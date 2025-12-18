@@ -1,0 +1,18 @@
+{
+  "name": "idc-backend",
+  "version": "1.0.0",
+  "description": "IDC设备管理系统后端",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "sequelize": "^6.32.1",
+    "sqlite3": "^5.1.6",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
