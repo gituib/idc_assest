@@ -28,9 +28,7 @@ function DeviceManagement() {
     showSizeChanger: true,
     showTotal: (total) => `共 ${total} 条记录`
   });
-  // 自定义字段状态
-  const [customFieldName, setCustomFieldName] = useState('');
-  const [customFieldValue, setCustomFieldValue] = useState('');
+  
   // 设备字段配置
   const [deviceFields, setDeviceFields] = useState([]);
   const [loadingFields, setLoadingFields] = useState(true);
@@ -41,6 +39,10 @@ function DeviceManagement() {
   const [importResult, setImportResult] = useState(null);
   const [selectedDevices, setSelectedDevices] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
+  // 自定义字段状态
+  const [customFieldName, setCustomFieldName] = useState('');
+  const [customFieldValue, setCustomFieldValue] = useState('');
+
   // 字段配置模态框
   const [fieldConfigModalVisible, setFieldConfigModalVisible] = useState(false);
 
@@ -149,14 +151,47 @@ function DeviceManagement() {
       const deviceData = { ...device };
       if (deviceData.purchaseDate) deviceData.purchaseDate = dayjs(deviceData.purchaseDate);
       if (deviceData.warrantyExpiry) deviceData.warrantyExpiry = dayjs(deviceData.warrantyExpiry);
-      if (!deviceData.customFields) deviceData.customFields = {};
       
-      // 将customFields中的字段值合并到deviceData中，以便动态表单控件能正确显示
-      Object.entries(deviceData.customFields).forEach(([fieldName, value]) => {
-        deviceData[fieldName] = value;
+      // 定义设备模型的固定字段
+      const fixedFields = [
+        'deviceId', 'name', 'type', 'model', 'serialNumber', 'rackId',
+        'position', 'height', 'powerConsumption', 'status', 'purchaseDate',
+        'warrantyExpiry', 'ipAddress', 'description'
+      ];
+      
+      // 定义需要排除的系统字段
+      const systemFields = ['createdAt', 'updatedAt', 'Rack', 'Room', 'customFields'];
+      
+      // 创建一个干净的设备数据对象
+      const cleanDeviceData = {};
+      
+      // 复制固定字段
+      fixedFields.forEach(field => {
+        if (deviceData[field] !== undefined) {
+          cleanDeviceData[field] = deviceData[field];
+        }
       });
       
-      form.setFieldsValue(deviceData);
+      // 将自定义字段直接添加到表单数据中（不在customFields对象内）
+      Object.entries(deviceData).forEach(([key, value]) => {
+        // 排除固定字段、系统字段和非基本类型的值
+        if (!fixedFields.includes(key) && 
+            !systemFields.includes(key) && 
+            key !== 'deviceId' &&
+            typeof value !== 'object' &&
+            value !== null) {
+          cleanDeviceData[key] = value;
+        }
+      });
+      
+      // 如果有原始customFields对象，将其字段也添加到表单数据中
+      if (deviceData.customFields && typeof deviceData.customFields === 'object') {
+        Object.entries(deviceData.customFields).forEach(([key, value]) => {
+          cleanDeviceData[key] = value;
+        });
+      }
+      
+      form.setFieldsValue(cleanDeviceData);
     } else {
       form.resetFields();
     }
@@ -179,31 +214,22 @@ function DeviceManagement() {
         'warrantyExpiry', 'ipAddress', 'description'
       ];
       
-      // 分离固定字段和动态字段
-      const fixedFieldValues = {};
-      const dynamicFieldValues = {};
+      // 构建最终的设备数据，包含固定字段和自定义字段
+      const deviceData = {
+        ...values,
+        purchaseDate: values.purchaseDate ? values.purchaseDate.format('YYYY-MM-DD') : null,
+        warrantyExpiry: values.warrantyExpiry ? values.warrantyExpiry.format('YYYY-MM-DD') : null,
+        customFields: {} // 用于存储自定义字段
+      };
       
-      Object.entries(values).forEach(([key, value]) => {
-        if (fixedFields.includes(key)) {
-          fixedFieldValues[key] = value;
-        } else if (key !== 'customFields') {
-          dynamicFieldValues[key] = value;
+      // 分离固定字段和自定义字段
+      Object.keys(deviceData).forEach(key => {
+        if (!fixedFields.includes(key) && key !== 'customFields') {
+          // 将非固定字段移动到customFields对象中
+          deviceData.customFields[key] = deviceData[key];
+          delete deviceData[key];
         }
       });
-      
-      // 合并原有的自定义字段和新的动态字段
-      const allCustomFields = {
-        ...(values.customFields || {}),
-        ...dynamicFieldValues
-      };
-      
-      // 构建最终的设备数据
-      const deviceData = {
-        ...fixedFieldValues,
-        purchaseDate: fixedFieldValues.purchaseDate ? fixedFieldValues.purchaseDate.format('YYYY-MM-DD') : null,
-        warrantyExpiry: fixedFieldValues.warrantyExpiry ? fixedFieldValues.warrantyExpiry.format('YYYY-MM-DD') : null,
-        customFields: allCustomFields
-      };
 
       if (editingDevice) {
         // 更新设备
@@ -397,7 +423,14 @@ function DeviceManagement() {
       setImportProgress(100);
       setImportResult(response.data);
       setIsImporting(false);
-      message.success('导入完成');
+      
+      // 根据导入结果显示不同的消息
+      const { success, failed } = response.data.statistics;
+      if (failed > 0) {
+        message.warning(`导入完成，但有 ${failed} 条记录导入失败`);
+      } else {
+        message.success('所有记录导入成功');
+      }
       
       // 重新加载设备列表
       setTimeout(() => {
@@ -461,7 +494,18 @@ function DeviceManagement() {
           title: field.displayName,
           dataIndex: field.fieldName,
           key: field.fieldName,
-          render: (type) => typeMap[type],
+          render: (type) => {
+            if (Array.isArray(type)) {
+              return (
+                <Space>
+                  {type.map(t => (
+                    <span key={t}>{typeMap[t]}</span>
+                  ))}
+                </Space>
+              );
+            }
+            return typeMap[type];
+          },
         });
       }
       // 特殊处理状态字段
@@ -470,11 +514,24 @@ function DeviceManagement() {
           title: field.displayName,
           dataIndex: field.fieldName,
           key: field.fieldName,
-          render: (status) => (
-            <span style={{ color: statusMap[status]?.color || 'black' }}>
-              {statusMap[status]?.text || status}
-            </span>
-          ),
+          render: (status) => {
+            if (Array.isArray(status)) {
+              return (
+                <Space>
+                  {status.map(s => (
+                    <span key={s} style={{ color: statusMap[s]?.color || 'black' }}>
+                      {statusMap[s]?.text || s}
+                    </span>
+                  ))}
+                </Space>
+              );
+            }
+            return (
+              <span style={{ color: statusMap[status]?.color || 'black' }}>
+                {statusMap[status]?.text || status}
+              </span>
+            );
+          },
         });
       }
       // 特殊处理日期字段
@@ -483,7 +540,27 @@ function DeviceManagement() {
           title: field.displayName,
           dataIndex: field.fieldName,
           key: field.fieldName,
-          render: (date) => date ? new Date(date).toLocaleDateString('zh-CN') : '',
+          render: (date) => {
+            if (!date) return '';
+            
+            const dateObj = new Date(date);
+            const formattedDate = dateObj.toLocaleDateString('zh-CN');
+            
+            // 检查是否是保修到期字段
+            if (field.fieldName === 'warrantyExpiry') {
+              const today = new Date();
+              // 设置时间为同一天的00:00:00，确保只比较日期部分
+              today.setHours(0, 0, 0, 0);
+              dateObj.setHours(0, 0, 0, 0);
+              
+              // 如果保修日期已过期，显示为红色
+              if (dateObj < today) {
+                return <span style={{ color: '#d93025', fontWeight: 'bold' }}>{formattedDate}</span>;
+              }
+            }
+            
+            return formattedDate;
+          },
         });
       }
       // 普通字段
@@ -552,6 +629,22 @@ function DeviceManagement() {
           <Button icon={<DownloadOutlined />} onClick={handleExport}>导出设备</Button>
           <Button icon={<UploadOutlined />} onClick={() => setImportModalVisible(true)}>导入设备</Button>
           <Button icon={<SettingOutlined />} onClick={() => setFieldConfigModalVisible(true)}>字段配置</Button>
+          <Button 
+            type="primary" 
+            danger={false} 
+            disabled={selectedDevices.length === 0} 
+            onClick={handleBatchOffline}
+          >
+            一键下线 ({selectedDevices.length})
+          </Button>
+          <Button 
+            type="primary" 
+            danger 
+            disabled={selectedDevices.length === 0} 
+            onClick={handleBatchDelete}
+          >
+            一键删除 ({selectedDevices.length})
+          </Button>
         </Space>
       }>
 
@@ -681,7 +774,7 @@ function DeviceManagement() {
                 control = <Input.TextArea placeholder={`请输入${field.displayName}`} rows={3} />;
                 break;
               case 'select':
-                // 特殊处理机柜选择
+                // 特殊处理机柜选择（仍然使用单选）
                 if (field.fieldName === 'rackId') {
                   control = (
                     <Select placeholder={`请选择${field.displayName}`}>
@@ -693,14 +786,17 @@ function DeviceManagement() {
                     </Select>
                   );
                 } else {
+                  // 其他select类型字段改为使用复选框组支持多选
                   control = (
-                    <Select placeholder={`请选择${field.displayName}`}>
-                      {field.options && field.options.map(option => (
-                        <Option key={option.value} value={option.value}>
-                          {option.label}
-                        </Option>
-                      ))}
-                    </Select>
+                    <Checkbox.Group placeholder={`请选择${field.displayName}`}>
+                      <Space direction="vertical">
+                        {field.options && field.options.map(option => (
+                          <Checkbox key={option.value} value={option.value}>
+                            {option.label}
+                          </Checkbox>
+                        ))}
+                      </Space>
+                    </Checkbox.Group>
                   );
                 }
                 break;
@@ -720,63 +816,7 @@ function DeviceManagement() {
             );
           })}
 
-          {/* 自定义字段区域 */}
-          <Form.Item label="自定义字段">
-            <div>
-              {/* 添加自定义字段 */}
-              <Space style={{ marginBottom: 16 }}>
-                <Input 
-                  placeholder="字段名称" 
-                  value={customFieldName}
-                  onChange={(e) => setCustomFieldName(e.target.value)}
-                  style={{ width: 150 }}
-                />
-                <Input 
-                  placeholder="字段值" 
-                  value={customFieldValue}
-                  onChange={(e) => setCustomFieldValue(e.target.value)}
-                  style={{ width: 150 }}
-                />
-                <Button 
-                  type="primary"
-                  onClick={() => {
-                    if (customFieldName && customFieldValue) {
-                      const currentCustomFields = form.getFieldValue('customFields') || {};
-                      form.setFieldValue('customFields', {
-                        ...currentCustomFields,
-                        [customFieldName]: customFieldValue
-                      });
-                      setCustomFieldName('');
-                      setCustomFieldValue('');
-                    }
-                  }}
-                >
-                  添加字段
-                </Button>
-              </Space>
-              
-              {/* 显示自定义字段 */}
-              <div>
-                {Object.entries(form.getFieldValue('customFields') || {}).map(([key, value]) => (
-                  <div key={key} style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
-                    <span style={{ marginRight: 8, fontWeight: 'bold' }}>{key}:</span>
-                    <span style={{ marginRight: 16 }}>{value}</span>
-                    <Button 
-                      danger 
-                      size="small"
-                      onClick={() => {
-                        const currentCustomFields = { ...form.getFieldValue('customFields') };
-                        delete currentCustomFields[key];
-                        form.setFieldValue('customFields', currentCustomFields);
-                      }}
-                    >
-                      删除
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Form.Item>
+
 
           <Form.Item style={{ textAlign: 'right' }}>
             <Space>
@@ -847,7 +887,7 @@ function DeviceManagement() {
         width={600}
         destroyOnClose
       >
-        {!isImporting ? (
+        {!isImporting && !importResult ? (
           <div>
             <p>请上传CSV格式的设备数据文件</p>
             <p style={{ color: '#999', fontSize: '12px', marginBottom: 20 }}>支持的编码格式：GBK</p>
@@ -888,24 +928,50 @@ function DeviceManagement() {
           <div>
             <p>正在导入数据...</p>
             <Progress percent={importProgress} status="active" style={{ marginBottom: 20 }} />
-            {importResult && (
+            {importResult && importResult.statistics && (
               <div>
                 <p style={{ marginBottom: 10 }}>导入完成：</p>
-                <p>总记录数：{importResult.statistics.total}</p>
-                <p>成功：{importResult.statistics.success}</p>
-                <p>失败：{importResult.statistics.failed}</p>
-                {importResult.statistics.errors.length > 0 && (
-                  <div style={{ marginTop: 20, maxHeight: 300, overflowY: 'auto' }}>
-                    <h4>失败记录：</h4>
-                    <ul>
-                      {importResult.statistics.errors.map((item, index) => (
-                        <li key={index} style={{ color: 'red', fontSize: '12px', marginBottom: 5 }}>
-                          行{item.row}：{item.error}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                <p>总记录数：{importResult.statistics.total || 0}</p>
+                <p>成功：{importResult.statistics.success || 0}</p>
+                <p>失败：{importResult.statistics.failed || 0}</p>
+                {/* 显示导入失败记录详情表格 */}
+                {(() => {
+                  // 检查是否有错误记录
+                  const errors = importResult.statistics?.errors;
+                  const hasErrors = Array.isArray(errors) && errors.length > 0;
+                  
+                  // 即使没有errors字段，如果failed数量大于0，也应该提示用户
+                  const hasFailedRecords = importResult.statistics?.failed > 0;
+                  
+                  return (hasErrors || hasFailedRecords) && (
+                    <div style={{ marginTop: 20, maxHeight: 400, overflowY: 'auto', border: '1px solid #ffcccc', borderRadius: '4px', padding: '12px', backgroundColor: '#fff7f7' }}>
+                      <h4 style={{ color: '#d93025', marginBottom: '12px' }}>失败记录详情：</h4>
+                      
+                      {hasErrors ? (
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                          <thead>
+                            <tr style={{ backgroundColor: '#ffeeee' }}>
+                              <th style={{ border: '1px solid #ffcccc', padding: '8px', textAlign: 'left', width: '80px' }}>行号</th>
+                              <th style={{ border: '1px solid #ffcccc', padding: '8px', textAlign: 'left' }}>失败原因</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {errors.map((item, index) => (
+                              <tr key={index} style={{ borderBottom: '1px solid #ffcccc' }}>
+                                <td style={{ border: '1px solid #ffcccc', padding: '8px', fontWeight: 'bold' }}>{item.row || index + 1}</td>
+                                <td style={{ border: '1px solid #ffcccc', padding: '8px', color: '#d93025' }}>{item.error || '未知错误'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <div style={{ color: '#d93025', padding: '20px', textAlign: 'center' }}>
+                          检测到 {importResult.statistics.failed} 条导入失败记录，但未提供详细错误信息
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 <Button type="primary" onClick={() => {
                   setImportModalVisible(false);
                   setImportProgress(0);

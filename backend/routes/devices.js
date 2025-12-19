@@ -401,47 +401,86 @@ router.post('/import', async (req, res) => {
       });
       
       try {
-        // 验证必填字段
-        if (!fieldValueMap['设备ID'] || !fieldValueMap['设备名称'] || !fieldValueMap['设备类型'] || !fieldValueMap['型号'] || !fieldValueMap['序列号'] || !fieldValueMap['所在机柜ID'] || !fieldValueMap['位置(U)'] || !fieldValueMap['高度(U)'] || !fieldValueMap['功率(W)'] || !fieldValueMap['状态'] || !fieldValueMap['购买日期'] || !fieldValueMap['保修到期']) {
-          throw new Error('缺少必填字段');
-        }
-        
-        // 验证设备ID是否已存在
-        const existingDevice = await Device.findByPk(fieldValueMap['设备ID']);
-        if (existingDevice) {
-          throw new Error('设备ID已存在');
-        }
-        
-        // 验证机柜是否存在，如果不存在则自动创建
-        if (!rackIds.includes(fieldValueMap['所在机柜ID'])) {
-          // 自动创建机柜
-          const newRack = await Rack.create({
-            rackId: fieldValueMap['所在机柜ID'],
-            name: fieldValueMap['所在机柜ID'], // 使用机柜ID作为默认名称
-            height: 42, // 默认42U高度
-            maxPower: 10000, // 默认最大功耗10000W
-            currentPower: 0,
-            status: 'active',
-            roomId: defaultRoomId
-          });
+          // 验证必填字段
+          const requiredFields = {
+            '设备ID': fieldValueMap['设备ID'],
+            '设备名称': fieldValueMap['设备名称'],
+            '设备类型': fieldValueMap['设备类型'],
+            '型号': fieldValueMap['型号'],
+            '序列号': fieldValueMap['序列号'],
+            '所在机柜ID': fieldValueMap['所在机柜ID'],
+            '位置(U)': fieldValueMap['位置(U)'],
+            '高度(U)': fieldValueMap['高度(U)'],
+            '功率(W)': fieldValueMap['功率(W)'],
+            '状态': fieldValueMap['状态'],
+            '购买日期': fieldValueMap['购买日期'],
+            '保修到期': fieldValueMap['保修到期']
+          };
           
-          // 更新机柜列表和ID列表
-          racks.push(newRack);
-          rackIds.push(newRack.rackId);
-        }
-        
-        // 验证状态值
-        const validStatus = ['running', 'maintenance', 'offline', 'fault'];
-        if (!validStatus.includes(fieldValueMap['状态'])) {
-          throw new Error('状态值无效，有效值为：running, maintenance, offline, fault');
-        }
-        
-        // 验证日期格式并解析日期
-        const purchaseDate = new Date(fieldValueMap['购买日期']);
-        const warrantyExpiry = new Date(fieldValueMap['保修到期']);
-        if (isNaN(purchaseDate.getTime()) || isNaN(warrantyExpiry.getTime())) {
-          throw new Error('日期格式无效，请使用有效的日期格式');
-        }
+          const missingFields = Object.keys(requiredFields).filter(fieldName => !requiredFields[fieldName]);
+          if (missingFields.length > 0) {
+            throw new Error(`缺少必填字段：${missingFields.join('、')}`);
+          }
+          
+          // 验证序列号是否已存在
+          const existingDevice = await Device.findOne({
+            where: { serialNumber: fieldValueMap['序列号'] }
+          });
+          if (existingDevice) {
+            throw new Error(`序列号已存在：${fieldValueMap['序列号']}`);
+          }
+          
+          // 验证机柜是否存在，如果不存在则自动创建
+          if (!rackIds.includes(fieldValueMap['所在机柜ID'])) {
+            // 自动创建机柜
+            const newRack = await Rack.create({
+              rackId: fieldValueMap['所在机柜ID'],
+              name: fieldValueMap['所在机柜ID'], // 使用机柜ID作为默认名称
+              height: 42, // 默认42U高度
+              maxPower: 10000, // 默认最大功耗10000W
+              currentPower: 0,
+              status: 'active',
+              roomId: defaultRoomId
+            });
+            
+            // 更新机柜列表和ID列表
+            racks.push(newRack);
+            rackIds.push(newRack.rackId);
+          }
+          
+          // 验证状态值
+          const validStatus = ['running', 'maintenance', 'offline', 'fault'];
+          if (!validStatus.includes(fieldValueMap['状态'])) {
+            throw new Error(`状态值无效，有效值为：${validStatus.join('、')}，当前值：${fieldValueMap['状态']}`);
+          }
+          
+          // 验证数字字段
+          const numericFields = {
+            '位置(U)': fieldValueMap['位置(U)'],
+            '高度(U)': fieldValueMap['高度(U)'],
+            '功率(W)': fieldValueMap['功率(W)']
+          };
+          
+          for (const [fieldName, value] of Object.entries(numericFields)) {
+            if (isNaN(Number(value))) {
+              throw new Error(`${fieldName}必须是数字，当前值：${value}`);
+            }
+          }
+          
+          // 验证日期格式并解析日期
+          const purchaseDate = new Date(fieldValueMap['购买日期']);
+          const warrantyExpiry = new Date(fieldValueMap['保修到期']);
+          if (isNaN(purchaseDate.getTime())) {
+            throw new Error(`购买日期格式无效：${fieldValueMap['购买日期']}，请使用YYYY-MM-DD格式`);
+          }
+          if (isNaN(warrantyExpiry.getTime())) {
+            throw new Error(`保修到期日期格式无效：${fieldValueMap['保修到期']}，请使用YYYY-MM-DD格式`);
+          }
+          
+          // 验证日期逻辑
+          if (warrantyExpiry <= purchaseDate) {
+            throw new Error(`保修到期日期必须晚于购买日期：购买日期${fieldValueMap['购买日期']}，保修到期${fieldValueMap['保修到期']}`);
+          }
         
         // 构建设备数据
         const deviceData = {
