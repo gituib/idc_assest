@@ -38,12 +38,17 @@ const deviceRoutes = require('./routes/devices');
 const rackRoutes = require('./routes/racks');
 const roomRoutes = require('./routes/rooms');
 const deviceFieldRoutes = require('./routes/deviceFields');
+const backgroundRoutes = require('./routes/background');
 
 // 使用路由
 app.use('/api/devices', deviceRoutes);
 app.use('/api/racks', rackRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/deviceFields', deviceFieldRoutes);
+app.use('/api/background', backgroundRoutes);
+
+// 静态文件服务
+app.use('/uploads', express.static('uploads'));
 
 // 健康检查
 app.get('/health', (req, res) => {

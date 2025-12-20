@@ -145,6 +145,7 @@ function RackVisualization() {
   const [backgroundImage, setBackgroundImage] = useState(null);
   const [backgroundType, setBackgroundType] = useState('gradient'); // gradient or image
   const [backgroundSize, setBackgroundSize] = useState('contain'); // cover, contain, auto
+  const [uploading, setUploading] = useState(false); // 上传状态
 
   // 获取所有机柜
   const fetchRacks = async () => {
@@ -333,6 +334,7 @@ function RackVisualization() {
 
   useEffect(() => {
     fetchRacks();
+    loadBackgroundSettings();
   }, []);
 
   // 根据设备类型获取图标
@@ -617,6 +619,33 @@ function RackVisualization() {
       message.success('数据已刷新');
     });
   };
+  
+  // 保存背景设置到服务器
+  const saveBackgroundSettings = async (type, image, size) => {
+    try {
+      await axios.post('/api/background/settings', {
+        type,
+        image,
+        size
+      });
+    } catch (error) {
+      console.error('保存背景设置失败:', error);
+    }
+  };
+  
+  // 从服务器加载背景设置
+  const loadBackgroundSettings = async () => {
+    try {
+      const response = await axios.get('/api/background/settings');
+      if (response.data) {
+        setBackgroundType(response.data.type || 'gradient');
+        setBackgroundImage(response.data.image || null);
+        setBackgroundSize(response.data.size || 'contain');
+      }
+    } catch (error) {
+      console.error('加载背景设置失败:', error);
+    }
+  };
 
   // 重置视角
   const handleResetView = () => {
@@ -689,45 +718,78 @@ function RackVisualization() {
             <Button icon={<ZoomOutOutlined />} onClick={handleZoomOut}>缩小</Button>
             <Button icon={<RotateRightOutlined />} onClick={handleResetView}>重置视角</Button>
             <Select
-              placeholder="选择背景类型"
-              style={{ width: 150 }}
-              value={backgroundType}
-              onChange={setBackgroundType}
-            >
-              <Option value="gradient">渐变背景</Option>
-              <Option value="image">自定义图片</Option>
-            </Select>
-            {backgroundType === 'image' && (
-              <Space>
-                <input
-                  type="text"
-                  placeholder="输入图片URL"
-                  style={{ width: 200, padding: '4px 8px', borderRadius: '4px', border: '1px solid #d9d9d9' }}
-                  onChange={(e) => setBackgroundImage(e.target.value)}
-                  value={backgroundImage || ''}
-                />
+                  placeholder="选择背景类型"
+                  style={{ width: 150 }}
+                  value={backgroundType}
+                  onChange={async (type) => {
+                    setBackgroundType(type);
+                    await saveBackgroundSettings(type, backgroundImage, backgroundSize);
+                  }}
+                >
+                  <Option value="gradient">渐变背景</Option>
+                  <Option value="image">自定义图片</Option>
+                </Select>
+                {backgroundType === 'image' && (
+                  <Space>
+                    <input
+                      type="text"
+                      placeholder="输入图片URL"
+                      style={{ width: 200, padding: '4px 8px', borderRadius: '4px', border: '1px solid #d9d9d9' }}
+                      onChange={async (e) => {
+                        const image = e.target.value;
+                        setBackgroundImage(image);
+                        await saveBackgroundSettings(backgroundType, image, backgroundSize);
+                      }}
+                      value={backgroundImage || ''}
+                    />
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files[0];
                     if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        setBackgroundImage(event.target.result);
-                      };
-                      reader.readAsDataURL(file);
+                      try {
+                        setUploading(true);
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        formData.append('type', 'background');
+                        
+                        // 发送图片到服务器
+                        const response = await axios.post('/api/background/upload', formData, {
+                          headers: {
+                            'Content-Type': 'multipart/form-data'
+                          }
+                        });
+                        
+                        // 保存服务器返回的图片路径
+                        if (response.data && response.data.path) {
+                          setBackgroundImage(response.data.path);
+                          message.success('背景图片上传成功');
+                          // 保存背景设置到服务器
+                          await saveBackgroundSettings('image', response.data.path, backgroundSize);
+                        } else {
+                          message.error('上传失败：服务器返回格式不正确');
+                        }
+                      } catch (error) {
+                        console.error('上传失败:', error);
+                        message.error('背景图片上传失败，请重试');
+                      } finally {
+                        setUploading(false);
+                      }
                     }
                   }}
                   style={{ display: 'none' }}
                   id="backgroundFileInput"
                 />
-                <Button onClick={() => document.getElementById('backgroundFileInput').click()}>上传图片</Button>
+                <Button onClick={() => document.getElementById('backgroundFileInput').click()} loading={uploading}>上传图片</Button>
                 <Select
                   placeholder="图片大小"
                   style={{ width: 100 }}
                   value={backgroundSize}
-                  onChange={setBackgroundSize}
+                  onChange={async (size) => {
+                    setBackgroundSize(size);
+                    await saveBackgroundSettings(backgroundType, backgroundImage, size);
+                  }}
                 >
                   <Option value="contain">自适应</Option>
                   <Option value="cover">覆盖</Option>
