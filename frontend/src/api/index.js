@@ -111,4 +111,29 @@ export const operationLogAPI = {
   clear: (data) => api.delete('/operation-logs', { data })
 };
 
+export const ticketAPI = {
+  list: (params) => api.get('/tickets', { params }),
+  get: (ticketId) => api.get(`/tickets/${ticketId}`),
+  create: (data) => api.post('/tickets', data),
+  update: (ticketId, data) => api.put(`/tickets/${ticketId}`, data),
+  delete: (ticketId) => api.delete(`/tickets/${ticketId}`),
+  assign: (ticketId, data) => api.put(`/tickets/${ticketId}/assign`, data),
+  transfer: (ticketId, data) => api.put(`/tickets/${ticketId}/transfer`, data),
+  process: (ticketId, data) => api.put(`/tickets/${ticketId}/process`, data),
+  close: (ticketId, data) => api.put(`/tickets/${ticketId}/close`, data),
+  reopen: (ticketId, data) => api.put(`/tickets/${ticketId}/reopen`, data),
+  getOperations: (ticketId) => api.get(`/tickets/${ticketId}/operations`),
+  getStatistics: (params) => api.get('/tickets/statistics', { params })
+};
+
+export const ticketCategoryAPI = {
+  list: (params) => api.get('/ticket-categories', { params }),
+  get: (code) => api.get(`/ticket-categories/${code}`),
+  create: (data) => api.post('/ticket-categories', data),
+  update: (code, data) => api.put(`/ticket-categories/${code}`, data),
+  delete: (code) => api.delete(`/ticket-categories/${code}`),
+  tree: () => api.get('/ticket-categories/tree'),
+  init: () => api.post('/ticket-categories/init')
+};
+
 export default api;

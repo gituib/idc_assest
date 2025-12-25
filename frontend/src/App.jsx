@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Layout, Menu, theme, Button, Dropdown, Avatar, message, Space, Divider } from 'antd';
-import { BarChartOutlined, DatabaseOutlined, CloudServerOutlined, MenuUnfoldOutlined, MenuFoldOutlined, EyeOutlined, BuildOutlined, HomeOutlined, ShoppingCartOutlined, InboxOutlined, ImportOutlined, FileTextOutlined, UserOutlined, LogoutOutlined, UserOutlined as UserIcon, HistoryOutlined, AuditOutlined } from '@ant-design/icons';
+import { BarChartOutlined, DatabaseOutlined, CloudServerOutlined, MenuUnfoldOutlined, MenuFoldOutlined, EyeOutlined, BuildOutlined, HomeOutlined, ShoppingCartOutlined, InboxOutlined, ImportOutlined, FileTextOutlined, UserOutlined, LogoutOutlined, UserOutlined as UserIcon, HistoryOutlined, AuditOutlined, ToolOutlined, ScheduleOutlined } from '@ant-design/icons';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Dashboard from './pages/Dashboard';
@@ -17,6 +17,9 @@ import UserManagement from './pages/UserManagement';
 import LoginHistory from './pages/LoginHistory';
 import OperationLogs from './pages/OperationLogs';
 import Login from './pages/Login';
+import TicketManagement from './pages/TicketManagement';
+import TicketCategoryManagement from './pages/TicketCategoryManagement';
+import TicketStatistics from './pages/TicketStatistics';
 import { Spin } from 'antd';
 
 const { Header, Content, Sider } = Layout;
@@ -205,6 +208,28 @@ const AppLayout = ({ children }) => {
                 },
               ],
             },
+            {
+              key: 'ticket-management',
+              icon: <ToolOutlined />,
+              label: '工单管理',
+              children: [
+                {
+                  key: 'tickets',
+                  icon: <ScheduleOutlined />,
+                  label: <Link to="/tickets">工单列表</Link>,
+                },
+                {
+                  key: 'ticket-categories',
+                  icon: <InboxOutlined />,
+                  label: <Link to="/ticket-categories">故障分类</Link>,
+                },
+                {
+                  key: 'ticket-statistics',
+                  icon: <BarChartOutlined />,
+                  label: <Link to="/ticket-statistics">统计报表</Link>,
+                },
+              ],
+            },
           ]}
         />
       </Sider>
@@ -387,6 +412,36 @@ function App() {
             <PrivateRoute>
               <AppLayout>
                 <OperationLogs />
+              </AppLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/tickets"
+          element={
+            <PrivateRoute>
+              <AppLayout>
+                <TicketManagement />
+              </AppLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/ticket-categories"
+          element={
+            <PrivateRoute>
+              <AppLayout>
+                <TicketCategoryManagement />
+              </AppLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/ticket-statistics"
+          element={
+            <PrivateRoute>
+              <AppLayout>
+                <TicketStatistics />
               </AppLayout>
             </PrivateRoute>
           }
