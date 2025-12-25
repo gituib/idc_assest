@@ -123,7 +123,7 @@ function TicketStatistics() {
       width: 120,
       render: (pct) => (
         <span style={{ color: pct > 30 ? '#ff4d4f' : '#52c41a' }}>
-          {pct.toFixed(1)}%
+          {pct !== undefined && pct !== null ? `${pct.toFixed(1)}%` : '-'}
         </span>
       )
     }
@@ -148,7 +148,7 @@ function TicketStatistics() {
       dataIndex: 'percentage',
       key: 'percentage',
       width: 100,
-      render: (pct) => `${pct.toFixed(1)}%`
+      render: (pct) => `${pct !== undefined && pct !== null ? pct.toFixed(1) : 0}%`
     },
     {
       title: '已完成',
@@ -404,7 +404,7 @@ function TicketStatistics() {
                   dataIndex: 'date',
                   key: 'date',
                   width: 120,
-                  render: (text) => dayjs(text).format('YYYY-MM-DD')
+                  render: (text) => text ? dayjs(text).format('YYYY-MM-DD') : '-'
                 },
                 {
                   title: '新建工单',
