@@ -74,6 +74,7 @@ function TicketManagement() {
   });
 
   const [searchFilters, setSearchFilters] = useState({});
+  const [deviceSource, setDeviceSource] = useState('select');
 
   const fetchTickets = useCallback(async (page = 1, pageSize = 10, filters = {}) => {
     try {
@@ -148,9 +149,18 @@ function TicketManagement() {
       if (ticketData.completionDate) {
         ticketData.completionDate = dayjs(ticketData.completionDate);
       }
+      if (ticket.deviceId) {
+        setDeviceSource('select');
+        ticketData.deviceId = ticket.deviceId;
+      } else {
+        setDeviceSource('manual');
+        ticketData.deviceName = ticket.deviceName;
+        ticketData.serialNumber = ticket.serialNumber;
+      }
       form.setFieldsValue(ticketData);
     } else {
       form.resetFields();
+      setDeviceSource('select');
     }
     setModalVisible(true);
   }, []);
@@ -168,6 +178,12 @@ function TicketManagement() {
         completionDate: values.completionDate ? values.completionDate.format('YYYY-MM-DD HH:mm:ss') : null
       };
 
+      if (deviceSource === 'manual') {
+        ticketData.deviceId = null;
+        ticketData.deviceName = values.deviceName;
+        ticketData.serialNumber = values.serialNumber;
+      }
+
       if (editingTicket) {
         await axios.put(`/api/tickets/${editingTicket.ticketId}`, ticketData);
         message.success('工单更新成功');
@@ -182,11 +198,12 @@ function TicketManagement() {
       setModalVisible(false);
       fetchTickets();
       setEditingTicket(null);
+      setDeviceSource('select');
     } catch (error) {
       message.error(editingTicket ? '工单更新失败' : '工单创建失败');
       console.error(error);
     }
-  }, [editingTicket, fetchTickets]);
+  }, [editingTicket, fetchTickets, deviceSource]);
 
   const handleDelete = useCallback(async (ticketId) => {
     Modal.confirm({
@@ -473,15 +490,33 @@ function TicketManagement() {
             <Input placeholder="请输入工单标题" />
           </Form.Item>
 
-          <Form.Item name="deviceId" label="关联设备" rules={[{ required: true }]}>
-            <Select placeholder="选择设备" showSearch optionFilterProp="children">
-              {devices.map(device => (
-                <Option key={device.deviceId} value={device.deviceId}>
-                  {device.name} - {device.serialNumber}
-                </Option>
-              ))}
+          <Form.Item label="设备来源">
+            <Select value={deviceSource} onChange={setDeviceSource} style={{ width: 200 }}>
+              <Option value="select">从设备列表选择</Option>
+              <Option value="manual">手动输入设备信息</Option>
             </Select>
           </Form.Item>
+
+          {deviceSource === 'select' ? (
+            <Form.Item name="deviceId" label="关联设备" rules={[{ required: true }]}>
+              <Select placeholder="选择设备" showSearch optionFilterProp="children">
+                {devices.map(device => (
+                  <Option key={device.deviceId} value={device.deviceId}>
+                    {device.name} - {device.serialNumber}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          ) : (
+            <>
+              <Form.Item name="deviceName" label="设备名称" rules={[{ required: true }]}>
+                <Input placeholder="请输入设备名称" />
+              </Form.Item>
+              <Form.Item name="serialNumber" label="设备序列号" rules={[{ required: true }]}>
+                <Input placeholder="请输入设备序列号" />
+              </Form.Item>
+            </>
+          )}
 
           <Form.Item name="faultCategory" label="故障分类" rules={[{ required: true }]}>
             <Select placeholder="选择故障分类">

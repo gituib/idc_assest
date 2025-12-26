@@ -269,6 +269,8 @@ router.post('/', async (req, res) => {
   try {
     const {
       deviceId,
+      deviceName,
+      serialNumber,
       faultCategory,
       faultSubCategory,
       priority,
@@ -279,23 +281,44 @@ router.post('/', async (req, res) => {
       tags
     } = req.body;
 
-    // 获取设备信息
-    const device = await Device.findByPk(deviceId, {
-      include: [{ model: require('../models/Rack') }]
-    });
-    if (!device) {
-      return res.status(404).json({ error: '设备不存在' });
+    let device = null;
+    let ticketDeviceName = '';
+    let ticketDeviceModel = '';
+    let ticketSerialNumber = '';
+    let ticketLocation = '';
+
+    // 判断是选择设备还是手动输入
+    if (deviceId) {
+      // 从设备列表选择
+      device = await Device.findByPk(deviceId, {
+        include: [{ model: require('../models/Rack') }]
+      });
+      if (!device) {
+        return res.status(404).json({ error: '设备不存在' });
+      }
+      ticketDeviceName = device.name;
+      ticketDeviceModel = device.model;
+      ticketSerialNumber = device.serialNumber;
+      ticketLocation = device.Rack ? `${device.Rack.name}` : '未知位置';
+    } else if (deviceName && serialNumber) {
+      // 手动输入设备信息
+      ticketDeviceName = deviceName;
+      ticketSerialNumber = serialNumber;
+      ticketDeviceModel = '';
+      ticketLocation = '未知位置';
+    } else {
+      return res.status(400).json({ error: '请选择设备或手动输入设备信息' });
     }
 
     const ticketId = `TKT${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
     const ticket = await Ticket.create({
       ticketId,
-      title: title || `${faultCategory} - ${device.name}`,
-      deviceId,
-      deviceName: device.name,
-      deviceModel: device.model,
-      serialNumber: device.serialNumber,
+      title: title || `${faultCategory} - ${ticketDeviceName}`,
+      deviceId: deviceId || null,
+      deviceName: ticketDeviceName,
+      deviceModel: ticketDeviceModel,
+      serialNumber: ticketSerialNumber,
       faultCategory,
       faultSubCategory,
       priority: priority || 'medium',
@@ -303,7 +326,7 @@ router.post('/', async (req, res) => {
       expectedCompletionDate: expectedCompletionDate ? new Date(expectedCompletionDate) : null,
       reporterId: req.body.reporterId || 'USER001',
       reporterName: req.body.reporterName || '系统用户',
-      location: device.Rack ? `${device.Rack.name}` : '未知位置',
+      location: ticketLocation,
       attachments: attachments || [],
       tags: tags || [],
       status: 'pending'
