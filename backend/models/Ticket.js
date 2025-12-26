@@ -70,6 +70,14 @@ const Ticket = sequelize.define('Ticket', {
     allowNull: false,
     comment: '报修人姓名'
   },
+  assigneeId: {
+    type: DataTypes.STRING,
+    comment: '处理人ID'
+  },
+  assigneeName: {
+    type: DataTypes.STRING,
+    comment: '处理人姓名'
+  },
   location: {
     type: DataTypes.STRING,
     comment: '设备位置'
@@ -114,11 +122,13 @@ const Ticket = sequelize.define('Ticket', {
     { fields: ['faultCategory'] },
     { fields: ['priority'] },
     { fields: ['reporterId'] },
+    { fields: ['assigneeId'] },
     { fields: ['createdAt'] }
   ]
 });
 
 Ticket.belongsTo(User, { foreignKey: 'reporterId', as: 'reporter', constraints: false });
+Ticket.belongsTo(User, { foreignKey: 'assigneeId', as: 'assignee', constraints: false });
 Ticket.belongsTo(Device, { foreignKey: 'deviceId', constraints: false });
 
 module.exports = Ticket;

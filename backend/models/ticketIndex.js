@@ -157,8 +157,6 @@ const initDefaultFaultCategories = async () => {
 };
 
 const initAssociations = () => {
-  Ticket.belongsTo(User, { foreignKey: 'assigneeId', as: 'assignee' });
-
   Ticket.hasMany(TicketOperationRecord, { foreignKey: 'ticketId', as: 'operationRecords' });
   TicketOperationRecord.belongsTo(Ticket, { foreignKey: 'ticketId' });
 };
