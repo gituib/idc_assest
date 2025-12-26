@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Table, Button, Modal, Form, Input, Select, DatePicker, message, Card, Space, InputNumber, Switch, Upload, Progress, Checkbox } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, UploadOutlined, DownloadOutlined, SettingOutlined, UndoOutlined, CloudServerOutlined, SwapOutlined, SafetyOutlined, DatabaseOutlined, AppstoreOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -6,6 +6,79 @@ import dayjs from 'dayjs';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
+
+// 工具函数提取到组件外部，避免每次渲染重复创建
+const getStatusConfig = (status) => {
+  const statusMap = {
+    running: { text: '运行中', color: 'green' },
+    maintenance: { text: '维护中', color: 'orange' },
+    offline: { text: '离线', color: 'gray' },
+    fault: { text: '故障', color: 'red' }
+  };
+  return statusMap[status] || { text: status, color: 'black' };
+};
+
+const getTypeLabel = (type) => {
+  const typeMap = {
+    server: '服务器',
+    switch: '交换机',
+    router: '路由器',
+    storage: '存储设备',
+    other: '其他设备'
+  };
+  return typeMap[type] || type;
+};
+
+const getDeviceTypeIcon = (type) => {
+  const iconMap = {
+    server: <CloudServerOutlined style={{ color: '#1890ff' }} />,
+    switch: <SwapOutlined style={{ color: '#52c41a' }} />,
+    router: <SafetyOutlined style={{ color: '#faad14' }} />,
+    storage: <DatabaseOutlined style={{ color: '#722ed1' }} />,
+    other: <AppstoreOutlined style={{ color: '#8c8c8c' }} />
+  };
+  return iconMap[type] || <AppstoreOutlined style={{ color: '#8c8c8c' }} />;
+};
+
+// 格式化日期
+const formatDate = (date, fieldName) => {
+  if (!date) return '';
+  
+  const dateObj = new Date(date);
+  const formattedDate = dateObj.toLocaleDateString('zh-CN');
+  
+  if (fieldName === 'warrantyExpiry') {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    dateObj.setHours(0, 0, 0, 0);
+    
+    if (dateObj < today) {
+      return <span style={{ color: '#d93025', fontWeight: 'bold' }}>{formattedDate}</span>;
+    }
+  }
+  
+  return formattedDate;
+};
+
+// 默认设备字段配置
+const defaultDeviceFields = [
+  { fieldName: 'deviceId', displayName: '设备ID', fieldType: 'string', required: true, order: 1, visible: true },
+  { fieldName: 'name', displayName: '设备名称', fieldType: 'string', required: true, order: 2, visible: true },
+  { fieldName: 'type', displayName: '设备类型', fieldType: 'select', required: true, order: 3, visible: true, 
+    options: [{ value: 'server', label: '服务器' }, { value: 'switch', label: '交换机' }, { value: 'router', label: '路由器' }, { value: 'storage', label: '存储设备' }, { value: 'other', label: '其他设备' }] },
+  { fieldName: 'model', displayName: '型号', fieldType: 'string', required: true, order: 4, visible: true },
+  { fieldName: 'serialNumber', displayName: '序列号', fieldType: 'string', required: true, order: 5, visible: true },
+  { fieldName: 'rackId', displayName: '所在机柜', fieldType: 'select', required: true, order: 6, visible: true },
+  { fieldName: 'position', displayName: '位置(U)', fieldType: 'number', required: true, order: 7, visible: true },
+  { fieldName: 'height', displayName: '高度(U)', fieldType: 'number', required: true, order: 8, visible: true },
+  { fieldName: 'powerConsumption', displayName: '功率(W)', fieldType: 'number', required: true, order: 9, visible: true },
+  { fieldName: 'status', displayName: '状态', fieldType: 'select', required: true, order: 10, visible: true, 
+    options: [{ value: 'running', label: '运行中' }, { value: 'maintenance', label: '维护中' }, { value: 'offline', label: '离线' }, { value: 'fault', label: '故障' }] },
+  { fieldName: 'purchaseDate', displayName: '购买日期', fieldType: 'date', required: true, order: 11, visible: true },
+  { fieldName: 'warrantyExpiry', displayName: '保修到期', fieldType: 'date', required: true, order: 12, visible: true },
+  { fieldName: 'ipAddress', displayName: 'IP地址', fieldType: 'string', required: false, order: 13, visible: true },
+  { fieldName: 'description', displayName: '描述', fieldType: 'textarea', required: false, order: 14, visible: true }
+];
 
 // 可调整列宽的表头组件
 const ResizeableTitle = (props) => {
@@ -18,13 +91,12 @@ const ResizeableTitle = (props) => {
   const handleMouseDown = (e) => {
     if (!onResize) return;
     
-   
     const startX = e.pageX;
     const startWidth = width;
     
     const handleMouseMove = (moveEvent) => {
       const diff = moveEvent.pageX - startX;
-      const newWidth = Math.max(50, startWidth + diff); // 最小宽度50px
+      const newWidth = Math.max(50, startWidth + diff);
       onResize(newWidth);
     };
     
@@ -855,7 +927,8 @@ function DeviceManagement() {
           loading={loading}
           pagination={pagination}
           onChange={handleTableChange}
-          scroll={{ x: 'max-content' }}
+          scroll={{ y: 600, x: 'max-content' }}
+          virtual
           rowSelection={{
             selectedRowKeys: selectedDevices,
             onChange: setSelectedDevices,

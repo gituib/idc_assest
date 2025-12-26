@@ -840,6 +840,910 @@ SESSION_SECRET=random_session_secret_key_here
 
 ---
 
+##  更新升级流程
+
+### 手动更新步骤
+
+#### 1. 备份当前版本
+
+```bash
+# 创建备份目录
+mkdir -p /var/backups/idc_assest/$(date +%Y%m%d)
+cd /var/backups/idc_assest/$(date +%Y%m%d)
+
+# 备份数据库
+mysqldump -u idc_prod_user -p idc_management > database_backup.sql
+
+# 备份配置文件
+cp -r /var/www/idc_assest/backend/.env ./
+cp -r /var/www/idc_assest/frontend/.env ./
+
+# 备份上传文件
+cp -r /var/www/idc_assest/backend/uploads ./
+```
+
+#### 2. 下载最新代码
+
+```bash
+cd /var/www/idc_assest
+
+# 拉取最新代码
+git fetch origin
+git checkout main
+git pull origin main
+```
+
+#### 3. 更新依赖
+
+```bash
+# 更新后端依赖
+cd backend
+npm install
+cd ..
+
+# 更新前端依赖并构建
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+#### 4. 重启服务
+
+```bash
+# 重启后端
+pm2 restart idc-backend
+
+# 重启Nginx
+sudo systemctl restart nginx
+
+# 验证服务
+curl http://localhost:8000/health
+```
+
+### Docker环境更新
+
+```bash
+cd /var/www/idc_assest/docker
+
+# 拉取最新代码
+cd ..
+git pull origin main
+cd docker
+
+# 重新构建并启动
+docker-compose down
+docker-compose up -d --build
+
+# 验证服务
+curl http://localhost/health
+```
+
+### 回滚操作
+
+```bash
+# 查看历史版本
+cd /var/www/idc_assest
+git log --oneline -10
+
+# 回滚到指定版本
+git checkout <commit-hash>
+
+# 重新构建
+cd frontend && npm run build && cd ..
+cd backend && npm install && cd ..
+
+# 重启服务
+pm2 restart idc-backend
+```
+
+### 版本兼容性检查
+
+```bash
+# 检查Node.js版本
+node --version
+
+# 检查依赖版本
+cd backend && npm list | grep -E "(express|sequelize|mysql2)" && cd ..
+cd frontend && npm list | grep -E "(react|antd|vite)" && cd ..
+```
+
+---
+
+## 📊 系统架构说明
+
+### 整体架构图
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         用户访问层                                │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
+│  │   浏览器      │    │   移动端      │    │   API客户端   │      │
+│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘      │
+└─────────┼──────────────────┼──────────────────┼───────────────┘
+          │                  │                  │
+          └──────────────────┼──────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       Web服务层                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                     Nginx / Apache                       │    │
+│  │   • 静态资源服务    • 反向代理    • SSL终端    • 负载均衡  │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+          ┌───────────────┼───────────────┐
+          │               │               │
+          ▼               ▼               ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│   前端应用       │ │   后端API       │ │   静态资源       │
+│   (React)       │ │   (Express)     │ │   (Nginx)       │
+│   端口: 3000    │ │   端口: 8000    │ │   端口: 80/443  │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       数据存储层                                  │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │     MySQL       │  │    SQLite       │  │   文件存储       │  │
+│  │   端口: 3306    │  │   嵌入式        │  │   uploads/      │  │
+│  │                 │  │                 │  │                 │  │
+│  │  • 设备信息     │  │  • 开发环境     │  │  • 设备图片     │  │
+│  │  • 用户数据     │  │  • 快速部署     │  │  • 附件         │  │
+│  │  • 工单记录     │  │                 │  │  • 备份文件     │  │
+│  │  • 耗材库存     │  │                 │  │                 │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 技术栈版本
+
+| 层级 | 技术 | 版本要求 | 用途 |
+|------|------|----------|------|
+| 前端 | React | 18.2.0+ | UI框架 |
+| 前端 | Ant Design | 5.8.6+ | 组件库 |
+| 前端 | Vite | 4.4.9+ | 构建工具 |
+| 前端 | Three.js | 0.160.0+ | 3D可视化 |
+| 后端 | Node.js | 14.0.0+ | 运行时 |
+| 后端 | Express | 4.18.2+ | Web框架 |
+| 后端 | Sequelize | 6.32.1+ | ORM框架 |
+| 数据库 | MySQL | 8.0+ | 主数据库 |
+| 数据库 | SQLite | 5.1.6+ | 嵌入式数据库 |
+| 服务器 | Nginx | 1.18+ | 反向代理 |
+| 进程管理 | PM2 | 5.0+ | 进程管理 |
+
+### 数据流说明
+
+1. **用户请求流程**
+   - 用户通过浏览器访问系统
+   - 请求首先到达Nginx
+   - Nginx判断请求类型：
+     - 静态资源：直接返回
+     - API请求：转发到后端服务
+     - 前端路由：返回index.html
+
+2. **数据处理流程**
+   - 后端接收API请求
+   - 验证用户身份和权限
+   - 通过Sequelize操作数据库
+   - 返回JSON响应
+
+3. **实时通信**
+   - WebSocket用于实时告警推送
+   - HTTP轮询用于数据刷新
+
+---
+
+## 🔍 故障排查指南
+
+### 常见错误及解决方案
+
+#### 1. 后端服务无法启动
+
+**错误信息**：Error: listen EADDRINUSE: address already in use :::8000
+
+**原因分析**：端口8000已被其他进程占用
+
+**解决方案**：
+```bash
+# 查看占用端口的进程
+netstat -tulpn | grep :8000
+lsof -i :8000
+
+# 终止占用进程
+kill -9 <PID>
+
+# 或修改为其他端口
+PORT=8001 npm run dev
+```
+
+#### 2. 数据库连接失败
+
+**错误信息**：SequelizeConnectionError: Access denied for user
+
+**原因分析**：数据库用户名或密码错误
+
+**解决方案**：
+```bash
+# 检查.env配置
+cat backend/.env | grep -E "(MYSQL|USERNAME|PASSWORD)"
+
+# 测试数据库连接
+mysql -u idc_user -p -h localhost
+
+# 检查MySQL服务状态
+sudo systemctl status mysql
+sudo systemctl start mysql
+```
+
+#### 3. 前端构建失败
+
+**错误信息**：Error: Cannot find module 'node-sass'
+
+**原因分析**：依赖安装不完整
+
+**解决方案**：
+```bash
+# 清理并重新安装依赖
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+
+# 检查Node.js版本兼容性
+node --version
+```
+
+#### 4. Nginx 502 Bad Gateway
+
+**原因分析**：后端服务未运行或连接超时
+
+**解决方案**：
+```bash
+# 检查后端服务状态
+pm2 status
+
+# 查看后端日志
+pm2 logs idc-backend
+
+# 检查Nginx错误日志
+tail -f /var/log/nginx/idc_assest-error.log
+
+# 测试后端服务
+curl http://127.0.0.1:8000/health
+```
+
+#### 5. 文件上传失败
+
+**错误信息**：Error: ENOENT: no such file or directory
+
+**原因分析**：上传目录不存在或权限不足
+
+**解决方案**：
+```bash
+# 创建上传目录
+mkdir -p backend/uploads
+chmod 755 backend/uploads
+
+# 检查目录权限
+ls -la backend/ | grep uploads
+```
+
+#### 6. CORS跨域错误
+
+**错误信息**：Access to XMLHttpRequest at '...' from origin '...' has been blocked by CORS policy
+
+**原因分析**：CORS配置不正确
+
+**解决方案**：
+```javascript
+// 检查backend/server.js中的CORS配置
+const cors = require('cors');
+app.use(cors({
+  origin: 'http://your-domain.com',
+  credentials: true
+}));
+```
+
+### 诊断命令速查表
+
+```bash
+# 检查端口占用
+netstat -tulpn | grep -E "(80|443|8000|3306)"
+
+# 检查进程状态
+ps aux | grep -E "(node|nginx|mysql)"
+
+# 检查磁盘空间
+df -h
+
+# 检查内存使用
+free -m
+
+# 检查系统负载
+top -bn1 | head -5
+
+# 网络连通性测试
+curl -I http://localhost:8000/health
+curl -I http://localhost/api/devices
+
+# 查看系统日志
+tail -f /var/log/syslog
+journalctl -xe
+
+# Docker诊断（Docker部署）
+docker-compose ps
+docker-compose logs --tail=100
+docker stats
+```
+
+### 日志文件位置
+
+| 服务 | 日志位置 |
+|------|----------|
+| 后端（PM2） | `pm2 logs idc-backend` |
+| 后端（文件） | `/var/log/idc_assest/backend/` |
+| Nginx | `/var/log/nginx/idc_assest-access.log` |
+| Nginx | `/var/log/nginx/idc_assest-error.log` |
+| MySQL | `/var/log/mysql/error.log` |
+| Docker | `docker-compose logs` |
+
+---
+
+## ⚡ 性能优化
+
+### 后端性能优化
+
+#### 1. PM2集群模式
+
+```javascript
+// ecosystem.config.js
+module.exports = {
+  apps: [{
+    name: 'idc-backend',
+    script: 'server.js',
+    instances: 'max',              // 使用所有CPU核心
+    exec_mode: 'cluster',          // 集群模式
+    env: {
+      NODE_ENV: 'production',
+      PORT: 8000
+    },
+    max_memory_restart: '1G',      // 内存超过1G自动重启
+    node_args: '--max-old-space-size=1024',
+    listen_timeout: 3000,          // 监听超时
+    kill_timeout: 5000,            // 终止超时
+    max_restarts: 10,              // 最大重启次数
+    min_uptime: '10s'              // 最小运行时间
+  }]
+};
+```
+
+#### 2. 数据库连接池优化
+
+```javascript
+// backend/db.js
+const sequelize = new Sequelize({
+  dialect: 'mysql',
+  host: process.env.MYSQL_HOST,
+  port: process.env.MYSQL_PORT,
+  username: process.env.MYSQL_USERNAME,
+  password: process.env.MYSQL_PASSWORD,
+  database: process.env.MYSQL_DATABASE,
+  pool: {
+    max: 20,                       // 最大连接数
+    min: 5,                        // 最小连接数
+    acquire: 60000,                // 获取连接最大等待时间
+    idle: 10000                    // 连接空闲最大时间
+  },
+  logging: false,                  // 关闭SQL日志
+  dialectOptions: {
+    charset: 'utf8mb4'
+  }
+});
+```
+
+#### 3. 缓存策略
+
+```javascript
+// 使用内存缓存热点数据
+const cache = new Map();
+
+// 设备统计缓存（5分钟过期）
+function getDeviceStats() {
+  const cacheKey = 'device_stats';
+  const cached = cache.get(cacheKey);
+  
+  if (cached && Date.now() - cached.time < 5 * 60 * 1000) {
+    return cached.data;
+  }
+  
+  const stats = calculateDeviceStats();
+  cache.set(cacheKey, { data: stats, time: Date.now() });
+  return stats;
+}
+```
+
+### 数据库性能优化
+
+#### 1. 创建索引
+
+```sql
+-- 设备表索引
+CREATE INDEX idx_device_rack ON devices(rackId);
+CREATE INDEX idx_device_type ON devices(deviceType);
+CREATE INDEX idx_device_status ON devices(status);
+CREATE INDEX idx_device_created ON devices(createdAt);
+
+-- 工单表索引
+CREATE INDEX idx_ticket_status ON tickets(status);
+CREATE INDEX idx_ticket_priority ON tickets(priority);
+CREATE INDEX idx_ticket_device ON tickets(deviceId);
+CREATE INDEX idx_ticket_created ON tickets(createdAt);
+
+-- 耗材表索引
+CREATE INDEX idx_consumable_category ON consumables(category);
+CREATE INDEX idx_consumable_status ON consumables(status);
+```
+
+#### 2. MySQL配置优化
+
+```ini
+# /etc/mysql/mysql.conf.d/mysqld.cnf
+
+[mysqld]
+# 缓冲池大小（建议为物理内存的70%）
+innodb_buffer_pool_size = 2G
+
+# 日志文件大小
+innodb_log_file_size = 512M
+
+# 刷新策略
+innodb_flush_log_at_trx_commit = 2
+innodb_flush_method = O_DIRECT
+
+# 连接数
+max_connections = 200
+
+# 查询缓存（MySQL 8.0已移除）
+# query_cache_type = 0
+```
+
+### 前端性能优化
+
+#### 1. 构建优化
+
+```javascript
+// vite.config.js
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    // 开启压缩
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    },
+    // 代码分割
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'antd': ['antd', '@ant-design/icons'],
+          'charts': ['recharts'],
+          'three': ['three']
+        }
+      }
+    },
+    // 资源优化
+    assetsDir: 'assets',
+    chunkSizeWarningLimit: 1000
+  },
+  // 依赖预构建
+  optimizeDeps: {
+    include: ['antd', 'axios', 'react-router-dom']
+  }
+});
+```
+
+#### 2. 路由懒加载
+
+```javascript
+// App.jsx
+import { lazy, Suspense } from 'react';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const DeviceManagement = lazy(() => import('./pages/DeviceManagement'));
+
+// 使用
+<Suspense fallback={<Loading />}>
+  <Routes>
+    <Route path="/" element={<Dashboard />} />
+  </Routes>
+</Suspense>
+```
+
+### Nginx性能优化
+
+```nginx
+# /etc/nginx/nginx.conf
+
+worker_processes auto;
+worker_rlimit_nofile 65535;
+
+events {
+    worker_connections 2048;
+    use epoll;
+    multi_accept on;
+}
+
+http {
+    # 打开文件缓存
+    open_file_cache max=10000 inactive=20s;
+    open_file_cache_valid 30s;
+    open_file_cache_min_uses 2;
+    
+    # Gzip压缩
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+    
+    # 缓冲区优化
+    client_body_buffer_size 16K;
+    client_max_body_size 100M;
+    proxy_buffer_size 128K;
+    proxy_buffers 4 256K;
+    proxy_busy_buffers_size 256K;
+    
+    # 连接超时
+    keepalive_timeout 65;
+    keepalive_requests 100;
+    
+    # 上游服务器配置
+    upstream backend {
+        server 127.0.0.1:8000;
+        keepalive 32;
+    }
+}
+```
+
+---
+
+## 📝 日志管理
+
+### 日志配置
+
+```javascript
+// backend/logger.js
+const winston = require('winston');
+const path = require('path');
+
+const logDir = process.env.LOG_DIR || './logs';
+
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: winston.format.combine(
+    winston.format.timestamp({
+      format: 'YYYY-MM-DD HH:mm:ss'
+    }),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  defaultMeta: { service: 'idc-backend' },
+  transports: [
+    // 错误日志
+    new winston.transports.File({
+      filename: path.join(logDir, 'error.log'),
+      level: 'error',
+      maxsize: 10485760,    // 10MB
+      maxFiles: 10
+    }),
+    // 组合日志
+    new winston.transports.File({
+      filename: path.join(logDir, 'combined.log'),
+      maxsize: 10485760,
+      maxFiles: 10
+    }),
+    // 控制台输出
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    })
+  ]
+});
+
+module.exports = logger;
+```
+
+### 日志轮转配置
+
+#### 1. 使用logrotate（Linux）
+
+```bash
+# /etc/logrotate.d/idc_assest
+/var/log/idc_assest/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 0640 www-data www-data
+    sharedscripts
+    postrotate
+        pm2 restart idc-backend > /dev/null 2>&1 || true
+    endscript
+}
+```
+
+#### 2. 使用PM2日志轮转
+
+```bash
+# 安装pm2-logrotate
+pm2 install pm2-logrotate
+
+# 配置
+pm2 set pm2-logrotate:max_size 50M      # 单个文件最大50MB
+pm2 set pm2-logrotate:retain 30          # 保留30个文件
+pm2 set pm2-logrotate:compress true      # 压缩历史文件
+pm2 set pm2-logrotate:dateFormat YYYY-MM-DD_HH-mm-ss
+```
+
+### 日志分析示例
+
+```bash
+# 查看错误日志
+tail -f /var/log/idc_assest/error.log
+
+# 统计API响应时间
+grep -o '"duration":[0-9]*' /var/log/idc_assest/combined.log | \
+  awk -F: '{sum+=$2; count++} END {print "平均响应时间:", sum/count, "ms"}'
+
+# 统计用户登录情况
+grep "登录成功" /var/log/idc_assest/combined.log | \
+  awk '{print $4}' | sort | uniq -c | sort -rn
+
+# 查找异常请求
+grep -E "(ERROR|500|401)" /var/log/idc_assest/error.log
+```
+
+---
+
+## 💾 备份与灾难恢复
+
+### 备份策略
+
+| 备份类型 | 频率 | 保留时间 | 说明 |
+|----------|------|----------|------|
+| 全量备份 | 每周日凌晨3点 | 4周 | 完整数据库备份 |
+| 增量备份 | 每天凌晨2点 | 7天 | 每日变更数据 |
+| 实时备份 | 持续 | 永久 | 二进制日志 |
+| 配置备份 | 每次变更 | 12个月 | 配置文件和代码 |
+
+### 自动化备份脚本
+
+```bash
+#!/bin/bash
+# backup_full.sh - 完整备份脚本
+
+set -e
+
+# 配置
+BACKUP_DIR="/var/backups/idc_assest"
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="$BACKUP_DIR/full_backup_$DATE"
+KEEP_DAYS=30
+
+# 创建备份目录
+mkdir -p "$BACKUP_DIR"
+
+# 1. 备份数据库
+echo "正在备份数据库..."
+mysqldump -u idc_prod_user -p"$MYSQL_PASSWORD" \
+  --single-transaction \
+  --routines \
+  --triggers \
+  --events \
+  idc_management | gzip > "$BACKUP_FILE.sql.gz"
+
+# 2. 备份配置文件
+echo "正在备份配置文件..."
+tar czf "$BACKUP_DIR/config_$DATE.tar.gz" \
+  backend/.env \
+  nginx/conf.d/
+
+# 3. 备份上传文件
+echo "正在备份上传文件..."
+tar czf "$BACKUP_DIR/uploads_$DATE.tar.gz" \
+  backend/uploads/
+
+# 4. 备份代码（排除node_modules）
+echo "正在备份代码..."
+tar czf "$BACKUP_DIR/code_$DATE.tar.gz" \
+  --exclude=node_modules \
+  --exclude=dist \
+  --exclude=uploads \
+  .
+
+# 5. 清理旧备份
+echo "正在清理旧备份..."
+find "$BACKUP_DIR" -name "full_backup_*.sql.gz" -mtime +$KEEP_DAYS -delete
+find "$BACKUP_DIR" -name "*.tar.gz" -mtime +$KEEP_DAYS -delete
+
+# 6. 验证备份
+echo "正在验证备份..."
+if [ -f "$BACKUP_FILE.sql.gz" ]; then
+  gunzip -t "$BACKUP_FILE.sql.gz" && echo "数据库备份验证成功"
+fi
+
+# 7. 生成备份清单
+echo "备份完成，文件列表："
+ls -lh "$BACKUP_DIR"/*"$DATE"*
+
+# 8. 发送通知（可选）
+# curl -X POST "https://hooks.example.com/notify" -d "backup completed"
+
+echo "备份任务完成：$DATE"
+```
+
+### 定时任务配置
+
+```bash
+# crontab配置
+crontab -e
+
+# 每日增量备份（凌晨2点）
+0 2 * * * /var/www/idc_assest/scripts/backup_incremental.sh
+
+# 每周完整备份（周日凌晨3点）
+0 3 * * 0 /var/www/idc_assest/scripts/backup_full.sh
+
+# 每月清理旧备份（每月1日凌晨4点）
+0 4 1 * * /var/www/idc_assest/scripts/cleanup_old_backups.sh
+```
+
+### 灾难恢复流程
+
+#### 1. 数据恢复步骤
+
+```bash
+# 1. 停止服务
+pm2 stop idc-backend
+
+# 2. 恢复数据库
+gunzip -c /var/backups/idc_assest/full_backup_20240101_030000.sql.gz | \
+  mysql -u idc_prod_user -p idc_management
+
+# 3. 恢复配置文件
+tar xzf /var/backups/idc_assest/config_20240101.tar.gz -C /
+
+# 4. 恢复上传文件
+tar xzf /var/backups/idc_assest/uploads_20240101.tar.gz -C /
+
+# 5. 重启服务
+pm2 restart idc-backend
+
+# 6. 验证恢复
+curl http://localhost:8000/health
+```
+
+#### 2. 完整系统恢复
+
+```bash
+# 1. 创建新服务器
+# 2. 安装必要软件
+# 3. 从Git克隆代码
+# 4. 恢复配置文件
+# 5. 恢复数据库
+# 6. 恢复上传文件
+# 7. 重新安装依赖
+# 8. 重启服务
+```
+
+### 备份验证
+
+```bash
+#!/bin/bash
+# verify_backup.sh - 备份验证脚本
+
+BACKUP_FILE="$1"
+
+if [ -z "$BACKUP_FILE" ]; then
+  echo "用法: $0 <备份文件>"
+  exit 1
+fi
+
+echo "正在验证备份文件：$BACKUP_FILE"
+
+# 检查文件存在
+if [ ! -f "$BACKUP_FILE" ]; then
+  echo "错误：文件不存在"
+  exit 1
+fi
+
+# 检查文件大小（至少1KB）
+FILE_SIZE=$(stat -f%z "$BACKUP_FILE" 2>/dev/null || stat -c%s "$BACKUP_FILE")
+if [ "$FILE_SIZE" -lt 1024 ]; then
+  echo "警告：文件大小异常小"
+fi
+
+# 对于SQL备份，验证SQL语法
+if [[ "$BACKUP_FILE" == *.sql.gz ]]; then
+  echo "验证SQL语法..."
+  gunzip -c "$BACKUP_FILE" | head -100 | grep -q "INSERT INTO\|CREATE TABLE"
+  if [ $? -eq 0 ]; then
+    echo "✓ SQL语法验证通过"
+  else
+    echo "✗ SQL语法验证失败"
+    exit 1
+  fi
+fi
+
+# 对于压缩包，验证完整性
+if [[ "$BACKUP_FILE" == *.tar.gz ]]; then
+  echo "验证压缩包完整性..."
+  tar -tzf "$BACKUP_FILE" > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo "✓ 压缩包验证通过"
+  else
+    echo "✗ 压缩包验证失败"
+    exit 1
+  fi
+fi
+
+echo "备份验证完成"
+```
+
+---
+
+## 🔐 安全加固清单
+
+### 服务器安全
+
+- [ ] 配置防火墙规则（仅开放必要端口）
+- [ ] 启用SSH密钥认证，禁用密码登录
+- [ ] 安装配置fail2ban防止暴力破解
+- [ ] 定期更新系统安全补丁
+- [ ] 配置自动安全更新
+- [ ] 启用系统审计日志
+- [ ] 限制root用户登录
+
+### 数据库安全
+
+- [ ] 使用强密码策略
+- [ ] 创建专用数据库用户，禁用root远程登录
+- [ ] 定期备份数据库
+- [ ] 启用数据库审计日志
+- [ ] 限制数据库用户权限（最小权限原则）
+- [ ] 加密数据库连接（SSL/TLS）
+
+### 应用安全
+
+- [ ] 配置HTTPS强制跳转
+- [ ] 设置安全的Cookie属性（HttpOnly, Secure）
+- [ ] 启用CSRF防护
+- [ ] 实现请求速率限制
+- [ ] 配置安全的HTTP头
+- [ ] 敏感信息加密存储
+- [ ] 实现完善的权限控制
+
+### 监控与告警
+
+- [ ] 配置异常登录告警
+- [ ] 启用API访问日志
+- [ ] 监控服务状态和资源使用
+- [ ] 配置磁盘空间告警
+- [ ] 设置数据库连接数告警
+- [ ] 实现自动化健康检查
+
+---
+
 **🎉 部署完成后，您就可以开始使用IDC设备管理系统了！**
 
 ---

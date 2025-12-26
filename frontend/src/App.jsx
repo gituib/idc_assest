@@ -1,26 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { Layout, Menu, theme, Button, Dropdown, Avatar, message, Space, Divider } from 'antd';
-import { BarChartOutlined, DatabaseOutlined, CloudServerOutlined, MenuUnfoldOutlined, MenuFoldOutlined, EyeOutlined, BuildOutlined, HomeOutlined, ShoppingCartOutlined, InboxOutlined, ImportOutlined, FileTextOutlined, UserOutlined, LogoutOutlined, UserOutlined as UserIcon, HistoryOutlined, AuditOutlined, ToolOutlined, ScheduleOutlined } from '@ant-design/icons';
+import { BarChartOutlined, DatabaseOutlined, CloudServerOutlined, MenuUnfoldOutlined, MenuFoldOutlined, EyeOutlined, BuildOutlined, HomeOutlined, ShoppingCartOutlined, InboxOutlined, ImportOutlined, FileTextOutlined, UserOutlined, LogoutOutlined, HistoryOutlined, AuditOutlined, ToolOutlined, ScheduleOutlined } from '@ant-design/icons';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import Dashboard from './pages/Dashboard';
-import DeviceManagement from './pages/DeviceManagement';
-import RackManagement from './pages/RackManagement';
-import RoomManagement from './pages/RoomManagement';
-import DeviceFieldManagement from './pages/DeviceFieldManagement';
-import RackVisualization from './pages/RackVisualization';
-import ConsumableManagement from './pages/ConsumableManagement';
-import ConsumableStatistics from './pages/ConsumableStatistics';
-import ConsumableLogs from './pages/ConsumableLogs';
-import CategoryManagement from './pages/CategoryManagement';
-import UserManagement from './pages/UserManagement';
-import LoginHistory from './pages/LoginHistory';
-import OperationLogs from './pages/OperationLogs';
-import Login from './pages/Login';
-import TicketManagement from './pages/TicketManagement';
-import TicketCategoryManagement from './pages/TicketCategoryManagement';
-import TicketStatistics from './pages/TicketStatistics';
 import { Spin } from 'antd';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const DeviceManagement = lazy(() => import('./pages/DeviceManagement'));
+const RackManagement = lazy(() => import('./pages/RackManagement'));
+const RoomManagement = lazy(() => import('./pages/RoomManagement'));
+const DeviceFieldManagement = lazy(() => import('./pages/DeviceFieldManagement'));
+const RackVisualization = lazy(() => import('./pages/RackVisualization'));
+const ConsumableManagement = lazy(() => import('./pages/ConsumableManagement'));
+const ConsumableStatistics = lazy(() => import('./pages/ConsumableStatistics'));
+const ConsumableLogs = lazy(() => import('./pages/ConsumableLogs'));
+const CategoryManagement = lazy(() => import('./pages/CategoryManagement'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
+const LoginHistory = lazy(() => import('./pages/LoginHistory'));
+const OperationLogs = lazy(() => import('./pages/OperationLogs'));
+const Login = lazy(() => import('./pages/Login'));
+const TicketManagement = lazy(() => import('./pages/TicketManagement'));
+const TicketCategoryManagement = lazy(() => import('./pages/TicketCategoryManagement'));
+const TicketStatistics = lazy(() => import('./pages/TicketStatistics'));
 
 const { Header, Content, Sider } = Layout;
 
@@ -46,7 +47,25 @@ const PrivateRoute = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  return children;
+  return (
+    <Suspense 
+      fallback={
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '100vh',
+          background: '#f5f5f5'
+        }}>
+          <Spin size="large" tip="正在加载页面..." />
+        </div>
+      }
+    >
+      <AppLayout>
+        {children}
+      </AppLayout>
+    </Suspense>
+  );
 };
 
 const AppLayout = ({ children }) => {
@@ -285,14 +304,28 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={
+          <Suspense 
+            fallback={
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                height: '100vh',
+                background: '#f5f5f5'
+              }}>
+                <Spin size="large" tip="正在加载登录页面..." />
+              </div>
+            }
+          >
+            <Login />
+          </Suspense>
+        } />
         <Route
           path="/"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <Dashboard />
-              </AppLayout>
+              <Dashboard />
             </PrivateRoute>
           }
         />
@@ -300,9 +333,7 @@ function App() {
           path="/devices"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <DeviceManagement />
-              </AppLayout>
+              <DeviceManagement />
             </PrivateRoute>
           }
         />
@@ -310,9 +341,7 @@ function App() {
           path="/racks"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <RackManagement />
-              </AppLayout>
+              <RackManagement />
             </PrivateRoute>
           }
         />
@@ -320,9 +349,7 @@ function App() {
           path="/rooms"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <RoomManagement />
-              </AppLayout>
+              <RoomManagement />
             </PrivateRoute>
           }
         />
@@ -330,9 +357,7 @@ function App() {
           path="/fields"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <DeviceFieldManagement />
-              </AppLayout>
+              <DeviceFieldManagement />
             </PrivateRoute>
           }
         />
@@ -340,9 +365,7 @@ function App() {
           path="/visualization"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <RackVisualization />
-              </AppLayout>
+              <RackVisualization />
             </PrivateRoute>
           }
         />
@@ -350,9 +373,7 @@ function App() {
           path="/consumables"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <ConsumableManagement />
-              </AppLayout>
+              <ConsumableManagement />
             </PrivateRoute>
           }
         />
@@ -360,9 +381,7 @@ function App() {
           path="/consumables-categories"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <CategoryManagement />
-              </AppLayout>
+              <CategoryManagement />
             </PrivateRoute>
           }
         />
@@ -370,9 +389,7 @@ function App() {
           path="/consumables-stats"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <ConsumableStatistics />
-              </AppLayout>
+              <ConsumableStatistics />
             </PrivateRoute>
           }
         />
@@ -380,9 +397,7 @@ function App() {
           path="/consumables-logs"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <ConsumableLogs />
-              </AppLayout>
+              <ConsumableLogs />
             </PrivateRoute>
           }
         />
@@ -390,9 +405,7 @@ function App() {
           path="/users"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <UserManagement />
-              </AppLayout>
+              <UserManagement />
             </PrivateRoute>
           }
         />
@@ -400,9 +413,7 @@ function App() {
           path="/login-history"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <LoginHistory />
-              </AppLayout>
+              <LoginHistory />
             </PrivateRoute>
           }
         />
@@ -410,9 +421,7 @@ function App() {
           path="/operation-logs"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <OperationLogs />
-              </AppLayout>
+              <OperationLogs />
             </PrivateRoute>
           }
         />
@@ -420,9 +429,7 @@ function App() {
           path="/tickets"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <TicketManagement />
-              </AppLayout>
+              <TicketManagement />
             </PrivateRoute>
           }
         />
@@ -430,9 +437,7 @@ function App() {
           path="/ticket-categories"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <TicketCategoryManagement />
-              </AppLayout>
+              <TicketCategoryManagement />
             </PrivateRoute>
           }
         />
@@ -440,9 +445,7 @@ function App() {
           path="/ticket-statistics"
           element={
             <PrivateRoute>
-              <AppLayout>
-                <TicketStatistics />
-              </AppLayout>
+              <TicketStatistics />
             </PrivateRoute>
           }
         />

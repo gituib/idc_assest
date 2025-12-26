@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, InputNumber, message, Card, Space, Popconfirm, Upload, Table as AntTable } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ExportOutlined, ImportOutlined, UploadOutlined, FileExcelOutlined, InboxOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -31,7 +31,7 @@ function ConsumableManagement() {
   const [stockType, setStockType] = useState('in');
   const [stockForm] = Form.useForm();
 
-  const fetchConsumables = async (page = 1, pageSize = 10) => {
+  const fetchConsumables = useCallback(async (page = 1, pageSize = 10) => {
     try {
       setLoading(true);
       const response = await axios.get('/api/consumables', {
@@ -45,23 +45,23 @@ function ConsumableManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [keyword, category, status]);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const response = await axios.get('/api/consumable-categories/list');
       setCategories(response.data);
     } catch (error) {
       console.error('获取分类列表失败:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchConsumables();
     fetchCategories();
-  }, [keyword, category, status]);
+  }, [fetchConsumables, fetchCategories]);
 
-  const showModal = (consumable = null) => {
+  const showModal = useCallback((consumable = null) => {
     setEditingConsumable(consumable);
     if (consumable) {
       form.setFieldsValue(consumable);
@@ -69,14 +69,14 @@ function ConsumableManagement() {
       form.resetFields();
     }
     setModalVisible(true);
-  };
+  }, [form]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setModalVisible(false);
     setEditingConsumable(null);
-  };
+  }, []);
 
-  const handleSubmit = async (values) => {
+  const handleSubmit = useCallback(async (values) => {
     try {
       if (editingConsumable) {
         await axios.put(`/api/consumables/${editingConsumable.consumableId}`, values);
@@ -95,9 +95,9 @@ function ConsumableManagement() {
       message.error(editingConsumable ? '耗材更新失败' : '耗材创建失败');
       console.error('提交失败:', error);
     }
-  };
+  }, [editingConsumable, fetchConsumables]);
 
-  const handleDelete = async (consumableId) => {
+  const handleDelete = useCallback(async (consumableId) => {
     try {
       await axios.delete(`/api/consumables/${consumableId}`);
       message.success('删除成功');
@@ -106,11 +106,11 @@ function ConsumableManagement() {
       message.error('删除失败');
       console.error('删除失败:', error);
     }
-  };
+  }, [fetchConsumables]);
 
-  const handleSearch = (value) => {
+  const handleSearch = useCallback((value) => {
     setKeyword(value);
-  };
+  }, []);
 
   const exportToCSV = (data, filename) => {
     const headers = ['耗材ID', '名称', '分类', '单位', '当前库存', '最小库存', '最大库存', '单价', '供应商', '存放位置', '状态'];
@@ -267,7 +267,7 @@ function ConsumableManagement() {
     window.URL.revokeObjectURL(url);
   };
 
-  const showStockModal = (record, type) => {
+  const showStockModal = useCallback((record, type) => {
     setStockRecord(record);
     setStockType(type);
     stockForm.setFieldsValue({
@@ -278,14 +278,14 @@ function ConsumableManagement() {
       notes: ''
     });
     setStockModalVisible(true);
-  };
+  }, [stockForm]);
 
-  const handleStockCancel = () => {
+  const handleStockCancel = useCallback(() => {
     setStockModalVisible(false);
     setStockRecord(null);
-  };
+  }, []);
 
-  const handleStockSubmit = async (values) => {
+  const handleStockSubmit = useCallback(async (values) => {
     try {
       const response = await axios.post('/api/consumables/quick-inout', {
         consumableId: stockRecord.consumableId,
@@ -302,9 +302,9 @@ function ConsumableManagement() {
       message.error(error.response?.data?.error || `${stockType === 'in' ? '入库' : '出库'}操作失败`);
       console.error('操作失败:', error);
     }
-  };
+  }, [stockRecord, stockType, fetchConsumables]);
 
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: '耗材ID',
       dataIndex: 'consumableId',
@@ -402,7 +402,7 @@ function ConsumableManagement() {
         </Space>
       )
     }
-  ];
+  ], [showModal, showStockModal, handleDelete]);
 
   const previewColumns = [
     { title: '名称', dataIndex: '名称', key: 'name', width: 120 },
@@ -608,4 +608,4 @@ function ConsumableManagement() {
   );
 }
 
-export default ConsumableManagement;
+export default React.memo(ConsumableManagement);

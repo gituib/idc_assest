@@ -19,6 +19,30 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'antd': ['antd', '@ant-design/icons'],
+          'vendor': ['react', 'react-dom', 'react-router-dom'],
+          'charts': ['axios', 'dayjs'],
+          'utils': ['three', 'xlsx']
+        },
+        chunkFileNames: 'js/[name]-[hash].js',
+        entryFileNames: 'js/[name]-[hash].js',
+        assetFileNames: '[ext]/[name]-[hash].[ext]',
+        compact: true
+      }
+    },
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    }
+  },
+  optimizeDeps: {
+    include: ['antd', '@ant-design/icons', 'axios', 'react-router-dom']
   }
 });

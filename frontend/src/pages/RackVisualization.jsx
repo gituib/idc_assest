@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, Select, Button, Space, message, Tooltip, Modal, Form, Switch, Checkbox } from 'antd';
 import { 
   ReloadOutlined, 
@@ -18,101 +18,226 @@ import axios from 'axios';
 
 const { Option } = Select;
 
-// 添加动画样式
-const style = document.createElement('style');
-style.textContent = `
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(-50%) translateX(20px) scale(0.95);
+// 工具函数提取到组件外部，避免每次渲染重复创建
+const getDeviceIcon = (deviceType) => {
+  try {
+    if (!deviceType) return <CloudServerOutlined style={{ color: '#ffffff' }} />;
+    const type = deviceType.toLowerCase();
+    
+    if (type.includes('server') || type.includes('服务器')) return <CloudServerOutlined style={{ color: '#ffffff' }} />;
+    if (type.includes('switch') || type.includes('交换机')) return <SwitcherOutlined style={{ color: '#ffffff' }} />;
+    if (type.includes('storage') || type.includes('存储')) return <DatabaseOutlined style={{ color: '#ffffff' }} />;
+    if (type.includes('router') || type.includes('路由器')) return <CloudOutlined style={{ color: '#ffffff' }} />;
+    if (type.includes('laptop') || type.includes('笔记本')) return <LaptopOutlined style={{ color: '#ffffff' }} />;
+    if (type.includes('mobile') || type.includes('手机')) return <MobileOutlined style={{ color: '#ffffff' }} />;
+    if (type.includes('printer') || type.includes('打印机')) return <PrinterOutlined style={{ color: '#ffffff' }} />;
+    
+    return <CloudServerOutlined style={{ color: '#ffffff' }} />;
+  } catch (error) {
+    console.error('设备图标渲染错误:', error);
+    return <CloudServerOutlined style={{ color: '#ffffff' }} />;
+  }
+};
+
+const getDeviceColor = (deviceType) => {
+  if (!deviceType) return '#1890ff';
+  const type = deviceType.toLowerCase();
+  
+  if (type.includes('server') || type.includes('服务器')) return '#1890ff';
+  if (type.includes('switch') || type.includes('交换机')) return '#52c41a';
+  if (type.includes('storage') || type.includes('存储')) return '#faad14';
+  if (type.includes('router') || type.includes('路由器')) return '#f5222d';
+  if (type.includes('laptop') || type.includes('笔记本')) return '#722ed1';
+  if (type.includes('mobile') || type.includes('手机')) return '#eb2f96';
+  if (type.includes('printer') || type.includes('打印机')) return '#13c2c2';
+  
+  return '#1890ff';
+};
+
+const getDeviceStatusColor = (status) => {
+  const statusColorMap = {
+    'normal': '#10b981',
+    'warning': '#f59e0b',
+    'error': '#ef4444',
+    'offline': '#6b7280',
+    'maintenance': '#3b82f6',
+    undefined: '#3b82f6',
+    null: '#3b82f6'
+  };
+  return statusColorMap[status] || '#3b82f6';
+};
+
+const getDeviceTypeTheme = (type) => {
+  const themeMap = {
+    'server': {
+      borderColor: '#38bdf8',
+      accentColor: '#0ea5e9',
+      glowColor: 'rgba(56, 189, 248, 0.3)',
+      iconColor: '#38bdf8',
+      label: '服务器'
+    },
+    'switch': {
+      borderColor: '#22c55e',
+      accentColor: '#16a34a',
+      glowColor: 'rgba(34, 197, 94, 0.3)',
+      iconColor: '#22c55e',
+      label: '交换机'
+    },
+    'router': {
+      borderColor: '#f59e0b',
+      accentColor: '#d97706',
+      glowColor: 'rgba(245, 158, 11, 0.3)',
+      iconColor: '#f59e0b',
+      label: '路由器'
+    },
+    'storage': {
+      borderColor: '#8b5cf6',
+      accentColor: '#7c3aed',
+      glowColor: 'rgba(139, 92, 246, 0.3)',
+      iconColor: '#8b5cf6',
+      label: '存储'
+    },
+    'firewall': {
+      borderColor: '#ef4444',
+      accentColor: '#dc2626',
+      glowColor: 'rgba(239, 68, 68, 0.3)',
+      iconColor: '#ef4444',
+      label: '防火墙'
+    },
+    'ups': {
+      borderColor: '#14b8a6',
+      accentColor: '#0d9488',
+      glowColor: 'rgba(20, 184, 166, 0.3)',
+      iconColor: '#14b8a6',
+      label: 'UPS'
+    },
+    'pdus': {
+      borderColor: '#64748b',
+      accentColor: '#475569',
+      glowColor: 'rgba(100, 116, 139, 0.3)',
+      iconColor: '#64748b',
+      label: 'PDU'
+    },
+    'other': {
+      borderColor: '#94a3b8',
+      accentColor: '#64748b',
+      glowColor: 'rgba(148, 163, 184, 0.3)',
+      iconColor: '#94a3b8',
+      label: '其他设备'
     }
-    to {
-      opacity: 1;
-      transform: translateY(-50%) translateX(0) scale(1);
+  };
+  
+  const normalizedType = type?.toLowerCase();
+  
+  if (normalizedType?.includes('server') || normalizedType?.includes('服务器')) return themeMap.server;
+  if (normalizedType?.includes('switch') || normalizedType?.includes('交换机')) return themeMap.switch;
+  if (normalizedType?.includes('router') || normalizedType?.includes('路由器')) return themeMap.router;
+  if (normalizedType?.includes('storage') || normalizedType?.includes('存储')) return themeMap.storage;
+  if (normalizedType?.includes('firewall') || normalizedType?.includes('防火墙')) return themeMap.firewall;
+  if (normalizedType?.includes('ups') || normalizedType?.includes('不间断电源')) return themeMap.ups;
+  if (normalizedType?.includes('pdu') || normalizedType?.includes('电源分配')) return themeMap.pdus;
+  
+  return themeMap.other;
+};
+
+// 初始化动画样式
+const initAnimationStyles = () => {
+  const existingStyle = document.getElementById('rack-visualization-styles');
+  if (existingStyle) {
+    return existingStyle;
+  }
+  
+  const style = document.createElement('style');
+  style.id = 'rack-visualization-styles';
+  style.textContent = `
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-50%) translateX(20px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0) scale(1);
+      }
     }
-  }
-  
-  /* LED指示灯闪烁动画 */
-  @keyframes ledBlink {
-    0%, 50% { opacity: 1; }
-    51%, 100% { opacity: 0.3; }
-  }
-  
-  /* Tooltip淡入动画 */
-  @keyframes tooltipFadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(-50%) translateX(-10px) scale(0.95);
+    
+    @keyframes ledBlink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0.3; }
     }
-    to {
-      opacity: 1;
-      transform: translateY(-50%) translateX(0) scale(1);
+    
+    @keyframes tooltipFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-50%) translateX(-10px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0) scale(1);
+      }
     }
-  }
-  
-  /* 金属拉丝纹理 */
-  .metal-texture {
-    background-image: 
-      linear-gradient(90deg, 
-        transparent 0%, 
-        rgba(255,255,255,0.03) 50%, 
-        transparent 100%),
-      repeating-linear-gradient(0deg,
-        transparent 0px,
-        rgba(255,255,255,0.02) 1px,
-        transparent 2px,
-        transparent 3px);
-    background-size: 100% 100%, 4px 4px;
-  }
-  
-  /* 散热格栅效果 */
-  .ventilation-grille {
-    background-image: repeating-linear-gradient(
-      0deg,
-      #334155 0px,
-      #334155 1px,
-      transparent 1px,
-      transparent 2px
-    );
-  }
-  
-  /* 悬停提亮效果 */
-  .device-hover {
-    background: linear-gradient(145deg, #1e293b, #0f172a) !important;
-    box-shadow: 0 6px 16px rgba(56, 189, 248, 0.3), 0 0 12px rgba(56, 189, 248, 0.2) !important;
-    border-color: #38bdf8 !important;
-  }
-  
-  /* Tooltip样式 */
-  .device-tooltip {
-    background: rgba(0, 0, 0, 0.9);
-    color: #5eead4;
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-family: 'Roboto Mono', monospace;
-    font-size: 11px;
-    border: 1px solid rgba(94, 234, 212, 0.3);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    white-space: nowrap;
-  }
-  
-  /* 设备数量badge */
-  .device-count-badge {
-    background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(14, 165, 233, 0.2));
-    color: #38bdf8;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 600;
-    box-shadow: 0 4px 15px rgba(56, 189, 248, 0.2);
-    border: 1px solid rgba(56, 189, 248, 0.3);
-    backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
-    white-space: nowrap;
-    font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
-  }
-`;
-document.head.appendChild(style);
+    
+    .metal-texture {
+      background-image: 
+        linear-gradient(90deg, 
+          transparent 0%, 
+          rgba(255,255,255,0.03) 50%, 
+          transparent 100%),
+        repeating-linear-gradient(0deg,
+          transparent 0px,
+          rgba(255,255,255,0.02) 1px,
+          transparent 2px,
+          transparent 3px);
+      background-size: 100% 100%, 4px 4px;
+    }
+    
+    .ventilation-grille {
+      background-image: repeating-linear-gradient(
+        0deg,
+        #334155 0px,
+        #334155 1px,
+        transparent 1px,
+        transparent 2px
+      );
+    }
+    
+    .device-hover {
+      background: linear-gradient(145deg, #1e293b, #0f172a) !important;
+      box-shadow: 0 6px 16px rgba(56, 189, 248, 0.3), 0 0 12px rgba(56, 189, 248, 0.2) !important;
+      border-color: #38bdf8 !important;
+    }
+    
+    .device-tooltip {
+      background: rgba(0, 0, 0, 0.9);
+      color: #5eead4;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 11px;
+      border: 1px solid rgba(94, 234, 212, 0.3);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      white-space: nowrap;
+    }
+    
+    .device-count-badge {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(14, 165, 233, 0.2));
+      color: #38bdf8;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 4px 15px rgba(56, 189, 248, 0.2);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+      white-space: nowrap;
+      font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+    }
+  `;
+  document.head.appendChild(style);
+  return style;
+};
+
 // 错误边界组件
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -191,7 +316,7 @@ function RackVisualization() {
   const [tooltipFields, setTooltipFields] = useState({});
 
   // 默认设备字段配置
-  const defaultTooltipFields = {
+  const defaultTooltipFields = useMemo(() => ({
     name: { label: '设备名称', enabled: true, field: 'name', fieldType: 'string' },
     deviceId: { label: '设备ID', enabled: true, field: 'deviceId', fieldType: 'string' },
     type: { label: '设备类型', enabled: true, field: 'type', fieldType: 'string' },
@@ -202,10 +327,15 @@ function RackVisualization() {
     height: { label: '高度', enabled: true, field: 'height', fieldType: 'number' },
     ipAddress: { label: 'IP地址', enabled: true, field: 'ipAddress', fieldType: 'string' },
     power: { label: '功率', enabled: true, field: 'power', fieldType: 'number' }
-  };
+  }), []);
 
-  // 获取设备字段配置
-  const fetchTooltipDeviceFields = async () => {
+  // 初始化样式
+  useEffect(() => {
+    initAnimationStyles();
+  }, []);
+
+  // 获取设备字段配置 - 使用 useCallback 避免重复创建
+  const fetchTooltipDeviceFields = useCallback(async () => {
     try {
       setLoadingTooltipFields(true);
       console.log('开始获取设备字段配置...');
@@ -242,10 +372,10 @@ function RackVisualization() {
     } finally {
       setLoadingTooltipFields(false);
     }
-  };
+  }, [defaultTooltipFields]);
 
   // 保存tooltip字段配置
-  const saveTooltipConfig = async () => {
+  const saveTooltipConfig = useCallback(async () => {
     try {
       setSavingTooltipConfig(true);
       
@@ -268,10 +398,10 @@ function RackVisualization() {
     } finally {
       setSavingTooltipConfig(false);
     }
-  };
+  }, [tooltipFields, fetchTooltipDeviceFields]);
 
-  // 获取所有机柜
-  const fetchRacks = async () => {
+  // 获取所有机柜 - 使用 useCallback 避免重复创建
+  const fetchRacks = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -317,10 +447,10 @@ function RackVisualization() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // 获取机柜内的设备
-  const fetchDevices = async (rackId) => {
+  // 获取机柜内的设备 - 使用 useCallback 避免重复创建
+  const fetchDevices = useCallback(async (rackId) => {
     try {
       setLoadingDevices(true);
       console.log(`=== 开始获取机柜 ${rackId} 的设备数据 ===`);
@@ -462,13 +592,11 @@ function RackVisualization() {
     } finally {
       setLoadingDevices(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchRacks();
-    loadBackgroundSettings();
-    fetchTooltipDeviceFields();
-  }, []);
+  }, [fetchRacks]);
 
   // 打开字段配置模态框时获取数据
   const handleOpenTooltipConfig = () => {
@@ -476,120 +604,6 @@ function RackVisualization() {
       fetchTooltipDeviceFields();
     }
     setShowTooltipConfig(true);
-  };
-
-  // 根据设备类型获取图标
-  const getDeviceIcon = (deviceType) => {
-    try {
-      if (!deviceType) return <CloudServerOutlined style={{ color: '#ffffff' }} />;
-      const type = deviceType.toLowerCase();
-      
-      if (type.includes('server') || type.includes('服务器')) return <CloudServerOutlined style={{ color: '#ffffff' }} />;
-      if (type.includes('switch') || type.includes('交换机')) return <SwitcherOutlined style={{ color: '#ffffff' }} />;
-      if (type.includes('storage') || type.includes('存储')) return <DatabaseOutlined style={{ color: '#ffffff' }} />;
-      if (type.includes('router') || type.includes('路由器')) return <CloudOutlined style={{ color: '#ffffff' }} />;
-      if (type.includes('laptop') || type.includes('笔记本')) return <LaptopOutlined style={{ color: '#ffffff' }} />;
-      if (type.includes('mobile') || type.includes('手机')) return <MobileOutlined style={{ color: '#ffffff' }} />;
-      if (type.includes('printer') || type.includes('打印机')) return <PrinterOutlined style={{ color: '#ffffff' }} />;
-      
-      return <CloudServerOutlined style={{ color: '#ffffff' }} />;
-    } catch (error) {
-      console.error('设备图标渲染错误:', error);
-      return <CloudServerOutlined style={{ color: '#ffffff' }} />;
-    }
-  };
-
-  // 根据设备类型获取背景色
-  const getDeviceColor = (deviceType) => {
-    if (!deviceType) return '#1890ff';
-    const type = deviceType.toLowerCase();
-    
-    if (type.includes('server') || type.includes('服务器')) return '#1890ff'; // 蓝色
-    if (type.includes('switch') || type.includes('交换机')) return '#52c41a'; // 绿色
-    if (type.includes('storage') || type.includes('存储')) return '#faad14'; // 黄色
-    if (type.includes('router') || type.includes('路由器')) return '#f5222d'; // 红色
-    if (type.includes('laptop') || type.includes('笔记本')) return '#722ed1'; // 紫色
-    if (type.includes('mobile') || type.includes('手机')) return '#eb2f96'; // 粉色
-    if (type.includes('printer') || type.includes('打印机')) return '#13c2c2'; // 青色
-    
-    return '#1890ff'; // 默认蓝色
-  };
-
-  // 获取设备状态颜色
-  const getDeviceStatusColor = (status) => {
-    const statusColorMap = {
-      'normal': '#10b981',     // 正常 - 绿色常亮
-      'warning': '#f59e0b',    // 预警 - 黄色常亮
-      'error': '#ef4444',      // 告警 - 红色慢闪
-      'offline': '#6b7280',    // 离线 - 灰色
-      'maintenance': '#3b82f6', // 维护 - 蓝色常亮
-      undefined: '#3b82f6',    // 默认普通设备 - 蓝色常亮
-      null: '#3b82f6'
-    };
-    return statusColorMap[status] || '#3b82f6';
-  };
-
-  // 获取设备类型对应的颜色主题
-  const getDeviceTypeTheme = (type) => {
-    const themeMap = {
-      'server': {
-        borderColor: '#38bdf8',
-        accentColor: '#0ea5e9',
-        glowColor: 'rgba(56, 189, 248, 0.3)',
-        iconColor: '#38bdf8',
-        label: '服务器'
-      },
-      'switch': {
-        borderColor: '#22c55e',
-        accentColor: '#16a34a',
-        glowColor: 'rgba(34, 197, 94, 0.3)',
-        iconColor: '#22c55e',
-        label: '交换机'
-      },
-      'router': {
-        borderColor: '#f59e0b',
-        accentColor: '#d97706',
-        glowColor: 'rgba(245, 158, 11, 0.3)',
-        iconColor: '#f59e0b',
-        label: '路由器'
-      },
-      'storage': {
-        borderColor: '#8b5cf6',
-        accentColor: '#7c3aed',
-        glowColor: 'rgba(139, 92, 246, 0.3)',
-        iconColor: '#8b5cf6',
-        label: '存储'
-      },
-      'firewall': {
-        borderColor: '#ef4444',
-        accentColor: '#dc2626',
-        glowColor: 'rgba(239, 68, 68, 0.3)',
-        iconColor: '#ef4444',
-        label: '防火墙'
-      },
-      'ups': {
-        borderColor: '#14b8a6',
-        accentColor: '#0d9488',
-        glowColor: 'rgba(20, 184, 166, 0.3)',
-        iconColor: '#14b8a6',
-        label: 'UPS'
-      },
-      'pdus': {
-        borderColor: '#64748b',
-        accentColor: '#475569',
-        glowColor: 'rgba(100, 116, 139, 0.3)',
-        iconColor: '#64748b',
-        label: 'PDU'
-      },
-      'other': {
-        borderColor: '#94a3b8',
-        accentColor: '#64748b',
-        glowColor: 'rgba(148, 163, 184, 0.3)',
-        iconColor: '#94a3b8',
-        label: '其他'
-      }
-    };
-    return themeMap[type?.toLowerCase()] || themeMap['other'];
   };
 
   // 生成模拟监控数据
@@ -1987,4 +2001,4 @@ function RackVisualization() {
   );
 }
 
-export default RackVisualization;
+export default React.memo(RackVisualization);

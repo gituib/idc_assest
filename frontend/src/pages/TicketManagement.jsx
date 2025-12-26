@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, DatePicker, message, Card, Space, Tag, Dropdown, Menu, Tabs, Timeline, Descriptions } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EyeOutlined, MoreOutlined, UserOutlined, ToolOutlined, CheckCircleOutlined, SyncOutlined, ClockCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -8,6 +8,46 @@ const { Option } = Select;
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
 const { TabPane } = Tabs;
+
+const getStatusColor = (status) => {
+  const colors = {
+    pending: 'orange',
+    in_progress: 'processing',
+    completed: 'green',
+    closed: 'default'
+  };
+  return colors[status] || 'default';
+};
+
+const getStatusText = (status) => {
+  const texts = {
+    pending: '待处理',
+    in_progress: '处理中',
+    completed: '已完成',
+    closed: '已关闭'
+  };
+  return texts[status] || status;
+};
+
+const getPriorityColor = (priority) => {
+  const colors = {
+    low: 'green',
+    medium: 'orange',
+    high: 'red',
+    urgent: 'magenta'
+  };
+  return colors[priority] || 'default';
+};
+
+const getPriorityText = (priority) => {
+  const texts = {
+    low: '低',
+    medium: '中',
+    high: '高',
+    urgent: '紧急'
+  };
+  return texts[priority] || priority;
+};
 
 function TicketManagement() {
   const [tickets, setTickets] = useState([]);
@@ -35,7 +75,7 @@ function TicketManagement() {
 
   const [searchFilters, setSearchFilters] = useState({});
 
-  const fetchTickets = async (page = 1, pageSize = 10, filters = {}) => {
+  const fetchTickets = useCallback(async (page = 1, pageSize = 10, filters = {}) => {
     try {
       setLoading(true);
       const params = {
@@ -56,27 +96,27 @@ function TicketManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchFilters]);
 
-  const fetchDevices = async () => {
+  const fetchDevices = useCallback(async () => {
     try {
       const response = await axios.get('/api/devices', { params: { pageSize: 1000 } });
       setDevices(response.data.devices || []);
     } catch (error) {
       console.error('获取设备列表失败:', error);
     }
-  };
+  }, []);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const response = await axios.get('/api/ticket-categories');
       setCategories(response.data || []);
     } catch (error) {
       console.error('获取分类列表失败:', error);
     }
-  };
+  }, []);
 
-  const fetchTicketDetail = async (ticketId) => {
+  const fetchTicketDetail = useCallback(async (ticketId) => {
     try {
       const [ticketRes, operationsRes] = await Promise.all([
         axios.get(`/api/tickets/${ticketId}`),
@@ -90,15 +130,15 @@ function TicketManagement() {
       message.error('获取工单详情失败');
       console.error('获取工单详情失败:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchTickets();
     fetchDevices();
     fetchCategories();
-  }, []);
+  }, [fetchTickets, fetchDevices, fetchCategories]);
 
-  const showModal = (ticket = null) => {
+  const showModal = useCallback((ticket = null) => {
     setEditingTicket(ticket);
     if (ticket) {
       const ticketData = { ...ticket };
@@ -113,14 +153,14 @@ function TicketManagement() {
       form.resetFields();
     }
     setModalVisible(true);
-  };
+  }, []);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setModalVisible(false);
     setEditingTicket(null);
-  };
+  }, []);
 
-  const handleSubmit = async (values) => {
+  const handleSubmit = useCallback(async (values) => {
     try {
       const ticketData = {
         ...values,
@@ -146,9 +186,9 @@ function TicketManagement() {
       message.error(editingTicket ? '工单更新失败' : '工单创建失败');
       console.error(error);
     }
-  };
+  }, [editingTicket, fetchTickets]);
 
-  const handleDelete = async (ticketId) => {
+  const handleDelete = useCallback(async (ticketId) => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个工单吗？',
@@ -166,15 +206,15 @@ function TicketManagement() {
         }
       }
     });
-  };
+  }, [fetchTickets]);
 
-  const handleProcess = (ticket) => {
+  const handleProcess = useCallback((ticket) => {
     setSelectedTicket(ticket);
     processForm.resetFields();
     setProcessingModalVisible(true);
-  };
+  }, []);
 
-  const handleProcessSubmit = async (values) => {
+  const handleProcessSubmit = useCallback(async (values) => {
     try {
       await axios.put(`/api/tickets/${selectedTicket.ticketId}/process`, {
         ...values,
@@ -188,9 +228,9 @@ function TicketManagement() {
       message.error('处理失败');
       console.error(error);
     }
-  };
+  }, [selectedTicket, fetchTickets]);
 
-  const handleStatusChange = async (ticketId, newStatus) => {
+  const handleStatusChange = useCallback(async (ticketId, newStatus) => {
     try {
       await axios.put(`/api/tickets/${ticketId}/status`, {
         status: newStatus,
@@ -203,65 +243,25 @@ function TicketManagement() {
       message.error('状态更新失败');
       console.error(error);
     }
-  };
+  }, [fetchTickets]);
 
-  const handleSearch = (values) => {
+  const handleSearch = useCallback((values) => {
     setSearchFilters(values);
     fetchTickets(1, pagination.pageSize, values);
-  };
+  }, [fetchTickets, pagination.pageSize]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     searchForm.resetFields();
     setSearchFilters({});
     fetchTickets(1, pagination.pageSize, {});
-  };
+  }, [fetchTickets, pagination.pageSize]);
 
-  const handleTableChange = (paginationInfo) => {
+  const handleTableChange = useCallback((paginationInfo) => {
     setPagination(paginationInfo);
     fetchTickets(paginationInfo.current, paginationInfo.pageSize, searchFilters);
-  };
+  }, [fetchTickets, searchFilters]);
 
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: 'orange',
-      in_progress: 'processing',
-      completed: 'green',
-      closed: 'default'
-    };
-    return colors[status] || 'default';
-  };
-
-  const getStatusText = (status) => {
-    const texts = {
-      pending: '待处理',
-      in_progress: '处理中',
-      completed: '已完成',
-      closed: '已关闭'
-    };
-    return texts[status] || status;
-  };
-
-  const getPriorityColor = (priority) => {
-    const colors = {
-      low: 'green',
-      medium: 'orange',
-      high: 'red',
-      urgent: 'magenta'
-    };
-    return colors[priority] || 'default';
-  };
-
-  const getPriorityText = (priority) => {
-    const texts = {
-      low: '低',
-      medium: '中',
-      high: '高',
-      urgent: '紧急'
-    };
-    return texts[priority] || priority;
-  };
-
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: '工单编号',
       dataIndex: 'ticketId',
@@ -404,7 +404,7 @@ function TicketManagement() {
         </Space>
       )
     }
-  ];
+  ], [fetchTicketDetail, handleStatusChange, handleDelete]);
 
   return (
     <div style={{ padding: 24 }}>
@@ -651,4 +651,4 @@ function TicketManagement() {
   );
 }
 
-export default TicketManagement;
+export default React.memo(TicketManagement);

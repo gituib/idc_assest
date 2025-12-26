@@ -1,10 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, message, Card, Space, InputNumber, Upload, Progress } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 
 const { Option } = Select;
+
+// 状态映射函数
+const statusMap = {
+  active: { text: '在用', color: 'green' },
+  maintenance: { text: '维护中', color: 'orange' },
+  inactive: { text: '停用', color: 'gray' }
+};
 
 function RackManagement() {
   const [racks, setRacks] = useState([]);
@@ -28,10 +35,7 @@ function RackManagement() {
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
 
-
-
-  // 获取所有机柜
-  const fetchRacks = async (page = 1, pageSize = 10) => {
+  const fetchRacks = useCallback(async (page = 1, pageSize = 10) => {
     try {
       setLoading(true);
       const response = await axios.get('/api/racks', {
@@ -51,10 +55,9 @@ function RackManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // 获取所有机房
-  const fetchRooms = async () => {
+  const fetchRooms = useCallback(async () => {
     try {
       const response = await axios.get('/api/rooms');
       setRooms(response.data);
@@ -62,20 +65,19 @@ function RackManagement() {
       message.error('获取机房列表失败');
       console.error('获取机房列表失败:', error);
     }
-  };
+  }, []);
 
-  // 处理表格分页变化
-  const handleTableChange = (pagination) => {
+  const handleTableChange = useCallback((pagination) => {
     fetchRacks(pagination.current, pagination.pageSize);
-  };
+  }, [fetchRacks]);
 
   useEffect(() => {
     fetchRacks(pagination.current, pagination.pageSize);
     fetchRooms();
-  }, []);
+  }, [fetchRacks, fetchRooms]);
 
   // 打开模态框
-  const showModal = (rack = null) => {
+  const showModal = useCallback((rack = null) => {
     setEditingRack(rack);
     if (rack) {
       form.setFieldsValue(rack);
@@ -83,16 +85,16 @@ function RackManagement() {
       form.resetFields();
     }
     setModalVisible(true);
-  };
+  }, []);
 
   // 关闭模态框
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setModalVisible(false);
     setEditingRack(null);
-  };
+  }, []);
 
   // 提交表单
-  const handleSubmit = async (values) => {
+  const handleSubmit = useCallback(async (values) => {
     try {
       if (editingRack) {
         // 更新机柜
@@ -111,10 +113,10 @@ function RackManagement() {
       message.error(editingRack ? '机柜更新失败' : '机柜创建失败');
       console.error(editingRack ? '机柜更新失败:' : '机柜创建失败:', error);
     }
-  };
+  }, [editingRack, fetchRacks]);
 
   // 删除机柜
-  const handleDelete = async (rackId) => {
+  const handleDelete = useCallback(async (rackId) => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个机柜吗？',
@@ -132,17 +134,17 @@ function RackManagement() {
         }
       }
     });
-  };
+  }, [fetchRacks]);
 
   // 下载导入模板
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = useCallback(() => {
     // 调用后端API下载模板
     window.open('/api/racks/import-template', '_blank');
     message.success('模板下载成功');
-  };
+  }, []);
 
   // 导入机柜数据
-  const handleImport = async (file) => {
+  const handleImport = useCallback(async (file) => {
     try {
       setIsImporting(true);
       setImportProgress(0);
@@ -213,17 +215,10 @@ function RackManagement() {
       // 阻止自动上传
       return false;
     }
-  };
-
-  // 状态标签映射
-  const statusMap = {
-    active: { text: '在用', color: 'green' },
-    maintenance: { text: '维护中', color: 'orange' },
-    inactive: { text: '停用', color: 'gray' }
-  };
+  }, []);
 
   // 表格列配置
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: '机柜ID',
       dataIndex: 'rackId',
@@ -493,4 +488,4 @@ function RackManagement() {
   );
 }
 
-export default RackManagement;
+export default React.memo(RackManagement);

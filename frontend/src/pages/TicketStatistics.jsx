@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, Row, Col, Statistic, Table, DatePicker, Select, Space, Tag, message } from 'antd';
 import { BarChartOutlined, PieChartOutlined, RiseOutlined, FallOutlined, ClockCircleOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -6,6 +6,48 @@ import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
+
+const getStatusColor = (status) => {
+  const colors = {
+    pending: 'orange',
+    assigned: 'blue',
+    in_progress: 'processing',
+    completed: 'green',
+    closed: 'default'
+  };
+  return colors[status] || 'default';
+};
+
+const getStatusText = (status) => {
+  const texts = {
+    pending: '待处理',
+    assigned: '已分配',
+    in_progress: '处理中',
+    completed: '已完成',
+    closed: '已关闭'
+  };
+  return texts[status] || status;
+};
+
+const getPriorityColor = (priority) => {
+  const colors = {
+    low: 'green',
+    medium: 'orange',
+    high: 'red',
+    urgent: 'magenta'
+  };
+  return colors[priority] || 'default';
+};
+
+const getPriorityText = (priority) => {
+  const texts = {
+    low: '低',
+    medium: '中',
+    high: '高',
+    urgent: '紧急'
+  };
+  return texts[priority] || priority;
+};
 
 function TicketStatistics() {
   const [loading, setLoading] = useState(true);
@@ -27,7 +69,7 @@ function TicketStatistics() {
     trend: []
   });
 
-  const fetchStatistics = async () => {
+  const fetchStatistics = useCallback(async () => {
     try {
       setLoading(true);
       const params = {
@@ -43,17 +85,17 @@ function TicketStatistics() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange]);
 
   useEffect(() => {
     fetchStatistics();
-  }, [dateRange]);
+  }, [fetchStatistics]);
 
-  const handleDateChange = (dates) => {
+  const handleDateChange = useCallback((dates) => {
     if (dates) {
       setDateRange(dates);
     }
-  };
+  }, []);
 
   const getStatusColor = (status) => {
     const colors = {
@@ -97,7 +139,7 @@ function TicketStatistics() {
     return texts[priority] || priority;
   };
 
-  const statusColumns = [
+  const statusColumns = useMemo(() => [
     {
       title: '状态',
       dataIndex: 'status',
@@ -127,9 +169,9 @@ function TicketStatistics() {
         </span>
       )
     }
-  ];
+  ], []);
 
-  const categoryColumns = [
+  const categoryColumns = useMemo(() => [
     {
       title: '故障分类',
       dataIndex: 'category',
@@ -164,38 +206,9 @@ function TicketStatistics() {
       width: 150,
       render: (time) => time !== undefined && time !== null ? time.toFixed(1) : '-'
     }
-  ];
+  ], []);
 
-  const deviceColumns = [
-    {
-      title: '设备名称',
-      dataIndex: 'deviceName',
-      key: 'deviceName',
-      width: 180
-    },
-    {
-      title: '故障次数',
-      dataIndex: 'count',
-      key: 'count',
-      width: 100,
-      render: (count) => <Tag color="red">{count}</Tag>
-    },
-    {
-      title: '最后故障时间',
-      dataIndex: 'lastFaultTime',
-      key: 'lastFaultTime',
-      width: 160,
-      render: (text) => text ? dayjs(text).format('YYYY-MM-DD HH:mm') : '-'
-    },
-    {
-      title: '设备类型',
-      dataIndex: 'deviceType',
-      key: 'deviceType',
-      width: 100
-    }
-  ];
-
-  const priorityColumns = [
+  const priorityColumns = useMemo(() => [
     {
       title: '优先级',
       dataIndex: 'priority',
@@ -228,7 +241,36 @@ function TicketStatistics() {
       width: 150,
       render: (time) => time !== undefined && time !== null ? time.toFixed(1) : '-'
     }
-  ];
+  ], []);
+
+  const deviceColumns = useMemo(() => [
+    {
+      title: '设备名称',
+      dataIndex: 'deviceName',
+      key: 'deviceName',
+      width: 180
+    },
+    {
+      title: '故障次数',
+      dataIndex: 'count',
+      key: 'count',
+      width: 100,
+      render: (count) => <Tag color="red">{count}</Tag>
+    },
+    {
+      title: '最后故障时间',
+      dataIndex: 'lastFaultTime',
+      key: 'lastFaultTime',
+      width: 160,
+      render: (text) => text ? dayjs(text).format('YYYY-MM-DD HH:mm') : '-'
+    },
+    {
+      title: '设备类型',
+      dataIndex: 'deviceType',
+      key: 'deviceType',
+      width: 100
+    }
+  ], []);
 
   const simpleBarData = [
     { name: '待处理', value: statistics.pending },
@@ -454,4 +496,4 @@ function TicketStatistics() {
   );
 }
 
-export default TicketStatistics;
+export default React.memo(TicketStatistics);
