@@ -163,9 +163,6 @@ const initAssociations = () => {
   TicketOperationRecord.belongsTo(Ticket, { foreignKey: 'ticketId' });
 };
 
-// 立即初始化关联（在模型导出前）
-initAssociations();
-
 const initializeModels = async () => {
   try {
     await sequelize.sync({ alter: true });
