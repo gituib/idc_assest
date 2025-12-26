@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const { Ticket, TicketOperationRecord } = require('../models/ticketIndex');
 const Device = require('../models/Device');
 const User = require('../models/User');
+const { DB_TYPE } = require('../db');
 
 // 获取工单统计 (必须定义在 /:ticketId 之前)
 router.get('/stats', async (req, res) => {
@@ -50,7 +51,10 @@ router.get('/stats', async (req, res) => {
     const monthlyStats = await Ticket.findAll({
       where,
       attributes: [
-        [require('sequelize').fn('strftime', '%Y-%m', require('sequelize').col('createdAt')), 'month'],
+        [DB_TYPE === 'mysql' 
+          ? require('sequelize').fn('DATE_FORMAT', require('sequelize').col('createdAt'), '%Y-%m')
+          : require('sequelize').fn('strftime', '%Y-%m', require('sequelize').col('createdAt')), 
+          'month'],
         [require('sequelize').fn('COUNT', '*'), 'count']
       ],
       group: ['month'],

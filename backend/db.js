@@ -31,4 +31,4 @@ if (DB_TYPE === 'mysql') {
   });
 }
 
-module.exports = { sequelize };
+module.exports = { sequelize, DB_TYPE };
