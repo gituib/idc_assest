@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, message, Typography, Tabs, Divider, Space, Modal, Alert } from 'antd';
-import { UserOutlined, LockOutlined, MailOutlined, PhoneOutlined, SafetyCertificateOutlined, RobotOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, message, Typography, Divider, Space, Alert } from 'antd';
+import {
+  UserOutlined,
+  LockOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  SafetyCertificateOutlined,
+  RobotOutlined
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -82,36 +89,69 @@ const Login = () => {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '24px'
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #6B8DD6 100%)',
+    padding: '24px',
+    position: 'relative',
+    overflow: 'hidden'
+  };
+
+  const backgroundDecorationStyle = {
+    position: 'absolute',
+    borderRadius: '50%',
+    filter: 'blur(80px)',
+    opacity: '0.3'
   };
 
   const cardStyle = {
     width: '100%',
-    maxWidth: isFirstUser ? 450 : 400,
-    borderRadius: '16px',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+    maxWidth: isFirstUser ? 480 : 420,
+    borderRadius: '20px',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.15)',
+    background: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255, 255, 255, 0.3)'
   };
 
   const headerStyle = {
     textAlign: 'center',
-    marginBottom: '32px'
+    marginBottom: '32px',
+    paddingTop: '8px'
+  };
+
+  const iconContainerStyle = {
+    width: '80px',
+    height: '80px',
+    borderRadius: '20px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '0 auto 20px',
+    boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)'
   };
 
   const titleStyle = {
-    fontSize: '28px',
+    fontSize: '26px',
     fontWeight: '700',
-    color: '#1a1a2e',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
     marginBottom: '8px'
   };
 
   const subtitleStyle = {
     fontSize: '14px',
-    color: '#666'
+    color: '#8c8c8c'
   };
 
   const formStyle = {
     marginTop: '24px'
+  };
+
+  const inputStyle = {
+    borderRadius: '8px',
+    height: '48px',
+    border: '1px solid #e8e8e8'
   };
 
   const submitButtonStyle = {
@@ -119,32 +159,61 @@ const Login = () => {
     height: '48px',
     fontSize: '16px',
     fontWeight: '600',
-    borderRadius: '8px'
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    border: 'none',
+    boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+    transition: 'all 0.3s ease'
   };
 
   const footerStyle = {
     textAlign: 'center',
-    marginTop: '24px'
+    marginTop: '24px',
+    paddingBottom: '16px'
+  };
+
+  const toggleButtonStyle = {
+    color: '#667eea',
+    fontWeight: '500',
+    padding: '4px 8px',
+    borderRadius: '4px',
+    transition: 'all 0.3s ease'
+  };
+
+  const inputPrefixStyle = {
+    color: '#667eea',
+    fontSize: '18px'
   };
 
   return (
     <div style={containerStyle}>
+      <div style={{
+        ...backgroundDecorationStyle,
+        width: '400px',
+        height: '400px',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        top: '-100px',
+        right: '-100px'
+      }} />
+      <div style={{
+        ...backgroundDecorationStyle,
+        width: '300px',
+        height: '300px',
+        background: 'linear-gradient(135deg, #764ba2 0%, #6B8DD6 100%)',
+        bottom: '-50px',
+        left: '-50px'
+      }} />
+
       <Card style={cardStyle}>
         <div style={headerStyle}>
-          <div style={{ 
-            fontSize: '48px', 
-            marginBottom: '16px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}>
-            <RobotOutlined />
+          <div style={iconContainerStyle}>
+            <RobotOutlined style={{ fontSize: '40px', color: '#fff' }} />
           </div>
           <Title level={2} style={titleStyle}>
             {isFirstUser ? '创建管理员账户' : 'IDC设备管理系统'}
           </Title>
           <Text style={subtitleStyle}>
-            {isFirstUser ? '首次使用，请创建系统管理员账户' : '请登录您的账户'}
+            {isFirstUser ? '首次使用，请创建系统管理员账户' : '安全登录您的账户'}
           </Text>
         </div>
 
@@ -154,7 +223,7 @@ const Login = () => {
             description="您是第一个用户，系统将自动为您分配管理员权限。"
             type="success"
             showIcon
-            style={{ marginBottom: '24px' }}
+            style={{ marginBottom: '24px', borderRadius: '8px' }}
           />
         )}
 
@@ -174,9 +243,10 @@ const Login = () => {
                   { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名只能包含字母、数字和下划线' }
                 ]}
               >
-                <Input 
-                  prefix={<UserOutlined />} 
-                  placeholder="用户名" 
+                <Input
+                  prefix={<UserOutlined style={inputPrefixStyle} />}
+                  placeholder="用户名"
+                  style={inputStyle}
                 />
               </Form.Item>
 
@@ -184,9 +254,10 @@ const Login = () => {
                 name="realName"
                 rules={[{ required: true, message: '请输入真实姓名' }]}
               >
-                <Input 
-                  prefix={<SafetyCertificateOutlined />} 
-                  placeholder="真实姓名" 
+                <Input
+                  prefix={<SafetyCertificateOutlined style={inputPrefixStyle} />}
+                  placeholder="真实姓名"
+                  style={inputStyle}
                 />
               </Form.Item>
 
@@ -197,18 +268,20 @@ const Login = () => {
                   { type: 'email', message: '请输入有效的邮箱地址' }
                 ]}
               >
-                <Input 
-                  prefix={<MailOutlined />} 
-                  placeholder="邮箱" 
+                <Input
+                  prefix={<MailOutlined style={inputPrefixStyle} />}
+                  placeholder="邮箱"
+                  style={inputStyle}
                 />
               </Form.Item>
 
               <Form.Item
                 name="phone"
               >
-                <Input 
-                  prefix={<PhoneOutlined />} 
-                  placeholder="手机号（可选）" 
+                <Input
+                  prefix={<PhoneOutlined style={inputPrefixStyle} />}
+                  placeholder="手机号（可选）"
+                  style={inputStyle}
                 />
               </Form.Item>
 
@@ -219,9 +292,10 @@ const Login = () => {
                   { min: 6, message: '密码长度不能少于6个字符' }
                 ]}
               >
-                <Input.Password 
-                  prefix={<LockOutlined />} 
-                  placeholder="密码" 
+                <Input.Password
+                  prefix={<LockOutlined style={inputPrefixStyle} />}
+                  placeholder="密码"
+                  style={inputStyle}
                 />
               </Form.Item>
 
@@ -240,9 +314,10 @@ const Login = () => {
                   }),
                 ]}
               >
-                <Input.Password 
-                  prefix={<LockOutlined />} 
-                  placeholder="确认密码" 
+                <Input.Password
+                  prefix={<LockOutlined style={inputPrefixStyle} />}
+                  placeholder="确认密码"
+                  style={inputStyle}
                 />
               </Form.Item>
             </>
@@ -252,9 +327,10 @@ const Login = () => {
                 name="username"
                 rules={[{ required: true, message: '请输入用户名' }]}
               >
-                <Input 
-                  prefix={<UserOutlined />} 
-                  placeholder="用户名" 
+                <Input
+                  prefix={<UserOutlined style={inputPrefixStyle} />}
+                  placeholder="用户名"
+                  style={inputStyle}
                 />
               </Form.Item>
 
@@ -262,18 +338,19 @@ const Login = () => {
                 name="password"
                 rules={[{ required: true, message: '请输入密码' }]}
               >
-                <Input.Password 
-                  prefix={<LockOutlined />} 
-                  placeholder="密码" 
+                <Input.Password
+                  prefix={<LockOutlined style={inputPrefixStyle} />}
+                  placeholder="密码"
+                  style={inputStyle}
                 />
               </Form.Item>
             </>
           )}
 
-          <Form.Item style={{ marginBottom: '16px' }}>
-            <Button 
-              type="primary" 
-              htmlType="submit" 
+          <Form.Item style={{ marginBottom: '16px', marginTop: '24px' }}>
+            <Button
+              type="primary"
+              htmlType="submit"
               loading={loading}
               style={submitButtonStyle}
             >
@@ -284,10 +361,20 @@ const Login = () => {
 
         {!isFirstUser && (
           <div style={footerStyle}>
+            <Divider plain>
+              <Text style={{ color: '#8c8c8c', fontSize: '12px' }}>其他方式</Text>
+            </Divider>
             <Space split={<Divider type="vertical" />}>
-              <Button 
-                type="link" 
+              <Button
+                type="link"
                 size="small"
+                style={toggleButtonStyle}
+                onMouseEnter={(e) => {
+                  e.target.style.background = 'rgba(102, 126, 234, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'transparent';
+                }}
                 onClick={() => setRegisterMode(!registerMode)}
               >
                 {registerMode ? '已有账户？去登录' : '注册新账户'}

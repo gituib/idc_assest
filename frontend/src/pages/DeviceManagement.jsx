@@ -819,102 +819,208 @@ function DeviceManagement() {
     message.success('字段配置已重置为默认值');
   };
 
+  const pageHeaderStyle = {
+    marginBottom: '24px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '16px'
+  };
+
+  const titleStyle = {
+    fontSize: '24px',
+    fontWeight: '700',
+    margin: 0,
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text'
+  };
+
+  const cardStyle = {
+    borderRadius: '16px',
+    border: 'none',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+    overflow: 'hidden'
+  };
+
+  const primaryButtonStyle = {
+    height: '40px',
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    border: 'none',
+    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.35)',
+    fontWeight: '500',
+    transition: 'all 0.3s ease'
+  };
+
+  const secondaryButtonStyle = {
+    height: '40px',
+    borderRadius: '8px',
+    border: '1px solid #e8e8e8',
+    transition: 'all 0.3s ease'
+  };
+
+  const searchCardStyle = {
+    borderRadius: '12px',
+    border: '1px solid #f0f0f0',
+    background: 'linear-gradient(180deg, #fafafa 0%, #ffffff 100%)',
+    marginBottom: '20px'
+  };
+
+  const modalHeaderStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '18px',
+    fontWeight: '600'
+  };
+
   return (
-    <div>
-      <Card title="设备管理" extra={
-        <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>添加设备</Button>
-          <Button icon={<DownloadOutlined />} onClick={handleExport}>导出设备</Button>
-          <Button icon={<UploadOutlined />} onClick={() => setImportModalVisible(true)}>导入设备</Button>
-          <Button icon={<SettingOutlined />} onClick={() => setFieldConfigModalVisible(true)}>字段配置</Button>
-          <Button 
-            icon={<UndoOutlined />} 
+    <div style={{ padding: '24px' }}>
+      <div style={pageHeaderStyle}>
+        <h1 style={titleStyle}>
+          <CloudServerOutlined style={{ marginRight: '12px' }} />
+          设备管理
+        </h1>
+        <Space size={12}>
+          <Button
+            style={primaryButtonStyle}
+            icon={<PlusOutlined />}
+            onClick={() => showModal()}
+          >
+            添加设备
+          </Button>
+          <Button
+            style={secondaryButtonStyle}
+            icon={<DownloadOutlined />}
+            onClick={handleExport}
+          >
+            导出设备
+          </Button>
+          <Button
+            style={secondaryButtonStyle}
+            icon={<UploadOutlined />}
+            onClick={() => setImportModalVisible(true)}
+          >
+            导入设备
+          </Button>
+          <Button
+            style={secondaryButtonStyle}
+            icon={<SettingOutlined />}
+            onClick={() => setFieldConfigModalVisible(true)}
+          >
+            字段配置
+          </Button>
+          <Button
+            style={secondaryButtonStyle}
+            icon={<UndoOutlined />}
             onClick={resetColumnWidths}
             title="重置列宽"
           >
             重置列宽
           </Button>
-          <Button 
-            type="primary" 
-            danger={false} 
-            disabled={selectedDevices.length === 0} 
+          <Button
+            style={{
+              ...secondaryButtonStyle,
+              color: selectedDevices.length > 0 ? '#1890ff' : undefined,
+              borderColor: selectedDevices.length > 0 ? '#1890ff' : undefined
+            }}
+            icon={<SwapOutlined />}
+            disabled={selectedDevices.length === 0}
             onClick={handleBatchOffline}
           >
             一键下线 ({selectedDevices.length})
           </Button>
-          <Button 
-            type="primary" 
-            danger 
-            disabled={selectedDevices.length === 0} 
+          <Button
+            style={{
+              ...secondaryButtonStyle,
+              color: selectedDevices.length > 0 ? '#ff4d4f' : undefined,
+              borderColor: selectedDevices.length > 0 ? '#ff4d4f' : undefined
+            }}
+            danger
+            icon={<DeleteOutlined />}
+            disabled={selectedDevices.length === 0}
             onClick={handleBatchDelete}
           >
             一键删除 ({selectedDevices.length})
           </Button>
         </Space>
-      }>
+      </div>
 
-        {/* 搜索和筛选区域 */}
-        <Card size="small" style={{ marginBottom: 16 }}>
-          <Form
-            form={searchForm}
-            layout="inline"
-            onFinish={handleSearch}
-            style={{ width: '100%' }}
-          >
-            <Form.Item name="keyword">
-              <Input
-                placeholder="搜索设备ID、名称、类型、型号、序列号、IP、描述..."
-                prefix={<SearchOutlined />}
-                style={{ width: 300 }}
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-              />
-            </Form.Item>
-            
-            <Form.Item name="status">
-              <Select
-                value={status}
-                onChange={setStatus}
-                style={{ width: 150 }}
+      <Card size="small" style={searchCardStyle} bodyStyle={{ padding: '16px 20px' }}>
+        <Form
+          form={searchForm}
+          layout="inline"
+          onFinish={handleSearch}
+          style={{ width: '100%' }}
+        >
+          <Form.Item name="keyword">
+            <Input
+              placeholder="搜索设备ID、名称、类型、型号、序列号、IP、描述..."
+              prefix={<SearchOutlined style={{ color: '#667eea' }} />}
+              style={{ 
+                width: 320,
+                borderRadius: '8px',
+                border: '1px solid #d9d9d9'
+              }}
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+            />
+          </Form.Item>
+          
+          <Form.Item name="status">
+            <Select
+              value={status}
+              onChange={setStatus}
+              style={{ width: 150, borderRadius: '8px' }}
+            >
+              <Option value="all">所有状态</Option>
+              <Option value="running">运行中</Option>
+              <Option value="maintenance">维护中</Option>
+              <Option value="offline">离线</Option>
+              <Option value="fault">故障</Option>
+            </Select>
+          </Form.Item>
+          
+          <Form.Item name="type">
+            <Select
+              value={type}
+              onChange={setType}
+              style={{ width: 150, borderRadius: '8px' }}
+            >
+              <Option value="all">所有类型</Option>
+              <Option value="server">服务器</Option>
+              <Option value="switch">交换机</Option>
+              <Option value="router">路由器</Option>
+              <Option value="storage">存储设备</Option>
+              <Option value="other">其他设备</Option>
+            </Select>
+          </Form.Item>
+          
+          <Form.Item>
+            <Space>
+              <Button
+                type="primary"
+                htmlType="submit"
+                icon={<SearchOutlined />}
+                style={primaryButtonStyle}
               >
-                <Option value="all">所有状态</Option>
-                <Option value="running">运行中</Option>
-                <Option value="maintenance">维护中</Option>
-                <Option value="offline">离线</Option>
-                <Option value="fault">故障</Option>
-              </Select>
-            </Form.Item>
-            
-            <Form.Item name="type">
-              <Select
-                value={type}
-                onChange={setType}
-                style={{ width: 150 }}
+                搜索
+              </Button>
+              <Button
+                onClick={handleReset}
+                style={secondaryButtonStyle}
               >
-                <Option value="all">所有类型</Option>
-                <Option value="server">服务器</Option>
-                <Option value="switch">交换机</Option>
-                <Option value="router">路由器</Option>
-                <Option value="storage">存储设备</Option>
-                <Option value="other">其他设备</Option>
-              </Select>
-            </Form.Item>
-            
-            <Form.Item>
-              <Space>
-                <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
-                  搜索
-                </Button>
-                <Button onClick={handleReset}>
-                  重置
-                </Button>
-              </Space>
-            </Form.Item>
-          </Form>
-        </Card>
-        
+                重置
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Card>
 
-
+      <Card style={cardStyle}>
         <Table
           components={{
             header: {
@@ -937,44 +1043,48 @@ function DeviceManagement() {
       </Card>
 
       <Modal
-        title={editingDevice ? '编辑设备' : '添加设备'}
+        title={
+          <div style={modalHeaderStyle}>
+            {editingDevice ? <EditOutlined style={{ color: '#667eea' }} /> : <PlusOutlined style={{ color: '#667eea' }} />}
+            {editingDevice ? '编辑设备' : '添加设备'}
+          </div>
+        }
         open={modalVisible}
         onCancel={handleCancel}
         footer={null}
         width={700}
+        style={{ borderRadius: '16px' }}
+        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
         >
-          {/* 动态生成表单字段 */}
           {deviceFields.map(field => {
-            // 根据字段类型生成表单控件
             let control = null;
             
             switch (field.fieldType) {
               case 'text':
               case 'string':
-                control = <Input placeholder={`请输入${field.displayName}`} />;
+                control = <Input placeholder={`请输入${field.displayName}`} style={{ borderRadius: '8px' }} />;
                 break;
               case 'number':
-                control = <InputNumber placeholder={`请输入${field.displayName}`} min={0} style={{ width: '100%' }} />;
+                control = <InputNumber placeholder={`请输入${field.displayName}`} min={0} style={{ width: '100%', borderRadius: '8px' }} />;
                 break;
               case 'boolean':
                 control = <Switch />;
                 break;
               case 'date':
-                control = <DatePicker style={{ width: '100%' }} placeholder={`请选择${field.displayName}`} />;
+                control = <DatePicker style={{ width: '100%', borderRadius: '8px' }} placeholder={`请选择${field.displayName}`} />;
                 break;
               case 'textarea':
-                control = <Input.TextArea placeholder={`请输入${field.displayName}`} rows={3} />;
+                control = <Input.TextArea placeholder={`请输入${field.displayName}`} rows={3} style={{ borderRadius: '8px' }} />;
                 break;
               case 'select':
-                // 特殊处理机柜选择（仍然使用单选）
                 if (field.fieldName === 'rackId') {
                   control = (
-                    <Select placeholder={`请选择${field.displayName}`}>
+                    <Select placeholder={`请选择${field.displayName}`} style={{ borderRadius: '8px' }}>
                       {racks.map(rack => (
                         <Option key={rack.rackId} value={rack.rackId}>
                           {rack.name} ({rack.rackId})
@@ -983,9 +1093,8 @@ function DeviceManagement() {
                     </Select>
                   );
                 } else {
-                  // 设备类型等使用单选select
                   control = (
-                    <Select placeholder={`请选择${field.displayName}`}>
+                    <Select placeholder={`请选择${field.displayName}`} style={{ borderRadius: '8px' }}>
                       {field.options && field.options.map(option => (
                         <Option key={option.value} value={option.value}>
                           {option.label}
@@ -996,7 +1105,7 @@ function DeviceManagement() {
                 }
                 break;
               default:
-                control = <Input placeholder={`请输入${field.displayName}`} />;
+                control = <Input placeholder={`请输入${field.displayName}`} style={{ borderRadius: '8px' }} />;
             }
 
             return (
@@ -1011,27 +1120,27 @@ function DeviceManagement() {
             );
           })}
 
-
-
-          <Form.Item style={{ textAlign: 'right' }}>
+          <Form.Item style={{ textAlign: 'right', marginTop: '24px' }}>
             <Space>
-              <Button onClick={handleCancel}>取消</Button>
-              <Button type="primary" htmlType="submit">
-                确定
-              </Button>
+              <Button onClick={handleCancel} style={secondaryButtonStyle}>取消</Button>
+              <Button type="primary" htmlType="submit" style={primaryButtonStyle}>确定</Button>
             </Space>
           </Form.Item>
         </Form>
       </Modal>
 
-      {/* 导入设备模态框 */}
-      {/* 字段配置模态框 */}
       <Modal
-        title="字段配置"
+        title={
+          <div style={modalHeaderStyle}>
+            <SettingOutlined style={{ color: '#667eea' }} />
+            字段配置
+          </div>
+        }
         open={fieldConfigModalVisible}
         onCancel={() => setFieldConfigModalVisible(false)}
         footer={null}
         width={600}
+        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
       >
         <Form
           layout="vertical"
@@ -1042,7 +1151,6 @@ function DeviceManagement() {
           }), {})}
         >
           <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-            {/* 将字段分为多列显示 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
               {deviceFields.map(field => (
                 <Form.Item
@@ -1061,16 +1169,21 @@ function DeviceManagement() {
           
           <Form.Item style={{ textAlign: 'right', marginTop: '20px' }}>
             <Space>
-              <Button onClick={() => setFieldConfigModalVisible(false)}>取消</Button>
-              <Button onClick={handleResetFieldConfig}>重置默认</Button>
-              <Button type="primary" htmlType="submit">保存</Button>
+              <Button onClick={() => setFieldConfigModalVisible(false)} style={secondaryButtonStyle}>取消</Button>
+              <Button onClick={handleResetFieldConfig} style={secondaryButtonStyle}>重置默认</Button>
+              <Button type="primary" htmlType="submit" style={primaryButtonStyle}>保存</Button>
             </Space>
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
-        title="导入设备"
+        title={
+          <div style={modalHeaderStyle}>
+            <UploadOutlined style={{ color: '#667eea' }} />
+            导入设备
+          </div>
+        }
         open={importModalVisible}
         onCancel={() => {
           setImportModalVisible(false);
@@ -1081,15 +1194,16 @@ function DeviceManagement() {
         footer={null}
         width={600}
         destroyOnHidden
+        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
       >
         {!isImporting && !importResult ? (
           <div>
-            <p>请上传CSV格式的设备数据文件</p>
-            <p style={{ color: '#999', fontSize: '12px', marginBottom: 20 }}>支持的编码格式：GBK</p>
+            <p style={{ color: '#666', marginBottom: '8px' }}>请上传CSV格式的设备数据文件</p>
+            <p style={{ color: '#999', fontSize: '12px', marginBottom: '20px' }}>支持的编码格式：GBK</p>
             
-            <div style={{ marginBottom: 20 }}>
-              <p style={{ fontWeight: 'bold', marginBottom: 8 }}>CSV文件格式要求：</p>
-              <ul style={{ paddingLeft: 20, marginBottom: 10 }}>
+            <div style={{ marginBottom: '20px', padding: '16px', background: 'linear-gradient(180deg, #fafafa 0%, #ffffff 100%)', borderRadius: '12px', border: '1px solid #f0f0f0' }}>
+              <p style={{ fontWeight: '600', marginBottom: '8px', color: '#333' }}>CSV文件格式要求：</p>
+              <ul style={{ paddingLeft: '20px', marginBottom: '10px', color: '#666', fontSize: '13px' }}>
                 <li>必填字段：设备ID、设备名称、设备类型、型号、序列号、所在机柜ID、位置(U)、高度(U)、功率(W)、状态、购买日期、保修到期</li>
                 <li>可选字段：IP地址、描述</li>
                 <li>设备类型：server(服务器)、switch(交换机)、router(路由器)、storage(存储设备)</li>
@@ -1098,13 +1212,13 @@ function DeviceManagement() {
               </ul>
             </div>
             
-            <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: '20px' }}>
               <a href="/api/devices/import-template" download="设备导入模板.csv">
-                <Button icon={<DownloadOutlined />} style={{ marginRight: 10 }}>
+                <Button icon={<DownloadOutlined />} style={secondaryButtonStyle}>
                   下载导入模板
                 </Button>
               </a>
-              <span style={{ color: '#999', fontSize: '12px' }}>包含示例数据的CSV模板文件</span>
+              <span style={{ color: '#999', fontSize: '12px', marginLeft: '10px' }}>包含示例数据的CSV模板文件</span>
             </div>
             
             <Upload
@@ -1114,33 +1228,40 @@ function DeviceManagement() {
               beforeUpload={handleImport}
               maxCount={1}
             >
-              <Button type="primary" icon={<UploadOutlined />} block>
+              <Button type="primary" icon={<UploadOutlined />} block style={primaryButtonStyle}>
                 选择CSV文件
               </Button>
             </Upload>
           </div>
         ) : (
           <div>
-            <p>正在导入数据...</p>
-            <Progress percent={importProgress} status="active" style={{ marginBottom: 20 }} />
+            <p style={{ marginBottom: '16px', color: '#666' }}>正在导入数据...</p>
+            <Progress percent={importProgress} status="active" style={{ marginBottom: '20px' }} strokeColor={{ '0%': '#667eea', '100%': '#764ba2' }} />
             {importResult && importResult.statistics && (
               <div>
-                <p style={{ marginBottom: 10 }}>导入完成：</p>
-                <p>总记录数：{importResult.statistics.total || 0}</p>
-                <p>成功：{importResult.statistics.success || 0}</p>
-                <p>失败：{importResult.statistics.failed || 0}</p>
-                {/* 显示导入失败记录详情表格 */}
+                <p style={{ marginBottom: '10px', fontWeight: '600' }}>导入完成：</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ padding: '12px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '8px', color: '#fff', textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: '700' }}>{importResult.statistics.total || 0}</div>
+                    <div style={{ fontSize: '12px', opacity: 0.9 }}>总记录数</div>
+                  </div>
+                  <div style={{ padding: '12px', background: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)', borderRadius: '8px', color: '#fff', textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: '700' }}>{importResult.statistics.success || 0}</div>
+                    <div style={{ fontSize: '12px', opacity: 0.9 }}>成功</div>
+                  </div>
+                  <div style={{ padding: '12px', background: 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)', borderRadius: '8px', color: '#fff', textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: '700' }}>{importResult.statistics.failed || 0}</div>
+                    <div style={{ fontSize: '12px', opacity: 0.9 }}>失败</div>
+                  </div>
+                </div>
                 {(() => {
-                  // 检查是否有错误记录
                   const errors = importResult.statistics?.errors;
                   const hasErrors = Array.isArray(errors) && errors.length > 0;
-                  
-                  // 即使没有errors字段，如果failed数量大于0，也应该提示用户
                   const hasFailedRecords = importResult.statistics?.failed > 0;
                   
                   return (hasErrors || hasFailedRecords) && (
-                    <div style={{ marginTop: 20, maxHeight: 400, overflowY: 'auto', border: '1px solid #ffcccc', borderRadius: '4px', padding: '12px', backgroundColor: '#fff7f7' }}>
-                      <h4 style={{ color: '#d93025', marginBottom: '12px' }}>失败记录详情：</h4>
+                    <div style={{ marginTop: '20px', maxHeight: 400, overflowY: 'auto', border: '1px solid #ffcccc', borderRadius: '8px', padding: '12px', backgroundColor: '#fff7f7' }}>
+                      <h4 style={{ color: '#d93025', marginBottom: '12px', fontWeight: '600' }}>失败记录详情：</h4>
                       
                       {hasErrors ? (
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -1173,7 +1294,7 @@ function DeviceManagement() {
                   setImportResult(null);
                   setIsImporting(false);
                   fetchDevices();
-                }} style={{ marginTop: 20 }}>
+                }} style={{ marginTop: '20px', ...primaryButtonStyle, height: '40px' }}>
                   确定
                 </Button>
               </div>
@@ -1182,9 +1303,13 @@ function DeviceManagement() {
         )}
       </Modal>
 
-      {/* 设备详情模态框 */}
       <Modal
-        title="设备详情"
+        title={
+          <div style={modalHeaderStyle}>
+            <AppstoreOutlined style={{ color: '#667eea' }} />
+            设备详情
+          </div>
+        }
         open={detailModalVisible}
         onCancel={() => {
           setDetailModalVisible(false);
@@ -1194,34 +1319,43 @@ function DeviceManagement() {
           <Button key="close" onClick={() => {
             setDetailModalVisible(false);
             setSelectedDevice(null);
-          }}>
+          }} style={secondaryButtonStyle}>
             关闭
           </Button>,
           <Button key="edit" type="primary" onClick={() => {
             setDetailModalVisible(false);
             showModal(selectedDevice);
-          }}>
+          }} style={primaryButtonStyle}>
             编辑
           </Button>
         ]}
         width={800}
         destroyOnHidden
+        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
       >
         {selectedDevice && (
           <div>
-            {/* 基本信息区域 */}
-            <Card size="small" title="基本信息">
+            <Card 
+              size="small" 
+              title={
+                <span style={{ fontWeight: '600' }}>
+                  <CloudServerOutlined style={{ marginRight: '8px', color: '#667eea' }} />
+                  基本信息
+                </span>
+              }
+              style={{ borderRadius: '12px', border: '1px solid #f0f0f0' }}
+            >
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>设备ID：</label>
-                  <span style={{ marginLeft: 8 }}>{selectedDevice.deviceId || '-'}</span>
+                  <label style={{ fontWeight: '500', color: '#666' }}>设备ID：</label>
+                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.deviceId || '-'}</span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>设备名称：</label>
-                  <span style={{ marginLeft: 8 }}>{selectedDevice.name || '-'}</span>
+                  <label style={{ fontWeight: '500', color: '#666' }}>设备名称：</label>
+                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.name || '-'}</span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>设备类型：</label>
+                  <label style={{ fontWeight: '500', color: '#666' }}>设备类型：</label>
                   <span style={{ marginLeft: 8 }}>
                     {selectedDevice.type ? (
                       <Space>
@@ -1232,68 +1366,68 @@ function DeviceManagement() {
                   </span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>型号：</label>
-                  <span style={{ marginLeft: 8 }}>{selectedDevice.model || '-'}</span>
+                  <label style={{ fontWeight: '500', color: '#666' }}>型号：</label>
+                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.model || '-'}</span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>序列号：</label>
-                  <span style={{ marginLeft: 8 }}>{selectedDevice.serialNumber || '-'}</span>
+                  <label style={{ fontWeight: '500', color: '#666' }}>序列号：</label>
+                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.serialNumber || '-'}</span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>IP地址：</label>
-                  <span style={{ marginLeft: 8 }}>{selectedDevice.ipAddress || '-'}</span>
+                  <label style={{ fontWeight: '500', color: '#666' }}>IP地址：</label>
+                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.ipAddress || '-'}</span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>所在机房：</label>
-                  <span style={{ marginLeft: 8 }}>{selectedDevice.Rack?.Room?.name || '-'}</span>
+                  <label style={{ fontWeight: '500', color: '#666' }}>所在机房：</label>
+                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.Rack?.Room?.name || '-'}</span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>所在机柜：</label>
-                  <span style={{ marginLeft: 8 }}>{selectedDevice.Rack?.name || '-'}</span>
+                  <label style={{ fontWeight: '500', color: '#666' }}>所在机柜：</label>
+                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.Rack?.name || '-'}</span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>位置：</label>
-                  <span style={{ marginLeft: 8 }}>{selectedDevice.position || '-'}</span>
+                  <label style={{ fontWeight: '500', color: '#666' }}>位置：</label>
+                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.position || '-'}</span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>高度(U)：</label>
-                  <span style={{ marginLeft: 8 }}>{selectedDevice.height || '-'}</span>
+                  <label style={{ fontWeight: '500', color: '#666' }}>高度(U)：</label>
+                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.height || '-'}</span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>功率(W)：</label>
-                  <span style={{ marginLeft: 8 }}>{selectedDevice.power || '-'}</span>
+                  <label style={{ fontWeight: '500', color: '#666' }}>功率(W)：</label>
+                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.power || '-'}</span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>状态：</label>
+                  <label style={{ fontWeight: '500', color: '#666' }}>状态：</label>
                   <span style={{ 
                     marginLeft: 8, 
                     color: selectedDevice.status ? statusMap[selectedDevice.status]?.color : '#666',
-                    fontWeight: 'bold'
+                    fontWeight: '600'
                   }}>
                     {selectedDevice.status ? statusMap[selectedDevice.status]?.text || selectedDevice.status : '-'}
                   </span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>购买日期：</label>
-                  <span style={{ marginLeft: 8 }}>
+                  <label style={{ fontWeight: '500', color: '#666' }}>购买日期：</label>
+                  <span style={{ marginLeft: 8, color: '#333' }}>
                     {selectedDevice.purchaseDate ? new Date(selectedDevice.purchaseDate).toLocaleDateString('zh-CN') : '-'}
                   </span>
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>保修到期：</label>
+                  <label style={{ fontWeight: '500', color: '#666' }}>保修到期：</label>
                   <span style={{ 
                     marginLeft: 8, 
-                    color: selectedDevice.warrantyExpiry && new Date(selectedDevice.warrantyExpiry) < new Date() ? '#d93025' : '#666',
-                    fontWeight: selectedDevice.warrantyExpiry && new Date(selectedDevice.warrantyExpiry) < new Date() ? 'bold' : 'normal'
+                    color: selectedDevice.warrantyExpiry && new Date(selectedDevice.warrantyExpiry) < new Date() ? '#d93025' : '#333',
+                    fontWeight: selectedDevice.warrantyExpiry && new Date(selectedDevice.warrantyExpiry) < new Date() ? '600' : 'normal'
                   }}>
                     {selectedDevice.warrantyExpiry ? new Date(selectedDevice.warrantyExpiry).toLocaleDateString('zh-CN') : '-'}
                   </span>
                 </div>
               </div>
               {selectedDevice.description && (
-                <div style={{ marginTop: 16 }}>
-                  <label style={{ fontWeight: 'bold', color: '#666' }}>描述：</label>
-                  <div style={{ marginTop: 8, padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                <div style={{ marginTop: '16px' }}>
+                  <label style={{ fontWeight: '500', color: '#666' }}>描述：</label>
+                  <div style={{ marginTop: '8px', padding: '12px', backgroundColor: '#fafafa', borderRadius: '8px', color: '#333' }}>
                     {selectedDevice.description}
                   </div>
                 </div>

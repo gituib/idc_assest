@@ -61,14 +61,95 @@ const getDeviceColor = (deviceType) => {
 const getDeviceStatusColor = (status) => {
   const statusColorMap = {
     'normal': '#10b981',
+    'running': '#10b981',
     'warning': '#f59e0b',
     'error': '#ef4444',
+    'fault': '#ef4444',
     'offline': '#6b7280',
     'maintenance': '#3b82f6',
     undefined: '#3b82f6',
     null: '#3b82f6'
   };
   return statusColorMap[status] || '#3b82f6';
+};
+
+const getStatusTheme = (status) => {
+  const themeMap = {
+    'normal': {
+      bgGradient: 'linear-gradient(180deg, #059669 0%, #047857 50%, #065f46 100%)',
+      borderColor: '#10b981',
+      topBorderColor: '#34d399',
+      glowColor: 'rgba(16, 185, 129, 0.4)',
+      shadowColor: 'rgba(16, 185, 129, 0.3)',
+      iconColor: '#10b981',
+      label: '正常'
+    },
+    'running': {
+      bgGradient: 'linear-gradient(180deg, #059669 0%, #047857 50%, #065f46 100%)',
+      borderColor: '#10b981',
+      topBorderColor: '#34d399',
+      glowColor: 'rgba(16, 185, 129, 0.4)',
+      shadowColor: 'rgba(16, 185, 129, 0.3)',
+      iconColor: '#10b981',
+      label: '运行中'
+    },
+    'warning': {
+      bgGradient: 'linear-gradient(180deg, #d97706 0%, #b45309 50%, #92400e 100%)',
+      borderColor: '#f59e0b',
+      topBorderColor: '#fbbf24',
+      glowColor: 'rgba(245, 158, 11, 0.4)',
+      shadowColor: 'rgba(245, 158, 11, 0.3)',
+      iconColor: '#f59e0b',
+      label: '警告'
+    },
+    'error': {
+      bgGradient: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%)',
+      borderColor: '#ef4444',
+      topBorderColor: '#f87171',
+      glowColor: 'rgba(239, 68, 68, 0.5)',
+      shadowColor: 'rgba(239, 68, 68, 0.4)',
+      iconColor: '#ef4444',
+      label: '故障'
+    },
+    'fault': {
+      bgGradient: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%)',
+      borderColor: '#ef4444',
+      topBorderColor: '#f87171',
+      glowColor: 'rgba(239, 68, 68, 0.5)',
+      shadowColor: 'rgba(239, 68, 68, 0.4)',
+      iconColor: '#ef4444',
+      label: '故障'
+    },
+    'offline': {
+      bgGradient: 'linear-gradient(180deg, #4b5563 0%, #374151 50%, #1f2937 100%)',
+      borderColor: '#6b7280',
+      topBorderColor: '#9ca3af',
+      glowColor: 'rgba(107, 114, 128, 0.2)',
+      shadowColor: 'rgba(0, 0, 0, 0.2)',
+      iconColor: '#9ca3af',
+      label: '离线'
+    },
+    'maintenance': {
+      bgGradient: 'linear-gradient(180deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%)',
+      borderColor: '#3b82f6',
+      topBorderColor: '#60a5fa',
+      glowColor: 'rgba(59, 130, 246, 0.4)',
+      shadowColor: 'rgba(59, 130, 246, 0.3)',
+      iconColor: '#3b82f6',
+      label: '维护中'
+    },
+    'default': {
+      bgGradient: 'linear-gradient(180deg, #3d4451 0%, #2d3139 50%, #252930 100%)',
+      borderColor: '#4a5568',
+      topBorderColor: '#565c6b',
+      glowColor: 'rgba(56, 189, 248, 0.2)',
+      shadowColor: 'rgba(0, 0, 0, 0.3)',
+      iconColor: '#38bdf8',
+      label: '未知'
+    }
+  };
+  
+  return themeMap[status] || themeMap['default'];
 };
 
 const getDeviceTypeTheme = (type) => {
@@ -317,6 +398,56 @@ class ErrorBoundary extends React.Component {
 }
 
 function RackVisualization() {
+  const pageHeaderStyle = {
+    marginBottom: '24px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '16px'
+  };
+  
+  const titleStyle = {
+    fontSize: '24px',
+    fontWeight: '700',
+    margin: 0,
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text'
+  };
+  
+  const primaryButtonStyle = {
+    height: '40px',
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    border: 'none',
+    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.35)',
+    fontWeight: '500',
+    transition: 'all 0.3s ease'
+  };
+  
+  const secondaryButtonStyle = {
+    height: '40px',
+    borderRadius: '8px',
+    border: '1px solid #e8e8e8',
+    transition: 'all 0.3s ease'
+  };
+  
+  const cardStyle = {
+    borderRadius: '16px',
+    border: 'none',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+    overflow: 'hidden'
+  };
+  
+  const searchCardStyle = {
+    borderRadius: '12px',
+    border: 'none',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+    marginBottom: '20px'
+  };
+  
   const [racks, setRacks] = useState([]);
   const [selectedRack, setSelectedRack] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
@@ -1035,96 +1166,98 @@ function RackVisualization() {
   // 无需额外的初始化，CSS 3D变换直接在JSX中实现
 
   return (
-    <div>
-      <Card 
-        title="机柜可视化"
-        extra={
-          <Space>
-            <Input
-              placeholder="搜索设备名称、ID、IP..."
-              value={searchKeyword}
-              onChange={(e) => handleSearch(e.target.value)}
-              onPressEnter={(e) => handleSearch(e.target.value)}
-              style={{ width: 220 }}
-              allowClear
-              prefix={<SearchOutlined />}
-              suffix={
-                searchMatchCount > 0 ? (
-                  <Badge count={searchMatchCount} size="small" style={{ backgroundColor: '#52c41a' }} />
-                ) : null
-              }
+    <div style={{ padding: '24px' }}>
+      <div style={pageHeaderStyle}>
+        <h1 style={titleStyle}>
+          <CloudServerOutlined style={{ marginRight: '12px' }} />
+          机柜可视化
+        </h1>
+        <Space size={12} wrap>
+          <Input
+            placeholder="搜索设备名称、ID、IP..."
+            value={searchKeyword}
+            onChange={(e) => handleSearch(e.target.value)}
+            onPressEnter={(e) => handleSearch(e.target.value)}
+            style={{ width: 220, height: '40px', borderRadius: '8px' }}
+            allowClear
+            prefix={<SearchOutlined />}
+            suffix={
+              searchMatchCount > 0 ? (
+                <Badge count={searchMatchCount} size="small" style={{ backgroundColor: '#52c41a' }} />
+              ) : null
+            }
+          />
+          {searchKeyword && (
+            <Button
+              style={secondaryButtonStyle}
+              icon={<ClearOutlined />}
+              onClick={clearSearch}
+              title="清除搜索"
             />
-            {searchKeyword && (
-              <Button
-                icon={<ClearOutlined />}
-                onClick={clearSearch}
-                title="清除搜索"
-              />
-            )}
-            <Select
-              placeholder="选择机房"
-              style={{ width: 180 }}
-              value={selectedRoom}
-              onChange={handleRoomChange}
-              loading={loading}
-              disabled={loading}
-              allowClear
-            >
-              {getRooms().map(room => (
-                <Option key={room.key} value={room.key}>
-                  {room.name || '未知机房'} ({room.roomId || room.id || '无ID'})
-                </Option>
-              ))}
-            </Select>
-            <Select
-              placeholder="选择机柜"
-              style={{ width: 200 }}
-              value={selectedRack?.rackId}
-              onChange={handleRackChange}
-              loading={loading || loadingDevices}
-              disabled={!selectedRoom || loading}
-              allowClear
-            >
-              {selectedRoom && getRacksByRoom(selectedRoom).map(rack => (
-                <Option key={rack?.rackId || `rack-${Math.random()}`} value={rack?.rackId}>
-                  {rack?.name || '未知机柜'} ({rack?.rackId || '无ID'}) - {rack?.height || 0}U
-                </Option>
-              ))}
-            </Select>
-            <Button 
-              icon={<ReloadOutlined />} 
-              onClick={handleReload}
-              loading={loading}
-              disabled={loading}
-            >
-              刷新
-            </Button>
-            <Button 
-              icon={<SettingOutlined />} 
-              onClick={handleOpenTooltipConfig}
-              type={showTooltipConfig ? 'primary' : 'default'}
-            >
-              字段配置
-            </Button>
-          </Space>
-        }  
-      >
-        {searchKeyword && (
+          )}
+          <Select
+            placeholder="选择机房"
+            style={{ width: 180, height: '40px' }}
+            value={selectedRoom}
+            onChange={handleRoomChange}
+            loading={loading}
+            disabled={loading}
+            allowClear
+          >
+            {getRooms().map(room => (
+              <Option key={room.key} value={room.key}>
+                {room.name || '未知机房'} ({room.roomId || room.id || '无ID'})
+              </Option>
+            ))}
+          </Select>
+          <Select
+            placeholder="选择机柜"
+            style={{ width: 200, height: '40px' }}
+            value={selectedRack?.rackId}
+            onChange={handleRackChange}
+            loading={loading || loadingDevices}
+            disabled={!selectedRoom || loading}
+            allowClear
+          >
+            {selectedRoom && getRacksByRoom(selectedRoom).map(rack => (
+              <Option key={rack?.rackId || `rack-${Math.random()}`} value={rack?.rackId}>
+                {rack?.name || '未知机柜'} ({rack?.rackId || '无ID'}) - {rack?.height || 0}U
+              </Option>
+            ))}
+          </Select>
+          <Button 
+            style={secondaryButtonStyle}
+            icon={<ReloadOutlined />} 
+            onClick={handleReload}
+            loading={loading}
+            disabled={loading}
+          >
+            刷新
+          </Button>
+          <Button 
+            style={showTooltipConfig ? primaryButtonStyle : secondaryButtonStyle}
+            icon={<SettingOutlined />} 
+            onClick={handleOpenTooltipConfig}
+            type={showTooltipConfig ? 'primary' : 'default'}
+          >
+            字段配置
+          </Button>
+        </Space>
+      </div>
+      
+      {searchKeyword && (
+        <Card size="small" style={searchCardStyle} bodyStyle={{ padding: '16px 20px' }}>
           <div style={{ 
-            marginBottom: 16, 
-            padding: '12px 16px', 
-            background: searchResults.length > 0 ? 'linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%)' : '#fff2f0',
-            border: `1px solid ${searchResults.length > 0 ? '#b7eb8f' : '#ffccc7'}`,
-            borderRadius: '6px',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
+            gap: '12px',
+            flexWrap: 'wrap'
           }}>
             <SearchOutlined style={{ 
               fontSize: 18, 
               color: searchResults.length > 0 ? '#52c41a' : '#ff4d4f'
             }} />
-            <Text strong style={{ color: searchResults.length > 0 ? '#135200' : '#cf1322' }}>
+            <Text strong style={{ color: searchResults.length > 0 ? '#135200' : '#cf1322', margin: 0 }}>
               {searchResults.length > 0 
                 ? `找到 ${searchResults.length} 个设备` 
                 : searching ? '搜索中...' : '未找到匹配的设备'}
@@ -1143,7 +1276,6 @@ function RackVisualization() {
                       type={highlightedDevice === result.deviceId ? 'primary' : 'default'}
                       icon={<EnvironmentOutlined />}
                       onClick={() => {
-                        // 如果设备不在当前机柜，跳转到对应机柜
                         if (selectedRack && result.rackId !== selectedRack.rackId) {
                           const targetRack = racks.find(r => r.rackId === result.rackId);
                           if (targetRack) {
@@ -1161,8 +1293,10 @@ function RackVisualization() {
                         setHighlightedDevice(result.deviceId);
                       }}
                       style={{ 
-                        borderColor: highlightedDevice === result.deviceId ? '#1890ff' : undefined,
-                        background: highlightedDevice === result.deviceId ? '#1890ff' : undefined
+                        borderColor: highlightedDevice === result.deviceId ? '#667eea' : undefined,
+                        background: highlightedDevice === result.deviceId ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : undefined,
+                        height: '32px',
+                        borderRadius: '6px'
                       }}
                     >
                       <Tooltip title={`机柜: ${result.rackName}${result.roomName ? ` | 机房: ${result.roomName}` : ''} | U${result.position || '?'}`}>
@@ -1185,37 +1319,40 @@ function RackVisualization() {
               </Space>
             )}
           </div>
-        )}
+        </Card>
+      )}
+      
+      <Card style={cardStyle} bodyStyle={{ padding: '16px 20px' }}>
         <div style={{ marginBottom: 16 }}>
-          <Space wrap>
-            <Button icon={<ZoomInOutlined />} onClick={handleZoomIn}>放大</Button>
-            <Button icon={<ZoomOutOutlined />} onClick={handleZoomOut}>缩小</Button>
-            <Button icon={<RotateRightOutlined />} onClick={handleResetView}>重置视角</Button>
+          <Space wrap size={12}>
+            <Button style={secondaryButtonStyle} icon={<ZoomInOutlined />} onClick={handleZoomIn}>放大</Button>
+            <Button style={secondaryButtonStyle} icon={<ZoomOutOutlined />} onClick={handleZoomOut}>缩小</Button>
+            <Button style={secondaryButtonStyle} icon={<RotateRightOutlined />} onClick={handleResetView}>重置视角</Button>
             <Select
-                  placeholder="选择背景类型"
-                  style={{ width: 150 }}
-                  value={backgroundType}
-                  onChange={async (type) => {
-                    setBackgroundType(type);
-                    await saveBackgroundSettings(type, backgroundImage, backgroundSize);
+              placeholder="选择背景类型"
+              style={{ width: 150, height: '40px' }}
+              value={backgroundType}
+              onChange={async (type) => {
+                setBackgroundType(type);
+                await saveBackgroundSettings(type, backgroundImage, backgroundSize);
+              }}
+            >
+              <Option value="gradient">渐变背景</Option>
+              <Option value="image">自定义图片</Option>
+            </Select>
+            {backgroundType === 'image' && (
+              <Space size={8}>
+                <input
+                  type="text"
+                  placeholder="输入图片URL"
+                  style={{ width: 200, padding: '8px 12px', borderRadius: '8px', border: '1px solid #d9d9d9', height: '40px', boxSizing: 'border-box' }}
+                  onChange={async (e) => {
+                    const image = e.target.value;
+                    setBackgroundImage(image);
+                    await saveBackgroundSettings(backgroundType, image, backgroundSize);
                   }}
-                >
-                  <Option value="gradient">渐变背景</Option>
-                  <Option value="image">自定义图片</Option>
-                </Select>
-                {backgroundType === 'image' && (
-                  <Space>
-                    <input
-                      type="text"
-                      placeholder="输入图片URL"
-                      style={{ width: 200, padding: '4px 8px', borderRadius: '4px', border: '1px solid #d9d9d9' }}
-                      onChange={async (e) => {
-                        const image = e.target.value;
-                        setBackgroundImage(image);
-                        await saveBackgroundSettings(backgroundType, image, backgroundSize);
-                      }}
-                      value={backgroundImage || ''}
-                    />
+                  value={backgroundImage || ''}
+                />
                 <input
                   type="file"
                   accept="image/*"
@@ -1228,18 +1365,15 @@ function RackVisualization() {
                         formData.append('file', file);
                         formData.append('type', 'background');
                         
-                        // 发送图片到服务器
                         const response = await axios.post('/api/background/upload', formData, {
                           headers: {
                             'Content-Type': 'multipart/form-data'
                           }
                         });
                         
-                        // 保存服务器返回的图片路径
                         if (response.data && response.data.path) {
                           setBackgroundImage(response.data.path);
                           message.success('背景图片上传成功');
-                          // 保存背景设置到服务器
                           await saveBackgroundSettings('image', response.data.path, backgroundSize);
                         } else {
                           message.error('上传失败：服务器返回格式不正确');
@@ -1255,10 +1389,10 @@ function RackVisualization() {
                   style={{ display: 'none' }}
                   id="backgroundFileInput"
                 />
-                <Button onClick={() => document.getElementById('backgroundFileInput').click()} loading={uploading}>上传图片</Button>
+                <Button style={secondaryButtonStyle} onClick={() => document.getElementById('backgroundFileInput').click()} loading={uploading}>上传图片</Button>
                 <Select
                   placeholder="图片大小"
-                  style={{ width: 100 }}
+                  style={{ width: 100, height: '40px' }}
                   value={backgroundSize}
                   onChange={async (size) => {
                     setBackgroundSize(size);
@@ -1270,7 +1404,7 @@ function RackVisualization() {
                   <Option value="auto">原始大小</Option>
                 </Select>
                 {backgroundImage && (
-                  <Button onClick={() => {
+                  <Button style={secondaryButtonStyle} onClick={() => {
                     setBackgroundImage(null);
                     setBackgroundType('gradient');
                   }}>清除</Button>
@@ -1288,9 +1422,10 @@ function RackVisualization() {
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
-              backgroundColor: '#f5f5f5',
+              backgroundColor: '#fafafa',
               fontSize: '16px',
-              color: '#666'
+              color: '#666',
+              borderRadius: '12px'
             }}>
               加载机柜数据中...
             </div>
@@ -1299,23 +1434,23 @@ function RackVisualization() {
               className="rack-visualization-container"
               style={{ 
                 width: '100%',
-                height: 'calc(100vh - 200px)',
+                height: 'calc(100vh - 280px)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'flex-start',
                 perspective: '1000px',
                 overflow: 'auto',
-                backgroundColor: '#f5f5f5',
+                backgroundColor: '#fafafa',
                 background: backgroundType === 'image' && backgroundImage 
                   ? `url(${backgroundImage})`
-                  : '#f8fffe',
+                  : 'linear-gradient(180deg, #f8fffe 0%, #f0fdf4 50%, #e6fffa 100%)',
                 backgroundSize: backgroundType === 'image' ? backgroundSize : 'auto',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 position: 'relative',
-                borderRadius: '8px',
+                borderRadius: '12px',
                 border: '1px solid #e8e8e8',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                 transition: 'all 0.3s ease',
                 padding: '20px',
                 boxSizing: 'border-box',
@@ -1560,6 +1695,10 @@ function RackVisualization() {
                         // 检查是否是高亮的设备
                         const isHighlighted = highlightedDevice === deviceId;
                         
+                        // 获取状态主题
+                        const statusTheme = getStatusTheme(device?.status);
+                        const statusColor = getDeviceStatusColor(device?.status);
+                        
                         return (
                           <div 
                             key={deviceId} 
@@ -1576,8 +1715,8 @@ function RackVisualization() {
                               transition: 'all 0.2s ease',
                               boxShadow: isHighlighted 
                                 ? `
-                                    0 0 20px rgba(56, 189, 248, 0.6),
-                                    0 4px 12px rgba(56, 189, 248, 0.4),
+                                    0 0 20px ${statusTheme.glowColor},
+                                    0 4px 12px ${statusTheme.shadowColor},
                                     0 1px 2px rgba(0,0,0,0.3),
                                     inset 0 1px 0 rgba(255,255,255,0.2)
                                   `
@@ -1588,20 +1727,22 @@ function RackVisualization() {
                                     inset 0 -1px 0 rgba(0,0,0,0.1)
                                   `,
                               background: isHighlighted
-                                ? 'linear-gradient(180deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%)'
-                                : 'linear-gradient(180deg, #3d4451 0%, #2d3139 50%, #252930 100%)',
+                                ? statusTheme.bgGradient
+                                : statusTheme.bgGradient,
                               border: isHighlighted 
-                                ? '2px solid #38bdf8' 
-                                : '1px solid #4a5568',
+                                ? `2px solid ${statusTheme.topBorderColor}` 
+                                : `1px solid ${statusTheme.borderColor}`,
                               borderTop: isHighlighted
-                                ? '2px solid #7dd3fc'
-                                : '1px solid #565c6b',
+                                ? `2px solid ${statusTheme.topBorderColor}`
+                                : `1px solid ${statusTheme.topBorderColor}`,
                               overflow: 'hidden',
                               margin: 0,
                               padding: 0,
                               zIndex: isHighlighted ? 200 : 100,
                               pointerEvents: 'auto',
-                              animation: isHighlighted ? 'highlightPulse 1.5s ease-in-out infinite' : 'none'
+                              animation: isHighlighted ? 'highlightPulse 1.5s ease-in-out infinite' : 
+                                       device?.status === 'warning' ? 'ledBlink 2s ease-in-out infinite' :
+                                       device?.status === 'error' || device?.status === 'fault' ? 'ledBlink 0.8s ease-in-out infinite' : 'none'
                             }}
                             onMouseEnter={(e) => {
                               const isOneU = (device?.height || 1) === 1;
@@ -1611,11 +1752,11 @@ function RackVisualization() {
                               }
                               e.currentTarget.style.transform = 'scale(1.008)';
                               e.currentTarget.style.boxShadow = `
-                                0 4px 12px rgba(56, 189, 248, 0.3),
+                                0 4px 12px ${statusTheme.shadowColor},
                                 0 2px 6px rgba(0,0,0,0.3),
                                 inset 0 1px 0 rgba(255,255,255,0.15)
                               `;
-                              e.currentTarget.style.borderColor = '#38bdf8';
+                              e.currentTarget.style.borderColor = statusTheme.topBorderColor;
                               
                               const rect = e.currentTarget.getBoundingClientRect();
                               setTooltipPosition({ x: rect.right + 5, y: rect.top + rect.height / 2 });
@@ -1635,24 +1776,25 @@ function RackVisualization() {
                                 inset 0 1px 0 rgba(255,255,255,0.1),
                                 inset 0 -1px 0 rgba(0,0,0,0.1)
                               `;
-                              e.currentTarget.style.borderColor = '#4a5568';
+                              e.currentTarget.style.borderColor = statusTheme.borderColor;
                               setDeviceTooltip(null);
                             }}
                           >
                             <div style={{
-                              position: 'absolute',
                               top: 0,
                               left: 0,
                               right: 0,
                               height: '2px',
-                              background: 'linear-gradient(90deg, #38bdf8 0%, #0ea5e9 50%, #38bdf8 100%)',
-                              opacity: 0.6
+                              background: `linear-gradient(90deg, ${statusTheme.topBorderColor} 0%, ${statusTheme.borderColor} 50%, ${statusTheme.topBorderColor} 100%)`,
+                              opacity: 0.8
                             }} />
                             
                               {/* 左侧状态指示区域 - 增强版 */}
                               <div style={{
                                 width: '7%',
-                                background: 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)',
+                                background: isHighlighted 
+                                  ? `linear-gradient(180deg, ${statusTheme.borderColor}33 0%, ${statusTheme.borderColor}22 100%)`
+                                  : `linear-gradient(180deg, ${statusTheme.borderColor}44 0%, ${statusTheme.borderColor}22 100%)`,
                                 borderRadius: '3px 0 0 3px',
                                 display: 'flex',
                                 flexDirection: 'column',
@@ -1662,22 +1804,22 @@ function RackVisualization() {
                                 flexShrink: 0,
                                 overflow: 'hidden',
                                 position: 'relative',
-                                borderRight: '1px solid rgba(0,0,0,0.5)'
+                                borderRight: `1px solid ${statusTheme.borderColor}66`
                               }}>
                                 {/* 设备类型标识 */}
                                 <div style={{
                                   width: '100%',
                                   height: '8px',
-                                  background: 'linear-gradient(180deg, #334155 0%, #1e293b 100%)',
+                                  background: `linear-gradient(180deg, ${statusTheme.borderColor}66 0%, ${statusTheme.borderColor}33 100%)`,
                                   borderRadius: '2px',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  border: '1px solid rgba(56, 189, 248, 0.2)'
+                                  border: `1px solid ${statusTheme.borderColor}44`
                                 }}>
                                   <span style={{
                                     fontSize: '4px',
-                                    color: '#38bdf8',
+                                    color: statusTheme.topBorderColor,
                                     fontWeight: '700',
                                     letterSpacing: '0.5px'
                                   }}>

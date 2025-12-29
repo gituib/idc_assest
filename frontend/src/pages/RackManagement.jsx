@@ -287,18 +287,101 @@ function RackManagement() {
     },
   ], [showModal, handleDelete]);
 
+  const pageHeaderStyle = {
+    marginBottom: '24px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '16px'
+  };
+
+  const titleStyle = {
+    fontSize: '24px',
+    fontWeight: '700',
+    margin: 0,
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text'
+  };
+
+  const cardStyle = {
+    borderRadius: '16px',
+    border: 'none',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+    overflow: 'hidden'
+  };
+
+  const cardHeadStyle = {
+    borderBottom: '1px solid #f0f0f0',
+    padding: '16px 24px',
+    background: 'linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%)'
+  };
+
+  const primaryButtonStyle = {
+    height: '40px',
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    border: 'none',
+    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.35)',
+    fontWeight: '500',
+    transition: 'all 0.3s ease'
+  };
+
+  const secondaryButtonStyle = {
+    height: '40px',
+    borderRadius: '8px',
+    border: '1px solid #e8e8e8',
+    transition: 'all 0.3s ease'
+  };
+
+  const actionButtonStyle = {
+    height: '32px',
+    borderRadius: '6px',
+    border: '1px solid #e8e8e8',
+    transition: 'all 0.3s ease'
+  };
+
+  const modalHeaderStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '18px',
+    fontWeight: '600'
+  };
+
+  const modalHeaderAccent = {
+    width: '4px',
+    height: '20px',
+    background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
+    borderRadius: '2px'
+  };
+
   return (
-    <div>
-      <Card title="机柜管理" extra={
-        <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
-            添加机柜
-          </Button>
-          <Button icon={<UploadOutlined />} onClick={() => setImportModalVisible(true)}>
+    <div style={{ padding: '8px' }}>
+      <div style={pageHeaderStyle}>
+        <h1 style={titleStyle}>机柜管理</h1>
+        <Space size="middle">
+          <Button 
+            icon={<UploadOutlined />} 
+            onClick={() => setImportModalVisible(true)}
+            style={secondaryButtonStyle}
+          >
             导入机柜
           </Button>
+          <Button 
+            type="primary" 
+            icon={<PlusOutlined />} 
+            onClick={() => showModal()}
+            style={primaryButtonStyle}
+          >
+            添加机柜
+          </Button>
         </Space>
-      }>
+      </div>
+
+      <Card style={cardStyle} headStyle={cardHeadStyle} bodyStyle={{ padding: '20px 24px' }}>
         <Table
           columns={columns}
           dataSource={racks}
@@ -307,15 +390,27 @@ function RackManagement() {
           pagination={pagination}
           onChange={handleTableChange}
           scroll={{ x: 'max-content' }}
+          rowClassName={() => 'table-row'}
         />
       </Card>
 
       <Modal
-        title={editingRack ? '编辑机柜' : '添加机柜'}
+        title={
+          <div style={modalHeaderStyle}>
+            <span style={modalHeaderAccent}></span>
+            {editingRack ? '编辑机柜' : '添加机柜'}
+          </div>
+        }
         open={modalVisible}
         onCancel={handleCancel}
         footer={null}
         width={600}
+        destroyOnClose
+        styles={{
+          body: { padding: '24px' },
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }
+        }}
+        style={{ borderRadius: '16px', overflow: 'hidden' }}
       >
         <Form
           form={form}
@@ -327,7 +422,7 @@ function RackManagement() {
             label="机柜ID"
             rules={[{ required: true, message: '请输入机柜ID' }]}
           >
-            <Input placeholder="请输入机柜ID" />
+            <Input placeholder="请输入机柜ID" style={{ borderRadius: '8px' }} />
           </Form.Item>
 
           <Form.Item
@@ -335,7 +430,7 @@ function RackManagement() {
             label="机柜名称"
             rules={[{ required: true, message: '请输入机柜名称' }]}
           >
-            <Input placeholder="请输入机柜名称" />
+            <Input placeholder="请输入机柜名称" style={{ borderRadius: '8px' }} />
           </Form.Item>
 
           <Form.Item
@@ -343,7 +438,7 @@ function RackManagement() {
             label="所属机房"
             rules={[{ required: true, message: '请选择机房' }]}
           >
-            <Select placeholder="请选择机房">
+            <Select placeholder="请选择机房" style={{ borderRadius: '8px' }}>
               {rooms.map(room => (
                 <Option key={room.roomId} value={room.roomId}>
                   {room.name} ({room.roomId})
@@ -357,7 +452,7 @@ function RackManagement() {
             label="高度(U)"
             rules={[{ required: true, message: '请输入机柜高度' }]}
           >
-            <InputNumber placeholder="请输入机柜高度" min={1} max={50} style={{ width: '100%' }} />
+            <InputNumber placeholder="请输入机柜高度" min={1} max={50} style={{ width: '100%', borderRadius: '8px' }} />
           </Form.Item>
 
           <Form.Item
@@ -365,7 +460,7 @@ function RackManagement() {
             label="最大功率(W)"
             rules={[{ required: true, message: '请输入最大功率' }]}
           >
-            <InputNumber placeholder="请输入最大功率" min={0} style={{ width: '100%' }} />
+            <InputNumber placeholder="请输入最大功率" min={0} style={{ width: '100%', borderRadius: '8px' }} />
           </Form.Item>
 
           <Form.Item
@@ -373,17 +468,31 @@ function RackManagement() {
             label="状态"
             rules={[{ required: true, message: '请选择状态' }]}
           >
-            <Select placeholder="请选择状态">
+            <Select placeholder="请选择状态" style={{ borderRadius: '8px' }}>
               <Option value="active">在用</Option>
               <Option value="maintenance">维护中</Option>
               <Option value="inactive">停用</Option>
             </Select>
           </Form.Item>
 
-          <Form.Item style={{ textAlign: 'right' }}>
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right', marginTop: '24px' }}>
             <Space>
-              <Button onClick={handleCancel}>取消</Button>
-              <Button type="primary" htmlType="submit">
+              <Button 
+                onClick={handleCancel}
+                style={{ borderRadius: '8px', height: '40px' }}
+              >
+                取消
+              </Button>
+              <Button 
+                type="primary" 
+                htmlType="submit"
+                style={{
+                  ...primaryButtonStyle,
+                  width: 'auto',
+                  paddingLeft: '24px',
+                  paddingRight: '24px'
+                }}
+              >
                 确定
               </Button>
             </Space>
@@ -393,7 +502,12 @@ function RackManagement() {
 
       {/* 导入机柜模态框 */}
       <Modal
-        title="导入机柜"
+        title={
+          <div style={modalHeaderStyle}>
+            <span style={modalHeaderAccent}></span>
+            导入机柜
+          </div>
+        }
         open={importModalVisible}
         onCancel={() => {
           setImportModalVisible(false);
@@ -404,26 +518,64 @@ function RackManagement() {
         footer={null}
         width={600}
         destroyOnClose
+        styles={{
+          body: { padding: '24px' },
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }
+        }}
+        style={{ borderRadius: '16px', overflow: 'hidden' }}
       >
         {!isImporting && !importResult ? (
           <div>
-            <p>请上传XLSX格式的机柜数据文件</p>
-            <p style={{ color: '#999', fontSize: '12px', marginBottom: 20 }}>支持的编码格式：UTF-8</p>
+            <div style={{ 
+              padding: '16px', 
+              background: 'linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%)', 
+              borderRadius: '12px',
+              marginBottom: '20px',
+              border: '1px solid #e8e8e8'
+            }}>
+              <p style={{ margin: '0 0 12px 0', fontWeight: '600', color: '#262626' }}>
+                请上传XLSX格式的机柜数据文件
+              </p>
+              <p style={{ margin: 0, color: '#8c8c8c', fontSize: '12px' }}>
+                支持的编码格式：UTF-8
+              </p>
+            </div>
             
-            <div style={{ marginBottom: 20 }}>
-              <p style={{ fontWeight: 'bold', marginBottom: 8 }}>Excel文件格式要求：</p>
-              <ul style={{ paddingLeft: 20, marginBottom: 10 }}>
+            <div style={{ marginBottom: '24px' }}>
+              <p style={{ fontWeight: '600', marginBottom: '12px', color: '#262626' }}>
+                Excel文件格式要求：
+              </p>
+              <ul style={{ 
+                paddingLeft: '20px', 
+                marginBottom: '10px', 
+                color: '#595959',
+                lineHeight: '1.8'
+              }}>
                 <li>必填字段：机柜ID、机柜名称、所属机房名称、高度(U)、最大功率(W)、状态</li>
                 <li>状态值：active(在用)、maintenance(维护中)、inactive(停用)</li>
                 <li>高度和功率必须是数字格式</li>
               </ul>
             </div>
             
-            <div style={{ marginBottom: 20 }}>
-              <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate} style={{ marginRight: 10 }}>
+            <div style={{ 
+              padding: '16px', 
+              background: '#f6f6f6', 
+              borderRadius: '8px',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <Button 
+                icon={<DownloadOutlined />} 
+                onClick={handleDownloadTemplate}
+                style={actionButtonStyle}
+              >
                 下载导入模板
               </Button>
-              <span style={{ color: '#999', fontSize: '12px' }}>包含示例数据的XLSX模板文件</span>
+              <span style={{ color: '#8c8c8c', fontSize: '12px' }}>
+                包含示例数据的XLSX模板文件
+              </span>
             </div>
             
             <Upload
@@ -433,31 +585,72 @@ function RackManagement() {
               beforeUpload={handleImport}
               maxCount={1}
             >
-              <Button type="primary" icon={<UploadOutlined />} block>
+              <Button 
+                type="primary" 
+                icon={<UploadOutlined />} 
+                block
+                style={{
+                  ...primaryButtonStyle,
+                  height: '48px',
+                  fontSize: '16px'
+                }}
+              >
                 选择Excel文件
               </Button>
             </Upload>
           </div>
         ) : (
-          <div>
-            <p>正在导入数据...</p>
-            <Progress percent={importProgress} status="active" style={{ marginBottom: 20 }} />
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <p style={{ marginBottom: '20px', fontWeight: '500' }}>
+              {isImporting ? '正在导入数据...' : '导入完成'}
+            </p>
+            <Progress 
+              percent={importProgress} 
+              status={isImporting ? "active" : "success"}
+              style={{ marginBottom: '24px' }}
+              strokeColor={{
+                '0%': '#667eea',
+                '100%': '#764ba2'
+              }}
+            />
             {importResult && (
-              <div>
-                <p style={{ marginBottom: 10 }}>导入完成：</p>
-                <p>总记录数：{importResult.total || 0}</p>
-                <p>成功：{importResult.imported || 0}</p>
-                <p>重复：{importResult.duplicates || 0}</p>
+              <div style={{ 
+                textAlign: 'left', 
+                background: '#f6f6f6', 
+                padding: '20px', 
+                borderRadius: '12px',
+                marginBottom: '20px'
+              }}>
+                <p style={{ marginBottom: '12px', fontWeight: '600' }}>
+                  导入结果：
+                </p>
+                <p style={{ margin: '8px 0', color: '#52c41a' }}>
+                  ✓ 总记录数：{importResult.total || 0}
+                </p>
+                <p style={{ margin: '8px 0', color: '#52c41a' }}>
+                  ✓ 成功：{importResult.imported || 0}
+                </p>
+                <p style={{ margin: '8px 0', color: importResult.duplicates > 0 ? '#faad14' : '#52c41a' }}>
+                  {importResult.duplicates > 0 ? '⚠' : '✓'} 重复：{importResult.duplicates || 0}
+                </p>
                 {importResult.details && importResult.details.length > 0 && (
-                  <div>
-                    <p style={{ marginTop: 20, fontWeight: 'bold' }}>导入失败记录：</p>
-                    <ul style={{ maxHeight: '300px', overflowY: 'auto', textAlign: 'left' }}>
+                  <div style={{ marginTop: '16px' }}>
+                    <p style={{ fontWeight: '600', color: '#ff4d4f', marginBottom: '8px' }}>
+                      导入失败记录：
+                    </p>
+                    <ul style={{ 
+                      maxHeight: '200px', 
+                      overflowY: 'auto', 
+                      textAlign: 'left',
+                      paddingLeft: '20px',
+                      margin: 0
+                    }}>
                       {importResult.details.map((item, index) => (
-                        <li key={index} style={{ marginBottom: '8px' }}>
+                        <li key={index} style={{ marginBottom: '8px', color: '#ff4d4f' }}>
                           <strong>第 {item.row} 行</strong>
                           <ul style={{ margin: '4px 0 0 20px' }}>
                             {item.errors.map((err, errIndex) => (
-                              <li key={errIndex} style={{ color: '#ff4d4f' }}>{err}</li>
+                              <li key={errIndex}>{err}</li>
                             ))}
                           </ul>
                         </li>
@@ -465,21 +658,21 @@ function RackManagement() {
                     </ul>
                   </div>
                 )}
-                <Button
-                  type="primary"
-                  onClick={() => {
-                    setImportModalVisible(false);
-                    setImportProgress(0);
-                    setImportResult(null);
-                    setIsImporting(false);
-                    fetchRacks();
-                  }}
-                  style={{ marginTop: 20 }}
-                >
-                  确定
-                </Button>
               </div>
             )}
+            <Button
+              type="primary"
+              onClick={() => {
+                setImportModalVisible(false);
+                setImportProgress(0);
+                setImportResult(null);
+                setIsImporting(false);
+                fetchRacks();
+              }}
+              style={primaryButtonStyle}
+            >
+              确定
+            </Button>
           </div>
         )}
       </Modal>

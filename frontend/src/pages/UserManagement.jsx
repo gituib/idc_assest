@@ -323,28 +323,108 @@ const UserManagement = () => {
     marginBottom: '24px',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '16px'
   };
 
   const titleStyle = {
-    fontSize: '20px',
-    fontWeight: '600',
-    margin: 0
+    fontSize: '24px',
+    fontWeight: '700',
+    margin: 0,
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text'
+  };
+
+  const cardStyle = {
+    borderRadius: '16px',
+    border: 'none',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+    overflow: 'hidden'
+  };
+
+  const cardHeadStyle = {
+    borderBottom: '1px solid #f0f0f0',
+    padding: '16px 24px',
+    background: 'linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%)'
+  };
+
+  const primaryButtonStyle = {
+    height: '40px',
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    border: 'none',
+    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.35)',
+    fontWeight: '500',
+    transition: 'all 0.3s ease'
+  };
+
+  const secondaryButtonStyle = {
+    height: '40px',
+    borderRadius: '8px',
+    border: '1px solid #e8e8e8',
+    transition: 'all 0.3s ease'
+  };
+
+  const actionButtonStyle = {
+    height: '32px',
+    borderRadius: '6px',
+    border: '1px solid #e8e8e8',
+    transition: 'all 0.3s ease'
+  };
+
+  const modalHeaderStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '18px',
+    fontWeight: '600'
+  };
+
+  const modalHeaderAccent = {
+    width: '4px',
+    height: '20px',
+    background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
+    borderRadius: '2px'
+  };
+
+  const avatarModalStyle = {
+    textAlign: 'center',
+    padding: '20px 0'
+  };
+
+  const avatarWrapperStyle = {
+    marginBottom: '24px',
+    position: 'relative',
+    display: 'inline-block'
   };
 
   return (
-    <div>
+    <div style={{ padding: '8px' }}>
       <div style={pageHeaderStyle}>
         <h1 style={titleStyle}>用户管理</h1>
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={fetchUsers}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+        <Space size="middle">
+          <Button 
+            icon={<ReloadOutlined />} 
+            onClick={fetchUsers}
+            style={secondaryButtonStyle}
+          >
+            刷新
+          </Button>
+          <Button 
+            type="primary" 
+            icon={<PlusOutlined />} 
+            onClick={handleAdd}
+            style={primaryButtonStyle}
+          >
             添加用户
           </Button>
         </Space>
       </div>
 
-      <Card>
+      <Card style={cardStyle} headStyle={cardHeadStyle} bodyStyle={{ padding: '20px 24px' }}>
         <Table
           columns={columns}
           dataSource={users}
@@ -359,15 +439,27 @@ const UserManagement = () => {
           onChange={(newPagination) => {
             setPagination(prev => ({ ...prev, ...newPagination }));
           }}
+          rowClassName={() => 'table-row'}
         />
       </Card>
 
       <Modal
-        title={editingUser ? '编辑用户' : '添加用户'}
+        title={
+          <div style={modalHeaderStyle}>
+            <span style={modalHeaderAccent}></span>
+            {editingUser ? '编辑用户' : '添加用户'}
+          </div>
+        }
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         footer={null}
         width={500}
+        destroyOnClose
+        styles={{
+          body: { padding: '24px' },
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }
+        }}
+        style={{ borderRadius: '16px', overflow: 'hidden' }}
       >
         <Form
           form={form}
@@ -383,7 +475,7 @@ const UserManagement = () => {
               { min: 3, max: 20, message: '用户名长度必须在3-20个字符之间' }
             ]}
           >
-            <Input placeholder="请输入用户名" />
+            <Input placeholder="请输入用户名" style={{ borderRadius: '8px' }} />
           </Form.Item>
 
           <Form.Item
@@ -391,7 +483,7 @@ const UserManagement = () => {
             label="真实姓名"
             rules={[{ required: true, message: '请输入真实姓名' }]}
           >
-            <Input placeholder="请输入真实姓名" />
+            <Input placeholder="请输入真实姓名" style={{ borderRadius: '8px' }} />
           </Form.Item>
 
           <Form.Item
@@ -402,11 +494,11 @@ const UserManagement = () => {
               { type: 'email', message: '请输入有效的邮箱地址' }
             ]}
           >
-            <Input placeholder="请输入邮箱" />
+            <Input placeholder="请输入邮箱" style={{ borderRadius: '8px' }} />
           </Form.Item>
 
           <Form.Item name="phone" label="手机号">
-            <Input placeholder="请输入手机号" />
+            <Input placeholder="请输入手机号" style={{ borderRadius: '8px' }} />
           </Form.Item>
 
           <Form.Item
@@ -414,7 +506,7 @@ const UserManagement = () => {
             label="角色"
             rules={[{ required: true, message: '请选择角色' }]}
           >
-            <Select mode="multiple" placeholder="请选择角色">
+            <Select mode="multiple" placeholder="请选择角色" style={{ borderRadius: '8px' }}>
               {roles.map(role => (
                 <Option key={role.roleId} value={role.roleId}>
                   {role.roleName}
@@ -432,12 +524,12 @@ const UserManagement = () => {
                 { min: 6, message: '密码长度不能少于6个字符' }
               ]}
             >
-              <Input.Password placeholder="请输入初始密码" />
+              <Input.Password placeholder="请输入初始密码" style={{ borderRadius: '8px' }} />
             </Form.Item>
           )}
 
           <Form.Item name="status" label="状态">
-            <Select placeholder="请选择状态">
+            <Select placeholder="请选择状态" style={{ borderRadius: '8px' }}>
               <Option value="active">正常</Option>
               <Option value="inactive">禁用</Option>
               <Option value="locked">锁定</Option>
@@ -452,14 +544,29 @@ const UserManagement = () => {
                 { min: 6, message: '密码长度不能少于6个字符' }
               ]}
             >
-              <Input.Password placeholder="留空则不修改密码" />
+              <Input.Password placeholder="留空则不修改密码" style={{ borderRadius: '8px' }} />
             </Form.Item>
           )}
 
-          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right', marginTop: '24px' }}>
             <Space>
-              <Button onClick={() => setModalVisible(false)}>取消</Button>
-              <Button type="primary" htmlType="submit" loading={loading}>
+              <Button 
+                onClick={() => setModalVisible(false)}
+                style={{ borderRadius: '8px', height: '40px' }}
+              >
+                取消
+              </Button>
+              <Button 
+                type="primary" 
+                htmlType="submit" 
+                loading={loading}
+                style={{
+                  ...primaryButtonStyle,
+                  width: 'auto',
+                  paddingLeft: '24px',
+                  paddingRight: '24px'
+                }}
+              >
                 {editingUser ? '更新' : '创建'}
               </Button>
             </Space>
@@ -468,11 +575,22 @@ const UserManagement = () => {
       </Modal>
 
       <Modal
-        title={`重置密码 - ${passwordUser?.username}`}
+        title={
+          <div style={modalHeaderStyle}>
+            <span style={modalHeaderAccent}></span>
+            {`重置密码 - ${passwordUser?.username}`}
+          </div>
+        }
         open={passwordModalVisible}
         onCancel={() => setPasswordModalVisible(false)}
         footer={null}
         width={400}
+        destroyOnClose
+        styles={{
+          body: { padding: '24px' },
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }
+        }}
+        style={{ borderRadius: '16px', overflow: 'hidden' }}
       >
         <Form
           form={passwordForm}
@@ -488,13 +606,28 @@ const UserManagement = () => {
               { min: 6, message: '密码长度不能少于6个字符' }
             ]}
           >
-            <Input.Password placeholder="请输入新密码" />
+            <Input.Password placeholder="请输入新密码" style={{ borderRadius: '8px' }} />
           </Form.Item>
 
-          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right', marginTop: '24px' }}>
             <Space>
-              <Button onClick={() => setPasswordModalVisible(false)}>取消</Button>
-              <Button type="primary" htmlType="submit" loading={loading}>
+              <Button 
+                onClick={() => setPasswordModalVisible(false)}
+                style={{ borderRadius: '8px', height: '40px' }}
+              >
+                取消
+              </Button>
+              <Button 
+                type="primary" 
+                htmlType="submit" 
+                loading={loading}
+                style={{
+                  ...primaryButtonStyle,
+                  width: 'auto',
+                  paddingLeft: '24px',
+                  paddingRight: '24px'
+                }}
+              >
                 重置
               </Button>
             </Space>
@@ -503,14 +636,25 @@ const UserManagement = () => {
       </Modal>
 
       <Modal
-        title={`设置头像 - ${avatarUser?.username}`}
+        title={
+          <div style={modalHeaderStyle}>
+            <span style={modalHeaderAccent}></span>
+            {`设置头像 - ${avatarUser?.username}`}
+          </div>
+        }
         open={avatarModalVisible}
         onCancel={() => setAvatarModalVisible(false)}
         footer={null}
         width={400}
+        destroyOnClose
+        styles={{
+          body: { padding: '24px' },
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }
+        }}
+        style={{ borderRadius: '16px', overflow: 'hidden' }}
       >
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <div style={{ marginBottom: '24px' }}>
+        <div style={avatarModalStyle}>
+          <div style={avatarWrapperStyle}>
             <Badge dot={!!avatarUser?.avatar} color="green" offset={[-5, 35]}>
               <Avatar
                 size={120}
@@ -518,7 +662,8 @@ const UserManagement = () => {
                 src={getAvatarUrl(avatarUser)}
                 style={{ 
                   backgroundColor: avatarUser?.avatar ? 'transparent' : '#1890ff',
-                  border: '1px solid #f0f0f0'
+                  border: '1px solid #f0f0f0',
+                  cursor: 'pointer'
                 }}
               />
             </Badge>
@@ -539,6 +684,10 @@ const UserManagement = () => {
               onClick={() => fileInputRef.current?.click()}
               loading={uploadLoading}
               block
+              style={{
+                ...primaryButtonStyle,
+                height: '44px'
+              }}
             >
               {avatarUser?.avatar ? '更换头像' : '上传头像'}
             </Button>
@@ -549,13 +698,14 @@ const UserManagement = () => {
                 icon={<DeleteOutlined />}
                 onClick={handleAvatarDelete}
                 block
+                style={{ borderRadius: '8px', height: '44px' }}
               >
                 删除头像
               </Button>
             )}
           </Space>
 
-          <div style={{ marginTop: '16px', color: '#999', fontSize: '12px' }}>
+          <div style={{ marginTop: '16px', color: '#8c8c8c', fontSize: '12px' }}>
             支持 JPG、PNG、GIF、WebP 格式，大小不超过 5MB
           </div>
         </div>
