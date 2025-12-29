@@ -278,6 +278,7 @@ function RoomManagement() {
           style={tableStyle}
           rowClassName={() => 'table-row'}
         />
+      </Card>
 
       <Modal
         title={
