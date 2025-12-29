@@ -17,7 +17,7 @@ const Ticket = sequelize.define('Ticket', {
   },
   deviceId: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
     comment: '关联设备ID'
   },
   deviceName: {

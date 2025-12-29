@@ -1,6 +1,6 @@
 import React, { useState, Suspense, lazy } from 'react';
 import { Layout, Menu, theme, Button, Dropdown, Avatar, message, Space, Divider } from 'antd';
-import { BarChartOutlined, DatabaseOutlined, CloudServerOutlined, MenuUnfoldOutlined, MenuFoldOutlined, EyeOutlined, BuildOutlined, HomeOutlined, ShoppingCartOutlined, InboxOutlined, ImportOutlined, FileTextOutlined, UserOutlined, LogoutOutlined, HistoryOutlined, AuditOutlined, ToolOutlined, ScheduleOutlined } from '@ant-design/icons';
+import { BarChartOutlined, DatabaseOutlined, CloudServerOutlined, MenuUnfoldOutlined, MenuFoldOutlined, EyeOutlined, BuildOutlined, HomeOutlined, ShoppingCartOutlined, InboxOutlined, ImportOutlined, FileTextOutlined, UserOutlined, LogoutOutlined, HistoryOutlined, AuditOutlined, ToolOutlined, ScheduleOutlined, SettingOutlined } from '@ant-design/icons';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { Spin } from 'antd';
@@ -23,6 +23,7 @@ const TicketManagement = lazy(() => import('./pages/TicketManagement'));
 const TicketCategoryManagement = lazy(() => import('./pages/TicketCategoryManagement'));
 const TicketStatistics = lazy(() => import('./pages/TicketStatistics'));
 const TicketFieldManagement = lazy(() => import('./pages/TicketFieldManagement'));
+const SystemSettings = lazy(() => import('./pages/SystemSettings'));
 
 const { Header, Content, Sider } = Layout;
 
@@ -225,6 +226,11 @@ const AppLayout = ({ children }) => {
                   key: 'operation-logs',
                   icon: <AuditOutlined />,
                   label: <Link to="/operation-logs">操作日志</Link>,
+                },
+                {
+                  key: 'system-settings',
+                  icon: <SettingOutlined />,
+                  label: <Link to="/settings">系统设置</Link>,
                 },
               ],
             },
@@ -460,6 +466,14 @@ function App() {
           element={
             <PrivateRoute>
               <TicketFieldManagement />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <PrivateRoute>
+              <SystemSettings />
             </PrivateRoute>
           }
         />

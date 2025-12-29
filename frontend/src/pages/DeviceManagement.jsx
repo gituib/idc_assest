@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Table, Button, Modal, Form, Input, Select, DatePicker, message, Card, Space, InputNumber, Switch, Upload, Progress, Checkbox, Spin } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, UploadOutlined, DownloadOutlined, SettingOutlined, UndoOutlined, CloudServerOutlined, SwapOutlined, SafetyOutlined, DatabaseOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Select, DatePicker, message, Card, Space, InputNumber, Switch, Upload, Progress, Checkbox, Spin, Dropdown, Tooltip } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, UploadOutlined, DownloadOutlined, SettingOutlined, UndoOutlined, CloudServerOutlined, SwapOutlined, SafetyOutlined, DatabaseOutlined, AppstoreOutlined, MoreOutlined, ReloadOutlined, ExportOutlined, DragOutlined, FileExcelOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 
@@ -96,65 +96,70 @@ const defaultDeviceFields = [
   { fieldName: 'ipAddress', displayName: 'IP地址', fieldType: 'string', required: false, order: 13, visible: true },
   { fieldName: 'description', displayName: '描述', fieldType: 'textarea', required: false, order: 14, visible: true }
 ];
-
-// 可调整列宽的表头组件
-const ResizeableTitle = (props) => {
-  const { onResize, width, ...restProps } = props;
   
-  if (!width) {
-    return <th {...restProps} />;
-  }
-  
-  const handleMouseDown = (e) => {
-    if (!onResize) return;
+  // 简单的可调整列宽的表头组件
+  const ResizableTitle = (props) => {
+    const { children, onResize, width, ...restProps } = props;
     
-    const startX = e.pageX;
-    const startWidth = width;
-    
-    const handleMouseMove = (moveEvent) => {
-      const diff = moveEvent.pageX - startX;
-      const newWidth = Math.max(50, startWidth + diff);
-      onResize(newWidth);
+    const handleMouseDown = (e) => {
+      if (!onResize) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const th = e.currentTarget.closest('th');
+      if (!th) return;
+      
+      const startWidth = th.offsetWidth;
+      const startX = e.clientX;
+      
+      const handleMouseMove = (moveEvent) => {
+        const diff = moveEvent.clientX - startX;
+        const newWidth = Math.max(50, startWidth + diff);
+        onResize(newWidth);
+      };
+      
+      const handleMouseUp = () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+      
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
     };
     
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    return (
+      <th {...restProps} style={{ position: 'relative' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          width: '100%'
+        }}>
+          <span style={{ 
+            flex: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>{children}</span>
+          {onResize && (
+            <div
+              onMouseDown={handleMouseDown}
+              style={{
+                width: '8px',
+                height: '20px',
+                backgroundColor: '#e0e0e0',
+                borderRadius: '4px',
+                cursor: 'col-resize',
+                marginLeft: '8px',
+                flexShrink: 0
+              }}
+            />
+          )}
+        </div>
+      </th>
+    );
   };
-  
-  return (
-    <th
-      {...restProps}
-      style={{
-        position: 'relative',
-        width: width,
-        maxWidth: width,
-        minWidth: width,
-        ...restProps.style,
-      }}
-    >
-      {restProps.children}
-      <div
-        style={{
-          position: 'absolute',
-          right: '-3px',
-          top: 0,
-          bottom: 0,
-          width: '6px',
-          cursor: 'col-resize',
-          backgroundColor: 'transparent',
-          zIndex: 10,
-        }}
-        onMouseDown={handleMouseDown}
-        title="拖拽调整列宽"
-      />
-    </th>
-  );
-};
 
 function DeviceManagement() {
   const [devices, setDevices] = useState([]);
@@ -199,6 +204,27 @@ function DeviceManagement() {
 
   // 字段配置模态框
   const [fieldConfigModalVisible, setFieldConfigModalVisible] = useState(false);
+  
+  // 批量状态变更模态框
+  const [batchStatusModalVisible, setBatchStatusModalVisible] = useState(false);
+  const [batchStatusLoading, setBatchStatusLoading] = useState(false);
+  const [batchStatusForm] = Form.useForm();
+  
+  // 批量移动模态框
+  const [batchMoveModalVisible, setBatchMoveModalVisible] = useState(false);
+  const [batchMoveLoading, setBatchMoveLoading] = useState(false);
+  const [batchMoveForm] = Form.useForm();
+  
+  // 导出选项模态框
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [exportFormat, setExportFormat] = useState('csv');
+  const [exportScope, setExportScope] = useState('selected');
+  const [exportFields, setExportFields] = useState([]);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [currentPageDevices, setCurrentPageDevices] = useState([]);
+  
+  // 全选状态
+  const [selectAll, setSelectAll] = useState(false);
   
   // 列宽状态
   const [columnWidths, setColumnWidths] = useState({});
@@ -429,6 +455,18 @@ function DeviceManagement() {
     fetchDeviceFields();
   }, []);
 
+  // 同步当前页设备数据
+  useEffect(() => {
+    if (filteredDevicesMemo.length > 0) {
+      const start = (pagination.current - 1) * pagination.pageSize;
+      const end = start + pagination.pageSize;
+      const currentPageData = filteredDevicesMemo.slice(start, end);
+      setCurrentPageDevices(currentPageData);
+    } else {
+      setCurrentPageDevices([]);
+    }
+  }, [filteredDevicesMemo, pagination.current, pagination.pageSize]);
+
   // 打开模态框
   const showModal = (device = null) => {
     setEditingDevice(device);
@@ -565,9 +603,15 @@ function DeviceManagement() {
   };
 
   // 表格分页变化处理
-  const handleTableChange = (pagination) => {
-    setPagination(pagination);
-    fetchDevices(pagination.current, pagination.pageSize);
+  const handleTableChange = (newPagination) => {
+    setPagination(newPagination);
+    
+    const start = (newPagination.current - 1) * newPagination.pageSize;
+    const end = start + newPagination.pageSize;
+    const currentPageData = filteredDevicesMemo.slice(start, end);
+    setCurrentPageDevices(currentPageData);
+    
+    fetchDevices(newPagination.current, newPagination.pageSize);
   };
 
   // 批量下线设备
@@ -647,39 +691,177 @@ function DeviceManagement() {
     setDetailModalVisible(true);
   };
 
-  // 导出设备数据
-  const handleExport = async () => {
+  // 打开批量状态变更模态框
+  const showBatchStatusModal = () => {
+    if (selectedDevices.length === 0) {
+      message.warning('请先选择要操作的设备');
+      return;
+    }
+    batchStatusForm.resetFields();
+    setBatchStatusModalVisible(true);
+  };
+
+  // 执行批量状态变更
+  const handleBatchStatusChange = async () => {
     try {
-      if (selectedDevices.length === 0) {
-        message.warning('请先选择要导出的设备');
+      const values = await batchStatusForm.validateFields();
+      setBatchStatusLoading(true);
+      
+      const response = await axios.put('/api/devices/batch-status', {
+        deviceIds: selectedDevices,
+        status: values.status
+      });
+      
+      message.success(response.data.message || '批量状态变更成功');
+      setBatchStatusModalVisible(false);
+      setSelectedDevices([]);
+      setSelectAll(false);
+      fetchDevices();
+    } catch (error) {
+      if (error.errorFields) {
+        return;
+      }
+      message.error('批量状态变更失败');
+      console.error('批量状态变更失败:', error);
+    } finally {
+      setBatchStatusLoading(false);
+    }
+  };
+
+  // 打开批量移动模态框
+  const showBatchMoveModal = () => {
+    if (selectedDevices.length === 0) {
+      message.warning('请先选择要移动的设备');
+      return;
+    }
+    batchMoveForm.resetFields();
+    setBatchMoveModalVisible(true);
+  };
+
+  // 执行批量移动
+  const handleBatchMove = async () => {
+    try {
+      const values = await batchMoveForm.validateFields();
+      setBatchMoveLoading(true);
+      
+      const response = await axios.put('/api/devices/batch-move', {
+        deviceIds: selectedDevices,
+        targetRackId: values.targetRackId,
+        startPosition: values.startPosition
+      });
+      
+      message.success(response.data.message || '批量移动成功');
+      setBatchMoveModalVisible(false);
+      setSelectedDevices([]);
+      setSelectAll(false);
+      fetchDevices();
+      fetchRacks();
+    } catch (error) {
+      if (error.errorFields) {
+        return;
+      }
+      message.error('批量移动失败');
+      console.error('批量移动失败:', error);
+    } finally {
+      setBatchMoveLoading(false);
+    }
+  };
+
+  // 打开导出选项模态框
+  const showExportModal = () => {
+    if (selectedDevices.length === 0) {
+      message.warning('请先选择要导出的设备');
+      return;
+    }
+    setExportFormat('csv');
+    setExportFields(deviceFields.filter(f => f.visible && f.fieldName !== 'rackId').map(f => f.fieldName));
+    setExportModalVisible(true);
+  };
+
+  // 执行增强导出
+  const handleEnhancedExport = async () => {
+    try {
+      setExportLoading(true);
+      
+      const fieldLabels = {};
+      deviceFields.forEach(field => {
+        fieldLabels[field.fieldName] = field.displayName;
+      });
+      
+      let deviceIds = [];
+      if (exportScope === 'selected') {
+        deviceIds = selectedDevices;
+      } else if (exportScope === 'currentPage') {
+        deviceIds = filteredDevicesMemo.map(device => device.deviceId);
+      } else if (exportScope === 'all') {
+        deviceIds = allDevices.map(device => device.deviceId);
+      }
+      
+      if (deviceIds.length === 0) {
+        message.warning('没有可导出的设备');
+        setExportLoading(false);
         return;
       }
       
       const params = new URLSearchParams();
-      selectedDevices.forEach(id => params.append('deviceIds', id));
+      deviceIds.forEach(id => params.append('deviceIds', id));
+      params.append('format', exportFormat);
+      params.append('fields', JSON.stringify(exportFields));
+      params.append('fieldLabels', JSON.stringify(fieldLabels));
       
-      const response = await axios.get(`/api/devices/export?${params.toString()}`, { responseType: 'blob' });
-      const blob = new Blob([response.data], { type: 'text/csv; charset=gbk' });
+      const response = await axios.get(`/api/devices/enhanced-export?${params.toString()}`, { responseType: 'blob' });
+      
+      const contentType = exportFormat === 'csv' ? 'text/csv; charset=gbk' : 'application/json';
+      const blob = new Blob([response.data], { type: contentType });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `devices_export_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `devices_export_${new Date().toISOString().split('T')[0]}.${exportFormat}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      message.success('导出成功');
+      
+      message.success(`成功导出 ${deviceIds.length} 个设备`);
+      setExportModalVisible(false);
     } catch (error) {
       message.error('导出失败');
-      console.error('导出设备失败:', error);
+      console.error('增强导出失败:', error);
+    } finally {
+      setExportLoading(false);
     }
   };
 
-
-
-
-
-  // 导入设备数据
+  // 切换选择全部设备
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedDevices([]);
+      setSelectAll(false);
+    } else {
+      const allIds = filteredDevicesMemo.map(device => device.deviceId);
+      setSelectedDevices(allIds);
+      setSelectAll(true);
+    }
+  };
+  
+  // 处理选择变化
+  const handleSelectionChange = (selectedRowKeys) => {
+    setSelectedDevices(selectedRowKeys);
+    setSelectAll(selectedRowKeys.length === filteredDevicesMemo.length && filteredDevicesMemo.length > 0);
+  };
+  
+  // 全选复选框的处理函数
+  const handleSelectAllCheckbox = (e) => {
+    const checked = e.target.checked;
+    if (checked) {
+      const allIds = filteredDevicesMemo.map(device => device.deviceId);
+      setSelectedDevices(allIds);
+      setSelectAll(true);
+    } else {
+      setSelectedDevices([]);
+      setSelectAll(false);
+    }
+  };
   const handleImport = async (file) => {
     try {
       setIsImporting(true);
@@ -810,13 +992,15 @@ function DeviceManagement() {
     message.success('列宽已重置为默认值');
   };
   
-  // 处理表头单元格拖拽
+  // 处理表头单元格拖拽 - 自定义实现
   const handleHeaderCellResize = (key) => (column) => ({
     width: column.width,
-    onResize: (width) => handleColumnResize(key, width),
+    onResize: (width) => {
+      setColumnWidths(prev => ({ ...prev, [key]: width }));
+    },
   });
-
   
+
   // 动态生成表格列配置
   const columns = React.useMemo(() => {
     const generatedColumns = [];
@@ -942,7 +1126,10 @@ function DeviceManagement() {
           dataIndex: field.fieldName,
           key: field.fieldName,
           width: columnWidths[field.fieldName] || defaultWidth,
+          minWidth: 80,
+          maxWidth: field.fieldType === 'textarea' ? 300 : 200,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
+          ellipsis: field.fieldType !== 'textarea',
         };
         
         // 设备名称和ID列添加点击效果
@@ -953,7 +1140,11 @@ function DeviceManagement() {
               style={{ 
                 color: '#1890ff', 
                 textDecoration: 'none',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
               onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
               onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
@@ -971,17 +1162,32 @@ function DeviceManagement() {
     generatedColumns.push({
       title: '操作',
       key: 'action',
-      width: columnWidths.action || 120,
+      width: columnWidths.action || 80,
+      minWidth: 60,
+      maxWidth: 100,
       onHeaderCell: handleHeaderCellResize('action'),
       render: (_, record) => (
-        <Space size="middle">
-          <Button type="primary" icon={<EditOutlined />} onClick={() => showModal(record)} size="small">
-            编辑
-          </Button>
-          <Button danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.deviceId)} size="small">
-            删除
-          </Button>
-        </Space>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <Tooltip title="编辑">
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => showModal(record)}
+              size="small"
+              style={{ color: '#1890ff', padding: '4px 8px' }}
+            />
+          </Tooltip>
+          <Tooltip title="删除">
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record.deviceId)}
+              size="small"
+              style={{ padding: '4px 8px' }}
+            />
+          </Tooltip>
+        </div>
       ),
     });
     
@@ -1023,7 +1229,7 @@ function DeviceManagement() {
     justifyContent: 'space-between',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: '16px'
+    gap: '12px'
   };
 
   const titleStyle = {
@@ -1077,25 +1283,120 @@ function DeviceManagement() {
 
   return (
     <div style={{ padding: '24px' }}>
+      <style>{`
+        /* 表格自适应换行样式 */
+        .device-table-wrapper .ant-table {
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+        
+        .device-table-wrapper .ant-table-container {
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+        
+        .device-table-wrapper .ant-table-content {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: hidden !important;
+        }
+        
+        .device-table-wrapper .ant-table-thead > tr > th {
+          white-space: normal !important;
+          word-break: break-word !important;
+          font-size: 14px !important;
+          font-weight: 500 !important;
+          line-height: 1.4 !important;
+          padding: 12px 8px !important;
+        }
+        
+        .device-table-wrapper .ant-table-tbody > tr > td {
+          white-space: normal !important;
+          word-break: break-word !important;
+          line-height: 1.6 !important;
+          max-width: 250px !important;
+          padding: 12px 8px !important;
+        }
+        
+        .device-table-wrapper .ant-table-tbody > tr > td .ant-typography,
+        .device-table-wrapper .ant-table-tbody > tr > td .ant-typography-expand,
+        .device-table-wrapper .ant-table-tbody > tr > td span {
+          white-space: normal !important;
+          word-break: break-word !important;
+        }
+        
+        .device-table-wrapper .ant-table-cell {
+          word-break: break-word !important;
+        }
+        
+        /* 斑马纹样式 */
+        .device-table-wrapper .ant-table-row-even {
+          background-color: #fafafa;
+        }
+        
+        .device-table-wrapper .ant-table-row-odd {
+          background-color: #ffffff;
+        }
+        
+        .device-table-wrapper .ant-table-row-selected {
+          background-color: #e6f7ff !important;
+        }
+        
+        .device-table-wrapper .ant-table-row-selected:hover > td {
+          background-color: #bae7ff !important;
+        }
+        
+        /* 表格行悬停效果 */
+        .device-table-wrapper .ant-table-tbody > tr:hover > td {
+          background-color: #f5f5f5 !important;
+        }
+        
+        /* 复选框列固定 */
+        .device-table-wrapper .ant-table-selection-column {
+          position: sticky !important;
+          left: 0 !important;
+          z-index: 2 !important;
+          background: inherit !important;
+        }
+        
+        /* 操作列样式 */
+        .device-table-wrapper .ant-table-tbody > tr > td:last-child {
+          min-width: 120px !important;
+          max-width: 150px !important;
+        }
+        
+        /* 分页器样式 */
+        .device-table-wrapper .ant-pagination {
+          margin: 16px 0 !important;
+          flex-wrap: wrap !important;
+          justify-content: center !important;
+        }
+        
+        /* 响应式调整 */
+        @media screen and (max-width: 768px) {
+          .device-table-wrapper .ant-table-tbody > tr > td {
+            max-width: 150px !important;
+            font-size: 13px !important;
+          }
+          
+          .device-table-wrapper .ant-table-thead > tr > th {
+            font-size: 13px !important;
+          }
+        }
+      `}</style>
+      
       <div style={pageHeaderStyle}>
         <h1 style={titleStyle}>
           <CloudServerOutlined style={{ marginRight: '12px' }} />
           设备管理
         </h1>
-        <Space size={12}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
           <Button
             style={primaryButtonStyle}
             icon={<PlusOutlined />}
             onClick={() => showModal()}
           >
             添加设备
-          </Button>
-          <Button
-            style={secondaryButtonStyle}
-            icon={<DownloadOutlined />}
-            onClick={handleExport}
-          >
-            导出设备
           </Button>
           <Button
             style={secondaryButtonStyle}
@@ -1122,14 +1423,26 @@ function DeviceManagement() {
           <Button
             style={{
               ...secondaryButtonStyle,
-              color: selectedDevices.length > 0 ? '#1890ff' : undefined,
-              borderColor: selectedDevices.length > 0 ? '#1890ff' : undefined
+              color: selectedDevices.length > 0 ? '#52c41a' : undefined,
+              borderColor: selectedDevices.length > 0 ? '#52c41a' : undefined
             }}
-            icon={<SwapOutlined />}
+            icon={<ReloadOutlined />}
             disabled={selectedDevices.length === 0}
-            onClick={handleBatchOffline}
+            onClick={showBatchStatusModal}
           >
-            一键下线 ({selectedDevices.length})
+            状态变更 ({selectedDevices.length})
+          </Button>
+          <Button
+            style={{
+              ...secondaryButtonStyle,
+              color: selectedDevices.length > 0 ? '#722ed1' : undefined,
+              borderColor: selectedDevices.length > 0 ? '#722ed1' : undefined
+            }}
+            icon={<DragOutlined />}
+            disabled={selectedDevices.length === 0}
+            onClick={showBatchMoveModal}
+          >
+            批量移动 ({selectedDevices.length})
           </Button>
           <Button
             style={{
@@ -1142,17 +1455,30 @@ function DeviceManagement() {
             disabled={selectedDevices.length === 0}
             onClick={handleBatchDelete}
           >
-            一键删除 ({selectedDevices.length})
+            批量删除 ({selectedDevices.length})
           </Button>
-        </Space>
+          <Button
+            style={{
+              ...secondaryButtonStyle,
+              color: selectedDevices.length > 0 ? '#ff4d4f' : undefined,
+              borderColor: selectedDevices.length > 0 ? '#ff4d4f' : undefined
+            }}
+            danger
+            icon={<SwapOutlined />}
+            disabled={selectedDevices.length === 0}
+            onClick={handleBatchOffline}
+          >
+            批量下线 ({selectedDevices.length})
+          </Button>
+        </div>
       </div>
 
-      <Card size="small" style={searchCardStyle} styles={{ body: { padding: '16px 20px' } }}>
+      <Card size="small" style={searchCardStyle} styles={{ body: { padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px' } }}>
         <Form
           form={searchForm}
           layout="inline"
           onFinish={handleSearch}
-          style={{ width: '100%' }}
+          style={{ flex: 1 }}
         >
           <Form.Item name="keyword">
             <Input
@@ -1216,6 +1542,18 @@ function DeviceManagement() {
             </Space>
           </Form.Item>
         </Form>
+        <Button
+          style={{
+            ...secondaryButtonStyle,
+            color: '#fa8c16',
+            borderColor: '#fa8c16',
+            whiteSpace: 'nowrap'
+          }}
+          icon={<ExportOutlined />}
+          onClick={showExportModal}
+        >
+          增强导出
+        </Button>
       </Card>
 
       <Card style={cardStyle}>
@@ -1230,25 +1568,63 @@ function DeviceManagement() {
             <p>暂无设备数据</p>
           </div>
         )}
-        <Table
-          components={{
-            header: {
-              cell: ResizeableTitle,
-            },
-          }}
-          columns={columns}
-          dataSource={filteredDevicesMemo}
-          rowKey="deviceId"
-          loading={loading || searching}
-          pagination={pagination}
-          onChange={handleTableChange}
-          scroll={{ y: 600, x: 'max-content' }}
-          virtual
-          rowSelection={{
-            selectedRowKeys: selectedDevices,
-            onChange: setSelectedDevices,
-          }}
-        />
+        <div className="device-table-wrapper">
+          <Table
+            columns={columns}
+            dataSource={filteredDevicesMemo}
+            rowKey="deviceId"
+            loading={loading || searching}
+            pagination={pagination}
+            onChange={handleTableChange}
+            scroll={{ y: 'calc(100vh - 380px)', scrollToFirstRowOnChange: true }}
+            virtual
+            components={{
+              header: {
+                cell: ResizableTitle,
+              },
+            }}
+            style={{ width: '100%', maxWidth: '100%' }}
+            size="middle"
+            rowSelection={{
+              selectedRowKeys: selectedDevices,
+              onChange: handleSelectionChange,
+              columnWidth: 48,
+              fixed: 'left',
+              type: 'checkbox',
+              crossPageSelect: true,
+              selections: [
+                { key: 'all', text: '全选', onSelect: () => {
+                  const allIds = filteredDevicesMemo.map(device => device.deviceId);
+                  setSelectedDevices(allIds);
+                  setSelectAll(true);
+                }},
+                { key: 'invert', text: '反选', onSelect: () => {
+                  const visibleIds = filteredDevicesMemo.map(device => device.deviceId);
+                  const newSelected = visibleIds.filter(id => !selectedDevices.includes(id));
+                  setSelectedDevices(newSelected);
+                  setSelectAll(newSelected.length === filteredDevicesMemo.length);
+                }},
+                { key: 'none', text: '清除选择', onSelect: () => {
+                  setSelectedDevices([]);
+                  setSelectAll(false);
+                }},
+              ],
+            }}
+            onRow={(record) => ({
+              onClick: () => handleSelectionChange(
+                selectedDevices.includes(record.deviceId)
+                  ? selectedDevices.filter(id => id !== record.deviceId)
+                  : [...selectedDevices, record.deviceId]
+              ),
+            })}
+            rowClassName={(record, index) => {
+              if (selectedDevices.includes(record.deviceId)) {
+                return 'ant-table-row-selected';
+              }
+              return index % 2 === 0 ? 'ant-table-row-even' : 'ant-table-row-odd';
+            }}
+          />
+        </div>
       </Card>
 
       <Modal
@@ -1668,6 +2044,154 @@ function DeviceManagement() {
             </Card>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        title={
+          <div style={modalHeaderStyle}>
+            <ReloadOutlined style={{ color: '#52c41a' }} />
+            批量状态变更
+          </div>
+        }
+        open={batchStatusModalVisible}
+        onCancel={() => setBatchStatusModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setBatchStatusModalVisible(false)} style={secondaryButtonStyle}>
+            取消
+          </Button>,
+          <Button key="submit" type="primary" loading={batchStatusLoading} onClick={handleBatchStatusChange} style={primaryButtonStyle}>
+            确定
+          </Button>
+        ]}
+        destroyOnHidden
+        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
+      >
+        <Form form={batchStatusForm} layout="vertical">
+          <Form.Item
+            name="status"
+            label="选择新状态"
+            rules={[{ required: true, message: '请选择设备状态' }]}
+          >
+            <Select placeholder="请选择设备状态" style={{ width: '100%' }}>
+              <Option value="running">运行中</Option>
+              <Option value="maintenance">维护中</Option>
+              <Option value="offline">离线</Option>
+              <Option value="fault">故障</Option>
+            </Select>
+          </Form.Item>
+          <div style={{ color: '#666', fontSize: '13px' }}>
+            已选择 <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedDevices.length}</span> 个设备
+          </div>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={
+          <div style={modalHeaderStyle}>
+            <DragOutlined style={{ color: '#722ed1' }} />
+            批量移动设备
+          </div>
+        }
+        open={batchMoveModalVisible}
+        onCancel={() => setBatchMoveModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setBatchMoveModalVisible(false)} style={secondaryButtonStyle}>
+            取消
+          </Button>,
+          <Button key="submit" type="primary" loading={batchMoveLoading} onClick={handleBatchMove} style={primaryButtonStyle}>
+            确定
+          </Button>
+        ]}
+        destroyOnHidden
+        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
+      >
+        <Form form={batchMoveForm} layout="vertical">
+          <Form.Item
+            name="targetRackId"
+            label="目标机柜"
+            rules={[{ required: true, message: '请选择目标机柜' }]}
+          >
+            <Select placeholder="请选择目标机柜" style={{ width: '100%' }}>
+              {racks.map(rack => (
+                <Option key={rack.rackId} value={rack.rackId}>
+                  {rack.name} {rack.Room ? `(${rack.Room.name})` : ''}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="startPosition"
+            label="起始U位"
+            rules={[{ required: true, message: '请输入起始U位' }]}
+          >
+            <InputNumber min={1} placeholder="输入起始U位" style={{ width: '100%' }} />
+          </Form.Item>
+          <div style={{ color: '#666', fontSize: '13px' }}>
+            已选择 <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedDevices.length}</span> 个设备
+          </div>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={
+          <div style={modalHeaderStyle}>
+            <ExportOutlined style={{ color: '#fa8c16' }} />
+            导出设备数据
+          </div>
+        }
+        open={exportModalVisible}
+        onCancel={() => setExportModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setExportModalVisible(false)} style={secondaryButtonStyle}>
+            取消
+          </Button>,
+          <Button key="submit" type="primary" loading={exportLoading} onClick={handleEnhancedExport} style={primaryButtonStyle}>
+            导出
+          </Button>
+        ]}
+        destroyOnHidden
+        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
+        width={600}
+      >
+        <Form layout="vertical">
+          <Form.Item label="导出格式">
+            <Select value={exportFormat} onChange={setExportFormat} style={{ width: '100%' }}>
+              <Option value="csv">CSV 格式</Option>
+              <Option value="json">JSON 格式</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="导出范围">
+            <Select value={exportScope} onChange={setExportScope} style={{ width: '100%' }}>
+              <Option value="selected">选择的行 ({selectedDevices.length} 个)</Option>
+              <Option value="currentPage">当前页 ({currentPageDevices.length} 个)</Option>
+              <Option value="all">全部设备 ({allDevices.length} 个)</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="选择导出字段">
+            <div style={{ maxHeight: '300px', overflow: 'auto', border: '1px solid #f0f0f0', borderRadius: '8px', padding: '12px' }}>
+              {deviceFields.filter(f => f.visible && f.fieldName !== 'rackId').map(field => (
+                <div key={field.fieldName} style={{ marginBottom: '8px' }}>
+                  <Checkbox
+                    checked={exportFields.includes(field.fieldName)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setExportFields([...exportFields, field.fieldName]);
+                      } else {
+                        setExportFields(exportFields.filter(f => f !== field.fieldName));
+                      }
+                    }}
+                  >
+                    {field.displayName}
+                  </Checkbox>
+                </div>
+              ))}
+            </div>
+          </Form.Item>
+          <div style={{ color: '#666', fontSize: '13px' }}>
+            已选择 <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedDevices.length}</span> 个设备，
+            将导出 <span style={{ color: '#52c41a', fontWeight: 600 }}>{exportFields.length}</span> 个字段
+          </div>
+        </Form>
       </Modal>
     </div>
   );

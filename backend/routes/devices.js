@@ -10,6 +10,7 @@ const Device = require('../models/Device');
 const Rack = require('../models/Rack');
 const Room = require('../models/Room');
 const DeviceField = require('../models/DeviceField');
+const Ticket = require('../models/Ticket');
 
 // 获取所有设备（支持搜索和筛选）
 router.get('/', async (req, res) => {
@@ -653,16 +654,23 @@ router.delete('/batch-delete', async (req, res) => {
   try {
     const { deviceIds } = req.body;
     
-    if (!deviceIds || !Array.isArray(deviceIds)) {
-      return res.status(400).json({ error: '无效的设备ID列表' });
+    if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return res.status(400).json({ error: '请提供有效的设备ID列表' });
     }
     
-    // 先获取所有设备的功率信息
     const devices = await Device.findAll({
-      where: { deviceId: deviceIds }
+      where: { deviceId: { [Op.in]: deviceIds } }
     });
     
-    // 更新机柜功率
+    await Ticket.update(
+      { deviceId: null },
+      { where: { deviceId: { [Op.in]: deviceIds } } }
+    );
+    
+    const deletedCount = await Device.destroy({
+      where: { deviceId: { [Op.in]: deviceIds } }
+    });
+    
     for (const device of devices) {
       const rack = await Rack.findByPk(device.rackId);
       if (rack) {
@@ -672,12 +680,10 @@ router.delete('/batch-delete', async (req, res) => {
       }
     }
     
-    // 删除设备
-    const deleted = await Device.destroy({
-      where: { deviceId: deviceIds }
+    res.json({
+      message: `批量删除成功，已删除 ${deletedCount} 个设备`,
+      deletedCount
     });
-    
-    res.json({ message: `成功删除 ${deleted} 个设备` });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -711,6 +717,331 @@ router.delete('/:deviceId', async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// 批量上线设备
+router.put('/batch-online', async (req, res) => {
+  try {
+    const { deviceIds } = req.body;
+    
+    if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return res.status(400).json({ error: '请提供有效的设备ID列表' });
+    }
+    
+    // 更新设备状态为运行中
+    const [affectedCount] = await Device.update(
+      { status: 'running' },
+      { where: { deviceId: { [Op.in]: deviceIds } } }
+    );
+    
+    res.json({
+      message: `批量上线成功，已更新 ${affectedCount} 个设备`,
+      affectedCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 批量下线设备
+router.put('/batch-offline', async (req, res) => {
+  try {
+    const { deviceIds } = req.body;
+    
+    if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return res.status(400).json({ error: '请提供有效的设备ID列表' });
+    }
+    
+    // 更新设备状态为离线
+    const [affectedCount] = await Device.update(
+      { status: 'offline' },
+      { where: { deviceId: { [Op.in]: deviceIds } } }
+    );
+    
+    res.json({
+      message: `批量下线成功，已更新 ${affectedCount} 个设备`,
+      affectedCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 批量变更设备状态
+router.put('/batch-status', async (req, res) => {
+  try {
+    const { deviceIds, status } = req.body;
+    
+    if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return res.status(400).json({ error: '请提供有效的设备ID列表' });
+    }
+    
+    const validStatus = ['running', 'maintenance', 'offline', 'fault'];
+    if (!validStatus.includes(status)) {
+      return res.status(400).json({ 
+        error: `状态值无效，有效值为：${validStatus.join('、')}` 
+      });
+    }
+    
+    // 状态映射
+    const statusText = {
+      running: '运行中',
+      maintenance: '维护中',
+      offline: '离线',
+      fault: '故障'
+    };
+    
+    // 更新设备状态
+    const [affectedCount] = await Device.update(
+      { status },
+      { where: { deviceId: { [Op.in]: deviceIds } } }
+    );
+    
+    res.json({
+      message: `批量状态变更成功，已将 ${affectedCount} 个设备状态变更为"${statusText[status]}"`,
+      affectedCount,
+      newStatus: status
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 批量移动设备
+router.put('/batch-move', async (req, res) => {
+  try {
+    const { deviceIds, targetRackId, startPosition } = req.body;
+    
+    if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return res.status(400).json({ error: '请提供有效的设备ID列表' });
+    }
+    
+    if (!targetRackId) {
+      return res.status(400).json({ error: '请提供目标机柜ID' });
+    }
+    
+    if (startPosition === undefined || startPosition === null) {
+      return res.status(400).json({ error: '请提供起始U位' });
+    }
+    
+    // 验证目标机柜是否存在
+    const targetRack = await Rack.findByPk(targetRackId);
+    if (!targetRack) {
+      return res.status(404).json({ error: '目标机柜不存在' });
+    }
+    
+    // 获取要移动的设备
+    const devices = await Device.findAll({
+      where: { deviceId: { [Op.in]: deviceIds } }
+    });
+    
+    if (devices.length === 0) {
+      return res.status(404).json({ error: '未找到指定的设备' });
+    }
+    
+    const movedDevices = [];
+    let currentPosition = parseInt(startPosition);
+    
+    // 按原位置排序设备
+    devices.sort((a, b) => a.position - b.position);
+    
+    for (const device of devices) {
+      // 计算新位置
+      const newPosition = currentPosition;
+      
+      // 验证位置是否在机柜范围内
+      if (newPosition < 1 || newPosition > targetRack.height) {
+        return res.status(400).json({ 
+          error: `设备 ${device.name} 的位置 ${newPosition} 超出机柜高度范围(1-${targetRack.height})` 
+        });
+      }
+      
+      // 检查目标位置是否被其他设备占用（排除自身）
+      const existingDevice = await Device.findOne({
+        where: {
+          rackId: targetRackId,
+          position: newPosition,
+          deviceId: { [Op.ne]: device.deviceId }
+        }
+      });
+      
+      if (existingDevice) {
+        return res.status(400).json({ 
+          error: `机柜 ${targetRack.name} 的位置 ${newPosition} 已被设备 ${existingDevice.name} 占用` 
+        });
+      }
+      
+      // 计算功率变化
+      const oldPower = device.powerConsumption;
+      
+      // 更新设备位置
+      await device.update({
+        rackId: targetRackId,
+        position: newPosition
+      });
+      
+      // 更新原机柜和新机柜的功率
+      const oldRack = await Rack.findByPk(device.rackId);
+      if (oldRack) {
+        await oldRack.update({
+          currentPower: Math.max(0, oldRack.currentPower - oldPower)
+        });
+      }
+      
+      await targetRack.update({
+        currentPower: targetRack.currentPower + oldPower
+      });
+      
+      movedDevices.push({
+        deviceId: device.deviceId,
+        name: device.name,
+        oldRackId: device.rackId,
+        newRackId: targetRackId,
+        oldPosition: device.position,
+        newPosition: newPosition
+      });
+      
+      // 下一个设备的起始位置 = 当前设备位置 + 当前设备高度
+      currentPosition += device.height;
+    }
+    
+    res.json({
+      message: `批量移动成功，已移动 ${movedDevices.length} 个设备`,
+      movedDevices
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 增强导出设备数据（支持自定义字段选择和格式选择）
+router.get('/enhanced-export', async (req, res) => {
+  try {
+    const { deviceIds, format = 'csv', fields, fieldLabels } = req.query;
+    
+    // 解析字段列表
+    let selectedFields = [];
+    try {
+      selectedFields = fields ? JSON.parse(fields) : [];
+    } catch (e) {
+      selectedFields = [];
+    }
+    
+    // 解析字段标签
+    let fieldLabelMap = {};
+    try {
+      fieldLabelMap = fieldLabels ? JSON.parse(fieldLabels) : {};
+    } catch (e) {
+      fieldLabelMap = {};
+    }
+    
+    // 构建查询条件
+    const where = {};
+    if (deviceIds) {
+      const ids = Array.isArray(deviceIds) ? deviceIds : [deviceIds];
+      where.deviceId = { [Op.in]: ids };
+    }
+    
+    // 查询设备数据
+    const devices = await Device.findAll({
+      where,
+      include: [
+        {
+          model: Rack,
+          include: [
+            { model: Room }
+          ]
+        }
+      ]
+    });
+    
+    if (devices.length === 0) {
+      return res.status(404).json({ error: '未找到指定的设备' });
+    }
+    
+    // 准备导出数据
+    const exportData = devices.map(device => {
+      const data = {};
+      
+      selectedFields.forEach(fieldName => {
+        // 映射字段名到中文标签
+        const label = fieldLabelMap[fieldName] || fieldName;
+        
+        // 根据字段名获取值
+        if (fieldName === 'rackName') {
+          data[label] = device.Rack?.name || '';
+        } else if (fieldName === 'roomName') {
+          data[label] = device.Rack?.Room?.name || '';
+        } else if (fieldName === 'status') {
+          const statusMap = {
+            running: '运行中',
+            maintenance: '维护中',
+            offline: '离线',
+            fault: '故障'
+          };
+          data[label] = statusMap[device.status] || device.status;
+        } else if (fieldName === 'type') {
+          const typeMap = {
+            server: '服务器',
+            switch: '交换机',
+            router: '路由器',
+            storage: '存储设备',
+            other: '其他设备'
+          };
+          data[label] = typeMap[device.type] || device.type;
+        } else if (fieldName === 'purchaseDate' || fieldName === 'warrantyExpiry') {
+          data[label] = device[fieldName] ? new Date(device[fieldName]).toLocaleDateString('zh-CN') : '';
+        } else if (fieldName === 'customFields' && device.customFields) {
+          // 如果选择导出自定义字段，展开为单独的列
+          Object.entries(device.customFields).forEach(([key, value]) => {
+            data[key] = value;
+          });
+        } else if (device[fieldName] !== undefined) {
+          data[label] = device[fieldName];
+        }
+      });
+      
+      return data;
+    });
+    
+    if (format === 'json') {
+      // JSON格式导出
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename=devices.json');
+      res.json({
+        exportTime: new Date().toISOString(),
+        totalCount: devices.length,
+        devices: exportData
+      });
+    } else {
+      // CSV格式导出
+      const csvWriter = createObjectCsvWriter({
+        path: path.join(__dirname, '../temp/enhanced_export.csv'),
+        header: Object.keys(exportData[0] || {}).map(key => ({ id: key, title: key })),
+        encoding: 'utf8'
+      });
+      
+      // 确保temp目录存在
+      if (!fs.existsSync(path.join(__dirname, '../temp'))) {
+        fs.mkdirSync(path.join(__dirname, '../temp'));
+      }
+      
+      await csvWriter.writeRecords(exportData);
+      
+      const csvContent = fs.readFileSync(path.join(__dirname, '../temp/enhanced_export.csv'), 'utf8');
+      const gbkContent = iconv.encode(csvContent, 'gbk');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=devices.csv');
+      
+      res.send(gbkContent);
+      
+      fs.unlinkSync(path.join(__dirname, '../temp/enhanced_export.csv'));
+    }
+  } catch (error) {
+    console.error('增强导出失败:', error);
+    res.status(500).json({ error: '增强导出失败' });
   }
 });
 

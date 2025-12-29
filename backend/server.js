@@ -39,6 +39,11 @@ sequelize.authenticate()
     // 初始化工单模型关联
     return require('./models/ticketIndex').initializeModels();
   })
+  .then(() => {
+    // 同步系统设置模型
+    const SystemSetting = require('./models/SystemSetting');
+    return SystemSetting.sync();
+  })
   .catch(err => console.error('数据库操作失败:', err));
 
 // 导入路由
@@ -58,6 +63,7 @@ const operationLogsRoutes = require('./routes/operationLogs');
 const ticketRoutes = require('./routes/tickets');
 const ticketCategoryRoutes = require('./routes/ticketCategories');
 const ticketFieldRoutes = require('./routes/ticketFields');
+const systemSettingsRoutes = require('./routes/systemSettings');
 
 // 使用路由
 app.use('/api/devices', deviceRoutes);
@@ -76,6 +82,7 @@ app.use('/api/operation-logs', operationLogsRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/ticket-categories', ticketCategoryRoutes);
 app.use('/api/ticket-fields', ticketFieldRoutes);
+app.use('/api/system-settings', systemSettingsRoutes);
 
 // 静态文件服务
 app.use('/uploads', express.static('uploads'));
