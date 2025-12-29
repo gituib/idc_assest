@@ -22,6 +22,7 @@ const Login = lazy(() => import('./pages/Login'));
 const TicketManagement = lazy(() => import('./pages/TicketManagement'));
 const TicketCategoryManagement = lazy(() => import('./pages/TicketCategoryManagement'));
 const TicketStatistics = lazy(() => import('./pages/TicketStatistics'));
+const TicketFieldManagement = lazy(() => import('./pages/TicketFieldManagement'));
 
 const { Header, Content, Sider } = Layout;
 
@@ -247,6 +248,11 @@ const AppLayout = ({ children }) => {
                   icon: <BarChartOutlined />,
                   label: <Link to="/ticket-statistics">统计报表</Link>,
                 },
+                {
+                  key: 'ticket-fields',
+                  icon: <DatabaseOutlined />,
+                  label: <Link to="/ticket-fields">字段管理</Link>,
+                },
               ],
             },
           ]}
@@ -446,6 +452,14 @@ function App() {
           element={
             <PrivateRoute>
               <TicketStatistics />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/ticket-fields"
+          element={
+            <PrivateRoute>
+              <TicketFieldManagement />
             </PrivateRoute>
           }
         />

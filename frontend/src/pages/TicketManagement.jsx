@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, Select, DatePicker, message, Card, Space, Tag, Dropdown, Menu, Tabs, Timeline, Descriptions } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EyeOutlined, MoreOutlined, UserOutlined, ToolOutlined, CheckCircleOutlined, SyncOutlined, ClockCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Table, Button, Modal, Form, Input, Select, DatePicker, message, Card, Space, Tag, Dropdown, Menu, Tabs, Timeline, Descriptions, Checkbox, Popover, InputNumber, Switch } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EyeOutlined, MoreOutlined, UserOutlined, ToolOutlined, CheckCircleOutlined, SyncOutlined, ClockCircleOutlined, CloseCircleOutlined, SettingOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 
@@ -8,6 +8,29 @@ const { Option } = Select;
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
 const { TabPane } = Tabs;
+
+const BUILTIN_TICKET_FIELDS = [
+  'ticketId', 'title', 'deviceId', 'deviceName', 'deviceModel', 'serialNumber',
+  'faultCategory', 'faultSubCategory', 'priority', 'status', 'description',
+  'expectedCompletionDate', 'reporterId', 'reporterName', 'assigneeId', 'assigneeName',
+  'location', 'resolution', 'completionDate', 'evaluation', 'evaluationRating',
+  'attachments', 'tags', 'notes', 'result', 'solution', 'usedParts'
+];
+
+const DEFAULT_TICKET_FIELDS = [
+  { fieldName: 'title', displayName: '标题', fieldType: 'string', required: true, order: 1, visible: true },
+  { fieldName: 'deviceId', displayName: '关联设备', fieldType: 'device', required: false, order: 2, visible: true },
+  { fieldName: 'deviceName', displayName: '设备名称', fieldType: 'string', required: false, order: 3, visible: true },
+  { fieldName: 'serialNumber', displayName: '设备序列号', fieldType: 'string', required: false, order: 4, visible: true },
+  { fieldName: 'faultCategory', displayName: '故障分类', fieldType: 'select', required: true, order: 5, visible: true, options: [] },
+  { fieldName: 'priority', displayName: '优先级', fieldType: 'select', required: true, order: 6, visible: true, options: [
+    { value: 'low', label: '低' }, { value: 'medium', label: '中' }, { value: 'high', label: '高' }, { value: 'urgent', label: '紧急' }
+  ]},
+  { fieldName: 'description', displayName: '故障描述', fieldType: 'textarea', required: true, order: 7, visible: true },
+  { fieldName: 'expectedCompletionDate', displayName: '期望完成时间', fieldType: 'datetime', required: false, order: 8, visible: true },
+  { fieldName: 'resolution', displayName: '解决方案', fieldType: 'textarea', required: false, order: 9, visible: true },
+  { fieldName: 'notes', displayName: '备注', fieldType: 'textarea', required: false, order: 10, visible: true }
+];
 
 const getStatusColor = (status) => {
   const colors = {
@@ -75,6 +98,8 @@ function TicketManagement() {
 
   const [searchFilters, setSearchFilters] = useState({});
   const [deviceSource, setDeviceSource] = useState('select');
+  const [ticketFields, setTicketFields] = useState(DEFAULT_TICKET_FIELDS);
+  const [loadingFields, setLoadingFields] = useState(true);
 
   const fetchTickets = useCallback(async (page = 1, pageSize = 10, filters = {}) => {
     try {
@@ -89,7 +114,17 @@ function TicketManagement() {
       const response = await axios.get('/api/tickets', { params });
       const { tickets: ticketList, total } = response.data;
 
-      setTickets(ticketList);
+      const processedTickets = ticketList.map(ticket => {
+        const processed = { ...ticket };
+        if (ticket.metadata && typeof ticket.metadata === 'object') {
+          Object.entries(ticket.metadata).forEach(([key, value]) => {
+            processed[key] = value;
+          });
+        }
+        return processed;
+      });
+
+      setTickets(processedTickets);
       setPagination(prev => ({ ...prev, current: page, pageSize, total }));
     } catch (error) {
       message.error('获取工单列表失败');
@@ -111,11 +146,164 @@ function TicketManagement() {
   const fetchCategories = useCallback(async () => {
     try {
       const response = await axios.get('/api/ticket-categories');
+      const categoryOptions = (response.data || []).map(cat => ({ value: cat.name, label: cat.name }));
       setCategories(response.data || []);
+      setTicketFields(prev => prev.map(field => 
+        field.fieldName === 'faultCategory' ? { ...field, options: categoryOptions } : field
+      ));
     } catch (error) {
       console.error('获取分类列表失败:', error);
     }
   }, []);
+
+  const fetchTicketFields = useCallback(async () => {
+    try {
+      setLoadingFields(true);
+      const response = await axios.get('/api/ticket-fields');
+      const sortedFields = response.data.sort((a, b) => a.order - b.order);
+      setTicketFields(sortedFields);
+    } catch (error) {
+      console.error('获取工单字段配置失败:', error);
+      setTicketFields(DEFAULT_TICKET_FIELDS);
+    } finally {
+      setLoadingFields(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTickets();
+    fetchDevices();
+    fetchCategories();
+    fetchTicketFields();
+  }, [fetchTickets, fetchDevices, fetchCategories, fetchTicketFields]);
+
+  const renderFormItem = useCallback((field) => {
+    const { fieldName, displayName, fieldType, required, options, placeholder } = field;
+    const rules = required ? [{ required: true, message: `请选择或输入${displayName}` }] : [];
+
+    let formItem;
+    switch (fieldType) {
+      case 'string':
+        formItem = <Input placeholder={placeholder || `请输入${displayName}`} />;
+        break;
+      case 'number':
+        formItem = <InputNumber placeholder={placeholder || `请输入${displayName}`} style={{ width: '100%' }} />;
+        break;
+      case 'textarea':
+        formItem = <Input.TextArea rows={3} placeholder={placeholder || `请输入${displayName}`} />;
+        break;
+      case 'boolean':
+        formItem = <Switch />;
+        break;
+      case 'date':
+        formItem = <DatePicker style={{ width: '100%' }} />;
+        break;
+      case 'datetime':
+        formItem = <DatePicker showTime style={{ width: '100%' }} />;
+        break;
+      case 'select':
+        const selectOptions = options && Array.isArray(options) ? options : [];
+        formItem = (
+          <Select placeholder={placeholder || `请选择${displayName}`}>
+            {selectOptions.map((opt, idx) => (
+              <Option key={idx} value={opt.value}>{opt.label}</Option>
+            ))}
+          </Select>
+        );
+        break;
+      case 'device':
+        formItem = (
+          <Select placeholder="选择设备" showSearch optionFilterProp="children">
+            {devices.map(device => (
+              <Option key={device.deviceId} value={device.deviceId}>
+                {device.name} - {device.serialNumber}
+              </Option>
+            ))}
+          </Select>
+        );
+        break;
+      default:
+        formItem = <Input placeholder={placeholder || `请输入${displayName}`} />;
+    }
+
+    return (
+      <Form.Item key={fieldName} name={fieldName} label={displayName} rules={rules}>
+        {formItem}
+      </Form.Item>
+    );
+  }, [devices]);
+
+  const getTableColumns = useCallback(() => {
+    const baseColumns = [
+      { title: '工单编号', dataIndex: 'ticketId', key: 'ticketId', width: 150, fixed: 'left' },
+      { title: '标题', dataIndex: 'title', key: 'title', width: 200, ellipsis: true },
+      { 
+        title: '设备信息', 
+        key: 'deviceInfo', 
+        width: 180,
+        render: (_, record) => (
+          <div>
+            <div>{record.deviceName || '-'}</div>
+            <div style={{ fontSize: 12, color: '#888' }}>{record.serialNumber || '-'}</div>
+          </div>
+        )
+      },
+      { 
+        title: '故障分类', 
+        dataIndex: 'faultCategory', 
+        key: 'faultCategory', 
+        width: 120,
+        render: (value) => value ? <Tag>{value}</Tag> : '-'
+      },
+      { 
+        title: '优先级', 
+        dataIndex: 'priority', 
+        key: 'priority', 
+        width: 80,
+        render: (value) => <Tag color={getPriorityColor(value)}>{getPriorityText(value)}</Tag>
+      },
+      { 
+        title: '状态', 
+        dataIndex: 'status', 
+        key: 'status', 
+        width: 100,
+        render: (value) => <Tag color={getStatusColor(value)}>{getStatusText(value)}</Tag>
+      },
+      { title: '报告人', dataIndex: 'reporterName', key: 'reporterName', width: 100 },
+      { 
+        title: '创建时间', 
+        dataIndex: 'createdAt', 
+        key: 'createdAt', 
+        width: 160,
+        render: (value) => value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'
+      }
+    ];
+
+    const customFieldColumns = ticketFields
+      .filter(field => !BUILTIN_TICKET_FIELDS.includes(field.fieldName) && field.visible)
+      .map(field => ({
+        title: field.displayName,
+        dataIndex: field.fieldName,
+        key: field.fieldName,
+        width: 120,
+        render: (value) => {
+          if (value === null || value === undefined) return '-';
+          if (field.fieldType === 'boolean') {
+            return <Switch checked={value} disabled />;
+          }
+          if (field.fieldType === 'date' || field.fieldType === 'datetime') {
+            return value ? dayjs(value).format(field.fieldType === 'date' ? 'YYYY-MM-DD' : 'YYYY-MM-DD HH:mm') : '-';
+          }
+          if (field.fieldType === 'select' && Array.isArray(field.options)) {
+            const option = field.options.find(opt => opt.value === value);
+            return option ? option.label : value;
+          }
+          return String(value);
+        }
+      }));
+
+    return [...baseColumns, ...customFieldColumns];
+  }, [ticketFields]);
 
   const fetchTicketDetail = useCallback(async (ticketId) => {
     try {
@@ -132,12 +320,6 @@ function TicketManagement() {
       console.error('获取工单详情失败:', error);
     }
   }, []);
-
-  useEffect(() => {
-    fetchTickets();
-    fetchDevices();
-    fetchCategories();
-  }, [fetchTickets, fetchDevices, fetchCategories]);
 
   const showModal = useCallback((ticket = null) => {
     setEditingTicket(ticket);
@@ -157,6 +339,11 @@ function TicketManagement() {
         ticketData.deviceName = ticket.deviceName;
         ticketData.serialNumber = ticket.serialNumber;
       }
+      if (ticket.metadata && typeof ticket.metadata === 'object') {
+        Object.entries(ticket.metadata).forEach(([key, value]) => {
+          ticketData[key] = value;
+        });
+      }
       form.setFieldsValue(ticketData);
     } else {
       form.resetFields();
@@ -175,13 +362,29 @@ function TicketManagement() {
       const ticketData = {
         ...values,
         expectedCompletionDate: values.expectedCompletionDate ? values.expectedCompletionDate.format('YYYY-MM-DD HH:mm:ss') : null,
-        completionDate: values.completionDate ? values.completionDate.format('YYYY-MM-DD HH:mm:ss') : null
+        completionDate: values.completionDate ? values.completionDate.format('YYYY-MM-DD HH:mm:ss') : null,
+        metadata: {}
       };
+
+      ticketFields.forEach(field => {
+        if (!BUILTIN_TICKET_FIELDS.includes(field.fieldName)) {
+          if (values[field.fieldName] !== undefined) {
+            ticketData.metadata[field.fieldName] = values[field.fieldName];
+          }
+          delete ticketData[field.fieldName];
+        }
+      });
 
       if (deviceSource === 'manual') {
         ticketData.deviceId = null;
         ticketData.deviceName = values.deviceName;
         ticketData.serialNumber = values.serialNumber;
+      } else {
+        const selectedDevice = devices.find(d => d.deviceId === values.deviceId);
+        if (selectedDevice) {
+          ticketData.deviceName = selectedDevice.name;
+          ticketData.serialNumber = selectedDevice.serialNumber;
+        }
       }
 
       if (editingTicket) {
@@ -203,7 +406,7 @@ function TicketManagement() {
       message.error(editingTicket ? '工单更新失败' : '工单创建失败');
       console.error(error);
     }
-  }, [editingTicket, fetchTickets, deviceSource]);
+  }, [editingTicket, fetchTickets, deviceSource, ticketFields, devices]);
 
   const handleDelete = useCallback(async (ticketId) => {
     Modal.confirm({
@@ -278,150 +481,76 @@ function TicketManagement() {
     fetchTickets(paginationInfo.current, paginationInfo.pageSize, searchFilters);
   }, [fetchTickets, searchFilters]);
 
-  const columns = useMemo(() => [
-    {
-      title: '工单编号',
-      dataIndex: 'ticketId',
-      key: 'ticketId',
-      width: 150,
-      render: (text, record) => (
-        <Button type="link" onClick={() => fetchTicketDetail(text)}>
-          {text}
-        </Button>
-      )
-    },
-    {
-      title: '标题',
-      dataIndex: 'title',
-      key: 'title',
-      width: 200,
-      ellipsis: true
-    },
-    {
-      title: '设备信息',
-      key: 'deviceInfo',
-      width: 180,
-      render: (_, record) => (
-        <div>
-          <div>{record.deviceName}</div>
-          <div style={{ fontSize: 12, color: '#888' }}>{record.serialNumber}</div>
-        </div>
-      )
-    },
-    {
-      title: '故障分类',
-      dataIndex: 'faultCategory',
-      key: 'faultCategory',
-      width: 120,
-      render: (text) => text ? <Tag>{text}</Tag> : '-'
-    },
-    {
-      title: '优先级',
-      dataIndex: 'priority',
-      key: 'priority',
-      width: 80,
-      render: (priority) => (
-        <Tag color={getPriorityColor(priority)}>
-          {getPriorityText(priority)}
-        </Tag>
-      )
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status) => (
-        <Tag color={getStatusColor(status)}>
-          {getStatusText(status)}
-        </Tag>
-      )
-    },
-    {
-      title: '报告人',
-      dataIndex: ['reporter', 'username'],
-      key: 'reporter',
-      width: 100,
-      render: (text) => text || '-'
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 160,
-      render: (text) => text ? dayjs(text).format('YYYY-MM-DD HH:mm') : '-'
-    },
-    {
-      title: '期望完成时间',
-      dataIndex: 'expectedCompletionDate',
-      key: 'expectedCompletionDate',
-      width: 160,
-      render: (text) => text ? dayjs(text).format('YYYY-MM-DD HH:mm') : '-'
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 150,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            onClick={() => fetchTicketDetail(record.ticketId)}
-          >
-            详情
-          </Button>
-          {record.status === 'pending' ? (
-            <Button
-              type="link"
-              icon={<ToolOutlined />}
-              onClick={() => handleProcess(record)}
-            >
-              处理
-            </Button>
-          ) : null}
-          <Dropdown
-            overlay={
-              <Menu>
-                <Menu.Item key="edit" icon={<EditOutlined />} onClick={() => showModal(record)}>
-                  编辑
-                </Menu.Item>
-                {(record.status === 'pending' || record.status === 'in_progress') && (
-                  <Menu.Item
-                    key="complete"
-                    icon={<CheckCircleOutlined />}
-                    onClick={() => handleStatusChange(record.ticketId, 'completed')}
-                  >
-                    完成工单
-                  </Menu.Item>
-                )}
-                {record.status === 'completed' && (
-                  <Menu.Item
-                    key="close"
-                    icon={<CloseCircleOutlined />}
-                    onClick={() => handleStatusChange(record.ticketId, 'closed')}
-                  >
-                    关闭工单
-                  </Menu.Item>
-                )}
-                <Menu.Item
-                  key="delete"
-                  icon={<DeleteOutlined />}
-                  danger
-                  onClick={() => handleDelete(record.ticketId)}
-                >
-                  删除
-                </Menu.Item>
-              </Menu>
-            }
-          >
-            <Button icon={<MoreOutlined />} />
-          </Dropdown>
-        </Space>
-      )
+  const handleDeviceSourceChange = useCallback((value) => {
+    setDeviceSource(value);
+  }, []);
+
+  const renderDeviceFormItems = useCallback(() => {
+    if (deviceSource === 'select') {
+      return (
+        <Form.Item name="deviceId" label="关联设备" rules={[{ required: false }]}>
+          <Select placeholder="选择设备" showSearch optionFilterProp="children" allowClear>
+            {devices.map(device => (
+              <Option key={device.deviceId} value={device.deviceId}>
+                {device.name} - {device.serialNumber}
+              </Option>
+            ))}
+          </Select>
+        </Form.Item>
+      );
     }
-  ], [fetchTicketDetail, handleStatusChange, handleDelete]);
+    return (
+      <>
+        <Form.Item name="deviceName" label="设备名称" rules={[{ required: true, message: '请输入设备名称' }]}>
+          <Input placeholder="请输入设备名称" />
+        </Form.Item>
+        <Form.Item name="serialNumber" label="设备序列号" rules={[{ required: true, message: '请输入设备序列号' }]}>
+          <Input placeholder="请输入设备序列号" />
+        </Form.Item>
+      </>
+    );
+  }, [deviceSource, devices]);
+
+  const renderFormItems = useCallback(() => {
+    return ticketFields.map(field => {
+      if (field.fieldName === 'deviceId') {
+        return (
+          <React.Fragment key="deviceSource">
+            <Form.Item label="设备来源" required>
+              <Select value={deviceSource} onChange={handleDeviceSourceChange} style={{ width: 200 }}>
+                <Option value="select">从设备管理选择</Option>
+                <Option value="manual">手动输入</Option>
+              </Select>
+            </Form.Item>
+            {renderDeviceFormItems()}
+          </React.Fragment>
+        );
+      }
+      return renderFormItem(field);
+    });
+  }, [ticketFields, deviceSource, devices, handleDeviceSourceChange, renderDeviceFormItems, renderFormItem]);
+
+  const getActionItems = useCallback((record) => (
+    <Menu
+      items={[
+        { key: 'view', icon: <EyeOutlined />, label: '查看详情', onClick: () => fetchTicketDetail(record.ticketId) },
+        { key: 'process', icon: <ToolOutlined />, label: '处理工单', disabled: record.status === 'closed' || record.status === 'completed',
+          onClick: () => handleProcess(record) },
+        { type: 'divider' },
+        { key: 'pending', label: '标记为待处理', disabled: record.status !== 'pending',
+          onClick: () => handleStatusChange(record.ticketId, 'pending') },
+        { key: 'in_progress', label: '标记为处理中', disabled: record.status !== 'pending',
+          onClick: () => handleStatusChange(record.ticketId, 'in_progress') },
+        { key: 'completed', label: '标记为已完成', disabled: record.status === 'completed' || record.status === 'closed',
+          onClick: () => handleStatusChange(record.ticketId, 'completed') },
+        { key: 'closed', label: '标记为已关闭', disabled: record.status === 'closed',
+          onClick: () => handleStatusChange(record.ticketId, 'closed') },
+        { type: 'divider' },
+        { key: 'delete', icon: <DeleteOutlined />, label: '删除工单', danger: true,
+          onClick: () => handleDelete(record.ticketId) }
+      ]}
+    />
+  ), [fetchTicketDetail, handleProcess, handleStatusChange, handleDelete]);
 
   return (
     <div style={{ padding: 24 }}>
@@ -468,13 +597,18 @@ function TicketManagement() {
         </Form>
 
         <Table
-          columns={columns}
+          columns={getTableColumns()}
           dataSource={tickets}
           rowKey="ticketId"
           pagination={pagination}
           loading={loading}
           onChange={handleTableChange}
-          scroll={{ x: 1400 }}
+          scroll={{ x: 1200 }}
+          columnsState={{
+            onChange: ({ visibleColumns }) => {
+              localStorage.setItem('ticketVisibleColumns', JSON.stringify(visibleColumns));
+            }
+          }}
         />
       </Card>
 
@@ -486,67 +620,7 @@ function TicketManagement() {
         width={700}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item name="title" label="工单标题" rules={[{ required: true }]}>
-            <Input placeholder="请输入工单标题" />
-          </Form.Item>
-
-          <Form.Item label="设备来源">
-            <Select value={deviceSource} onChange={setDeviceSource} style={{ width: 200 }}>
-              <Option value="select">从设备列表选择</Option>
-              <Option value="manual">手动输入设备信息</Option>
-            </Select>
-          </Form.Item>
-
-          {deviceSource === 'select' ? (
-            <Form.Item name="deviceId" label="关联设备" rules={[{ required: true }]}>
-              <Select placeholder="选择设备" showSearch optionFilterProp="children">
-                {devices.map(device => (
-                  <Option key={device.deviceId} value={device.deviceId}>
-                    {device.name} - {device.serialNumber}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          ) : (
-            <>
-              <Form.Item name="deviceName" label="设备名称" rules={[{ required: true }]}>
-                <Input placeholder="请输入设备名称" />
-              </Form.Item>
-              <Form.Item name="serialNumber" label="设备序列号" rules={[{ required: true }]}>
-                <Input placeholder="请输入设备序列号" />
-              </Form.Item>
-            </>
-          )}
-
-          <Form.Item name="faultCategory" label="故障分类" rules={[{ required: true }]}>
-            <Select placeholder="选择故障分类">
-              {categories.map(cat => (
-                <Option key={cat.categoryId} value={cat.name}>{cat.name}</Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="priority" label="优先级" rules={[{ required: true }]}>
-            <Select placeholder="选择优先级">
-              <Option value="low">低</Option>
-              <Option value="medium">中</Option>
-              <Option value="high">高</Option>
-              <Option value="urgent">紧急</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="description" label="故障描述">
-            <TextArea rows={4} placeholder="请详细描述故障情况" />
-          </Form.Item>
-
-          <Form.Item name="expectedCompletionDate" label="期望完成时间">
-            <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
-          </Form.Item>
-
-          <Form.Item name="resolution" label="解决方案">
-            <TextArea rows={3} placeholder="请输入解决方案" />
-          </Form.Item>
-
+          {renderFormItems()}
           <Form.Item>
             <Space>
               <Button type="primary" htmlType="submit">
@@ -643,7 +717,7 @@ function TicketManagement() {
                     {getStatusText(selectedTicket.status)}
                   </Tag>
                 </Descriptions.Item>
-                <Descriptions.Item label="报告人">{selectedTicket.reporter?.username || '-'}</Descriptions.Item>
+                <Descriptions.Item label="报告人">{selectedTicket.reporterName}</Descriptions.Item>
                 <Descriptions.Item label="创建时间">
                   {selectedTicket.createdAt ? dayjs(selectedTicket.createdAt).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>

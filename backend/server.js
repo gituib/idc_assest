@@ -32,6 +32,10 @@ sequelize.authenticate()
     return require('./initDeviceFields')();
   })
   .then(() => {
+    // 初始化工单字段
+    return require('./initTicketFields')();
+  })
+  .then(() => {
     // 初始化工单模型关联
     return require('./models/ticketIndex').initializeModels();
   })
@@ -53,6 +57,7 @@ const loginHistoryRoutes = require('./routes/loginHistory');
 const operationLogsRoutes = require('./routes/operationLogs');
 const ticketRoutes = require('./routes/tickets');
 const ticketCategoryRoutes = require('./routes/ticketCategories');
+const ticketFieldRoutes = require('./routes/ticketFields');
 
 // 使用路由
 app.use('/api/devices', deviceRoutes);
@@ -70,6 +75,7 @@ app.use('/api/login-history', loginHistoryRoutes);
 app.use('/api/operation-logs', operationLogsRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/ticket-categories', ticketCategoryRoutes);
+app.use('/api/ticket-fields', ticketFieldRoutes);
 
 // 静态文件服务
 app.use('/uploads', express.static('uploads'));
