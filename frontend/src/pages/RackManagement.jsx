@@ -32,6 +32,7 @@ function RackManagement() {
   // 导入模态框状态
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
+  const [importPhase, setImportPhase] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
 
@@ -148,35 +149,41 @@ function RackManagement() {
     try {
       setIsImporting(true);
       setImportProgress(0);
+      setImportPhase('正在上传文件...');
       setImportResult(null);
       
       const formData = new FormData();
       formData.append('file', file);
       
-      // 模拟进度
-      const progressInterval = setInterval(() => {
-        setImportProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 10;
-        });
-      }, 500);
-      
-      // 发送文件到后端处理
       const response = await axios.post('/api/racks/import', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          const progress = Math.round((progressEvent.loaded * 50) / progressEvent.total);
+          setImportProgress(Math.min(progress, 50));
+          setImportPhase('正在上传文件...');
         }
       });
       
-      clearInterval(progressInterval);
+      setImportProgress(60);
+      setImportPhase('正在处理数据...');
+      
+      setTimeout(() => {
+        setImportProgress(80);
+        setImportPhase('正在验证数据...');
+      }, 200);
+      
+      setTimeout(() => {
+        setImportProgress(90);
+        setImportPhase('正在保存数据...');
+      }, 400);
+      
       setImportProgress(100);
+      setImportPhase('导入完成');
       setImportResult(response.data);
       setIsImporting(false);
       
-      // 根据导入结果显示不同的消息
       if (response.data.success) {
         const { imported, duplicates, total } = response.data;
         if (duplicates > 0) {
@@ -188,31 +195,44 @@ function RackManagement() {
         message.error(response.data.message || '导入失败');
       }
       
-      // 阻止自动上传
       return false;
     } catch (error) {
       setIsImporting(false);
+      setImportProgress(0);
       
       let errorMessage = '机柜导入失败';
-      let errorDetails = null;
+      let errorDetails = [];
       
       if (error.response) {
-        // 服务器返回了错误响应
-        errorMessage = error.response.data.message || error.response.data.error || errorMessage;
-        errorDetails = error.response.data.details;
-      } else if (error.request) {
-        // 请求已发送但没有收到响应
-        errorMessage = '网络错误，服务器没有响应';
-      } else {
-        // 请求配置错误
-        errorMessage = `请求错误: ${error.message}`;
+        const { data } = error.response;
+        if (data && data.errors && Array.isArray(data.errors)) {
+          errorDetails = data.errors.map((err, index) => ({
+            row: err.row || index + 1,
+            error: err.error || err.message || '未知错误'
+          }));
+          errorMessage = `导入失败，共发现 ${errorDetails.length} 处数据错误`;
+        } else if (data && data.message) {
+          errorMessage = data.message;
+        } else if (data && data.details && Array.isArray(data.details)) {
+          errorDetails = data.details.map((err, index) => ({
+            row: err.row || index + 1,
+            error: err.error || err.message || '未知错误'
+          }));
+          errorMessage = `导入失败，共发现 ${errorDetails.length} 处数据错误`;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
-      setImportResult({ success: false, message: errorMessage, details: errorDetails });
+      setImportResult({
+        success: false,
+        message: errorMessage,
+        details: errorDetails
+      });
+      
       message.error(errorMessage);
       console.error('机柜导入失败:', error);
       
-      // 阻止自动上传
       return false;
     }
   }, []);
@@ -512,11 +532,12 @@ function RackManagement() {
         onCancel={() => {
           setImportModalVisible(false);
           setImportProgress(0);
+          setImportPhase('');
           setImportResult(null);
           setIsImporting(false);
         }}
         footer={null}
-        width={600}
+        width={650}
         destroyOnClose
         styles={{
           body: { padding: '24px' },
@@ -599,21 +620,39 @@ function RackManagement() {
               </Button>
             </Upload>
           </div>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <p style={{ marginBottom: '20px', fontWeight: '500' }}>
-              {isImporting ? '正在导入数据...' : '导入完成'}
-            </p>
+        ) : isImporting ? (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ 
+                width: '48px', 
+                height: '48px', 
+                borderRadius: '50%', 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                marginRight: '16px',
+                color: '#fff',
+                fontSize: '20px'
+              }}>
+                <UploadOutlined spin />
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontWeight: '600', color: '#333', fontSize: '16px' }}>正在导入机柜数据</p>
+                <p style={{ margin: 0, color: '#667eea', fontSize: '14px' }}>{importPhase}</p>
+              </div>
+            </div>
             <Progress 
               percent={importProgress} 
-              status={isImporting ? "active" : "success"}
-              style={{ marginBottom: '24px' }}
+              status="active"
               strokeColor={{
                 '0%': '#667eea',
                 '100%': '#764ba2'
               }}
+              format={() => `${importProgress}%`}
             />
-            {importResult && (
+          </div>
+        ) : importResult && (
               <div style={{ 
                 textAlign: 'left', 
                 background: '#f6f6f6', 
@@ -658,23 +697,21 @@ function RackManagement() {
                     </ul>
                   </div>
                 )}
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    setImportModalVisible(false);
+                    setImportProgress(0);
+                    setImportResult(null);
+                    setIsImporting(false);
+                    fetchRacks();
+                  }}
+                  style={primaryButtonStyle}
+                >
+                  确定
+                </Button>
               </div>
             )}
-            <Button
-              type="primary"
-              onClick={() => {
-                setImportModalVisible(false);
-                setImportProgress(0);
-                setImportResult(null);
-                setIsImporting(false);
-                fetchRacks();
-              }}
-              style={primaryButtonStyle}
-            >
-              确定
-            </Button>
-          </div>
-        )}
       </Modal>
 
     </div>

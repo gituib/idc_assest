@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, Select, InputNumber, message, Card, Space, Popconfirm, Upload, Table as AntTable } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, InputNumber, message, Card, Space, Popconfirm, Upload, Table as AntTable, Progress } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ExportOutlined, ImportOutlined, UploadOutlined, FileExcelOutlined, InboxOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
@@ -25,7 +25,9 @@ function ConsumableManagement() {
   const [importPreview, setImportPreview] = useState([]);
   const [importFile, setImportFile] = useState(null);
   const [importing, setImporting] = useState(false);
-  const importFormRef = useRef(null);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importPhase, setImportPhase] = useState('');
+  const [importResult, setImportResult] = useState(null);
   const [stockModalVisible, setStockModalVisible] = useState(false);
   const [stockRecord, setStockRecord] = useState(null);
   const [stockType, setStockType] = useState('in');
@@ -218,6 +220,9 @@ function ConsumableManagement() {
     setImportModalVisible(false);
     setImportPreview([]);
     setImportFile(null);
+    setImportProgress(0);
+    setImportPhase('');
+    setImportResult(null);
   };
 
   const handleImport = async () => {
@@ -227,30 +232,119 @@ function ConsumableManagement() {
     }
     
     setImporting(true);
+    setImportProgress(0);
+    setImportPhase('正在读取文件...');
+    setImportResult(null);
+    
     try {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const text = e.target.result;
+        setImportProgress(10);
+        setImportPhase('正在读取文件...');
+        
+        setTimeout(() => {
+          setImportProgress(20);
+          setImportPhase('正在解析CSV数据...');
+        }, 100);
+        
         const items = parseCSV(text);
+        const totalItems = items.length;
+        
+        setTimeout(() => {
+          setImportProgress(30);
+          setImportPhase(`共解析 ${totalItems} 条记录，准备提交...`);
+        }, 200);
+        
+        setTimeout(() => {
+          setImportProgress(40);
+          setImportPhase('正在连接服务器...');
+        }, 300);
         
         const response = await axios.post('/api/consumables/import', { items });
-        message.success(response.data.message);
         
-        if (response.data.results.failed > 0) {
-          response.data.results.errors.forEach(err => console.error(err));
-        }
+        setTimeout(() => {
+          setImportProgress(60);
+          setImportPhase('正在处理服务器响应...');
+        }, 100);
         
-        setImportModalVisible(false);
-        setImportPreview([]);
-        setImportFile(null);
-        fetchConsumables();
+        setTimeout(() => {
+          setImportProgress(80);
+          setImportPhase('正在更新本地数据...');
+        }, 200);
+        
+        const results = response.data.results;
+        
+        setTimeout(() => {
+          setImportResult(results);
+          setImportProgress(100);
+          setImportPhase('导入完成');
+          setImporting(false);
+          
+          if (results.failed > 0) {
+            message.warning(`导入完成，成功 ${results.success} 条，失败 ${results.failed} 条`);
+          } else {
+            message.success(response.data.message || `成功导入 ${results.success} 条记录`);
+          }
+        }, 300);
+      };
+      reader.onerror = () => {
         setImporting(false);
+        setImportProgress(0);
+        setImportPhase('文件读取失败');
+        setImportResult({
+          success: false,
+          total: 0,
+          imported: 0,
+          failed: 0,
+          errors: [{ row: '-', error: '文件读取失败，请检查文件是否损坏' }],
+          message: '文件读取失败'
+        });
+        message.error('文件读取失败');
       };
       reader.readAsText(importFile);
     } catch (error) {
-      message.error('导入失败');
-      console.error('导入失败:', error);
       setImporting(false);
+      setImportProgress(0);
+      setImportPhase('导入失败');
+      
+      let errorMessage = '导入失败，请检查网络连接或服务器状态';
+      let errorDetails = [];
+      
+      if (error.response && error.response.data) {
+        const { data } = error.response;
+        if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+          errorDetails = data.errors.map((err, index) => ({
+            row: err.row || index + 1,
+            error: err.error || err.message || '数据格式错误'
+          }));
+          errorMessage = `导入失败，共发现 ${errorDetails.length} 处数据错误`;
+        } else if (data.message) {
+          errorMessage = data.message;
+        } else if (data.error) {
+          errorMessage = data.error;
+        }
+      } else if (error.message) {
+        if (error.message.includes('Network Error') || error.message.includes('network')) {
+          errorMessage = '网络连接失败，请检查服务器是否运行';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = '请求超时，请稍后重试';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setImportResult({
+        success: false,
+        total: 0,
+        imported: 0,
+        failed: 0,
+        errors: errorDetails,
+        message: errorMessage
+      });
+      
+      message.error(errorMessage);
+      console.error('导入耗材失败:', error);
     }
   };
 

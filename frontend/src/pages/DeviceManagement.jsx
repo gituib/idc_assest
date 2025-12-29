@@ -164,9 +164,10 @@ function DeviceManagement() {
   // 设备字段配置
   const [deviceFields, setDeviceFields] = useState([]);
   const [loadingFields, setLoadingFields] = useState(true);
-  // 导入导出状态
+  // 导入状态
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
+  const [importPhase, setImportPhase] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [selectedDevices, setSelectedDevices] = useState([]);
@@ -522,34 +523,41 @@ function DeviceManagement() {
     try {
       setIsImporting(true);
       setImportProgress(0);
+      setImportPhase('正在上传文件...');
       setImportResult(null);
       
       const formData = new FormData();
       formData.append('csvFile', file);
       
-      // 模拟进度
-      const progressInterval = setInterval(() => {
-        setImportProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 10;
-        });
-      }, 500);
-      
       const response = await axios.post('/api/devices/import', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          const progress = Math.round((progressEvent.loaded * 50) / progressEvent.total);
+          setImportProgress(Math.min(progress, 50));
+          setImportPhase('正在上传文件...');
         }
       });
       
-      clearInterval(progressInterval);
-      setImportProgress(100);
+      setImportProgress(60);
+      setImportPhase('正在处理数据...');
+      
+      setTimeout(() => {
+        setImportProgress(80);
+        setImportPhase('正在验证数据...');
+      }, 200);
+      
+      setTimeout(() => {
+        setImportProgress(90);
+        setImportPhase('正在保存数据...');
+      }, 400);
+      
       setImportResult(response.data);
+      setImportProgress(100);
+      setImportPhase('导入完成');
       setIsImporting(false);
       
-      // 根据导入结果显示不同的消息
       const { success, failed } = response.data.statistics;
       if (failed > 0) {
         message.warning(`导入完成，但有 ${failed} 条记录导入失败`);
@@ -557,18 +565,47 @@ function DeviceManagement() {
         message.success('所有记录导入成功');
       }
       
-      // 重新加载设备列表
       setTimeout(() => {
         fetchDevices();
       }, 1000);
       
     } catch (error) {
       setIsImporting(false);
-      message.error('导入失败');
+      setImportProgress(0);
+      
+      let errorMessage = '导入失败';
+      let errorDetails = [];
+      
+      if (error.response) {
+        const { data } = error.response;
+        if (data && data.errors && Array.isArray(data.errors)) {
+          errorDetails = data.errors.map((err, index) => ({
+            row: err.row || index + 1,
+            error: err.error || err.message || '未知错误'
+          }));
+          errorMessage = `导入失败，共发现 ${errorDetails.length} 处数据错误`;
+        } else if (data && data.message) {
+          errorMessage = data.message;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setImportResult({
+        success: false,
+        statistics: {
+          total: 0,
+          success: 0,
+          failed: 0,
+          errors: errorDetails,
+          message: errorMessage
+        }
+      });
+      
+      message.error(errorMessage);
       console.error('导入设备失败:', error);
     }
     
-    // 阻止默认上传行为
     return false;
   };
 
@@ -1188,11 +1225,12 @@ function DeviceManagement() {
         onCancel={() => {
           setImportModalVisible(false);
           setImportProgress(0);
+          setImportPhase('');
           setImportResult(null);
           setIsImporting(false);
         }}
         footer={null}
-        width={600}
+        width={650}
         destroyOnHidden
         styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
       >
@@ -1233,11 +1271,36 @@ function DeviceManagement() {
               </Button>
             </Upload>
           </div>
-        ) : (
+        ) : isImporting ? (
           <div>
-            <p style={{ marginBottom: '16px', color: '#666' }}>正在导入数据...</p>
-            <Progress percent={importProgress} status="active" style={{ marginBottom: '20px' }} strokeColor={{ '0%': '#667eea', '100%': '#764ba2' }} />
-            {importResult && importResult.statistics && (
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ 
+                width: '48px', 
+                height: '48px', 
+                borderRadius: '50%', 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                marginRight: '16px',
+                color: '#fff',
+                fontSize: '20px'
+              }}>
+                <UploadOutlined spin />
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontWeight: '600', color: '#333', fontSize: '16px' }}>正在导入设备数据</p>
+                <p style={{ margin: 0, color: '#667eea', fontSize: '14px' }}>{importPhase}</p>
+              </div>
+            </div>
+            <Progress 
+              percent={importProgress} 
+              status="active" 
+              strokeColor={{ '0%': '#667eea', '100%': '#764ba2' }}
+              format={() => `${importProgress}%`}
+            />
+          </div>
+        ) : importResult && importResult.statistics && (
               <div>
                 <p style={{ marginBottom: '10px', fontWeight: '600' }}>导入完成：</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
@@ -1299,8 +1362,6 @@ function DeviceManagement() {
                 </Button>
               </div>
             )}
-          </div>
-        )}
       </Modal>
 
       <Modal
