@@ -1746,7 +1746,8 @@ function RackVisualization() {
                             }}
                             onMouseEnter={(e) => {
                               const isOneU = (device?.height || 1) === 1;
-                              if (isOneU) {
+                              const isFaultStatus = device?.status === 'error' || device?.status === 'fault';
+                              if (isOneU && !isFaultStatus) {
                                 e.currentTarget.style.height = '33px';
                                 e.currentTarget.style.zIndex = '150';
                               }
@@ -1764,7 +1765,8 @@ function RackVisualization() {
                             }}
                             onMouseLeave={(e) => {
                               const isOneU = (device?.height || 1) === 1;
-                              if (isOneU) {
+                              const isFaultStatus = device?.status === 'error' || device?.status === 'fault';
+                              if (isOneU && !isFaultStatus) {
                                 const originalHeight = (device?.height || 1) * 25;
                                 e.currentTarget.style.height = `${originalHeight}px`;
                                 e.currentTarget.style.zIndex = '100';
