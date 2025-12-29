@@ -380,12 +380,12 @@ function DeviceManagement() {
   }, [allDevices, status, type, debouncedKeyword, searchDevices]);
 
   // 获取所有设备（支持搜索、筛选和分页）- 使用缓存和useCallback
-  const fetchDevices = useCallback(async (page = 1, pageSize = 10) => {
+  const fetchDevices = useCallback(async (page = 1, pageSize = 10, forceRefresh = false) => {
     try {
       setLoading(true);
       
-      // 先获取所有设备数据（使用缓存）
-      const allData = await fetchAllDevices();
+      // 先获取所有设备数据（使用缓存，批量删除后强制刷新）
+      const allData = await fetchAllDevices(forceRefresh);
       setAllDevices(allData);
       
       // 更新分页信息（筛选后的数据会通过useMemo自动更新）
@@ -655,7 +655,7 @@ function DeviceManagement() {
           message.success(response.data.message || '批量删除成功');
           setSelectedDevices([]);
           setSelectAll(false);
-          fetchDevices();
+          fetchDevices(1, 10, true);
         } catch (error) {
           message.error('批量删除失败');
           console.error('批量删除设备失败:', error);
@@ -1285,6 +1285,12 @@ function DeviceManagement() {
     <div style={{ padding: '24px' }}>
       <style>{`
         /* 表格自适应换行样式 */
+        .device-table-wrapper {
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        }
+        
         .device-table-wrapper .ant-table {
           width: 100% !important;
           max-width: 100% !important;
@@ -1293,12 +1299,18 @@ function DeviceManagement() {
         .device-table-wrapper .ant-table-container {
           width: 100% !important;
           max-width: 100% !important;
+          display: flex;
+          flex-direction: column;
         }
         
         .device-table-wrapper .ant-table-content {
           width: 100% !important;
           max-width: 100% !important;
           overflow-x: hidden !important;
+        }
+        
+        .device-table-wrapper .ant-table-thead {
+          flex-shrink: 0;
         }
         
         .device-table-wrapper .ant-table-thead > tr > th {
@@ -1308,6 +1320,11 @@ function DeviceManagement() {
           font-weight: 500 !important;
           line-height: 1.4 !important;
           padding: 12px 8px !important;
+        }
+        
+        .device-table-wrapper .ant-table-tbody {
+          flex-shrink: 1;
+          min-height: 0;
         }
         
         .device-table-wrapper .ant-table-tbody > tr > td {
@@ -1568,8 +1585,9 @@ function DeviceManagement() {
             <p>暂无设备数据</p>
           </div>
         )}
-        <div className="device-table-wrapper">
-          <Table
+        {filteredDevicesMemo.length > 0 && (
+          <div className="device-table-wrapper">
+            <Table
             columns={columns}
             dataSource={filteredDevicesMemo}
             rowKey="deviceId"
@@ -1585,6 +1603,7 @@ function DeviceManagement() {
             }}
             style={{ width: '100%', maxWidth: '100%' }}
             size="middle"
+            showHeader={filteredDevicesMemo.length > 0}
             rowSelection={{
               selectedRowKeys: selectedDevices,
               onChange: handleSelectionChange,
@@ -1625,6 +1644,7 @@ function DeviceManagement() {
             }}
           />
         </div>
+        )}
       </Card>
 
       <Modal
