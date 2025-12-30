@@ -407,23 +407,19 @@ router.post('/import', async (req, res) => {
       });
       
       try {
+          // 动态获取必填字段配置（从数据库读取）
+          const requiredFieldConfigs = deviceFields.filter(field => field.required);
+          const requiredFieldNames = requiredFieldConfigs.map(field => field.displayName);
+
           // 验证必填字段
-          const requiredFields = {
-            '设备ID': fieldValueMap['设备ID'],
-            '设备名称': fieldValueMap['设备名称'],
-            '设备类型': fieldValueMap['设备类型'],
-            '型号': fieldValueMap['型号'],
-            '序列号': fieldValueMap['序列号'],
-            '所在机柜ID': fieldValueMap['所在机柜ID'],
-            '位置(U)': fieldValueMap['位置(U)'],
-            '高度(U)': fieldValueMap['高度(U)'],
-            '功率(W)': fieldValueMap['功率(W)'],
-            '状态': fieldValueMap['状态'],
-            '购买日期': fieldValueMap['购买日期'],
-            '保修到期': fieldValueMap['保修到期']
-          };
-          
-          const missingFields = Object.keys(requiredFields).filter(fieldName => !requiredFields[fieldName]);
+          const missingFields = [];
+          for (const fieldName of requiredFieldNames) {
+            const value = fieldValueMap[fieldName];
+            if (!value || (typeof value === 'string' && value.trim() === '')) {
+              missingFields.push(fieldName);
+            }
+          }
+
           if (missingFields.length > 0) {
             throw new Error(`缺少必填字段：${missingFields.join('、')}`);
           }
