@@ -564,6 +564,162 @@ router.post('/import', async (req, res) => {
   }
 });
 
+// 批量上线设备
+router.put('/batch-online', async (req, res) => {
+  try {
+    const { deviceIds } = req.body;
+    
+    if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return res.status(400).json({ error: '请提供有效的设备ID列表' });
+    }
+    
+    // 更新设备状态为运行中
+    const [affectedCount] = await Device.update(
+      { status: 'running' },
+      { where: { deviceId: { [Op.in]: deviceIds } } }
+    );
+    
+    res.json({
+      message: `批量上线成功，已更新 ${affectedCount} 个设备`,
+      affectedCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 批量下线设备
+router.put('/batch-offline', async (req, res) => {
+  try {
+    const { deviceIds } = req.body;
+    
+    if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return res.status(400).json({ error: '请提供有效的设备ID列表' });
+    }
+    
+    // 更新设备状态为离线
+    const [affectedCount] = await Device.update(
+      { status: 'offline' },
+      { where: { deviceId: { [Op.in]: deviceIds } } }
+    );
+    
+    res.json({
+      message: `批量下线成功，已更新 ${affectedCount} 个设备`,
+      affectedCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 批量变更设备状态
+router.put('/batch-status', async (req, res) => {
+  try {
+    const { deviceIds, status } = req.body;
+    
+    console.log('批量状态变更请求:', { deviceIds, status });
+    
+    if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return res.status(400).json({ error: '请提供有效的设备ID列表' });
+    }
+    
+    // 检查数据库中是否存在这些设备
+    const existingDevices = await Device.findAll({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      attributes: ['deviceId']
+    });
+    
+    console.log('数据库中找到的设备:', existingDevices.map(d => d.deviceId));
+    console.log('请求的设备ID:', deviceIds);
+    
+    // 检查是否有不存在的设备
+    const existingIds = existingDevices.map(d => d.deviceId);
+    const missingIds = deviceIds.filter(id => !existingIds.includes(id));
+    
+    if (missingIds.length > 0) {
+      console.log('不存在的设备ID:', missingIds);
+      return res.status(404).json({ error: `设备不存在: ${missingIds.join(', ')}` });
+    }
+    
+    const validStatus = ['running', 'maintenance', 'offline', 'fault'];
+    if (!validStatus.includes(status)) {
+      return res.status(400).json({ 
+        error: `状态值无效，有效值为：${validStatus.join('、')}` 
+      });
+    }
+    
+    // 状态映射
+    const statusText = {
+      running: '运行中',
+      maintenance: '维护中',
+      offline: '离线',
+      fault: '故障'
+    };
+    
+    // 更新设备状态
+    const [affectedCount] = await Device.update(
+      { status },
+      { where: { deviceId: { [Op.in]: deviceIds } } }
+    );
+    
+    res.json({
+      message: `批量状态变更成功，已将 ${affectedCount} 个设备状态变更为"${statusText[status]}"`,
+      affectedCount,
+      newStatus: status
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 批量移动设备
+router.put('/batch-move', async (req, res) => {
+  try {
+    const { deviceIds, targetRackId, startPosition } = req.body;
+    
+    if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return res.status(400).json({ error: '请提供有效的设备ID列表' });
+    }
+    
+    if (!targetRackId) {
+      return res.status(400).json({ error: '请提供目标机柜ID' });
+    }
+    
+    // 验证目标机柜是否存在
+    const targetRack = await Rack.findByPk(targetRackId);
+    if (!targetRack) {
+      return res.status(404).json({ error: '目标机柜不存在' });
+    }
+    
+    // 批量更新设备位置
+    let movedCount = 0;
+    for (let i = 0; i < deviceIds.length; i++) {
+      const deviceId = deviceIds[i];
+      const position = startPosition ? startPosition + i : undefined;
+      
+      const updateData = { rackId: targetRackId };
+      if (position) {
+        updateData.position = position;
+      }
+      
+      const [updated] = await Device.update(updateData, {
+        where: { deviceId }
+      });
+      
+      if (updated) {
+        movedCount++;
+      }
+    }
+    
+    res.json({
+      message: `批量移动成功，已将 ${movedCount} 个设备移动到机柜 ${targetRackId}`,
+      movedCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 获取单个设备
 router.get('/:deviceId', async (req, res) => {
   try {
@@ -773,8 +929,28 @@ router.put('/batch-status', async (req, res) => {
   try {
     const { deviceIds, status } = req.body;
     
+    console.log('批量状态变更请求:', { deviceIds, status });
+    
     if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
       return res.status(400).json({ error: '请提供有效的设备ID列表' });
+    }
+    
+    // 检查数据库中是否存在这些设备
+    const existingDevices = await Device.findAll({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      attributes: ['deviceId']
+    });
+    
+    console.log('数据库中找到的设备:', existingDevices.map(d => d.deviceId));
+    console.log('请求的设备ID:', deviceIds);
+    
+    // 检查是否有不存在的设备
+    const existingIds = existingDevices.map(d => d.deviceId);
+    const missingIds = deviceIds.filter(id => !existingIds.includes(id));
+    
+    if (missingIds.length > 0) {
+      console.log('不存在的设备ID:', missingIds);
+      return res.status(404).json({ error: `设备不存在: ${missingIds.join(', ')}` });
     }
     
     const validStatus = ['running', 'maintenance', 'offline', 'fault'];
@@ -841,73 +1017,37 @@ router.put('/batch-move', async (req, res) => {
     }
     
     const movedDevices = [];
-    let currentPosition = parseInt(startPosition);
-    
-    // 按原位置排序设备
-    devices.sort((a, b) => a.position - b.position);
+    let currentPosition = startPosition;
     
     for (const device of devices) {
-      // 计算新位置
-      const newPosition = currentPosition;
+      const oldRackId = device.rackId;
+      const oldPosition = device.position;
+      const deviceHeight = device.height || 1;
       
-      // 验证位置是否在机柜范围内
-      if (newPosition < 1 || newPosition > targetRack.height) {
-        return res.status(400).json({ 
-          error: `设备 ${device.name} 的位置 ${newPosition} 超出机柜高度范围(1-${targetRack.height})` 
-        });
-      }
-      
-      // 检查目标位置是否被其他设备占用（排除自身）
-      const existingDevice = await Device.findOne({
-        where: {
+      const [updated] = await Device.update(
+        { 
           rackId: targetRackId,
-          position: newPosition,
-          deviceId: { [Op.ne]: device.deviceId }
-        }
-      });
+          position: currentPosition
+        },
+        { where: { deviceId: device.deviceId } }
+      );
       
-      if (existingDevice) {
-        return res.status(400).json({ 
-          error: `机柜 ${targetRack.name} 的位置 ${newPosition} 已被设备 ${existingDevice.name} 占用` 
+      if (updated) {
+        movedDevices.push({
+          deviceId: device.deviceId,
+          name: device.name,
+          oldRackId,
+          oldPosition,
+          newRackId: targetRackId,
+          newPosition: currentPosition
         });
       }
       
-      // 计算功率变化
-      const oldPower = device.powerConsumption;
-      
-      // 更新设备位置
-      await device.update({
-        rackId: targetRackId,
-        position: newPosition
-      });
-      
-      // 更新原机柜和新机柜的功率
-      const oldRack = await Rack.findByPk(device.rackId);
-      if (oldRack) {
-        await oldRack.update({
-          currentPower: Math.max(0, oldRack.currentPower - oldPower)
-        });
-      }
-      
-      await targetRack.update({
-        currentPower: targetRack.currentPower + oldPower
-      });
-      
-      movedDevices.push({
-        deviceId: device.deviceId,
-        name: device.name,
-        oldRackId: device.rackId,
-        newRackId: targetRackId,
-        oldPosition: device.position,
-        newPosition: newPosition
-      });
-      
-      // 下一个设备的起始位置 = 当前设备位置 + 当前设备高度
-      currentPosition += device.height;
+      currentPosition += deviceHeight;
     }
     
     res.json({
-      message: `批量移动成功，已移动 ${movedDevices.length} 个设备`,
+      message: `批量移动成功，已将 ${movedDevices.length} 个设备移动到机柜 ${targetRackId}`,
       movedDevices
     });
   } catch (error) {
@@ -915,7 +1055,7 @@ router.put('/batch-move', async (req, res) => {
   }
 });
 
-// 增强导出设备数据（支持自定义字段选择和格式选择）
+// 增强导出设备数据（支持自定义字段）
 router.get('/enhanced-export', async (req, res) => {
   try {
     const { deviceIds, format = 'csv', fields, fieldLabels } = req.query;

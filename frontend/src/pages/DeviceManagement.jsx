@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Table, Button, Modal, Form, Input, Select, DatePicker, message, Card, Space, InputNumber, Switch, Upload, Progress, Checkbox, Spin, Dropdown, Tooltip } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, UploadOutlined, DownloadOutlined, SettingOutlined, UndoOutlined, CloudServerOutlined, SwapOutlined, SafetyOutlined, DatabaseOutlined, AppstoreOutlined, MoreOutlined, ReloadOutlined, ExportOutlined, DragOutlined, FileExcelOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, UploadOutlined, DownloadOutlined, SettingOutlined, UndoOutlined, CloudServerOutlined, SafetyOutlined, DatabaseOutlined, AppstoreOutlined, MoreOutlined, ReloadOutlined, ExportOutlined, FileExcelOutlined, SwapOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 
@@ -209,11 +209,6 @@ function DeviceManagement() {
   const [batchStatusModalVisible, setBatchStatusModalVisible] = useState(false);
   const [batchStatusLoading, setBatchStatusLoading] = useState(false);
   const [batchStatusForm] = Form.useForm();
-  
-  // 批量移动模态框
-  const [batchMoveModalVisible, setBatchMoveModalVisible] = useState(false);
-  const [batchMoveLoading, setBatchMoveLoading] = useState(false);
-  const [batchMoveForm] = Form.useForm();
   
   // 导出选项模态框
   const [exportModalVisible, setExportModalVisible] = useState(false);
@@ -614,31 +609,6 @@ function DeviceManagement() {
     fetchDevices(newPagination.current, newPagination.pageSize);
   };
 
-  // 批量下线设备
-  const handleBatchOffline = async () => {
-    Modal.confirm({
-      title: '批量下线确认',
-      content: `确定要将选中的 ${selectedDevices.length} 个设备下线吗？`,
-      okText: '确认下线',
-      okType: 'primary',
-      cancelText: '取消',
-      onOk: async () => {
-        try {
-          const response = await axios.put('/api/devices/batch-offline', {
-            deviceIds: selectedDevices
-          });
-          message.success(response.data.message || '批量下线成功');
-          setSelectedDevices([]);
-          setSelectAll(false);
-          fetchDevices();
-        } catch (error) {
-          message.error('批量下线失败');
-          console.error('批量下线设备失败:', error);
-        }
-      }
-    });
-  };
-
   // 批量删除设备
   const handleBatchDelete = async () => {
     Modal.confirm({
@@ -725,45 +695,6 @@ function DeviceManagement() {
       console.error('批量状态变更失败:', error);
     } finally {
       setBatchStatusLoading(false);
-    }
-  };
-
-  // 打开批量移动模态框
-  const showBatchMoveModal = () => {
-    if (selectedDevices.length === 0) {
-      message.warning('请先选择要移动的设备');
-      return;
-    }
-    batchMoveForm.resetFields();
-    setBatchMoveModalVisible(true);
-  };
-
-  // 执行批量移动
-  const handleBatchMove = async () => {
-    try {
-      const values = await batchMoveForm.validateFields();
-      setBatchMoveLoading(true);
-      
-      const response = await axios.put('/api/devices/batch-move', {
-        deviceIds: selectedDevices,
-        targetRackId: values.targetRackId,
-        startPosition: values.startPosition
-      });
-      
-      message.success(response.data.message || '批量移动成功');
-      setBatchMoveModalVisible(false);
-      setSelectedDevices([]);
-      setSelectAll(false);
-      fetchDevices();
-      fetchRacks();
-    } catch (error) {
-      if (error.errorFields) {
-        return;
-      }
-      message.error('批量移动失败');
-      console.error('批量移动失败:', error);
-    } finally {
-      setBatchMoveLoading(false);
     }
   };
 
@@ -1452,18 +1383,6 @@ function DeviceManagement() {
           <Button
             style={{
               ...secondaryButtonStyle,
-              color: selectedDevices.length > 0 ? '#722ed1' : undefined,
-              borderColor: selectedDevices.length > 0 ? '#722ed1' : undefined
-            }}
-            icon={<DragOutlined />}
-            disabled={selectedDevices.length === 0}
-            onClick={showBatchMoveModal}
-          >
-            批量移动 ({selectedDevices.length})
-          </Button>
-          <Button
-            style={{
-              ...secondaryButtonStyle,
               color: selectedDevices.length > 0 ? '#ff4d4f' : undefined,
               borderColor: selectedDevices.length > 0 ? '#ff4d4f' : undefined
             }}
@@ -1473,19 +1392,6 @@ function DeviceManagement() {
             onClick={handleBatchDelete}
           >
             批量删除 ({selectedDevices.length})
-          </Button>
-          <Button
-            style={{
-              ...secondaryButtonStyle,
-              color: selectedDevices.length > 0 ? '#ff4d4f' : undefined,
-              borderColor: selectedDevices.length > 0 ? '#ff4d4f' : undefined
-            }}
-            danger
-            icon={<SwapOutlined />}
-            disabled={selectedDevices.length === 0}
-            onClick={handleBatchOffline}
-          >
-            批量下线 ({selectedDevices.length})
           </Button>
         </div>
       </div>
@@ -2098,53 +2004,6 @@ function DeviceManagement() {
               <Option value="offline">离线</Option>
               <Option value="fault">故障</Option>
             </Select>
-          </Form.Item>
-          <div style={{ color: '#666', fontSize: '13px' }}>
-            已选择 <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedDevices.length}</span> 个设备
-          </div>
-        </Form>
-      </Modal>
-
-      <Modal
-        title={
-          <div style={modalHeaderStyle}>
-            <DragOutlined style={{ color: '#722ed1' }} />
-            批量移动设备
-          </div>
-        }
-        open={batchMoveModalVisible}
-        onCancel={() => setBatchMoveModalVisible(false)}
-        footer={[
-          <Button key="cancel" onClick={() => setBatchMoveModalVisible(false)} style={secondaryButtonStyle}>
-            取消
-          </Button>,
-          <Button key="submit" type="primary" loading={batchMoveLoading} onClick={handleBatchMove} style={primaryButtonStyle}>
-            确定
-          </Button>
-        ]}
-        destroyOnHidden
-        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
-      >
-        <Form form={batchMoveForm} layout="vertical">
-          <Form.Item
-            name="targetRackId"
-            label="目标机柜"
-            rules={[{ required: true, message: '请选择目标机柜' }]}
-          >
-            <Select placeholder="请选择目标机柜" style={{ width: '100%' }}>
-              {racks.map(rack => (
-                <Option key={rack.rackId} value={rack.rackId}>
-                  {rack.name} {rack.Room ? `(${rack.Room.name})` : ''}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item
-            name="startPosition"
-            label="起始U位"
-            rules={[{ required: true, message: '请输入起始U位' }]}
-          >
-            <InputNumber min={1} placeholder="输入起始U位" style={{ width: '100%' }} />
           </Form.Item>
           <div style={{ color: '#666', fontSize: '13px' }}>
             已选择 <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedDevices.length}</span> 个设备
