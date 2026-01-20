@@ -81,8 +81,8 @@ const OperationLog = sequelize.define('OperationLog', {
     { fields: ['userId'] },
     { fields: ['action'] },
     { fields: ['module'] },
-    { fields: ['createdAt'] },
-    { fields: ['userId', 'createdAt'] }
+    { fields: ['operateTime'] },
+    { fields: ['userId', 'operateTime'] }
   ]
 });
 

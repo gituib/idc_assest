@@ -170,9 +170,7 @@ const initAssociations = () => {
 
 const initializeModels = async () => {
   try {
-    await sequelize.sync({ alter: true });
-    console.log('工单相关数据表同步完成');
-
+    // 仅初始化关联，不再次同步表结构（避免与server.js中的sync冲突）
     initAssociations();
     await initDefaultFaultCategories();
 
