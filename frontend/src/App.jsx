@@ -16,8 +16,6 @@ const ConsumableStatistics = lazy(() => import('./pages/ConsumableStatistics'));
 const ConsumableLogs = lazy(() => import('./pages/ConsumableLogs'));
 const CategoryManagement = lazy(() => import('./pages/CategoryManagement'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
-const LoginHistory = lazy(() => import('./pages/LoginHistory'));
-const OperationLogs = lazy(() => import('./pages/OperationLogs'));
 const Login = lazy(() => import('./pages/Login'));
 const TicketManagement = lazy(() => import('./pages/TicketManagement'));
 const TicketCategoryManagement = lazy(() => import('./pages/TicketCategoryManagement'));
@@ -224,33 +222,6 @@ const AppLayout = ({ children }) => {
       ],
     },
     {
-      key: 'system-management',
-      icon: <UserOutlined style={{ fontSize: '18px' }} />,
-      label: '系统管理',
-      children: [
-        {
-          key: 'users',
-          icon: <UserOutlined style={{ fontSize: '16px' }} />,
-          label: <Link to="/users">用户管理</Link>,
-        },
-        {
-          key: 'login-history',
-          icon: <HistoryOutlined style={{ fontSize: '16px' }} />,
-          label: <Link to="/login-history">登录历史</Link>,
-        },
-        {
-          key: 'operation-logs',
-          icon: <AuditOutlined style={{ fontSize: '16px' }} />,
-          label: <Link to="/operation-logs">操作日志</Link>,
-        },
-        {
-          key: 'system-settings',
-          icon: <SettingOutlined style={{ fontSize: '16px' }} />,
-          label: <Link to="/settings">系统设置</Link>,
-        },
-      ],
-    },
-    {
       key: 'ticket-management',
       icon: <ToolOutlined style={{ fontSize: '18px' }} />,
       label: '工单管理',
@@ -277,6 +248,23 @@ const AppLayout = ({ children }) => {
         },
       ],
     },
+    {
+        key: 'system-management',
+        icon: <UserOutlined style={{ fontSize: '18px' }} />,
+        label: '系统管理',
+        children: [
+          {
+            key: 'users',
+            icon: <UserOutlined style={{ fontSize: '16px' }} />,
+            label: <Link to="/users">用户管理</Link>,
+          },
+          {
+            key: 'system-settings',
+            icon: <SettingOutlined style={{ fontSize: '16px' }} />,
+            label: <Link to="/settings">系统设置</Link>,
+          },
+        ],
+      },
   ];
 
   return (
@@ -480,8 +468,6 @@ function App() {
           <Route path="/consumables-stats" element={<PrivateRoute><ConsumableStatistics /></PrivateRoute>} />
           <Route path="/consumables-logs" element={<PrivateRoute><ConsumableLogs /></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
-          <Route path="/login-history" element={<PrivateRoute><LoginHistory /></PrivateRoute>} />
-          <Route path="/operation-logs" element={<PrivateRoute><OperationLogs /></PrivateRoute>} />
           <Route path="/tickets" element={<PrivateRoute><TicketManagement /></PrivateRoute>} />
           <Route path="/ticket-categories" element={<PrivateRoute><TicketCategoryManagement /></PrivateRoute>} />
           <Route path="/ticket-statistics" element={<PrivateRoute><TicketStatistics /></PrivateRoute>} />

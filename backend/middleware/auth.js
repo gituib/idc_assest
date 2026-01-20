@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const LoginHistory = require('../models/LoginHistory');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'idc-management-secret-key-2024';
 const TOKEN_EXPIRY = process.env.TOKEN_EXPIRY || '24h';

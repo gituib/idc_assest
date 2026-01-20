@@ -45,23 +45,6 @@ const createIndexes = async () => {
     await queryInterface.addIndex('consumable_logs', ['consumableId', 'createdAt']);
     console.log('  ✓ consumable_logs 表索引创建完成');
 
-    // OperationLog 表索引
-    console.log('创建 operation_logs 表索引...');
-    await queryInterface.addIndex('operation_logs', ['userId']);
-    await queryInterface.addIndex('operation_logs', ['action']);
-    await queryInterface.addIndex('operation_logs', ['module']);
-    await queryInterface.addIndex('operation_logs', ['createdAt']);
-    await queryInterface.addIndex('operation_logs', ['userId', 'createdAt']);
-    console.log('  ✓ operation_logs 表索引创建完成');
-
-    // LoginHistory 表索引
-    console.log('创建 login_histories 表索引...');
-    await queryInterface.addIndex('login_histories', ['userId']);
-    await queryInterface.addIndex('login_histories', ['loginTime']);
-    await queryInterface.addIndex('login_histories', ['loginType']);
-    await queryInterface.addIndex('login_histories', ['userId', 'loginTime']);
-    console.log('  ✓ login_histories 表索引创建完成');
-
     // Rack 表索引
     console.log('创建 racks 表索引...');
     await queryInterface.addIndex('racks', ['roomId']);
@@ -87,8 +70,7 @@ const checkIndexes = async () => {
   const queryInterface = sequelize.getQueryInterface();
   const tables = [
     'devices', 'users', 'consumables', 'consumable_records',
-    'consumable_logs', 'operation_logs', 'login_histories',
-    'racks', 'rooms'
+    'consumable_logs', 'racks', 'rooms'
   ];
 
   console.log('\n检查现有索引...');
@@ -117,8 +99,6 @@ const dropIndexes = async () => {
       { table: 'consumables', indexes: ['category', 'status', 'category_status'] },
       { table: 'consumable_records', indexes: ['consumableId', 'type', 'createdAt'] },
       { table: 'consumable_logs', indexes: ['consumableId', 'operationType', 'createdAt', 'consumableId_createdAt'] },
-      { table: 'operation_logs', indexes: ['userId', 'action', 'module', 'createdAt', 'userId_createdAt'] },
-      { table: 'login_histories', indexes: ['userId', 'loginTime', 'loginType', 'userId_loginTime'] },
       { table: 'racks', indexes: ['roomId', 'status', 'roomId_status'] },
       { table: 'rooms', indexes: ['status', 'name'] }
     ];
