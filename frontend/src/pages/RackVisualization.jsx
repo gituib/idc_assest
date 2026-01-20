@@ -1,26 +1,174 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Card, Select, Button, Space, message, Tooltip, Modal, Form, Switch, Checkbox, Input, Badge, Typography } from 'antd';
-import { 
-  ReloadOutlined, 
-  ZoomInOutlined, 
-  ZoomOutOutlined,
-  RotateRightOutlined,
-  CloudServerOutlined,
-  SwitcherOutlined,
-  DatabaseOutlined,
-  CloudOutlined,
-  LaptopOutlined,
-  MobileOutlined,
-  PrinterOutlined,
-  SettingOutlined,
-  SearchOutlined,
-  ClearOutlined,
-  EnvironmentOutlined
+import { Card, Select, Button, Space, message, Tooltip, Modal, Form, Switch, Checkbox, Input, Badge, Typography, Row, Col, Empty, Spin } from 'antd';
+import {
+  ReloadOutlined, ZoomInOutlined, ZoomOutOutlined,
+  RotateRightOutlined, CloudServerOutlined, SwitcherOutlined,
+  DatabaseOutlined, CloudOutlined, LaptopOutlined,
+  MobileOutlined, PrinterOutlined, SettingOutlined,
+  SearchOutlined, ClearOutlined, EnvironmentOutlined,
+  FilterOutlined, AppstoreOutlined, UnorderedListOutlined,
+  FullscreenOutlined, CompressOutlined, EyeOutlined
 } from '@ant-design/icons';
 import axios from 'axios';
 
 const { Option } = Select;
-const { Text } = Typography;
+const { Text, Title } = Typography;
+
+const designTokens = {
+  colors: {
+    primary: {
+      main: '#667eea',
+      gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      light: '#8b9ff0',
+      dark: '#4f5db8'
+    },
+    success: {
+      main: '#10b981',
+      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+      light: '#34d399',
+      dark: '#047857'
+    },
+    warning: {
+      main: '#f59e0b',
+      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+      light: '#fbbf24',
+      dark: '#b45309'
+    },
+    error: {
+      main: '#ef4444',
+      gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+      light: '#f87171',
+      dark: '#b91c1c'
+    },
+    purple: {
+      main: '#8b5cf6',
+      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
+    },
+    cyan: {
+      main: '#06b6d4',
+      gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
+    },
+    text: {
+      primary: '#1e293b',
+      secondary: '#64748b',
+      tertiary: '#94a3b8',
+      inverse: '#ffffff'
+    },
+    background: {
+      primary: '#ffffff',
+      secondary: '#f8fafc',
+      tertiary: '#f1f5f9',
+      dark: '#1e293b'
+    },
+    border: {
+      light: '#e2e8f0',
+      medium: '#cbd5e1',
+      dark: '#94a3b8'
+    },
+    device: {
+      server: '#3b82f6',
+      switch: '#22c55e',
+      router: '#f59e0b',
+      storage: '#8b5cf6',
+      firewall: '#ef4444',
+      ups: '#14b8a6',
+      pdu: '#64748b',
+      other: '#94a3b8'
+    },
+    status: {
+      normal: '#10b981',
+      running: '#10b981',
+      warning: '#f59e0b',
+      error: '#ef4444',
+      fault: '#ef4444',
+      offline: '#6b7280',
+      maintenance: '#3b82f6'
+    }
+  },
+  shadows: {
+    small: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    medium: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
+    large: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
+    xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+    glow: '0 0 20px rgba(102, 126, 234, 0.3)'
+  },
+  borderRadius: {
+    small: '6px',
+    medium: '10px',
+    large: '16px',
+    xl: '24px',
+    round: '50%'
+  },
+  transitions: {
+    fast: '150ms cubic-bezier(0.4, 0, 0.2, 1)',
+    normal: '300ms cubic-bezier(0.4, 0, 0.2, 1)',
+    slow: '500ms cubic-bezier(0.4, 0, 0.2, 1)'
+  },
+  spacing: {
+    xs: '4px',
+    sm: '8px',
+    md: '16px',
+    lg: '24px',
+    xl: '32px'
+  }
+};
+
+const pageContainerStyle = {
+  minHeight: '100vh',
+  background: designTokens.colors.background.secondary,
+  padding: designTokens.spacing.lg
+};
+
+const headerStyle = {
+  marginBottom: designTokens.spacing.lg,
+  padding: `${designTokens.spacing.lg}px ${designTokens.spacing.xl}px`,
+  background: designTokens.colors.primary.gradient,
+  borderRadius: designTokens.borderRadius.large,
+  boxShadow: designTokens.shadows.large,
+  color: designTokens.colors.text.inverse
+};
+
+const cardStyle = {
+  borderRadius: designTokens.borderRadius.large,
+  border: 'none',
+  boxShadow: designTokens.shadows.medium,
+  background: designTokens.colors.background.primary,
+  overflow: 'hidden'
+};
+
+const filterCardStyle = {
+  borderRadius: designTokens.borderRadius.medium,
+  border: 'none',
+  boxShadow: designTokens.shadows.small,
+  background: designTokens.colors.background.primary,
+  marginBottom: designTokens.spacing.lg
+};
+
+const primaryButtonStyle = {
+  height: '40px',
+  borderRadius: designTokens.borderRadius.medium,
+  background: designTokens.colors.primary.gradient,
+  border: 'none',
+  boxShadow: designTokens.shadows.medium,
+  fontWeight: '500',
+  transition: `all ${designTokens.transitions.normal}`
+};
+
+const secondaryButtonStyle = {
+  height: '40px',
+  borderRadius: designTokens.borderRadius.medium,
+  border: `1px solid ${designTokens.colors.border.light}`,
+  background: designTokens.colors.background.primary,
+  transition: `all ${designTokens.transitions.fast}`
+};
+
+const statCardStyle = () => ({
+  background: 'rgba(255, 255, 255, 0.15)',
+  borderRadius: designTokens.borderRadius.medium,
+  padding: `${designTokens.spacing.md}px`,
+  border: '1px solid rgba(255, 255, 255, 0.2)',
+  backdropFilter: 'blur(10px)'
+});
 
 // 工具函数提取到组件外部，避免每次渲染重复创建
 const getDeviceIcon = (deviceType) => {
@@ -339,6 +487,30 @@ const initAnimationStyles = () => {
       white-space: nowrap;
       font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
     }
+
+    @media (max-width: 768px) {
+      .device-tooltip {
+        font-size: 10px;
+        padding: 6px 10px;
+      }
+
+      .device-count-badge {
+        padding: 4px 10px;
+        font-size: 11px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .device-tooltip {
+        font-size: 9px;
+        padding: 4px 8px;
+      }
+
+      .device-count-badge {
+        padding: 3px 8px;
+        font-size: 10px;
+      }
+    }
   `;
   document.head.appendChild(style);
   return style;
@@ -398,56 +570,6 @@ class ErrorBoundary extends React.Component {
 }
 
 function RackVisualization() {
-  const pageHeaderStyle = {
-    marginBottom: '24px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '16px'
-  };
-  
-  const titleStyle = {
-    fontSize: '24px',
-    fontWeight: '700',
-    margin: 0,
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    backgroundClip: 'text'
-  };
-  
-  const primaryButtonStyle = {
-    height: '40px',
-    borderRadius: '8px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    border: 'none',
-    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.35)',
-    fontWeight: '500',
-    transition: 'all 0.3s ease'
-  };
-  
-  const secondaryButtonStyle = {
-    height: '40px',
-    borderRadius: '8px',
-    border: '1px solid #e8e8e8',
-    transition: 'all 0.3s ease'
-  };
-  
-  const cardStyle = {
-    borderRadius: '16px',
-    border: 'none',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-    overflow: 'hidden'
-  };
-  
-  const searchCardStyle = {
-    borderRadius: '12px',
-    border: 'none',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
-    marginBottom: '20px'
-  };
-  
   const [racks, setRacks] = useState([]);
   const [selectedRack, setSelectedRack] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
@@ -1166,24 +1288,69 @@ function RackVisualization() {
   // 无需额外的初始化，CSS 3D变换直接在JSX中实现
 
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={pageHeaderStyle}>
-        <h1 style={titleStyle}>
-          <CloudServerOutlined style={{ marginRight: '12px' }} />
-          机柜可视化
-        </h1>
-        <Space size={12} wrap>
+    <div style={pageContainerStyle}>
+      <div style={headerStyle}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: designTokens.spacing.lg
+        }}>
+          <div>
+            <Title level={3} style={{ margin: 0, color: '#fff', fontWeight: 700 }}>
+              <CloudServerOutlined style={{ marginRight: designTokens.spacing.sm, fontSize: '28px' }} />
+              机柜可视化
+            </Title>
+            <Text style={{ color: 'rgba(255,255,255,0.8)', marginTop: designTokens.spacing.xs, display: 'block', fontSize: '14px' }}>
+              实时监控机房机柜设备分布与状态
+            </Text>
+          </div>
+          <Row gutter={[designTokens.spacing.md, designTokens.spacing.md]} style={{ textAlign: 'center' }}>
+            <Col>
+              <div style={statCardStyle()}>
+                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', display: 'block' }}>机柜总数</Text>
+                <div style={{ fontSize: '28px', fontWeight: 700, color: '#fff' }}>{racks.length}</div>
+              </div>
+            </Col>
+            <Col>
+              <div style={statCardStyle()}>
+                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', display: 'block' }}>设备总数</Text>
+                <div style={{ fontSize: '28px', fontWeight: 700, color: '#fff' }}>
+                  {racks.reduce((sum, rack) => sum + (rack.deviceCount || 0), 0)}
+                </div>
+              </div>
+            </Col>
+            <Col>
+              <div style={statCardStyle()}>
+                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', display: 'block' }}>在线设备</Text>
+                <div style={{ fontSize: '28px', fontWeight: 700, color: '#fff' }}>
+                  {devices.filter(d => d.status === 'running' || d.status === 'normal').length}
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </div>
+      </div>
+
+      <Card style={filterCardStyle} styles={{ body: { padding: `${designTokens.spacing.md}px ${designTokens.spacing.lg}px` } }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: designTokens.spacing.md,
+          flexWrap: 'wrap'
+        }}>
           <Input
             placeholder="搜索设备名称、ID、IP..."
             value={searchKeyword}
             onChange={(e) => handleSearch(e.target.value)}
             onPressEnter={(e) => handleSearch(e.target.value)}
-            style={{ width: 220, height: '40px', borderRadius: '8px' }}
+            style={{ width: 240, height: '40px', borderRadius: designTokens.borderRadius.medium }}
             allowClear
             prefix={<SearchOutlined />}
             suffix={
               searchMatchCount > 0 ? (
-                <Badge count={searchMatchCount} size="small" style={{ backgroundColor: '#52c41a' }} />
+                <Badge count={searchMatchCount} size="small" style={{ backgroundColor: designTokens.colors.success.main }} />
               ) : null
             }
           />
@@ -1197,7 +1364,7 @@ function RackVisualization() {
           )}
           <Select
             placeholder="选择机房"
-            style={{ width: 180, height: '40px' }}
+            style={{ width: 180, height: '40px', borderRadius: designTokens.borderRadius.medium }}
             value={selectedRoom}
             onChange={handleRoomChange}
             loading={loading}
@@ -1212,7 +1379,7 @@ function RackVisualization() {
           </Select>
           <Select
             placeholder="选择机柜"
-            style={{ width: 200, height: '40px' }}
+            style={{ width: 200, height: '40px', borderRadius: designTokens.borderRadius.medium }}
             value={selectedRack?.rackId}
             onChange={handleRackChange}
             loading={loading || loadingDevices}
@@ -1225,52 +1392,56 @@ function RackVisualization() {
               </Option>
             ))}
           </Select>
-          <Button 
+          <Button
             style={secondaryButtonStyle}
-            icon={<ReloadOutlined />} 
+            icon={<ReloadOutlined />}
             onClick={handleReload}
             loading={loading}
             disabled={loading}
           >
             刷新
           </Button>
-          <Button 
+          <Button
             style={showTooltipConfig ? primaryButtonStyle : secondaryButtonStyle}
-            icon={<SettingOutlined />} 
+            icon={<SettingOutlined />}
             onClick={handleOpenTooltipConfig}
             type={showTooltipConfig ? 'primary' : 'default'}
           >
             字段配置
           </Button>
-        </Space>
-      </div>
-      
+        </div>
+      </Card>
+
       {searchKeyword && (
-        <Card size="small" style={searchCardStyle} styles={{ body: { padding: '16px 20px' } }}>
-          <div style={{ 
+        <Card style={{
+          ...filterCardStyle,
+          background: designTokens.colors.success.gradient,
+          borderRadius: designTokens.borderRadius.medium
+        }} styles={{ body: { padding: `${designTokens.spacing.md}px ${designTokens.spacing.lg}px` } }}>
+          <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
+            gap: designTokens.spacing.md,
             flexWrap: 'wrap'
           }}>
-            <SearchOutlined style={{ 
-              fontSize: 18, 
-              color: searchResults.length > 0 ? '#52c41a' : '#ff4d4f'
+            <SearchOutlined style={{
+              fontSize: 20,
+              color: '#fff'
             }} />
-            <Text strong style={{ color: searchResults.length > 0 ? '#135200' : '#cf1322', margin: 0 }}>
-              {searchResults.length > 0 
-                ? `找到 ${searchResults.length} 个设备` 
+            <Text strong style={{ color: '#fff', margin: 0, fontSize: '14px' }}>
+              {searchResults.length > 0
+                ? `找到 ${searchResults.length} 个设备`
                 : searching ? '搜索中...' : '未找到匹配的设备'}
             </Text>
             {searching && (
-              <Badge status="processing" text="正在搜索所有机柜..." />
+              <Badge status="processing" text="正在搜索所有机柜..." style={{ color: '#fff' }} />
             )}
             {searchResults.length > 0 && (
-              <Space wrap size={4}>
+              <Space wrap size={designTokens.spacing.sm}>
                 {searchResults.slice(0, 5).map(result => {
                   const isCurrentRack = selectedRack && result.rackId === selectedRack.rackId;
                   return (
-                    <Button 
+                    <Button
                       key={result.deviceId}
                       size="small"
                       type={highlightedDevice === result.deviceId ? 'primary' : 'default'}
@@ -1292,11 +1463,12 @@ function RackVisualization() {
                         }
                         setHighlightedDevice(result.deviceId);
                       }}
-                      style={{ 
-                        borderColor: highlightedDevice === result.deviceId ? '#667eea' : undefined,
-                        background: highlightedDevice === result.deviceId ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : undefined,
+                      style={{
+                        borderColor: 'rgba(255,255,255,0.5)',
+                        background: highlightedDevice === result.deviceId ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)',
+                        color: '#fff',
                         height: '32px',
-                        borderRadius: '6px'
+                        borderRadius: designTokens.borderRadius.small
                       }}
                     >
                       <Tooltip title={`机柜: ${result.rackName}${result.roomName ? ` | 机房: ${result.roomName}` : ''} | U${result.position || '?'}`}>
@@ -1306,7 +1478,7 @@ function RackVisualization() {
                             U{result.position || '?'}
                           </Text>
                           {!isCurrentRack && (
-                            <EnvironmentOutlined style={{ marginLeft: 4, color: '#faad14' }} />
+                            <EnvironmentOutlined style={{ marginLeft: 4, color: '#fbbf24' }} />
                           )}
                         </span>
                       </Tooltip>
@@ -1314,7 +1486,7 @@ function RackVisualization() {
                   );
                 })}
                 {searchResults.length > 5 && (
-                  <Text type="secondary">+ 还有 {searchResults.length - 5} 个</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>+ 还有 {searchResults.length - 5} 个</Text>
                 )}
               </Space>
             )}
@@ -1322,15 +1494,15 @@ function RackVisualization() {
         </Card>
       )}
       
-      <Card style={cardStyle} styles={{ body: { padding: '16px 20px' } }}>
-        <div style={{ marginBottom: 16 }}>
-          <Space wrap size={12}>
+      <Card style={cardStyle} styles={{ body: { padding: `${designTokens.spacing.md}px ${designTokens.spacing.lg}px` } }}>
+        <div style={{ marginBottom: designTokens.spacing.md }}>
+          <Space wrap size={designTokens.spacing.sm}>
             <Button style={secondaryButtonStyle} icon={<ZoomInOutlined />} onClick={handleZoomIn}>放大</Button>
             <Button style={secondaryButtonStyle} icon={<ZoomOutOutlined />} onClick={handleZoomOut}>缩小</Button>
             <Button style={secondaryButtonStyle} icon={<RotateRightOutlined />} onClick={handleResetView}>重置视角</Button>
             <Select
               placeholder="选择背景类型"
-              style={{ width: 150, height: '40px' }}
+              style={{ width: 150, height: '40px', borderRadius: designTokens.borderRadius.medium }}
               value={backgroundType}
               onChange={async (type) => {
                 setBackgroundType(type);
@@ -1341,11 +1513,18 @@ function RackVisualization() {
               <Option value="image">自定义图片</Option>
             </Select>
             {backgroundType === 'image' && (
-              <Space size={8}>
+              <Space size={designTokens.spacing.sm}>
                 <input
                   type="text"
                   placeholder="输入图片URL"
-                  style={{ width: 200, padding: '8px 12px', borderRadius: '8px', border: '1px solid #d9d9d9', height: '40px', boxSizing: 'border-box' }}
+                  style={{
+                    width: 200,
+                    padding: `8px ${designTokens.spacing.md}px`,
+                    borderRadius: designTokens.borderRadius.medium,
+                    border: `1px solid ${designTokens.colors.border.light}`,
+                    height: '40px',
+                    boxSizing: 'border-box'
+                  }}
                   onChange={async (e) => {
                     const image = e.target.value;
                     setBackgroundImage(image);
@@ -1364,13 +1543,13 @@ function RackVisualization() {
                         const formData = new FormData();
                         formData.append('file', file);
                         formData.append('type', 'background');
-                        
+
                         const response = await axios.post('/api/background/upload', formData, {
                           headers: {
                             'Content-Type': 'multipart/form-data'
                           }
                         });
-                        
+
                         if (response.data && response.data.path) {
                           setBackgroundImage(response.data.path);
                           message.success('背景图片上传成功');
@@ -1392,7 +1571,7 @@ function RackVisualization() {
                 <Button style={secondaryButtonStyle} onClick={() => document.getElementById('backgroundFileInput').click()} loading={uploading}>上传图片</Button>
                 <Select
                   placeholder="图片大小"
-                  style={{ width: 100, height: '40px' }}
+                  style={{ width: 100, height: '40px', borderRadius: designTokens.borderRadius.medium }}
                   value={backgroundSize}
                   onChange={async (size) => {
                     setBackgroundSize(size);
@@ -2219,40 +2398,50 @@ function RackVisualization() {
         
         {/* 设备详情字段配置模态框 */}
         <Modal
-          title="设备详情字段配置"
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: designTokens.spacing.sm }}>
+              <SettingOutlined style={{ color: designTokens.colors.primary.main }} />
+              <span style={{ fontWeight: 600 }}>设备详情字段配置</span>
+            </div>
+          }
           open={showTooltipConfig}
           onCancel={() => setShowTooltipConfig(false)}
           footer={null}
-          width={500}
+          width={520}
+          styles={{ body: { padding: designTokens.spacing.lg } }}
         >
           {loadingTooltipFields ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-              加载字段配置中...
+            <div style={{ padding: designTokens.spacing.xl, textAlign: 'center', color: designTokens.colors.text.tertiary }}>
+              <Spin size="large" />
+              <div style={{ marginTop: designTokens.spacing.md }}>加载字段配置中...</div>
             </div>
           ) : Object.keys(tooltipFields).length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-              暂无字段配置，请先在设备字段管理中添加字段
+            <div style={{ padding: designTokens.spacing.xl, textAlign: 'center', color: designTokens.colors.text.tertiary }}>
+              <Empty description="暂无字段配置" />
+              <Text style={{ color: designTokens.colors.text.tertiary, display: 'block', marginTop: designTokens.spacing.sm }}>
+                请先在设备字段管理中添加字段
+              </Text>
             </div>
           ) : (
             <div>
-              <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-                <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '12px' }}>
+              <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+                <div style={{ color: designTokens.colors.text.secondary, fontSize: '13px', marginBottom: designTokens.spacing.md }}>
                   选择要在设备详情中显示的字段： ({Object.keys(tooltipFields).length} 个字段)
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: designTokens.spacing.sm }}>
                   {Object.entries(tooltipFields).map(([key, field]) => (
                     <div
                       key={key}
                       style={{
-                        padding: '8px 12px',
-                        borderRadius: '6px',
+                        padding: `${designTokens.spacing.sm}px ${designTokens.spacing.md}px`,
+                        borderRadius: designTokens.borderRadius.medium,
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
-                        background: field.enabled ? 'rgba(56, 189, 248, 0.1)' : 'transparent',
-                        border: field.enabled ? '1px solid rgba(56, 189, 248, 0.3)' : '1px solid transparent',
-                        transition: 'all 0.2s ease'
+                        gap: designTokens.spacing.sm,
+                        background: field.enabled ? `${designTokens.colors.primary.main}10` : 'transparent',
+                        border: field.enabled ? `1px solid ${designTokens.colors.primary.main}30` : `1px solid ${designTokens.colors.border.light}`,
+                        transition: `all ${designTokens.transitions.fast}`
                       }}
                       onClick={() => {
                         setTooltipFields(prev => ({
@@ -2262,32 +2451,45 @@ function RackVisualization() {
                       }}
                     >
                       <Checkbox checked={field.enabled} />
-                      {field.label}
+                      <Text style={{ color: field.enabled ? designTokens.colors.text.primary : designTokens.colors.text.tertiary }}>
+                        {field.label}
+                      </Text>
                     </div>
                   ))}
                 </div>
               </div>
-              
-              <div style={{ marginTop: '20px', textAlign: 'right' }}>
+
+              <div style={{ marginTop: designTokens.spacing.lg, textAlign: 'right' }}>
                 <Space>
-                  <Button onClick={() => {
-                    const allEnabled = Object.values(tooltipFields).every(f => f.enabled);
-                    setTooltipFields(prev => {
-                      const newFields = { ...prev };
-                      Object.keys(newFields).forEach(key => {
-                        newFields[key] = { ...newFields[key], enabled: !allEnabled };
+                  <Button
+                    onClick={() => {
+                      const allEnabled = Object.values(tooltipFields).every(f => f.enabled);
+                      setTooltipFields(prev => {
+                        const newFields = { ...prev };
+                        Object.keys(newFields).forEach(key => {
+                          newFields[key] = { ...newFields[key], enabled: !allEnabled };
+                        });
+                        return newFields;
                       });
-                      return newFields;
-                    });
-                  }}>
-                    全选/取消全选
+                    }}
+                    style={{ borderRadius: designTokens.borderRadius.medium }}
+                  >
+                    {Object.values(tooltipFields).every(f => f.enabled) ? '取消全选' : '全选'}
                   </Button>
-                  <Button onClick={() => setShowTooltipConfig(false)}>
+                  <Button
+                    onClick={() => setShowTooltipConfig(false)}
+                    style={{ borderRadius: designTokens.borderRadius.medium }}
+                  >
                     取消
                   </Button>
-                  <Button type="primary" onClick={async () => {
-                    await saveTooltipConfig();
-                  }} loading={savingTooltipConfig}>
+                  <Button
+                    type="primary"
+                    onClick={async () => {
+                      await saveTooltipConfig();
+                    }}
+                    loading={savingTooltipConfig}
+                    style={primaryButtonStyle}
+                  >
                     保存
                   </Button>
                 </Space>

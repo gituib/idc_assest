@@ -27,6 +27,55 @@ const SystemSettings = lazy(() => import('./pages/SystemSettings'));
 
 const { Header, Content, Sider } = Layout;
 
+const designTokens = {
+  colors: {
+    primary: {
+      main: '#667eea',
+      gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      light: '#8b9ff0'
+    },
+    success: { main: '#10b981' },
+    warning: { main: '#f59e0b' },
+    error: { main: '#ef4444' },
+    text: {
+      primary: '#1e293b',
+      secondary: '#64748b',
+      inverse: '#ffffff'
+    },
+    background: {
+      primary: '#ffffff',
+      secondary: '#f8fafc',
+      dark: '#1e293b'
+    },
+    border: {
+      light: '#e2e8f0'
+    },
+    sidebar: {
+      bg: '#ffffff',
+      bgHover: 'rgba(102, 126, 234, 0.08)',
+      bgActive: 'rgba(102, 126, 234, 0.15)',
+      text: '#475569',
+      textHover: '#667eea',
+      textActive: '#667eea',
+      border: '#e2e8f0'
+    }
+  },
+  shadows: {
+    small: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    medium: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    large: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+  },
+  borderRadius: {
+    small: '6px',
+    medium: '10px'
+  },
+  spacing: {
+    sm: '8px',
+    md: '16px',
+    lg: '24px'
+  }
+};
+
 const PrivateRoute = ({ children }) => {
   const { token, initialized, loading } = useAuth();
   const location = useLocation();
@@ -35,12 +84,15 @@ const PrivateRoute = ({ children }) => {
     return (
       <div style={{ 
         display: 'flex', 
+        flexDirection: 'column',
         justifyContent: 'center', 
         alignItems: 'center', 
         height: '100vh',
-        background: '#f5f5f5'
+        background: '#f5f5f5',
+        gap: '16px'
       }}>
-        <Spin size="large" tip="正在加载认证状态..." />
+        <Spin size="large" />
+        <span style={{ color: '#8c8c8c', fontSize: '14px' }}>正在加载认证状态...</span>
       </div>
     );
   }
@@ -54,12 +106,15 @@ const PrivateRoute = ({ children }) => {
       fallback={
         <div style={{ 
           display: 'flex', 
+          flexDirection: 'column',
           justifyContent: 'center', 
           alignItems: 'center', 
           height: '100vh',
-          background: '#f5f5f5'
+          background: '#f5f5f5',
+          gap: '16px'
         }}>
-          <Spin size="large" tip="正在加载页面..." />
+          <Spin size="large" />
+          <span style={{ color: '#8c8c8c', fontSize: '14px' }}>正在加载页面...</span>
         </div>
       }
     >
@@ -72,237 +127,331 @@ const PrivateRoute = ({ children }) => {
 
 const AppLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [activeKey, setActiveKey] = useState('dashboard');
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { 
-    token: { colorBgContainer, borderRadiusLG }, 
-  } = theme.useToken();
-
+  const location = useLocation();
+  
   const handleLogout = () => {
     logout();
     message.success('已退出登录');
     navigate('/login');
   };
 
-  const userMenuItems = [
+  const getSelectedKey = () => {
+    const path = location.pathname;
+    if (path === '/') return 'dashboard';
+    if (path.startsWith('/rooms') || path.startsWith('/racks') || path.startsWith('/visualization')) return 'room-management';
+    if (path.startsWith('/devices') || path.startsWith('/fields')) return 'asset-management';
+    if (path.startsWith('/consumables')) return 'consumables-management';
+    if (path.startsWith('/users') || path.startsWith('/login-history') || path.startsWith('/operation-logs') || path.startsWith('/settings')) return 'system-management';
+    if (path.startsWith('/tickets')) return 'ticket-management';
+    return 'dashboard';
+  };
+
+  const menuItems = [
     {
-      key: 'logout',
-      icon: <LogoutOutlined />,
-      label: '退出登录',
-      onClick: handleLogout
-    }
+      key: 'dashboard',
+      icon: <BarChartOutlined style={{ fontSize: '18px' }} />,
+      label: <Link to="/">仪表盘</Link>,
+    },
+    {
+      key: 'room-management',
+      icon: <HomeOutlined style={{ fontSize: '18px' }} />,
+      label: '机房管理',
+      children: [
+        {
+          key: 'rooms',
+          icon: <HomeOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/rooms">机房管理</Link>,
+        },
+        {
+          key: 'racks',
+          icon: <DatabaseOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/racks">机柜管理</Link>,
+        },
+        {
+          key: 'visualization',
+          icon: <EyeOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/visualization">机柜可视化</Link>,
+        },
+      ],
+    },
+    {
+      key: 'asset-management',
+      icon: <BuildOutlined style={{ fontSize: '18px' }} />,
+      label: '资产管理',
+      children: [
+        {
+          key: 'devices',
+          icon: <CloudServerOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/devices">设备管理</Link>,
+        },
+        {
+          key: 'fields',
+          icon: <DatabaseOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/fields">字段管理</Link>,
+        },
+      ],
+    },
+    {
+      key: 'consumables-management',
+      icon: <ShoppingCartOutlined style={{ fontSize: '18px' }} />,
+      label: '耗材管理',
+      children: [
+        {
+          key: 'consumables-stats',
+          icon: <BarChartOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/consumables-stats">耗材统计</Link>,
+        },
+        {
+          key: 'consumables',
+          icon: <DatabaseOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/consumables">耗材列表</Link>,
+        },
+        {
+          key: 'consumables-categories',
+          icon: <ImportOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/consumables-categories">分类管理</Link>,
+        },
+        {
+          key: 'consumables-logs',
+          icon: <FileTextOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/consumables-logs">操作日志</Link>,
+        },
+      ],
+    },
+    {
+      key: 'system-management',
+      icon: <UserOutlined style={{ fontSize: '18px' }} />,
+      label: '系统管理',
+      children: [
+        {
+          key: 'users',
+          icon: <UserOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/users">用户管理</Link>,
+        },
+        {
+          key: 'login-history',
+          icon: <HistoryOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/login-history">登录历史</Link>,
+        },
+        {
+          key: 'operation-logs',
+          icon: <AuditOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/operation-logs">操作日志</Link>,
+        },
+        {
+          key: 'system-settings',
+          icon: <SettingOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/settings">系统设置</Link>,
+        },
+      ],
+    },
+    {
+      key: 'ticket-management',
+      icon: <ToolOutlined style={{ fontSize: '18px' }} />,
+      label: '工单管理',
+      children: [
+        {
+          key: 'tickets',
+          icon: <ScheduleOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/tickets">工单列表</Link>,
+        },
+        {
+          key: 'ticket-categories',
+          icon: <InboxOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/ticket-categories">故障分类</Link>,
+        },
+        {
+          key: 'ticket-statistics',
+          icon: <BarChartOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/ticket-statistics">统计报表</Link>,
+        },
+        {
+          key: 'ticket-fields',
+          icon: <DatabaseOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/ticket-fields">字段管理</Link>,
+        },
+      ],
+    },
   ];
 
   return (
-    <Layout>
+    <Layout style={{ minHeight: '100vh' }}>
       <Sider 
-        width={220} 
-        collapsedWidth={80}
+        width={240} 
+        collapsedWidth={72}
         collapsed={collapsed}
         style={{
-          backgroundColor: colorBgContainer,
-          boxShadow: '2px 0 8px rgba(0,0,0,0.08)',
+          background: designTokens.colors.sidebar.bg,
+          boxShadow: '2px 0 8px rgba(0, 0, 0, 0.06)',
+          borderRight: `1px solid ${designTokens.colors.sidebar.border}`,
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          zIndex: 100
         }}
       >
         <div style={{
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          height: 64,
-          padding: '0 12px',
-          borderBottom: '1px solid #f0f0f0',
-          marginBottom: 8
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          padding: collapsed ? '16px 0' : '16px 20px',
+          borderBottom: `1px solid ${designTokens.colors.sidebar.border}`,
+          minHeight: '64px',
+          background: designTokens.colors.sidebar.bg
+        }}>
+          <div style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: designTokens.borderRadius.small,
+            background: designTokens.colors.primary.gradient,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <CloudServerOutlined style={{ fontSize: '18px', color: '#ffffff' }} />
+          </div>
+          {!collapsed && (
+            <div>
+              <div style={{
+                fontSize: '15px',
+                fontWeight: '600',
+                color: designTokens.colors.primary.main,
+                lineHeight: 1.2
+              }}>
+                IDC管理
+              </div>
+              <div style={{
+                fontSize: '11px',
+                color: designTokens.colors.sidebar.text,
+                marginTop: '2px'
+              }}>
+                数据中心管理平台
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <div style={{ 
+          padding: collapsed ? '12px 0' : '12px 8px',
+          overflowY: 'auto',
+          flex: 1
+        }}>
+          <Menu
+            mode="inline"
+            selectedKeys={[getSelectedKey()]}
+            defaultOpenKeys={['room-management', 'asset-management', 'consumables-management', 'system-management', 'ticket-management']}
+            style={{
+              background: 'transparent',
+              borderRight: 0,
+              fontSize: '14px'
+            }}
+            items={menuItems}
+          />
+        </div>
+        
+        <div style={{
+          padding: '12px',
+          borderTop: `1px solid ${designTokens.colors.sidebar.border}`
         }}>
           <Button
             type="text"
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             onClick={() => setCollapsed(!collapsed)}
             style={{
-              fontSize: 18,
-              padding: '8px',
-              borderRadius: 4
+              width: '100%',
+              height: '40px',
+              color: designTokens.colors.text.secondary,
+              fontSize: '16px',
+              borderRadius: designTokens.borderRadius.small,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              gap: '8px'
             }}
-          />
+          >
+            {!collapsed && <span style={{ fontSize: '13px', color: designTokens.colors.text.secondary }}>收起菜单</span>}
+          </Button>
         </div>
-        
-        <Menu
-          mode="inline"
-          defaultSelectedKeys={['dashboard']}
-          style={{
-            flex: 1,
-            borderRight: 0,
-            backgroundColor: 'transparent'
-          }}
-          items={[
-            {
-              key: 'dashboard',
-              icon: <BarChartOutlined />,
-              label: <Link to="/">仪表盘</Link>,
-            },
-            {
-              key: 'room-management',
-              icon: <HomeOutlined />,
-              label: '机房管理',
-              children: [
-                {
-                  key: 'rooms',
-                  icon: <HomeOutlined />,
-                  label: <Link to="/rooms">机房管理</Link>,
-                },
-                {
-                  key: 'racks',
-                  icon: <DatabaseOutlined />,
-                  label: <Link to="/racks">机柜管理</Link>,
-                },
-                {
-                  key: 'visualization',
-                  icon: <EyeOutlined />,
-                  label: <Link to="/visualization">机柜可视化</Link>,
-                },
-              ],
-            },
-            {
-              key: 'asset-management',
-              icon: <BuildOutlined />,
-              label: '资产管理',
-              children: [
-                {
-                  key: 'devices',
-                  icon: <CloudServerOutlined />,
-                  label: <Link to="/devices">设备管理</Link>,
-                },
-                {
-                  key: 'fields',
-                  icon: <DatabaseOutlined />,
-                  label: <Link to="/fields">字段管理</Link>,
-                },
-              ],
-            },
-            {
-              key: 'consumables-management',
-              icon: <ShoppingCartOutlined />,
-              label: '耗材管理',
-              children: [
-                {
-                  key: 'consumables-stats',
-                  icon: <BarChartOutlined />,
-                  label: <Link to="/consumables-stats">耗材统计</Link>,
-                },
-                {
-                  key: 'consumables',
-                  icon: <DatabaseOutlined />,
-                  label: <Link to="/consumables">耗材列表</Link>,
-                },
-                {
-                  key: 'consumables-categories',
-                  icon: <ImportOutlined />,
-                  label: <Link to="/consumables-categories">分类管理</Link>,
-                },
-                {
-                  key: 'consumables-logs',
-                  icon: <FileTextOutlined />,
-                  label: <Link to="/consumables-logs">操作日志</Link>,
-                },
-              ],
-            },
-            {
-              key: 'system-management',
-              icon: <UserOutlined />,
-              label: '系统管理',
-              children: [
-                {
-                  key: 'users',
-                  icon: <UserOutlined />,
-                  label: <Link to="/users">用户管理</Link>,
-                },
-                {
-                  key: 'login-history',
-                  icon: <HistoryOutlined />,
-                  label: <Link to="/login-history">登录历史</Link>,
-                },
-                {
-                  key: 'operation-logs',
-                  icon: <AuditOutlined />,
-                  label: <Link to="/operation-logs">操作日志</Link>,
-                },
-                {
-                  key: 'system-settings',
-                  icon: <SettingOutlined />,
-                  label: <Link to="/settings">系统设置</Link>,
-                },
-              ],
-            },
-            {
-              key: 'ticket-management',
-              icon: <ToolOutlined />,
-              label: '工单管理',
-              children: [
-                {
-                  key: 'tickets',
-                  icon: <ScheduleOutlined />,
-                  label: <Link to="/tickets">工单列表</Link>,
-                },
-                {
-                  key: 'ticket-categories',
-                  icon: <InboxOutlined />,
-                  label: <Link to="/ticket-categories">故障分类</Link>,
-                },
-                {
-                  key: 'ticket-statistics',
-                  icon: <BarChartOutlined />,
-                  label: <Link to="/ticket-statistics">统计报表</Link>,
-                },
-                {
-                  key: 'ticket-fields',
-                  icon: <DatabaseOutlined />,
-                  label: <Link to="/ticket-fields">字段管理</Link>,
-                },
-              ],
-            },
-          ]}
-        />
       </Sider>
-      <Layout style={{ padding: '0 24px 24px' }}>
+      
+      <Layout style={{ 
+        marginLeft: collapsed ? 72 : 240,
+        transition: 'margin-left 0.2s ease'
+      }}>
         <Header style={{
-          padding: '0 16px',
-          height: 56,
-          background: colorBgContainer,
-          marginBottom: 24,
-          borderRadius: borderRadiusLG,
+          padding: '0 24px',
+          height: 64,
+          background: designTokens.colors.background.primary,
           display: 'flex',
           justifyContent: 'flex-end',
           alignItems: 'center',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
+          boxShadow: designTokens.shadows.small,
+          position: 'sticky',
+          top: 0,
+          zIndex: 99
         }}>
           {user && (
-            <Space size={12}>
-              <Avatar 
-                style={{ backgroundColor: '#1890ff', cursor: 'pointer' }}
-                icon={<UserOutlined />}
-              />
-              <span style={{ color: '#666', fontSize: 14 }}>{user.username}</span>
-              <Divider type="vertical" style={{ margin: 0 }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 12px',
+                background: designTokens.colors.background.secondary,
+                borderRadius: designTokens.borderRadius.medium
+              }}>
+                <Avatar 
+                  style={{ 
+                    backgroundColor: designTokens.colors.primary.main,
+                    cursor: 'pointer',
+                    width: 32,
+                    height: 32,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  icon={<UserOutlined style={{ fontSize: '14px' }} />}
+                />
+                <span style={{ 
+                  color: designTokens.colors.text.primary, 
+                  fontSize: 14,
+                  fontWeight: 500
+                }}>{user.username}</span>
+              </div>
               <Button
                 type="text"
                 danger
                 icon={<LogoutOutlined />}
                 onClick={handleLogout}
-                style={{ padding: '4px 8px' }}
+                style={{ 
+                  padding: '8px 12px',
+                  height: 'auto',
+                  borderRadius: designTokens.borderRadius.small,
+                  fontSize: 13
+                }}
               >
                 退出
               </Button>
-            </Space>
+            </div>
           )}
         </Header>
         <Content
           style={{
             padding: 24,
             margin: 0,
-            minHeight: 280,
-            background: colorBgContainer,
-            borderRadius: borderRadiusLG,
+            minHeight: 'calc(100vh - 64px)',
+            background: designTokens.colors.background.secondary
           }}
         >
           {children}
@@ -321,12 +470,15 @@ function App() {
             fallback={
               <div style={{ 
                 display: 'flex', 
+                flexDirection: 'column',
                 justifyContent: 'center', 
                 alignItems: 'center', 
                 height: '100vh',
-                background: '#f5f5f5'
+                background: '#f5f5f5',
+                gap: '16px'
               }}>
-                <Spin size="large" tip="正在加载登录页面..." />
+                <Spin size="large" />
+                <span style={{ color: '#8c8c8c', fontSize: '14px' }}>正在加载登录页面...</span>
               </div>
             }
           >

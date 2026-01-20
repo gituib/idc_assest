@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, Row, Col, Statistic, message, Button, Tag, Typography } from 'antd';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Card, Row, Col, Statistic, message, Button, Tag, Typography, Progress, Spin } from 'antd';
 import {
   DatabaseOutlined,
   CloudServerOutlined,
@@ -12,24 +12,92 @@ import {
   ReloadOutlined,
   EnvironmentOutlined,
   LineChartOutlined,
-  SafetyOutlined
+  SafetyOutlined,
+  TeamOutlined,
+  ThunderboltOutlined,
+  AppstoreOutlined,
+  BarChartOutlined
 } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api';
 
 const { Title, Text } = Typography;
 
-const theme = {
-  primary: '#1890ff',
-  primaryDark: '#096dd9',
-  success: '#52c41a',
-  warning: '#faad14',
-  error: '#ff4d4f',
-  purple: '#722ed1',
-  cyan: '#13c2c2',
-  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  cardBg: 'rgba(255, 255, 255, 0.95)',
-  textPrimary: '#262626',
-  textSecondary: '#8c8c8c'
+const designTokens = {
+  colors: {
+    primary: {
+      main: '#1890ff',
+      light: '#40a9ff',
+      dark: '#096dd9',
+      gradient: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+      bgGradient: 'linear-gradient(135deg, #1890ff15 0%, #096dd908 100%)'
+    },
+    success: {
+      main: '#52c41a',
+      light: '#73d13d',
+      dark: '#389e0d',
+      gradient: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)',
+      bgGradient: 'linear-gradient(135deg, #52c41a15 0%, #389e0d08 100%)'
+    },
+    warning: {
+      main: '#faad14',
+      light: '#ffc53d',
+      dark: '#d48806',
+      gradient: 'linear-gradient(135deg, #faad14 0%, #d48806 100%)',
+      bgGradient: 'linear-gradient(135deg, #faad1415 0%, #d4880608 100%)'
+    },
+    error: {
+      main: '#ff4d4f',
+      light: '#ff7875',
+      dark: '#cf1322',
+      gradient: 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)',
+      bgGradient: 'linear-gradient(135deg, #ff4d4f15 0%, #cf132208 100%)'
+    },
+    purple: {
+      main: '#722ed1',
+      light: '#9254de',
+      dark: '#531dab',
+      gradient: 'linear-gradient(135deg, #722ed1 0%, #531dab 100%)',
+      bgGradient: 'linear-gradient(135deg, #722ed115 0%, #531dab08 100%)'
+    },
+    cyan: {
+      main: '#13c2c2',
+      light: '#36cfc9',
+      dark: '#08979c',
+      gradient: 'linear-gradient(135deg, #13c2c2 0%, #08979c 100%)',
+      bgGradient: 'linear-gradient(135deg, #13c2c215 0%, #08979c08 100%)'
+    },
+    text: {
+      primary: '#262626',
+      secondary: '#8c8c8c',
+      tertiary: '#bfbfbf'
+    }
+  },
+  shadows: {
+    small: '0 2px 8px rgba(0, 0, 0, 0.06)',
+    medium: '0 4px 16px rgba(0, 0, 0, 0.08)',
+    large: '0 8px 24px rgba(0, 0, 0, 0.12)',
+    hover: '0 12px 32px rgba(0, 0, 0, 0.15)'
+  },
+  borderRadius: {
+    small: '8px',
+    medium: '12px',
+    large: '16px',
+    xl: '20px'
+  },
+  transitions: {
+    fast: '0.15s ease',
+    normal: '0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    slow: '0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+  }
+};
+
+const responsiveConfig = {
+  xs: { span: 24 },
+  sm: { span: 12 },
+  md: { span: 8 },
+  lg: { span: 6 },
+  xl: { span: 5 },
+  xxl: { span: 4 }
 };
 
 const containerStyle = {
@@ -41,59 +109,57 @@ const containerStyle = {
 const headerStyle = {
   textAlign: 'center',
   marginBottom: '32px',
-  padding: '24px',
+  padding: '32px 48px',
   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  borderRadius: '16px',
+  borderRadius: '20px',
   color: '#fff',
-  boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)'
+  boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3)',
+  animation: 'fadeInDown 0.6s ease-out'
 };
 
 const titleStyle = {
-  fontSize: '2rem',
+  fontSize: '2.2rem',
   fontWeight: '700',
   color: '#fff',
   margin: '0 0 8px 0',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: '12px'
+  gap: '16px'
 };
 
 const subtitleStyle = {
-  fontSize: '1rem',
+  fontSize: '1.1rem',
   color: 'rgba(255, 255, 255, 0.85)',
   margin: '0'
 };
 
-const statCardStyle = {
-  borderRadius: '16px',
+const statCardStyle = (color) => ({
+  borderRadius: designTokens.borderRadius.large,
   border: 'none',
-  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+  boxShadow: designTokens.shadows.medium,
   background: '#fff',
-  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  transition: `all ${designTokens.transitions.normal}`,
   position: 'relative',
   overflow: 'hidden',
   cursor: 'pointer',
-  height: '100%'
-};
-
-const statCardHoverStyle = {
-  transform: 'translateY(-4px)',
-  boxShadow: '0 12px 24px rgba(0, 0, 0, 0.12)'
-};
+  height: '100%',
+  animation: 'fadeInUp 0.6s ease-out backwards'
+});
 
 const statIconContainer = (color) => ({
   position: 'absolute',
-  top: '16px',
-  right: '16px',
-  width: '56px',
-  height: '56px',
-  borderRadius: '14px',
+  top: '20px',
+  right: '20px',
+  width: '64px',
+  height: '64px',
+  borderRadius: designTokens.borderRadius.medium,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: `linear-gradient(135deg, ${color}15 0%, ${color}08 100%)`,
-  fontSize: '28px'
+  background: `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)`,
+  fontSize: '32px',
+  transition: `all ${designTokens.transitions.normal}`
 });
 
 const topBorderStyle = (color) => ({
@@ -103,14 +169,15 @@ const topBorderStyle = (color) => ({
   right: 0,
   height: '4px',
   background: `linear-gradient(90deg, ${color}, ${color}80)`,
-  borderRadius: '16px 16px 0 0'
+  borderRadius: `${designTokens.borderRadius.large} ${designTokens.borderRadius.large} 0 0`
 });
 
 const overviewCardStyle = {
-  borderRadius: '16px',
+  borderRadius: designTokens.borderRadius.large,
   border: 'none',
-  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
-  background: '#fff'
+  boxShadow: designTokens.shadows.medium,
+  background: '#fff',
+  animation: 'fadeInUp 0.6s ease-out 0.2s backwards'
 };
 
 const navigationGridStyle = {
@@ -120,78 +187,332 @@ const navigationGridStyle = {
   marginBottom: '24px'
 };
 
-const navButtonStyle = {
+const navButtonStyle = (color) => ({
   height: 'auto',
   padding: '24px 20px',
-  borderRadius: '12px',
+  borderRadius: designTokens.borderRadius.medium,
   border: '2px solid #f0f0f0',
   background: '#fff',
-  transition: 'all 0.3s ease',
+  transition: `all ${designTokens.transitions.normal}`,
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   gap: '12px',
-  cursor: 'pointer'
-};
+  cursor: 'pointer',
+  boxShadow: designTokens.shadows.small
+});
 
-const navButtonHoverStyle = {
-  borderColor: '#1890ff',
-  background: 'linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%)',
-  transform: 'translateY(-2px)',
-  boxShadow: '0 4px 12px rgba(24, 144, 255, 0.2)'
-};
-
-const navIconStyle = {
-  fontSize: '2.2rem',
-  background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
-  WebkitBackgroundClip: 'text',
-  WebkitTextFillColor: 'transparent'
-};
+const navIconContainer = (color) => ({
+  width: '60px',
+  height: '60px',
+  borderRadius: designTokens.borderRadius.medium,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)`,
+  fontSize: '28px',
+  transition: `all ${designTokens.transitions.normal}`
+});
 
 const navTextStyle = {
   fontSize: '0.9rem',
   fontWeight: '600',
-  color: '#262626'
+  color: designTokens.colors.text.primary
 };
 
 const systemInfoStyle = {
   background: 'linear-gradient(135deg, #f0f7ff 0%, #e6f7ff 100%)',
-  borderRadius: '12px',
+  borderRadius: designTokens.borderRadius.medium,
   padding: '20px',
   border: '1px solid #91d5ff'
 };
 
 const quickStatsStyle = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
   gap: '16px',
   marginBottom: '24px'
 };
 
 const quickStatItemStyle = {
   background: 'linear-gradient(135deg, #fff 0%, #fafafa 100%)',
-  borderRadius: '12px',
-  padding: '16px',
+  borderRadius: designTokens.borderRadius.medium,
+  padding: '20px',
   display: 'flex',
   alignItems: 'center',
-  gap: '12px',
+  gap: '16px',
+  border: '1px solid #f0f0f0',
+  boxShadow: designTokens.shadows.small
+};
+
+const progressCardStyle = {
+  borderRadius: designTokens.borderRadius.large,
+  border: 'none',
+  boxShadow: designTokens.shadows.medium,
+  background: '#fff',
+  height: '100%',
+  animation: 'fadeInUp 0.6s ease-out 0.3s backwards'
+};
+
+const chartContainerStyle = {
+  padding: '20px',
+  borderRadius: designTokens.borderRadius.medium,
+  background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
   border: '1px solid #f0f0f0'
 };
 
-const createTrendStyle = (trend) => ({
+const pieChartStyle = {
+  width: '180px',
+  height: '180px',
+  borderRadius: '50%',
+  background: `conic-gradient(
+    ${designTokens.colors.success.main} 0deg 216deg,
+    ${designTokens.colors.warning.main} 216deg 288deg,
+    ${designTokens.colors.error.main} 288deg 324deg,
+    ${designTokens.colors.primary.main} 324deg 360deg
+  )`,
+  position: 'relative',
   display: 'flex',
   alignItems: 'center',
-  fontSize: '0.875rem',
-  fontWeight: '500',
-  color: trend > 0 ? theme.success : theme.error,
-  marginTop: '8px'
-});
+  justifyContent: 'center'
+};
+
+const pieChartInner = {
+  width: '120px',
+  height: '120px',
+  borderRadius: '50%',
+  background: '#fff',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexDirection: 'column'
+};
+
+const trendItemStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '12px 0',
+  borderBottom: '1px solid #f0f0f0'
+};
+
+const AnimatedCounter = ({ value, duration = 1500 }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+  const animationRef = useRef(null);
+  const startTimeRef = useRef(null);
+
+  useEffect(() => {
+    const animate = (currentTime) => {
+      if (!startTimeRef.current) {
+        startTimeRef.current = currentTime;
+      }
+
+      const elapsed = currentTime - startTimeRef.current;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+      const currentValue = Math.floor(easeOutQuart * value);
+
+      setDisplayValue(currentValue);
+
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [value, duration]);
+
+  return <span>{displayValue}</span>;
+};
+
+const CircularProgress = ({ percentage, size = 120, strokeWidth = 10, color, label }) => {
+  const circumference = 2 * Math.PI * ((size - strokeWidth) / 2);
+  const offset = circumference - (percentage / 100) * circumference;
+
+  return (
+    <div style={{ position: 'relative', width: size, height: size }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={(size - strokeWidth) / 2}
+          fill="none"
+          stroke="#f0f0f0"
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={(size - strokeWidth) / 2}
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          style={{
+            transition: 'stroke-dashoffset 1s ease-out',
+            filter: `drop-shadow(0 0 6px ${color}40)`
+          }}
+        />
+      </svg>
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '1.5rem', fontWeight: '700', color: designTokens.colors.text.primary }}>
+          {percentage}%
+        </div>
+        <div style={{ fontSize: '0.75rem', color: designTokens.colors.text.secondary }}>
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PowerGauge = ({ value, maxValue }) => {
+  const percentage = Math.min((value / maxValue) * 100, 100);
+  const getColor = () => {
+    if (percentage >= 80) return designTokens.colors.error.main;
+    if (percentage >= 60) return designTokens.colors.warning.main;
+    return designTokens.colors.success.main;
+  };
+
+  return (
+    <div style={{ marginTop: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <Text style={{ fontSize: '0.85rem', color: designTokens.colors.text.secondary }}>
+          功率使用率
+        </Text>
+        <Text style={{ fontSize: '0.85rem', fontWeight: '600', color: getColor() }}>
+          {percentage.toFixed(1)}%
+        </Text>
+      </div>
+      <div style={{
+        height: '8px',
+        borderRadius: '4px',
+        background: '#f0f0f0',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          height: '100%',
+          borderRadius: '4px',
+          background: `linear-gradient(90deg, ${getColor()}, ${getColor()}80)`,
+          width: `${percentage}%`,
+          transition: 'width 0.8s ease-out',
+          boxShadow: `0 0 8px ${getColor()}40`
+        }} />
+      </div>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        marginTop: '4px',
+        fontSize: '0.75rem',
+        color: designTokens.colors.text.tertiary
+      }}>
+        <span>{value}W</span>
+        <span>{maxValue}W</span>
+      </div>
+    </div>
+  );
+};
+
+const DeviceTrendChart = ({ data }) => {
+  const maxValue = Math.max(...data.map(d => d.value));
+  const chartHeight = 120;
+
+  return (
+    <div style={{ marginTop: '16px' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        height: chartHeight,
+        gap: '8px',
+        padding: '0 8px'
+      }}>
+        {data.map((item, index) => (
+          <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{
+              width: '100%',
+              maxWidth: '40px',
+              height: `${(item.value / maxValue) * chartHeight}px`,
+              borderRadius: '4px 4px 0 0',
+              background: `linear-gradient(180deg, ${item.color} 0%, ${item.color}80 100%)`,
+              transition: `height ${designTokens.transitions.slow}`,
+              boxShadow: `0 -2px 8px ${item.color}30`
+            }} />
+            <span style={{
+              fontSize: '0.7rem',
+              color: designTokens.colors.text.tertiary,
+              marginTop: '4px',
+              whiteSpace: 'nowrap'
+            }}>
+              {item.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const StatusLegend = () => {
+  const legends = [
+    { color: designTokens.colors.success.main, label: '运行中', percent: 60 },
+    { color: designTokens.colors.warning.main, label: '维护中', percent: 20 },
+    { color: designTokens.colors.error.main, label: '故障', percent: 10 },
+    { color: designTokens.colors.primary.main, label: '离线', percent: 10 }
+  ];
+
+  return (
+    <div style={{ marginTop: '16px' }}>
+      {legends.map((item, index) => (
+        <div key={index} style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 0',
+          borderBottom: index < legends.length - 1 ? '1px solid #f5f5f5' : 'none'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '3px',
+              background: item.color,
+              boxShadow: `0 0 6px ${item.color}40`
+            }} />
+            <Text style={{ fontSize: '0.85rem', color: designTokens.colors.text.secondary }}>
+              {item.label}
+            </Text>
+          </div>
+          <Text style={{ fontSize: '0.85rem', fontWeight: '600', color: designTokens.colors.text.primary }}>
+            {item.percent}%
+          </Text>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const navButtonsData = [
-  { key: 'devices', icon: CloudServerOutlined, text: '设备管理', path: '/devices', color: '#1890ff' },
-  { key: 'racks', icon: DatabaseOutlined, text: '资源规划', path: '/racks', color: '#722ed1' },
-  { key: 'faults', icon: WarningOutlined, text: '故障监控', path: '/faults', color: '#faad14' },
-  { key: 'settings', icon: SettingOutlined, text: '系统配置', path: '/settings', color: '#13c2c2' }
+  { key: 'devices', icon: CloudServerOutlined, text: '设备管理', path: '/devices', color: designTokens.colors.primary.main },
+  { key: 'racks', icon: DatabaseOutlined, text: '资源规划', path: '/racks', color: designTokens.colors.purple.main },
+  { key: 'faults', icon: WarningOutlined, text: '故障监控', path: '/faults', color: designTokens.colors.warning.main },
+  { key: 'tickets', icon: BarChartOutlined, text: '工单管理', path: '/tickets', color: designTokens.colors.cyan.main },
+  { key: 'consumables', icon: AppstoreOutlined, text: '耗材管理', path: '/consumables', color: '#fa8c16' },
+  { key: 'settings', icon: SettingOutlined, text: '系统配置', path: '/settings', color: designTokens.colors.success.main }
 ];
 
 function Dashboard() {
@@ -203,34 +524,44 @@ function Dashboard() {
     deviceGrowth: 2.5,
     faultTrend: -12.3,
     onlineRate: 98.5,
-    powerUsage: 0
+    powerUsage: 0,
+    totalUsers: 0,
+    activeTickets: 0
   });
   const [loading, setLoading] = useState(true);
   const [hoveredCard, setHoveredCard] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [animatedKey, setAnimatedKey] = useState(0);
 
   const fetchStats = useCallback(async () => {
     try {
-      setLoading(true);
+      setIsRefreshing(true);
 
-      const [devicesRes, racksRes, roomsRes] = await Promise.all([
-        axios.get('/api/devices', { params: { pageSize: 1 } }),
-        axios.get('/api/racks', { params: { pageSize: 1 } }),
-        axios.get('/api/rooms')
+      const [devicesRes, racksRes, roomsRes, usersRes, ticketsRes] = await Promise.all([
+        api.get('/devices', { params: { pageSize: 1 } }),
+        api.get('/racks', { params: { pageSize: 1 } }),
+        api.get('/rooms'),
+        api.get('/users', { params: { pageSize: 1 } }),
+        api.get('/tickets', { params: { pageSize: 1, status: 'open' } })
       ]);
 
-      const totalDevices = devicesRes.data.total || 0;
-      const totalRacks = racksRes.data.total || 0;
-      const rooms = roomsRes.data || [];
+      const totalDevices = devicesRes.total || 0;
+      const totalRacks = racksRes.total || 0;
+      const rooms = roomsRes || [];
       const totalRooms = rooms.length;
+      const totalUsers = usersRes.total || 0;
+      const activeTickets = ticketsRes.total || 0;
 
       let faultDevices = 0;
       if (totalDevices > 0) {
         try {
-          const faultRes = await axios.get('/api/devices/count', {
-            params: { status: 'fault' }
+          const faultRes = await api.get('/devices', {
+            params: { status: 'fault', pageSize: 1 }
           });
-          faultDevices = faultRes.data.count || 0;
-        } catch {
+          faultDevices = faultRes.total || 0;
+        } catch (error) {
+          message.warning('获取故障设备数失败，使用默认值');
+          console.error('获取故障设备数失败:', error);
           faultDevices = 0;
         }
       }
@@ -239,17 +570,22 @@ function Dashboard() {
         totalDevices,
         totalRacks,
         totalRooms,
+        totalUsers,
+        activeTickets,
         faultDevices,
         deviceGrowth: 2.5,
         faultTrend: -12.3,
         onlineRate: totalDevices > 0 ? ((totalDevices - faultDevices) / totalDevices * 100).toFixed(1) : 100,
         powerUsage: Math.floor(Math.random() * 5000) + 2000
       });
+
+      setAnimatedKey(prev => prev + 1);
     } catch (error) {
-      message.error('获取统计数据失败');
+      message.error(`获取统计数据失败: ${error}`);
       console.error('获取统计数据失败:', error);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -272,54 +608,81 @@ function Dashboard() {
   const statCards = useMemo(() => [
     {
       key: 'devices',
-      xs: 24, sm: 12, lg: 6,
+      xs: 24, sm: 12, lg: 6, xl: 4,
       icon: CloudServerOutlined,
-      color: '#1890ff',
+      color: designTokens.colors.primary.main,
       statKey: 'totalDevices',
       title: '总设备数',
       trend: stats.deviceGrowth,
-      tagColor: 'blue'
+      tagColor: 'blue',
+      delay: 0
     },
     {
       key: 'racks',
-      xs: 24, sm: 12, lg: 6,
+      xs: 24, sm: 12, lg: 6, xl: 4,
       icon: DatabaseOutlined,
-      color: '#722ed1',
+      color: designTokens.colors.purple.main,
       statKey: 'totalRacks',
       title: '总机柜数',
       trend: 0,
       tagColor: 'green',
-      customStatus: true
+      customStatus: true,
+      delay: 1
     },
     {
       key: 'rooms',
-      xs: 24, sm: 12, lg: 6,
+      xs: 24, sm: 12, lg: 6, xl: 4,
       icon: HomeOutlined,
-      color: '#52c41a',
+      color: designTokens.colors.success.main,
       statKey: 'totalRooms',
       title: '总机房数',
       trend: 0,
       tagColor: 'green',
-      customStatus: true
+      customStatus: true,
+      delay: 2
     },
     {
       key: 'faults',
-      xs: 24, sm: 12, lg: 6,
+      xs: 24, sm: 12, lg: 6, xl: 4,
       icon: WarningOutlined,
-      color: '#ff4d4f',
+      color: designTokens.colors.error.main,
       statKey: 'faultDevices',
       title: '故障设备',
       trend: stats.faultTrend,
-      tagColor: 'red'
+      tagColor: 'red',
+      delay: 3
+    },
+    {
+      key: 'users',
+      xs: 24, sm: 12, lg: 6, xl: 4,
+      icon: TeamOutlined,
+      color: designTokens.colors.cyan.main,
+      statKey: 'totalUsers',
+      title: '用户总数',
+      trend: 5.2,
+      tagColor: 'cyan',
+      delay: 4
+    },
+    {
+      key: 'tickets',
+      xs: 24, sm: 12, lg: 6, xl: 4,
+      icon: BarChartOutlined,
+      color: '#fa8c16',
+      statKey: 'activeTickets',
+      title: '待处理工单',
+      trend: -8.5,
+      tagColor: 'orange',
+      delay: 5
     }
   ], [stats.deviceGrowth, stats.faultTrend]);
 
   const renderStatCard = useCallback((config) => {
-    const { icon: Icon, color, statKey, title, trend, tagColor, customStatus, xs, sm, lg } = config;
-    const colProps = { xs, sm, lg };
+    const { icon: Icon, color, statKey, title, trend, tagColor, customStatus, xs, sm, lg, xl, delay } = config;
+    const colProps = { xs, sm, lg, xl };
     const cardStyle = {
-      ...statCardStyle,
-      ...(hoveredCard === statKey ? statCardHoverStyle : {})
+      ...statCardStyle(color),
+      ...(hoveredCard === statKey ? { transform: 'translateY(-6px)', boxShadow: designTokens.shadows.hover } : {}),
+      animationDelay: `${delay * 0.1}s`
     };
 
     return (
@@ -334,171 +697,325 @@ function Dashboard() {
             <div style={statIconContainer(color)}>
               <Icon style={{ color }} />
             </div>
-            <Statistic
-              title={
-                <span style={{ fontSize: '0.9rem', fontWeight: '600', color: theme.textSecondary }}>
-                  {title}
-                </span>
-              }
-              value={stats[statKey]}
-              valueStyle={{
-                fontSize: '2rem',
-                fontWeight: '700',
-                color: theme.textPrimary,
-                marginBottom: '4px'
-              }}
-              loading={loading}
-            />
+            <div style={{
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              color: designTokens.colors.text.secondary,
+              marginBottom: '8px'
+            }}>
+              {title}
+            </div>
+            <div style={{
+              fontSize: '2.2rem',
+              fontWeight: '700',
+              color: designTokens.colors.text.primary,
+              marginBottom: '8px',
+              background: `linear-gradient(135deg, ${color} 0%, ${color}cc 100%)`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
+              {loading ? (
+                <Spin size="small" />
+              ) : (
+                <AnimatedCounter key={`${animatedKey}-${statKey}`} value={stats[statKey]} />
+              )}
+            </div>
             {customStatus ? (
               statKey === 'totalRacks' ? (
-                <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.85rem', color: theme.success }}>
-                  <span style={{ width: '8px', height: '8px', background: theme.success, borderRadius: '50%', marginRight: '8px', boxShadow: '0 0 8px rgba(82, 196, 26, 0.5)' }} />
+                <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.85rem', color: designTokens.colors.success.main }}>
+                  <span style={{
+                    width: '8px',
+                    height: '8px',
+                    background: designTokens.colors.success.main,
+                    borderRadius: '50%',
+                    marginRight: '8px',
+                    boxShadow: '0 0 8px rgba(82, 196, 26, 0.5)'
+                  }} />
                   <span>正常运行中</span>
                 </div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.85rem', color: theme.success }}>
-                  <span style={{ width: '8px', height: '8px', background: theme.success, borderRadius: '50%', marginRight: '8px', boxShadow: '0 0 8px rgba(82, 196, 26, 0.5)' }} />
+                <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.85rem', color: designTokens.colors.success.main }}>
+                  <span style={{
+                    width: '8px',
+                    height: '8px',
+                    background: designTokens.colors.success.main,
+                    borderRadius: '50%',
+                    marginRight: '8px',
+                    boxShadow: '0 0 8px rgba(82, 196, 26, 0.5)'
+                  }} />
                   <span>全部在线</span>
                 </div>
               )
             ) : (
-              <div style={createTrendStyle(trend)}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                color: trend > 0 ? designTokens.colors.success.main : designTokens.colors.error.main,
+                marginTop: '8px'
+              }}>
                 {trend > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
                 <span style={{ marginLeft: '4px' }}>{Math.abs(trend)}%</span>
-                <Tag color={tagColor} style={{ marginLeft: '8px', fontSize: '0.75rem', borderRadius: '4px' }}>本月</Tag>
+                <Tag color={tagColor} style={{ marginLeft: '8px', fontSize: '0.75rem', borderRadius: '4px' }}>环比</Tag>
               </div>
             )}
           </div>
         </Card>
       </Col>
     );
-  }, [stats, loading, hoveredCard]);
+  }, [stats, loading, hoveredCard, animatedKey]);
 
   const navButtons = useMemo(() => navButtonsData.map(({ key, icon: Icon, text, color }) => (
-    <Button
+    <div
       key={key}
-      type="text"
       style={{
-        ...navButtonStyle,
-        ...(hoveredCard === `nav-${key}` ? navButtonHoverStyle : {})
+        ...navButtonStyle(color),
+        ...(hoveredCard === `nav-${key}` ? {
+          transform: 'translateY(-4px)',
+          boxShadow: designTokens.shadows.large,
+          borderColor: color
+        } : {}),
+        animationDelay: `${navButtonsData.findIndex(b => b.key === key) * 0.1}s`
       }}
       onMouseEnter={(e) => handleNavHover(e, true, `nav-${key}`)}
       onMouseLeave={(e) => handleNavHover(e, false, `nav-${key}`)}
     >
-      <Icon style={{ ...navIconStyle, background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }} />
+      <div style={navIconContainer(color)}>
+        <Icon style={{ color, fontSize: '28px' }} />
+      </div>
       <span style={navTextStyle}>{text}</span>
-    </Button>
+    </div>
   )), [hoveredCard]);
 
   const quickStats = useMemo(() => [
-    { icon: LineChartOutlined, label: '在线率', value: `${stats.onlineRate}%`, color: theme.success },
-    { icon: SafetyOutlined, label: '安全等级', value: 'A级', color: theme.primary },
-    { icon: EnvironmentOutlined, label: '功率使用', value: `${stats.powerUsage}W`, color: theme.warning }
+    { icon: LineChartOutlined, label: '在线率', value: `${stats.onlineRate}%`, color: designTokens.colors.success.main },
+    { icon: SafetyOutlined, label: '安全等级', value: 'A级', color: designTokens.colors.primary.main },
+    { icon: ThunderboltOutlined, label: '功率使用', value: `${stats.powerUsage}W`, color: designTokens.colors.warning.main }
   ], [stats.onlineRate, stats.powerUsage]);
+
+  const deviceTrendData = useMemo(() => [
+    { label: '周一', value: 45, color: designTokens.colors.primary.main },
+    { label: '周二', value: 52, color: designTokens.colors.primary.main },
+    { label: '周三', value: 48, color: designTokens.colors.primary.main },
+    { label: '周四', value: 60, color: designTokens.colors.success.main },
+    { label: '周五', value: 55, color: designTokens.colors.success.main },
+    { label: '周六', value: 42, color: designTokens.colors.warning.main },
+    { label: '周日', value: 58, color: designTokens.colors.primary.main }
+  ], []);
 
   const systemInfo = useMemo(() => (
     <div style={systemInfoStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <p style={{ margin: '0', fontSize: '0.9rem', color: theme.textPrimary, fontWeight: '600' }}>
+          <p style={{ margin: '0', fontSize: '0.9rem', color: designTokens.colors.text.primary, fontWeight: '600' }}>
             <strong>系统版本：</strong> v1.0.0
           </p>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: theme.textSecondary }}>
+          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: designTokens.colors.text.secondary }}>
             <strong>最后更新：</strong>{new Date().toLocaleDateString()}
           </p>
         </div>
         <Button
           type="primary"
-          icon={<ReloadOutlined />}
+          icon={<ReloadOutlined spin={isRefreshing} />}
           size="small"
           onClick={handleRefresh}
+          loading={isRefreshing}
           style={{
-            background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+            background: designTokens.colors.primary.gradient,
             border: 'none',
-            borderRadius: '6px'
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(24, 144, 255, 0.3)'
           }}
         >
           刷新数据
         </Button>
       </div>
     </div>
-  ), [handleRefresh]);
+  ), [handleRefresh, isRefreshing]);
+
+  const styles = `
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  `;
 
   return (
-    <div style={containerStyle}>
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>
-          <DashboardOutlined />
-          IDC设备管理系统
-        </h1>
-        <p style={subtitleStyle}>实时监控 · 智能管理 · 高效运维</p>
-      </div>
+    <>
+      <style>{styles}</style>
+      <div style={containerStyle}>
+        <div style={headerStyle}>
+          <h1 style={titleStyle}>
+            <DashboardOutlined />
+            IDC设备管理系统
+          </h1>
+          <p style={subtitleStyle}>实时监控 · 智能管理 · 高效运维</p>
+        </div>
 
-      <Row gutter={[24, 24]} style={{ marginBottom: '32px' }}>
-        {statCards.map(renderStatCard)}
-      </Row>
+        <Row gutter={[24, 24]} style={{ marginBottom: '32px' }}>
+          {statCards.map(renderStatCard)}
+        </Row>
 
-      <div>
-        <Card style={overviewCardStyle}>
-          <div style={{ padding: '24px' }}>
-            <div className="welcome-banner" style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              borderRadius: '12px',
-              padding: '24px',
-              color: '#fff',
-              marginBottom: '24px'
-            }}>
-              <h2 style={{
-                fontSize: '1.3rem',
-                fontWeight: '600',
-                margin: '0 0 8px 0',
-                color: '#fff'
-              }}>
-                欢迎使用IDC设备管理系统
-              </h2>
-              <p style={{
-                fontSize: '0.95rem',
-                margin: '0',
-                opacity: '0.9',
-                color: '#fff'
-              }}>
-                专业的机房设备管理解决方案，提供全方位的设备监控和管理能力
-              </p>
-            </div>
-
-            <div style={quickStatsStyle}>
-              {quickStats.map((stat, index) => (
-                <div key={index} style={quickStatItemStyle}>
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '10px',
-                    background: `linear-gradient(135deg, ${stat.color}20 0%, ${stat.color}10 100%)`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '20px',
-                    color: stat.color
-                  }}>
-                    <stat.icon />
+        <Row gutter={[24, 24]} style={{ marginBottom: '32px' }}>
+          <Col xs={24} lg={8}>
+            <Card style={progressCardStyle}>
+              <div style={{ padding: '20px' }}>
+                <Title level={5} style={{ margin: '0 0 20px 0', color: designTokens.colors.text.primary }}>
+                  设备状态分布
+                </Title>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={pieChartStyle}>
+                    <div style={pieChartInner}>
+                      <span style={{ fontSize: '1.5rem', fontWeight: '700', color: designTokens.colors.text.primary }}>
+                        {stats.totalDevices}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: designTokens.colors.text.secondary }}>
+                        设备总数
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <Text style={{ color: theme.textSecondary, fontSize: '0.85rem' }}>{stat.label}</Text>
-                    <div style={{ fontSize: '1.1rem', fontWeight: '600', color: theme.textPrimary }}>{stat.value}</div>
-                  </div>
+                  <StatusLegend />
                 </div>
-              ))}
-            </div>
+              </div>
+            </Card>
+          </Col>
 
-            <div style={navigationGridStyle}>
-              {navButtons}
-            </div>
+          <Col xs={24} lg={8}>
+            <Card style={progressCardStyle}>
+              <div style={{ padding: '20px' }}>
+                <Title level={5} style={{ margin: '0 0 20px 0', color: designTokens.colors.text.primary }}>
+                  系统健康指标
+                </Title>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}>
+                  <CircularProgress
+                    percentage={parseFloat(stats.onlineRate)}
+                    size={140}
+                    strokeWidth={12}
+                    color={designTokens.colors.success.main}
+                    label="在线率"
+                  />
+                  <PowerGauge value={stats.powerUsage} maxValue={10000} />
+                </div>
+              </div>
+            </Card>
+          </Col>
 
-            {systemInfo}
-          </div>
-        </Card>
+          <Col xs={24} lg={8}>
+            <Card style={progressCardStyle}>
+              <div style={{ padding: '20px' }}>
+                <Title level={5} style={{ margin: '0 0 20px 0', color: designTokens.colors.text.primary }}>
+                  周设备趋势
+                </Title>
+                <div style={chartContainerStyle}>
+                  <DeviceTrendChart data={deviceTrendData} />
+                </div>
+                <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center', gap: '16px' }}>
+                  <Text style={{ fontSize: '0.75rem', color: designTokens.colors.text.tertiary }}>
+                    周一 至 周日 设备变化趋势
+                  </Text>
+                </div>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+
+        <div>
+          <Card style={overviewCardStyle}>
+            <div style={{ padding: '24px' }}>
+              <div className="welcome-banner" style={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: designTokens.borderRadius.medium,
+                padding: '28px',
+                color: '#fff',
+                marginBottom: '24px',
+                animation: 'fadeInUp 0.6s ease-out 0.4s backwards'
+              }}>
+                <h2 style={{
+                  fontSize: '1.4rem',
+                  fontWeight: '600',
+                  margin: '0 0 8px 0',
+                  color: '#fff'
+                }}>
+                  欢迎使用IDC设备管理系统
+                </h2>
+                <p style={{
+                  fontSize: '1rem',
+                  margin: '0',
+                  opacity: '0.9',
+                  color: '#fff'
+                }}>
+                  专业的机房设备管理解决方案，提供全方位的设备监控和管理能力
+                </p>
+              </div>
+
+              <div style={{ ...quickStatsStyle, animation: 'fadeInUp 0.6s ease-out 0.5s backwards' }}>
+                {quickStats.map((stat, index) => (
+                  <div key={index} style={quickStatItemStyle}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: designTokens.borderRadius.medium,
+                      background: `linear-gradient(135deg, ${stat.color}20 0%, ${stat.color}10 100%)`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '24px',
+                      color: stat.color,
+                      boxShadow: `0 4px 12px ${stat.color}20`
+                    }}>
+                      <stat.icon />
+                    </div>
+                    <div>
+                      <Text style={{ color: designTokens.colors.text.secondary, fontSize: '0.85rem' }}>{stat.label}</Text>
+                      <div style={{ fontSize: '1.2rem', fontWeight: '700', color: designTokens.colors.text.primary }}>{stat.value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ ...navigationGridStyle, animation: 'fadeInUp 0.6s ease-out 0.6s backwards' }}>
+                {navButtons}
+              </div>
+
+              <div style={{ animation: 'fadeInUp 0.6s ease-out 0.7s backwards' }}>
+                {systemInfo}
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <style>{`
+          @media (max-width: 576px) {
+            ${containerStyle} {
+              padding: 16px;
+            }
+            ${titleStyle} {
+              font-size: 1.6rem;
+            }
+            ${headerStyle} {
+              padding: 24px;
+            }
+          }
+        `}</style>
       </div>
-    </div>
+    </>
   );
 }
 
