@@ -4,7 +4,10 @@
   "description": "IDC设备管理系统后端",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "create-indexes": "node create_indexes.js",
+    "check-indexes": "node create_indexes.js check",
+    "drop-indexes": "node create_indexes.js drop"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

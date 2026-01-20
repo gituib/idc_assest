@@ -57,7 +57,12 @@ const Consumable = sequelize.define('Consumable', {
   }
 }, {
   tableName: 'consumables',
-  timestamps: true
+  timestamps: true,
+  indexes: [
+    { fields: ['category'] },
+    { fields: ['status'] },
+    { fields: ['category', 'status'] }
+  ]
 });
 
 module.exports = Consumable;

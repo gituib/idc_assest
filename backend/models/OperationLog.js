@@ -76,7 +76,14 @@ const OperationLog = sequelize.define('OperationLog', {
   tableName: 'operation_logs',
   timestamps: true,
   createdAt: 'operateTime',
-  updatedAt: false
+  updatedAt: false,
+  indexes: [
+    { fields: ['userId'] },
+    { fields: ['action'] },
+    { fields: ['module'] },
+    { fields: ['createdAt'] },
+    { fields: ['userId', 'createdAt'] }
+  ]
 });
 
 module.exports = OperationLog;

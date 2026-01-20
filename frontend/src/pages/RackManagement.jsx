@@ -76,13 +76,13 @@ const headerStyle = {
   boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3)'
 };
 
-const statCardStyle = () => ({
+const statCardStyle = {
   background: 'rgba(255, 255, 255, 0.15)',
   borderRadius: designTokens.borderRadius.medium,
   padding: '16px',
   border: '1px solid rgba(255, 255, 255, 0.2)',
   backdropFilter: 'blur(10px)'
-});
+};
 
 const cardStyle = {
   borderRadius: designTokens.borderRadius.large,
@@ -654,19 +654,19 @@ function RackManagement() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
-            <div style={statCardStyle()}>
+            <div style={statCardStyle}>
               <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>总机柜</Text>
               <div style={{ fontSize: '24px', fontWeight: '700' }}>{stats.total}</div>
             </div>
-            <div style={statCardStyle()}>
+            <div style={statCardStyle}>
               <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>在用机柜</Text>
               <div style={{ fontSize: '24px', fontWeight: '700', color: '#52c41a' }}>{stats.active}</div>
             </div>
-            <div style={statCardStyle()}>
+            <div style={statCardStyle}>
               <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>设备总数</Text>
               <div style={{ fontSize: '24px', fontWeight: '700' }}>{stats.totalDevices}</div>
             </div>
-            <div style={statCardStyle()}>
+            <div style={statCardStyle}>
               <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>总功率</Text>
               <div style={{ fontSize: '24px', fontWeight: '700' }}>{(stats.totalPower / 1000).toFixed(1)}kW</div>
             </div>

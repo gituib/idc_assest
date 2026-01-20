@@ -312,174 +312,51 @@ function DeviceManagement() {
   // 列宽状态
   const [columnWidths, setColumnWidths] = useState({});
 
-  // 缓存用于搜索的数据（避免重复处理）
-  const devicesCacheRef = useRef({
-    timestamp: 0,
-    data: null,
-    TTL: 5 * 60 * 1000 // 缓存5分钟
-  });
-
   // 防抖搜索关键词
   const debouncedKeyword = useDebounce(keyword, 300);
 
-  // 预计算所有设备的搜索索引（提升搜索性能）
-  const searchIndexRef = useRef(new Map());
+  // 使用 useMemo 缓存筛选后的设备数据（现在直接使用 allDevices，因为后端已经处理了筛选）
+  const filteredDevicesMemo = useMemo(() => {
+    return allDevices;
+  }, [allDevices]);
 
-  // 构建设备搜索索引
-  const buildSearchIndex = useCallback((devices) => {
-    const index = new Map();
-    devices.forEach((device, idx) => {
-      const searchableValues = [];
-      
-      // 收集所有基本类型字段值
-      Object.entries(device).forEach(([key, value]) => {
-        if (value === null || value === undefined) return;
-        if (typeof value === 'object') {
-          // 收集嵌套对象值
-          if (device.Rack?.name) searchableValues.push(String(device.Rack.name).toLowerCase());
-          if (device.Rack?.Room?.name) searchableValues.push(String(device.Rack.Room.name).toLowerCase());
-          // 收集自定义字段值
-          if (device.customFields && typeof device.customFields === 'object') {
-            Object.values(device.customFields).forEach(cfValue => {
-              if (cfValue !== null && cfValue !== undefined && typeof cfValue !== 'object') {
-                searchableValues.push(String(cfValue).toLowerCase());
-              }
-            });
-          }
-        } else {
-          searchableValues.push(String(value).toLowerCase());
-        }
-      });
-      
-      index.set(idx, searchableValues);
-    });
-    return index;
-  }, []);
-
-  // 优化的全字段搜索函数
-  const searchDevices = useCallback((devices, keyword) => {
-    if (!keyword || !keyword.trim()) {
-      return devices;
-    }
-    
-    const searchTerm = keyword.toLowerCase().trim();
-    
-    return devices.filter((device, idx) => {
-      // 使用预计算的搜索索引
-      let searchableValues = searchIndexRef.current.get(idx);
-      
-      if (!searchableValues) {
-        // 如果没有预计算索引，当场计算并缓存
-        searchableValues = [];
-        Object.entries(device).forEach(([key, value]) => {
-          if (value === null || value === undefined) return;
-          if (typeof value === 'object') {
-            if (device.Rack?.name) searchableValues.push(String(device.Rack.name).toLowerCase());
-            if (device.Rack?.Room?.name) searchableValues.push(String(device.Rack.Room.name).toLowerCase());
-            if (device.customFields && typeof device.customFields === 'object') {
-              Object.values(device.customFields).forEach(cfValue => {
-                if (cfValue !== null && cfValue !== undefined && typeof cfValue !== 'object') {
-                  searchableValues.push(String(cfValue).toLowerCase());
-                }
-              });
-            }
-          } else {
-            searchableValues.push(String(value).toLowerCase());
-          }
-        });
-        searchIndexRef.current.set(idx, searchableValues);
-      }
-      
-      return searchableValues.some(value => value.includes(searchTerm));
-    });
-  }, []);
-
-  // 获取所有设备数据（不分页，用于本地搜索）- 使用缓存
-  const fetchAllDevices = useCallback(async (forceRefresh = false) => {
-    const now = Date.now();
-    const cache = devicesCacheRef.current;
-    
-    // 检查缓存是否有效
-    if (!forceRefresh && cache.data && (now - cache.timestamp) < cache.TTL) {
-      return cache.data;
-    }
-    
+  // 获取所有设备（支持搜索、筛选和分页）
+  const fetchDevices = useCallback(async (page = 1, pageSize = 10, forceRefresh = false) => {
     try {
-      const response = await axios.get('/api/devices', { 
-        params: { page: 1, pageSize: 99999 } 
-      });
-      const { devices } = response.data;
+      setLoading(true);
       
-      // 将customFields中的字段值映射为设备对象的直接属性
+      // 使用后端分页加载
+      const params = {
+        page,
+        pageSize,
+        keyword: debouncedKeyword || undefined,
+        status: status !== 'all' ? status : undefined,
+        type: type !== 'all' ? type : undefined
+      };
+      
+      const response = await axios.get('/api/devices', { params });
+      const { devices, total } = response.data;
+      
+      // 处理设备数据，展开自定义字段
       const processedDevices = devices.map(device => {
         const deviceWithFields = { ...device };
-        
-        // 如果有自定义字段，将其展开为设备对象的直接属性
         if (device.customFields && typeof device.customFields === 'object') {
           Object.entries(device.customFields).forEach(([fieldName, value]) => {
             deviceWithFields[fieldName] = value;
           });
         }
-        
         return deviceWithFields;
       });
       
-      // 更新缓存
-      cache.data = processedDevices;
-      cache.timestamp = now;
-      
-      // 预计算搜索索引
-      searchIndexRef.current = buildSearchIndex(processedDevices);
-      
-      return processedDevices;
-    } catch (error) {
-      console.error('获取所有设备数据失败:', error);
-      return cache.data || [];
-    }
-  }, [buildSearchIndex]);
-
-  // 使用 useMemo 缓存筛选后的设备数据
-  const filteredDevicesMemo = useMemo(() => {
-    if (!allDevices.length) return [];
-    
-    let result = allDevices;
-    
-    // 状态筛选
-    if (status && status !== 'all') {
-      result = result.filter(device => device.status === status);
-    }
-    
-    // 类型筛选
-    if (type && type !== 'all') {
-      result = result.filter(device => device.type === type);
-    }
-    
-    // 关键词搜索（使用防抖后的关键词）
-    if (debouncedKeyword && debouncedKeyword.trim()) {
-      result = searchDevices(result, debouncedKeyword);
-    }
-    
-    return result;
-  }, [allDevices, status, type, debouncedKeyword, searchDevices]);
-
-  // 获取所有设备（支持搜索、筛选和分页）- 使用缓存和useCallback
-  const fetchDevices = useCallback(async (page = 1, pageSize = 10, forceRefresh = false) => {
-    try {
-      setLoading(true);
-      
-      // 先获取所有设备数据（使用缓存，批量删除后强制刷新）
-      const allData = await fetchAllDevices(forceRefresh);
-      setAllDevices(allData);
-      
-      // 更新分页信息（筛选后的数据会通过useMemo自动更新）
-      setPagination(prev => ({ ...prev, current: page, pageSize, total: filteredDevicesMemo.length }));
+      setAllDevices(processedDevices);
+      setPagination(prev => ({ ...prev, current: page, pageSize, total }));
     } catch (error) {
       message.error('获取设备列表失败');
       console.error('获取设备列表失败:', error);
     } finally {
       setLoading(false);
     }
-  }, [fetchAllDevices, filteredDevicesMemo.length]);
+  }, [debouncedKeyword, status, type]);
 
   // 获取设备字段配置
   const fetchDeviceFields = async () => {
@@ -533,10 +410,10 @@ function DeviceManagement() {
   };
 
   useEffect(() => {
-    fetchDevices();
+    fetchDevices(1, pagination.pageSize);
     fetchRacks();
     fetchDeviceFields();
-  }, []);
+  }, [fetchDevices]);
 
   // 同步当前页设备数据
   useEffect(() => {

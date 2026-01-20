@@ -27,6 +27,36 @@ const SystemSettings = lazy(() => import('./pages/SystemSettings'));
 
 const { Header, Content, Sider } = Layout;
 
+const PageLoading = () => (
+  <div style={{
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100vh',
+    background: '#f5f5f5',
+    gap: '16px'
+  }}>
+    <Spin size="large" />
+    <span style={{ color: '#8c8c8c', fontSize: '14px' }}>正在加载页面...</span>
+  </div>
+);
+
+const AuthLoading = () => (
+  <div style={{
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100vh',
+    background: '#f5f5f5',
+    gap: '16px'
+  }}>
+    <Spin size="large" />
+    <span style={{ color: '#8c8c8c', fontSize: '14px' }}>正在加载认证状态...</span>
+  </div>
+);
+
 const designTokens = {
   colors: {
     primary: {
@@ -81,49 +111,21 @@ const PrivateRoute = ({ children }) => {
   const location = useLocation();
 
   if (!initialized) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        flexDirection: 'column',
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        background: '#f5f5f5',
-        gap: '16px'
-      }}>
-        <Spin size="large" />
-        <span style={{ color: '#8c8c8c', fontSize: '14px' }}>正在加载认证状态...</span>
-      </div>
-    );
+    return <AuthLoading />;
   }
 
   if (!token) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  return (
-    <Suspense 
-      fallback={
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column',
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          height: '100vh',
-          background: '#f5f5f5',
-          gap: '16px'
-        }}>
-          <Spin size="large" />
-          <span style={{ color: '#8c8c8c', fontSize: '14px' }}>正在加载页面...</span>
-        </div>
-      }
-    >
-      <AppLayout>
-        {children}
-      </AppLayout>
-    </Suspense>
-  );
+  return <AppLayout>{children}</AppLayout>;
 };
+
+const ProtectedRoute = ({ component: Component }) => (
+  <PrivateRoute>
+    <Component />
+  </PrivateRoute>
+);
 
 const AppLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -464,173 +466,30 @@ const AppLayout = ({ children }) => {
 function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/login" element={
-          <Suspense 
-            fallback={
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column',
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                height: '100vh',
-                background: '#f5f5f5',
-                gap: '16px'
-              }}>
-                <Spin size="large" />
-                <span style={{ color: '#8c8c8c', fontSize: '14px' }}>正在加载登录页面...</span>
-              </div>
-            }
-          >
-            <Login />
-          </Suspense>
-        } />
-        <Route
-          path="/"
-          element={
-            <PrivateRoute>
-              <Dashboard />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/devices"
-          element={
-            <PrivateRoute>
-              <DeviceManagement />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/racks"
-          element={
-            <PrivateRoute>
-              <RackManagement />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/rooms"
-          element={
-            <PrivateRoute>
-              <RoomManagement />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/fields"
-          element={
-            <PrivateRoute>
-              <DeviceFieldManagement />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/visualization"
-          element={
-            <PrivateRoute>
-              <RackVisualization />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/consumables"
-          element={
-            <PrivateRoute>
-              <ConsumableManagement />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/consumables-categories"
-          element={
-            <PrivateRoute>
-              <CategoryManagement />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/consumables-stats"
-          element={
-            <PrivateRoute>
-              <ConsumableStatistics />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/consumables-logs"
-          element={
-            <PrivateRoute>
-              <ConsumableLogs />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/users"
-          element={
-            <PrivateRoute>
-              <UserManagement />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/login-history"
-          element={
-            <PrivateRoute>
-              <LoginHistory />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/operation-logs"
-          element={
-            <PrivateRoute>
-              <OperationLogs />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/tickets"
-          element={
-            <PrivateRoute>
-              <TicketManagement />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/ticket-categories"
-          element={
-            <PrivateRoute>
-              <TicketCategoryManagement />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/ticket-statistics"
-          element={
-            <PrivateRoute>
-              <TicketStatistics />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/ticket-fields"
-          element={
-            <PrivateRoute>
-              <TicketFieldManagement />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <PrivateRoute>
-              <SystemSettings />
-            </PrivateRoute>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<PageLoading />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/devices" element={<PrivateRoute><DeviceManagement /></PrivateRoute>} />
+          <Route path="/racks" element={<PrivateRoute><RackManagement /></PrivateRoute>} />
+          <Route path="/rooms" element={<PrivateRoute><RoomManagement /></PrivateRoute>} />
+          <Route path="/fields" element={<PrivateRoute><DeviceFieldManagement /></PrivateRoute>} />
+          <Route path="/visualization" element={<PrivateRoute><RackVisualization /></PrivateRoute>} />
+          <Route path="/consumables" element={<PrivateRoute><ConsumableManagement /></PrivateRoute>} />
+          <Route path="/consumables-categories" element={<PrivateRoute><CategoryManagement /></PrivateRoute>} />
+          <Route path="/consumables-stats" element={<PrivateRoute><ConsumableStatistics /></PrivateRoute>} />
+          <Route path="/consumables-logs" element={<PrivateRoute><ConsumableLogs /></PrivateRoute>} />
+          <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
+          <Route path="/login-history" element={<PrivateRoute><LoginHistory /></PrivateRoute>} />
+          <Route path="/operation-logs" element={<PrivateRoute><OperationLogs /></PrivateRoute>} />
+          <Route path="/tickets" element={<PrivateRoute><TicketManagement /></PrivateRoute>} />
+          <Route path="/ticket-categories" element={<PrivateRoute><TicketCategoryManagement /></PrivateRoute>} />
+          <Route path="/ticket-statistics" element={<PrivateRoute><TicketStatistics /></PrivateRoute>} />
+          <Route path="/ticket-fields" element={<PrivateRoute><TicketFieldManagement /></PrivateRoute>} />
+          <Route path="/settings" element={<PrivateRoute><SystemSettings /></PrivateRoute>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </Router>
   );
 }

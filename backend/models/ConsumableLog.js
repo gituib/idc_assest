@@ -57,7 +57,13 @@ const ConsumableLog = sequelize.define('ConsumableLog', {
 }, {
   tableName: 'consumable_logs',
   timestamps: true,
-  comment: '耗材操作日志表'
+  comment: '耗材操作日志表',
+  indexes: [
+    { fields: ['consumableId'] },
+    { fields: ['operationType'] },
+    { fields: ['createdAt'] },
+    { fields: ['consumableId', 'createdAt'] }
+  ]
 });
 
 ConsumableLog.belongsTo(Consumable, {

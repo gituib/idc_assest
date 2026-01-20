@@ -33,7 +33,11 @@ const Room = sequelize.define('Room', {
   }
 }, {
   tableName: 'rooms',
-  timestamps: true
+  timestamps: true,
+  indexes: [
+    { fields: ['status'] },
+    { fields: ['name'] }
+  ]
 });
 
 module.exports = Room;

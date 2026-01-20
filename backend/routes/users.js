@@ -51,20 +51,38 @@ router.get('/', authMiddleware, async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    for (const user of users) {
-      const userRoles = await UserRole.findAll({
+    if (users.length > 0) {
+      const userIds = users.map(u => u.userId);
+      const allUserRoles = await UserRole.findAll({
         include: [{
           model: Role,
-          where: { status: 'active' }
+          where: { status: 'active' },
+          attributes: ['roleId', 'roleName', 'roleCode']
         }],
-        where: { UserId: user.userId }
+        where: {
+          UserId: { [Op.in]: userIds }
+        }
       });
-      
-      user.dataValues.roles = userRoles.map(ur => ({
-        roleId: ur.Role.roleId,
-        roleName: ur.Role.roleName,
-        roleCode: ur.Role.roleCode
-      }));
+
+      const userRolesMap = {};
+      allUserRoles.forEach(ur => {
+        if (!userRolesMap[ur.UserId]) {
+          userRolesMap[ur.UserId] = [];
+        }
+        userRolesMap[ur.UserId].push({
+          roleId: ur.Role.roleId,
+          roleName: ur.Role.roleName,
+          roleCode: ur.Role.roleCode
+        });
+      });
+
+      users.forEach(user => {
+        user.dataValues.roles = userRolesMap[user.userId] || [];
+      });
+    } else {
+      users.forEach(user => {
+        user.dataValues.roles = [];
+      });
     }
 
     res.json({

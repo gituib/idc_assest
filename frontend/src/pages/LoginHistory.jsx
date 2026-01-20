@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, Table, Tag, Space, Button, DatePicker, Select, message, Popconfirm, Typography, Descriptions } from 'antd';
 import { ReloadOutlined, DeleteOutlined, EyeOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { loginHistoryAPI } from '../api';
@@ -17,7 +17,7 @@ const LoginHistory = () => {
     fetchHistories();
   }, [pagination.current, filters]);
 
-  const fetchHistories = async () => {
+  const fetchHistories = useCallback(async () => {
     setLoading(true);
     try {
       const params = {
@@ -35,14 +35,14 @@ const LoginHistory = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.current, pagination.pageSize, filters]);
 
-  const handleFilterChange = (key, value) => {
+  const handleFilterChange = useCallback((key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
     setPagination(prev => ({ ...prev, current: 1 }));
-  };
+  }, []);
 
-  const handleDateChange = (dates) => {
+  const handleDateChange = useCallback((dates) => {
     if (dates) {
       setFilters(prev => ({
         ...prev,
@@ -53,9 +53,9 @@ const LoginHistory = () => {
       setFilters(prev => ({ ...prev, startDate: undefined, endDate: undefined }));
     }
     setPagination(prev => ({ ...prev, current: 1 }));
-  };
+  }, []);
 
-  const handleClear = async () => {
+  const handleClear = useCallback(async () => {
     try {
       const response = await loginHistoryAPI.clear({ days: 30 });
       if (response.success) {
@@ -65,9 +65,9 @@ const LoginHistory = () => {
     } catch (error) {
       message.error('清理失败');
     }
-  };
+  }, [fetchHistories]);
 
-  const columns = [
+  const tableColumns = useMemo(() => [
     {
       title: '用户名',
       dataIndex: 'username',
@@ -128,7 +128,7 @@ const LoginHistory = () => {
         return browser;
       }
     }
-  ];
+  ], []);
 
   const pageHeaderStyle = {
     marginBottom: '24px',
@@ -172,7 +172,7 @@ const LoginHistory = () => {
 
       <Card>
         <Table
-          columns={columns}
+          columns={tableColumns}
           dataSource={histories}
           rowKey="id"
           loading={loading}

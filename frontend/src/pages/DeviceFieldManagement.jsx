@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, message, Card, Space, InputNumber, Switch, Tag, Statistic } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, FontSizeOutlined, NumberOutlined, CheckCircleOutlined, CalendarOutlined, FileTextOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -126,6 +126,92 @@ const tableStyle = {
   background: designTokens.colors.background.primary
 };
 
+const titleIconStyle = {
+  color: designTokens.colors.primary.main
+};
+
+const modalTitleStyle = {
+  fontWeight: '600'
+};
+
+const formLabelStyle = {
+  fontWeight: '500'
+};
+
+const tableCellStyle = {
+  fontWeight: '500',
+  color: designTokens.colors.text.primary
+};
+
+const typeTagStyle = {
+  border: 'none',
+  borderRadius: designTokens.borderRadius.small,
+  fontWeight: '500'
+};
+
+const orderBadgeStyle = {
+  background: designTokens.colors.background.tertiary,
+  padding: '2px 8px',
+  borderRadius: designTokens.borderRadius.small,
+  fontSize: '12px',
+  fontWeight: '500'
+};
+
+const editButtonStyle = {
+  color: designTokens.colors.primary.main,
+  height: '28px',
+  padding: '0 8px'
+};
+
+const deleteButtonStyle = {
+  height: '28px',
+  padding: '0 8px'
+};
+
+const formRowStyle = {
+  display: 'flex',
+  gap: designTokens.spacing.md
+};
+
+const formItemFlexStyle = {
+  flex: 1
+};
+
+const textAreaStyle = {
+  fontFamily: 'monospace'
+};
+
+const modalBodyStyle = {
+  padding: designTokens.spacing.lg
+};
+
+const formActionsStyle = {
+  marginBottom: 0,
+  textAlign: 'right'
+};
+
+const modalStyle = {
+  borderRadius: designTokens.borderRadius.large
+};
+
+const FIELD_TYPE_MAP = {
+  string: { text: '文本', color: designTokens.colors.fieldType.string },
+  number: { text: '数字', color: designTokens.colors.fieldType.number },
+  boolean: { text: '布尔值', color: designTokens.colors.fieldType.boolean },
+  select: { text: '下拉选择', color: designTokens.colors.fieldType.select },
+  date: { text: '日期', color: designTokens.colors.fieldType.date },
+  textarea: { text: '多行文本', color: designTokens.colors.fieldType.textarea }
+};
+
+const FIELD_TYPE_OPTIONS = [
+  { value: 'string', label: '文本' },
+  { value: 'number', label: '数字' },
+  { value: 'boolean', label: '布尔值' },
+  { value: 'select', label: '下拉选择' },
+  { value: 'date', label: '日期' },
+  { value: 'textarea', label: '多行文本' }
+];
+
 function DeviceFieldManagement() {
   const [fields, setFields] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -225,17 +311,13 @@ function DeviceFieldManagement() {
     return iconMap[type] || <FontSizeOutlined />;
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: '字段名称',
       dataIndex: 'fieldName',
       key: 'fieldName',
       width: 150,
-      render: (text) => (
-        <span style={{ fontWeight: '500', color: designTokens.colors.text.primary }}>
-          {text}
-        </span>
-      )
+      render: (text) => <span style={tableCellStyle}>{text}</span>
     },
     {
       title: '显示名称',
@@ -249,25 +331,9 @@ function DeviceFieldManagement() {
       key: 'fieldType',
       width: 110,
       render: (type) => {
-        const typeMap = {
-          string: { text: '文本', color: designTokens.colors.fieldType.string },
-          number: { text: '数字', color: designTokens.colors.fieldType.number },
-          boolean: { text: '布尔值', color: designTokens.colors.fieldType.boolean },
-          select: { text: '下拉选择', color: designTokens.colors.fieldType.select },
-          date: { text: '日期', color: designTokens.colors.fieldType.date },
-          textarea: { text: '多行文本', color: designTokens.colors.fieldType.textarea }
-        };
-        const config = typeMap[type] || { text: type, color: designTokens.colors.text.tertiary };
+        const config = FIELD_TYPE_MAP[type] || { text: type, color: designTokens.colors.text.tertiary };
         return (
-          <Tag
-            style={{
-              border: 'none',
-              borderRadius: designTokens.borderRadius.small,
-              background: `${config.color}15`,
-              color: config.color,
-              fontWeight: '500'
-            }}
-          >
+          <Tag style={{ ...typeTagStyle, background: `${config.color}15`, color: config.color }}>
             {getFieldTypeIcon(type)}
             <span style={{ marginLeft: '4px' }}>{config.text}</span>
           </Tag>
@@ -282,7 +348,7 @@ function DeviceFieldManagement() {
       render: (required) => (
         <span style={{
           color: required ? designTokens.colors.success.main : designTokens.colors.text.tertiary,
-          fontWeight: '500'
+          ...tableCellStyle
         }}>
           {required ? '是' : '否'}
         </span>
@@ -296,7 +362,7 @@ function DeviceFieldManagement() {
       render: (visible) => (
         <span style={{
           color: visible ? designTokens.colors.primary.main : designTokens.colors.text.tertiary,
-          fontWeight: '500'
+          ...tableCellStyle
         }}>
           {visible ? '是' : '否'}
         </span>
@@ -307,17 +373,7 @@ function DeviceFieldManagement() {
       dataIndex: 'order',
       key: 'order',
       width: 80,
-      render: (order) => (
-        <span style={{
-          background: designTokens.colors.background.tertiary,
-          padding: `2px ${designTokens.spacing.sm}`,
-          borderRadius: designTokens.borderRadius.small,
-          fontSize: '12px',
-          fontWeight: '500'
-        }}>
-          {order}
-        </span>
-      )
+      render: (order) => <span style={orderBadgeStyle}>{order}</span>
     },
     {
       title: '操作',
@@ -326,48 +382,25 @@ function DeviceFieldManagement() {
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => showModal(record)}
-            style={{
-              color: designTokens.colors.primary.main,
-              height: '28px',
-              padding: '0 8px'
-            }}
-          >
+          <Button type="text" icon={<EditOutlined />} onClick={() => showModal(record)} style={editButtonStyle}>
             编辑
           </Button>
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record.fieldId)}
-            style={{
-              height: '28px',
-              padding: '0 8px'
-            }}
-          >
+          <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.fieldId)} style={deleteButtonStyle}>
             删除
           </Button>
         </Space>
       ),
     },
-  ];
+  ], []);
 
   return (
     <div style={pageContainerStyle}>
       <div style={titleRowStyle}>
         <div style={titleStyle}>
-          <AppstoreOutlined style={{ color: designTokens.colors.primary.main }} />
+          <AppstoreOutlined style={titleIconStyle} />
           设备字段管理
         </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => showModal()}
-          style={primaryActionStyle}
-        >
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()} style={primaryActionStyle}>
           添加字段
         </Button>
       </div>
@@ -390,30 +423,18 @@ function DeviceFieldManagement() {
       </div>
 
       <Modal
-        title={
-          <span style={{ fontWeight: '600' }}>
-            {editingField ? '编辑字段' : '添加字段'}
-          </span>
-        }
+        title={<span style={modalTitleStyle}>{editingField ? '编辑字段' : '添加字段'}</span>}
         open={modalVisible}
         onCancel={handleCancel}
         footer={null}
         width={600}
-        styles={{
-          body: { padding: designTokens.spacing.lg }
-        }}
-        style={{
-          borderRadius: designTokens.borderRadius.large
-        }}
+        styles={{ body: modalBodyStyle }}
+        style={modalStyle}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-        >
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item
             name="fieldName"
-            label={<span style={{ fontWeight: '500' }}>字段名称</span>}
+            label={<span style={formLabelStyle}>字段名称</span>}
             rules={[{ required: true, message: '请输入字段名称' }]}
           >
             <Input placeholder="请输入字段名称（英文，如：deviceId）" />
@@ -421,7 +442,7 @@ function DeviceFieldManagement() {
 
           <Form.Item
             name="displayName"
-            label={<span style={{ fontWeight: '500' }}>显示名称</span>}
+            label={<span style={formLabelStyle}>显示名称</span>}
             rules={[{ required: true, message: '请输入显示名称' }]}
           >
             <Input placeholder="请输入显示名称（中文，如：设备ID）" />
@@ -429,34 +450,31 @@ function DeviceFieldManagement() {
 
           <Form.Item
             name="fieldType"
-            label={<span style={{ fontWeight: '500' }}>字段类型</span>}
+            label={<span style={formLabelStyle}>字段类型</span>}
             rules={[{ required: true, message: '请选择字段类型' }]}
           >
             <Select placeholder="请选择字段类型">
-              <Option value="string">文本</Option>
-              <Option value="number">数字</Option>
-              <Option value="boolean">布尔值</Option>
-              <Option value="select">下拉选择</Option>
-              <Option value="date">日期</Option>
-              <Option value="textarea">多行文本</Option>
+              {FIELD_TYPE_OPTIONS.map(opt => (
+                <Option key={opt.value} value={opt.value}>{opt.label}</Option>
+              ))}
             </Select>
           </Form.Item>
 
-          <div style={{ display: 'flex', gap: designTokens.spacing.md }}>
+          <div style={formRowStyle}>
             <Form.Item
               name="required"
-              label={<span style={{ fontWeight: '500' }}>必填</span>}
+              label={<span style={formLabelStyle}>必填</span>}
               valuePropName="checked"
-              style={{ flex: 1 }}
+              style={formItemFlexStyle}
             >
               <Switch />
             </Form.Item>
 
             <Form.Item
               name="visible"
-              label={<span style={{ fontWeight: '500' }}>可见</span>}
+              label={<span style={formLabelStyle}>可见</span>}
               valuePropName="checked"
-              style={{ flex: 1 }}
+              style={formItemFlexStyle}
             >
               <Switch defaultChecked />
             </Form.Item>
@@ -464,7 +482,7 @@ function DeviceFieldManagement() {
 
           <Form.Item
             name="order"
-            label={<span style={{ fontWeight: '500' }}>显示顺序</span>}
+            label={<span style={formLabelStyle}>显示顺序</span>}
             rules={[{ required: true, message: '请输入显示顺序' }]}
           >
             <InputNumber placeholder="请输入显示顺序" min={0} style={{ width: '100%' }} />
@@ -472,17 +490,13 @@ function DeviceFieldManagement() {
 
           <Form.Item
             name="options"
-            label={<span style={{ fontWeight: '500' }}>选项配置（JSON格式）</span>}
+            label={<span style={formLabelStyle}>选项配置（JSON格式）</span>}
             tooltip="格式示例：[{value: 'option1', label: '选项1'}]，仅下拉选择类型需要配置"
           >
-            <Input.TextArea
-              rows={3}
-              placeholder="请输入JSON格式的选项配置，使用单引号"
-              style={{ fontFamily: 'monospace' }}
-            />
+            <Input.TextArea rows={3} placeholder="请输入JSON格式的选项配置，使用单引号" style={textAreaStyle} />
           </Form.Item>
 
-          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+          <Form.Item style={formActionsStyle}>
             <Space>
               <Button onClick={handleCancel}>取消</Button>
               <Button type="primary" htmlType="submit">确定</Button>

@@ -49,7 +49,12 @@ const ConsumableRecord = sequelize.define('ConsumableRecord', {
   }
 }, {
   tableName: 'consumable_records',
-  timestamps: true
+  timestamps: true,
+  indexes: [
+    { fields: ['consumableId'] },
+    { fields: ['type'] },
+    { fields: ['createdAt'] }
+  ]
 });
 
 ConsumableRecord.belongsTo(Consumable, { 

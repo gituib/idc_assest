@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, DatePicker, message, Card, Space, Tag, Dropdown, Menu, Tabs, Timeline, Descriptions, Checkbox, Popover, InputNumber, Switch } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EyeOutlined, MoreOutlined, UserOutlined, ToolOutlined, CheckCircleOutlined, SyncOutlined, ClockCircleOutlined, CloseCircleOutlined, SettingOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -233,7 +233,7 @@ function TicketManagement() {
     );
   }, [devices]);
 
-  const getTableColumns = useCallback(() => {
+  const tableColumns = useMemo(() => {
     const baseColumns = [
       { title: '工单编号', dataIndex: 'ticketId', key: 'ticketId', width: 150, fixed: 'left' },
       { title: '标题', dataIndex: 'title', key: 'title', width: 200, ellipsis: true },
@@ -609,7 +609,7 @@ function TicketManagement() {
         </Form>
 
         <Table
-          columns={getTableColumns()}
+          columns={tableColumns}
           dataSource={tickets}
           rowKey="ticketId"
           pagination={pagination}

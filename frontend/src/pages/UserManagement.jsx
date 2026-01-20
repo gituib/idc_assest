@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Card, Table, Button, Space, Modal, Form, Input, Select, message, Tag, Popconfirm, Avatar, Tooltip, Badge } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, ReloadOutlined, LockOutlined, CameraOutlined } from '@ant-design/icons';
 import { userAPI, roleAPI } from '../api';
@@ -26,7 +26,7 @@ const UserManagement = () => {
     fetchRoles();
   }, [pagination.current]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const response = await userAPI.list({
@@ -42,9 +42,9 @@ const UserManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.current, pagination.pageSize]);
 
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     try {
       const response = await roleAPI.all();
       if (response.success) {
@@ -56,15 +56,15 @@ const UserManagement = () => {
       console.error('获取角色列表失败:', error);
       message.error('获取角色列表失败，请检查网络连接');
     }
-  };
+  }, []);
 
-  const handleAdd = () => {
+  const handleAdd = useCallback(() => {
     setEditingUser(null);
     form.resetFields();
     setModalVisible(true);
-  };
+  }, []);
 
-  const handleEdit = (user) => {
+  const handleEdit = useCallback((user) => {
     setEditingUser(user);
     form.setFieldsValue({
       username: user.username,
@@ -75,20 +75,20 @@ const UserManagement = () => {
       roleIds: user.roles?.map(r => r.roleId) || []
     });
     setModalVisible(true);
-  };
+  }, []);
 
-  const handleResetPassword = (user) => {
+  const handleResetPassword = useCallback((user) => {
     setPasswordUser(user);
     passwordForm.resetFields();
     setPasswordModalVisible(true);
-  };
+  }, []);
 
-  const handleAvatarClick = (user) => {
+  const handleAvatarClick = useCallback((user) => {
     setAvatarUser(user);
     setAvatarModalVisible(true);
-  };
+  }, []);
 
-  const handleAvatarUpload = async (e) => {
+  const handleAvatarUpload = useCallback(async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -120,9 +120,9 @@ const UserManagement = () => {
         fileInputRef.current.value = '';
       }
     }
-  };
+  }, [avatarUser, fetchUsers]);
 
-  const handleAvatarDelete = async () => {
+  const handleAvatarDelete = useCallback(async () => {
     try {
       const response = await userAPI.deleteAvatar(avatarUser.userId);
       if (response.success) {
@@ -135,9 +135,9 @@ const UserManagement = () => {
     } catch (error) {
       message.error('删除失败');
     }
-  };
+  }, [avatarUser, fetchUsers]);
 
-  const handleDelete = async (userId) => {
+  const handleDelete = useCallback(async (userId) => {
     try {
       const response = await userAPI.delete(userId);
       if (response.success) {
@@ -149,9 +149,9 @@ const UserManagement = () => {
     } catch (error) {
       message.error('删除失败');
     }
-  };
+  }, [fetchUsers]);
 
-  const handleSubmit = async (values) => {
+  const handleSubmit = useCallback(async (values) => {
     try {
       let response;
       if (editingUser) {
@@ -170,9 +170,9 @@ const UserManagement = () => {
     } catch (error) {
       message.error('操作失败');
     }
-  };
+  }, [editingUser, fetchUsers]);
 
-  const handleResetPasswordSubmit = async (values) => {
+  const handleResetPasswordSubmit = useCallback(async (values) => {
     try {
       const response = await userAPI.resetPassword(passwordUser.userId, values);
       if (response.success) {
@@ -184,7 +184,7 @@ const UserManagement = () => {
     } catch (error) {
       message.error('重置失败');
     }
-  };
+  }, [passwordUser]);
 
   const getStatusColor = (status) => {
     const colors = {
@@ -209,7 +209,7 @@ const UserManagement = () => {
     return user.avatar;
   };
 
-  const columns = [
+  const tableColumns = useMemo(() => [
     {
       title: '头像',
       key: 'avatar',
@@ -317,7 +317,7 @@ const UserManagement = () => {
         </Space>
       )
     }
-  ];
+  ], [handleAvatarClick, handleEdit, handleResetPassword, handleDelete]);
 
   const pageHeaderStyle = {
     marginBottom: '24px',
@@ -426,7 +426,7 @@ const UserManagement = () => {
 
       <Card style={cardStyle} styles={{ header: cardHeadStyle, body: { padding: '20px 24px' } }}>
         <Table
-          columns={columns}
+          columns={tableColumns}
           dataSource={users}
           rowKey="userId"
           loading={loading}

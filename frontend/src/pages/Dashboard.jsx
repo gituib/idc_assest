@@ -134,7 +134,65 @@ const subtitleStyle = {
   margin: '0'
 };
 
-const statCardStyle = (color) => ({
+const progressCardStyle = {
+  borderRadius: designTokens.borderRadius.large,
+  border: 'none',
+  boxShadow: designTokens.shadows.medium,
+  background: '#fff',
+  height: '100%',
+  animation: 'fadeInUp 0.6s ease-out 0.3s backwards'
+};
+
+const chartContainerStyle = {
+  padding: '20px',
+  borderRadius: designTokens.borderRadius.medium,
+  background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
+  border: '1px solid #f0f0f0'
+};
+
+const PIE_CHART_COLORS = {
+  success: designTokens.colors.success.main,
+  warning: designTokens.colors.warning.main,
+  error: designTokens.colors.error.main,
+  primary: designTokens.colors.primary.main
+};
+
+const pieChartStyle = {
+  width: '180px',
+  height: '180px',
+  borderRadius: '50%',
+  background: `conic-gradient(
+    ${PIE_CHART_COLORS.success} 0deg 216deg,
+    ${PIE_CHART_COLORS.warning} 216deg 288deg,
+    ${PIE_CHART_COLORS.error} 288deg 324deg,
+    ${PIE_CHART_COLORS.primary} 324deg 360deg
+  )`,
+  position: 'relative',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+};
+
+const pieChartInner = {
+  width: '120px',
+  height: '120px',
+  borderRadius: '50%',
+  background: '#fff',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexDirection: 'column'
+};
+
+const trendItemStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '12px 0',
+  borderBottom: '1px solid #f0f0f0'
+};
+
+const STAT_CARD_BASE_STYLE = {
   borderRadius: designTokens.borderRadius.large,
   border: 'none',
   boxShadow: designTokens.shadows.medium,
@@ -145,9 +203,9 @@ const statCardStyle = (color) => ({
   cursor: 'pointer',
   height: '100%',
   animation: 'fadeInUp 0.6s ease-out backwards'
-});
+};
 
-const statIconContainer = (color) => ({
+const STAT_ICON_CONTAINER_BASE = {
   position: 'absolute',
   top: '20px',
   right: '20px',
@@ -157,19 +215,68 @@ const statIconContainer = (color) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)`,
   fontSize: '32px',
   transition: `all ${designTokens.transitions.normal}`
-});
+};
 
-const topBorderStyle = (color) => ({
+const TOP_BORDER_BASE = {
   position: 'absolute',
   top: 0,
   left: 0,
   right: 0,
   height: '4px',
-  background: `linear-gradient(90deg, ${color}, ${color}80)`,
   borderRadius: `${designTokens.borderRadius.large} ${designTokens.borderRadius.large} 0 0`
+};
+
+const NAV_BUTTON_BASE = {
+  height: 'auto',
+  padding: '24px 20px',
+  borderRadius: designTokens.borderRadius.medium,
+  border: '2px solid #f0f0f0',
+  background: '#fff',
+  transition: `all ${designTokens.transitions.normal}`,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '12px',
+  cursor: 'pointer',
+  boxShadow: designTokens.shadows.small
+};
+
+const NAV_ICON_CONTAINER_BASE = {
+  width: '60px',
+  height: '60px',
+  borderRadius: designTokens.borderRadius.medium,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '28px',
+  transition: `all ${designTokens.transitions.normal}`
+};
+
+const createStatCardStyle = (color) => ({
+  ...STAT_CARD_BASE_STYLE,
+  borderTop: `4px solid ${color}`
+});
+
+const createStatIconContainer = (color) => ({
+  ...STAT_ICON_CONTAINER_BASE,
+  background: `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)`
+});
+
+const createTopBorderStyle = (color) => ({
+  ...TOP_BORDER_BASE,
+  background: `linear-gradient(90deg, ${color}, ${color}80)`
+});
+
+const createNavButtonStyle = (color) => ({
+  ...NAV_BUTTON_BASE,
+  borderColor: color
+});
+
+const createNavIconContainer = (color) => ({
+  ...NAV_ICON_CONTAINER_BASE,
+  background: `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)`
 });
 
 const overviewCardStyle = {
@@ -243,57 +350,6 @@ const quickStatItemStyle = {
   gap: '16px',
   border: '1px solid #f0f0f0',
   boxShadow: designTokens.shadows.small
-};
-
-const progressCardStyle = {
-  borderRadius: designTokens.borderRadius.large,
-  border: 'none',
-  boxShadow: designTokens.shadows.medium,
-  background: '#fff',
-  height: '100%',
-  animation: 'fadeInUp 0.6s ease-out 0.3s backwards'
-};
-
-const chartContainerStyle = {
-  padding: '20px',
-  borderRadius: designTokens.borderRadius.medium,
-  background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
-  border: '1px solid #f0f0f0'
-};
-
-const pieChartStyle = {
-  width: '180px',
-  height: '180px',
-  borderRadius: '50%',
-  background: `conic-gradient(
-    ${designTokens.colors.success.main} 0deg 216deg,
-    ${designTokens.colors.warning.main} 216deg 288deg,
-    ${designTokens.colors.error.main} 288deg 324deg,
-    ${designTokens.colors.primary.main} 324deg 360deg
-  )`,
-  position: 'relative',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center'
-};
-
-const pieChartInner = {
-  width: '120px',
-  height: '120px',
-  borderRadius: '50%',
-  background: '#fff',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flexDirection: 'column'
-};
-
-const trendItemStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '12px 0',
-  borderBottom: '1px solid #f0f0f0'
 };
 
 const AnimatedCounter = ({ value, duration = 1500 }) => {
@@ -680,7 +736,7 @@ function Dashboard() {
     const { icon: Icon, color, statKey, title, trend, tagColor, customStatus, xs, sm, lg, xl, delay } = config;
     const colProps = { xs, sm, lg, xl };
     const cardStyle = {
-      ...statCardStyle(color),
+      ...createStatCardStyle(color),
       ...(hoveredCard === statKey ? { transform: 'translateY(-6px)', boxShadow: designTokens.shadows.hover } : {}),
       animationDelay: `${delay * 0.1}s`
     };
@@ -693,8 +749,8 @@ function Dashboard() {
           onMouseLeave={() => setHoveredCard(null)}
         >
           <div style={{ position: 'relative' }}>
-            <div style={topBorderStyle(color)} />
-            <div style={statIconContainer(color)}>
+            <div style={createTopBorderStyle(color)} />
+            <div style={createStatIconContainer(color)}>
               <Icon style={{ color }} />
             </div>
             <div style={{
@@ -770,7 +826,7 @@ function Dashboard() {
     <div
       key={key}
       style={{
-        ...navButtonStyle(color),
+        ...createNavButtonStyle(color),
         ...(hoveredCard === `nav-${key}` ? {
           transform: 'translateY(-4px)',
           boxShadow: designTokens.shadows.large,
@@ -781,7 +837,7 @@ function Dashboard() {
       onMouseEnter={(e) => handleNavHover(e, true, `nav-${key}`)}
       onMouseLeave={(e) => handleNavHover(e, false, `nav-${key}`)}
     >
-      <div style={navIconContainer(color)}>
+      <div style={createNavIconContainer(color)}>
         <Icon style={{ color, fontSize: '28px' }} />
       </div>
       <span style={navTextStyle}>{text}</span>

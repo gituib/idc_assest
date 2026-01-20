@@ -40,7 +40,12 @@ const Rack = sequelize.define('Rack', {
   }
 }, {
   tableName: 'racks',
-  timestamps: true
+  timestamps: true,
+  indexes: [
+    { fields: ['roomId'] },
+    { fields: ['status'] },
+    { fields: ['roomId', 'status'] }
+  ]
 });
 
 // 关联关系

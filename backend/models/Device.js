@@ -72,7 +72,15 @@ const Device = sequelize.define('Device', {
   }
 }, {
   tableName: 'devices',
-  timestamps: true
+  timestamps: true,
+  indexes: [
+    { fields: ['status'] },
+    { fields: ['type'] },
+    { fields: ['rackId'] },
+    { fields: ['createdAt'] },
+    { fields: ['status', 'type'] },
+    { fields: ['name'] }
+  ]
 });
 
 // 关联关系

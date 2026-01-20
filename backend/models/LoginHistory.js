@@ -51,7 +51,13 @@ const LoginHistory = sequelize.define('LoginHistory', {
   tableName: 'login_histories',
   timestamps: true,
   createdAt: 'loginTime',
-  updatedAt: false
+  updatedAt: false,
+  indexes: [
+    { fields: ['userId'] },
+    { fields: ['loginTime'] },
+    { fields: ['loginType'] },
+    { fields: ['userId', 'loginTime'] }
+  ]
 });
 
 module.exports = LoginHistory;

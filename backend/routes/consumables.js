@@ -179,34 +179,43 @@ router.get('/low-stock', async (req, res) => {
 
 router.get('/statistics/summary', async (req, res) => {
   try {
-    const total = await Consumable.count();
-    const lowStock = await Consumable.count({
-      where: sequelize.where(sequelize.col('currentStock'), {
-        [Op.lte]: sequelize.col('minStock')
-      })
-    });
-    
     const consumables = await Consumable.findAll({
-      attributes: ['currentStock', 'unitPrice']
+      attributes: ['currentStock', 'unitPrice', 'category']
     });
-    
-    const totalValue = consumables.reduce((sum, item) => {
-      return sum + (parseFloat(item.currentStock) || 0) * (parseFloat(item.unitPrice) || 0);
-    }, 0);
-    
-    const byCategory = await Consumable.findAll({
-      attributes: ['category', [sequelize.fn('COUNT', '*'), 'count']],
-      group: ['category']
+
+    let total = consumables.length;
+    let lowStock = 0;
+    let totalValue = 0;
+    const categoryMap = {};
+
+    consumables.forEach(item => {
+      const currentStock = parseFloat(item.currentStock) || 0;
+      const unitPrice = parseFloat(item.unitPrice) || 0;
+
+      totalValue += currentStock * unitPrice;
+
+      if (currentStock <= (parseFloat(item.minStock) || 0)) {
+        lowStock++;
+      }
+
+      if (item.category) {
+        if (!categoryMap[item.category]) {
+          categoryMap[item.category] = 0;
+        }
+        categoryMap[item.category]++;
+      }
     });
-    
+
+    const byCategory = Object.entries(categoryMap).map(([category, count]) => ({
+      category,
+      count
+    }));
+
     res.json({
       total,
       lowStock,
       totalValue: totalValue.toFixed(2),
-      byCategory: byCategory.map(item => ({
-        category: item.category,
-        count: item.dataValues.count
-      }))
+      byCategory
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

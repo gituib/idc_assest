@@ -19,48 +19,60 @@ router.get('/stats', async (req, res) => {
       if (endDate) where.createdAt[Op.lte] = new Date(endDate + ' 23:59:59');
     }
 
-    const total = await Ticket.count({ where });
+    const Sequelize = require('sequelize');
 
-    const statusStats = await Ticket.findAll({
-      where,
-      attributes: [
-        'status',
-        [require('sequelize').fn('COUNT', '*'), 'count']
-      ],
-      group: ['status']
-    });
-
-    const priorityStats = await Ticket.findAll({
-      where,
-      attributes: [
-        'priority',
-        [require('sequelize').fn('COUNT', '*'), 'count']
-      ],
-      group: ['priority']
-    });
-
-    const categoryStats = await Ticket.findAll({
-      where,
-      attributes: [
-        'faultCategory',
-        [require('sequelize').fn('COUNT', '*'), 'count']
-      ],
-      group: ['faultCategory']
-    });
-
-    const monthlyStats = await Ticket.findAll({
-      where,
-      attributes: [
-        [dbDialect === 'mysql' 
-          ? require('sequelize').fn('DATE_FORMAT', require('sequelize').col('createdAt'), '%Y-%m')
-          : require('sequelize').fn('strftime', '%Y-%m', require('sequelize').col('createdAt')), 
-          'month'],
-        [require('sequelize').fn('COUNT', '*'), 'count']
-      ],
-      group: ['month'],
-      order: [['month', 'DESC']],
-      limit: 12
-    });
+    const [total, statusStats, priorityStats, categoryStats, monthlyStats, deviceStats, dailyStats] = await Promise.all([
+      Ticket.count({ where }),
+      Ticket.findAll({
+        where,
+        attributes: ['status', [Sequelize.fn('COUNT', '*'), 'count']],
+        group: ['status']
+      }),
+      Ticket.findAll({
+        where,
+        attributes: ['priority', [Sequelize.fn('COUNT', '*'), 'count']],
+        group: ['priority']
+      }),
+      Ticket.findAll({
+        where,
+        attributes: ['faultCategory', [Sequelize.fn('COUNT', '*'), 'count']],
+        group: ['faultCategory']
+      }),
+      Ticket.findAll({
+        where,
+        attributes: [
+          [dbDialect === 'mysql' 
+            ? Sequelize.fn('DATE_FORMAT', Sequelize.col('createdAt'), '%Y-%m')
+            : Sequelize.fn('strftime', '%Y-%m', Sequelize.col('createdAt')), 
+            'month'],
+          [Sequelize.fn('COUNT', '*'), 'count']
+        ],
+        group: ['month'],
+        order: [['month', 'DESC']],
+        limit: 12
+      }),
+      Ticket.findAll({
+        where,
+        attributes: [
+          'deviceId',
+          'deviceName',
+          [Sequelize.fn('COUNT', '*'), 'count'],
+          [Sequelize.fn('MAX', Sequelize.col('createdAt')), 'lastFaultTime']
+        ],
+        group: ['deviceId', 'deviceName'],
+        order: [[Sequelize.fn('COUNT', '*'), 'DESC']],
+        limit: 10
+      }),
+      Ticket.findAll({
+        where,
+        attributes: [
+          [Sequelize.fn('DATE', Sequelize.col('createdAt')), 'date'],
+          [Sequelize.fn('COUNT', '*'), 'created']
+        ],
+        group: ['date'],
+        order: [['date', 'ASC']]
+      })
+    ]);
 
     const statusData = statusStats.map(s => s.dataValues);
     const pending = statusData.find(s => s.status === 'pending')?.count || 0;
@@ -88,19 +100,6 @@ router.get('/stats', async (req, res) => {
       avgTime: 0
     }));
 
-    const deviceStats = await Ticket.findAll({
-      where,
-      attributes: [
-        'deviceId',
-        'deviceName',
-        [require('sequelize').fn('COUNT', '*'), 'count'],
-        [require('sequelize').fn('MAX', require('sequelize').col('createdAt')), 'lastFaultTime']
-      ],
-      group: ['deviceId', 'deviceName'],
-      order: [[require('sequelize').fn('COUNT', '*'), 'DESC']],
-      limit: 10
-    });
-
     const byDevice = deviceStats.map(d => ({
       deviceId: d.deviceId,
       deviceName: d.deviceName,
@@ -108,16 +107,6 @@ router.get('/stats', async (req, res) => {
       lastFaultTime: d.dataValues.lastFaultTime,
       deviceType: ''
     }));
-
-    const dailyStats = await Ticket.findAll({
-      where,
-      attributes: [
-        [require('sequelize').fn('DATE', require('sequelize').col('createdAt')), 'date'],
-        [require('sequelize').fn('COUNT', '*'), 'created']
-      ],
-      group: ['date'],
-      order: [['date', 'ASC']]
-    });
 
     const trend = dailyStats.map(d => ({
       date: d.dataValues.date,

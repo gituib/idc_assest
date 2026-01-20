@@ -124,40 +124,42 @@ router.post('/', async (req, res) => {
 router.get('/statistics', async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    
+
     const dateWhere = {};
     if (startDate && endDate) {
       dateWhere.createdAt = {
         [Op.between]: [new Date(startDate), new Date(endDate)]
       };
     }
-    
-    const inCount = await ConsumableRecord.count({
-      where: { ...dateWhere, type: 'in' }
-    });
-    
-    const outCount = await ConsumableRecord.count({
-      where: { ...dateWhere, type: 'out' }
-    });
-    
-    const inQuantity = await ConsumableRecord.sum('quantity', {
-      where: { ...dateWhere, type: 'in' }
-    }) || 0;
-    
-    const outQuantity = await ConsumableRecord.sum('quantity', {
-      where: { ...dateWhere, type: 'out' }
-    }) || 0;
-    
-    const byType = await ConsumableRecord.findAll({
+
+    const records = await ConsumableRecord.findAll({
       where: dateWhere,
-      attributes: [
-        'type',
-        [sequelize.fn('SUM', sequelize.col('quantity')), 'totalQuantity'],
-        [sequelize.fn('COUNT', '*'), 'count']
-      ],
-      group: ['type']
+      attributes: ['type', 'quantity']
     });
-    
+
+    let inCount = 0;
+    let outCount = 0;
+    let inQuantity = 0;
+    let outQuantity = 0;
+    const typeMap = {};
+
+    records.forEach(item => {
+      const qty = parseFloat(item.quantity) || 0;
+      if (item.type === 'in') {
+        inCount++;
+        inQuantity += qty;
+      } else if (item.type === 'out') {
+        outCount++;
+        outQuantity += qty;
+      }
+
+      if (!typeMap[item.type]) {
+        typeMap[item.type] = { count: 0, totalQuantity: 0 };
+      }
+      typeMap[item.type].count++;
+      typeMap[item.type].totalQuantity += qty;
+    });
+
     const recentRecords = await ConsumableRecord.findAll({
       where: dateWhere,
       include: [
@@ -166,17 +168,17 @@ router.get('/statistics', async (req, res) => {
       order: [['createdAt', 'DESC']],
       limit: 10
     });
-    
+
     res.json({
       inCount,
       outCount,
       inQuantity,
       outQuantity,
       netQuantity: inQuantity - outQuantity,
-      byType: byType.map(item => ({
-        type: item.type,
-        totalQuantity: item.dataValues.totalQuantity,
-        count: item.dataValues.count
+      byType: Object.entries(typeMap).map(([type, data]) => ({
+        type,
+        totalQuantity: data.totalQuantity,
+        count: data.count
       })),
       recentRecords
     });
