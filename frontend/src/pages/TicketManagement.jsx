@@ -72,6 +72,13 @@ const getPriorityText = (priority) => {
   return texts[priority] || priority;
 };
 
+const generateTicketId = () => {
+  const prefix = 'TKT';
+  const timestamp = dayjs().format('YYYYMMDDHHmmss');
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `${prefix}${timestamp}${random}`;
+};
+
 function TicketManagement() {
   const [tickets, setTickets] = useState([]);
   const [devices, setDevices] = useState([]);
@@ -360,6 +367,8 @@ function TicketManagement() {
     } else {
       form.resetFields();
       setDeviceSource('select');
+      const newTicketId = generateTicketId();
+      form.setFieldsValue({ ticketId: newTicketId });
     }
     setModalVisible(true);
   }, []);
@@ -524,23 +533,35 @@ function TicketManagement() {
   }, [deviceSource, devices]);
 
   const renderFormItems = useCallback(() => {
-    return ticketFields.map(field => {
-      if (field.fieldName === 'deviceId') {
-        return (
-          <React.Fragment key="deviceSource">
-            <Form.Item label="设备来源" required>
-              <Select value={deviceSource} onChange={handleDeviceSourceChange} style={{ width: 200 }}>
-                <Option value="select">从设备管理选择</Option>
-                <Option value="manual">手动输入</Option>
-              </Select>
-            </Form.Item>
-            {renderDeviceFormItems()}
-          </React.Fragment>
-        );
+    const items = [];
+    if (!editingTicket) {
+      items.push(
+        <Form.Item key="ticketId" name="ticketId" label="工单编号">
+          <Input placeholder="自动生成" disabled style={{ background: '#f5f5f5' }} />
+        </Form.Item>
+      );
+    }
+    ticketFields.forEach(field => {
+      if (field.fieldName === 'ticketId' || field.fieldName === 'deviceId') {
+        if (field.fieldName === 'deviceId') {
+          items.push(
+            <React.Fragment key="deviceSource">
+              <Form.Item label="设备来源" required>
+                <Select value={deviceSource} onChange={handleDeviceSourceChange} style={{ width: 200 }}>
+                  <Option value="select">从设备管理选择</Option>
+                  <Option value="manual">手动输入</Option>
+                </Select>
+              </Form.Item>
+              {renderDeviceFormItems()}
+            </React.Fragment>
+          );
+        }
+      } else {
+        items.push(renderFormItem(field));
       }
-      return renderFormItem(field);
     });
-  }, [ticketFields, deviceSource, devices, handleDeviceSourceChange, renderDeviceFormItems, renderFormItem]);
+    return items;
+  }, [ticketFields, deviceSource, devices, handleDeviceSourceChange, renderDeviceFormItems, renderFormItem, editingTicket]);
 
   const getActionItems = useCallback((record) => (
     <Menu
