@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Tabs, Form, Input, Switch, Select, Button, Card, Space, message, Modal, Table, Tag, Progress, Divider, Descriptions, Alert } from 'antd';
 import { SettingOutlined, GlobalOutlined, BgColorsOutlined, DatabaseOutlined, InfoCircleOutlined, CloudUploadOutlined, DeleteOutlined, ReloadOutlined, DownloadOutlined, SyncOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import { useConfig } from '../context/ConfigContext';
 
 const { Option } = Select;
 const { TabPane } = Tabs;
@@ -15,6 +16,7 @@ const SystemSettings = () => {
   const [backupLoading, setBackupLoading] = useState(false);
   const [systemInfo, setSystemInfo] = useState(null);
   const [form] = Form.useForm();
+  const { reloadConfig } = useConfig();
 
   useEffect(() => {
     fetchSettings();
@@ -74,6 +76,8 @@ const SystemSettings = () => {
       await axios.put('/api/system-settings', { settings: updates });
       message.success('设置保存成功');
       fetchSettings();
+      // 重新加载全局配置，使更改立即生效
+      await reloadConfig();
     } catch (error) {
       message.error('保存设置失败');
     } finally {
@@ -151,6 +155,8 @@ const SystemSettings = () => {
           await axios.post(`/api/system-settings/reset/${key}`);
           message.success('重置成功');
           fetchSettings();
+          // 重新加载全局配置，使更改立即生效
+          await reloadConfig();
         } catch (error) {
           message.error('重置失败');
         }
@@ -237,10 +243,29 @@ const SystemSettings = () => {
         { value: 'DD/MM/YYYY', label: '01/01/2024' },
         { value: 'MM/DD/YYYY', label: '01/01/2024' }
       ],
-      language: [
-        { value: 'zh-CN', label: '简体中文' },
-        { value: 'zh-TW', label: '繁體中文' },
-        { value: 'en-US', label: 'English' }
+      primary_color: [
+        { value: '#667eea', label: '蓝色 (#667eea)' },
+        { value: '#764ba2', label: '紫色 (#764ba2)' },
+        { value: '#f093fb', label: '粉色 (#f093fb)' },
+        { value: '#4facfe', label: '浅蓝色 (#4facfe)' },
+        { value: '#43e97b', label: '绿色 (#43e97b)' },
+        { value: '#fa709a', label: '红色 (#fa709a)' },
+        { value: '#fee140', label: '黄色 (#fee140)' },
+        { value: '#00b4db', label: '青色 (#00b4db)' },
+        { value: '#0083b0', label: '深蓝色 (#0083b0)' },
+        { value: '#fcb045', label: '橙色 (#fcb045)' }
+      ],
+      secondary_color: [
+        { value: '#764ba2', label: '紫色 (#764ba2)' },
+        { value: '#667eea', label: '蓝色 (#667eea)' },
+        { value: '#4facfe', label: '浅蓝色 (#4facfe)' },
+        { value: '#43e97b', label: '绿色 (#43e97b)' },
+        { value: '#fa709a', label: '红色 (#fa709a)' },
+        { value: '#fee140', label: '黄色 (#fee140)' },
+        { value: '#00b4db', label: '青色 (#00b4db)' },
+        { value: '#0083b0', label: '深蓝色 (#0083b0)' },
+        { value: '#fcb045', label: '橙色 (#fcb045)' },
+        { value: '#f093fb', label: '粉色 (#f093fb)' }
       ],
       table_row_height: [
         { value: 'small', label: '紧凑 (Small)' },
@@ -273,11 +298,18 @@ const SystemSettings = () => {
   };
 
   const renderGeneralSettings = () => {
-    const generalKeys = ['site_name', 'site_logo', 'timezone', 'date_format', 'language', 'session_timeout', 'max_login_attempts', 'maintenance_mode'];
+    const generalKeys = ['site_name', 'site_logo', 'timezone', 'date_format', 'session_timeout', 'max_login_attempts', 'maintenance_mode'];
     return (
       <Card title="全局配置" bordered={false}>
         <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
-          {generalKeys.map(key => settings[key] && renderFormItem(key, settings[key]))}
+          {generalKeys.map(key => {
+            // 确保时区和日期格式使用select类型
+            const settingData = { ...settings[key] };
+            if (key === 'timezone' || key === 'date_format') {
+              settingData.type = 'select';
+            }
+            return renderFormItem(key, settingData);
+          })}
           <Form.Item>
             <Space>
               <Button type="primary" htmlType="submit" loading={saving}>保存设置</Button>
@@ -290,18 +322,25 @@ const SystemSettings = () => {
   };
 
   const renderAppearanceSettings = () => {
-    const appearanceKeys = ['primary_color', 'secondary_color', 'dark_mode', 'compact_mode', 'sidebar_collapsed', 'table_row_height', 'animation_enabled'];
+    const appearanceKeys = ['primary_color', 'secondary_color', 'compact_mode', 'sidebar_collapsed', 'table_row_height', 'animation_enabled'];
     return (
       <Card title="外观设置" bordered={false}>
         <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
           <Alert
             message="主题颜色"
-            description="修改主题颜色后需要刷新页面才能生效。深色模式可以减少眼睛疲劳。"
+            description="修改主题颜色后需要刷新页面才能生效。"
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
           />
-          {appearanceKeys.map(key => settings[key] && renderFormItem(key, settings[key]))}
+          {appearanceKeys.map(key => {
+            // 确保主题颜色使用select类型
+            const settingData = { ...settings[key] };
+            if (key === 'primary_color' || key === 'secondary_color') {
+              settingData.type = 'select';
+            }
+            return renderFormItem(key, settingData);
+          })}
           <Form.Item>
             <Space>
               <Button type="primary" htmlType="submit" loading={saving}>保存设置</Button>
@@ -314,14 +353,6 @@ const SystemSettings = () => {
   };
 
   const renderBackupSettings = () => {
-    const backupInfo = settings.backup_retention ? {
-      auto_backup_enabled: settings.auto_backup_enabled,
-      backup_interval: settings.backup_interval,
-      backup_retention: settings.backup_retention,
-      last_backup_time: settings.last_backup_time,
-      backup_count: settings.backup_count
-    } : null;
-
     const backupColumns = [
       {
         title: '文件名',
@@ -357,13 +388,19 @@ const SystemSettings = () => {
       }
     ];
 
+    // 备份设置键列表
+    const backupKeys = ['auto_backup_enabled', 'backup_interval', 'backup_retention', 'backup_path', 'last_backup_time', 'backup_count'];
+
     return (
       <div>
         <Card title="自动备份设置" bordered={false} style={{ marginBottom: 16 }}>
           <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
-            {backupInfo && Object.entries(backupInfo).map(([key, data]) => (
-              data && typeof data === 'object' ? renderFormItem(key, data) : null
-            ))}
+            {backupKeys.map(key => {
+              if (settings[key]) {
+                return renderFormItem(key, settings[key]);
+              }
+              return null;
+            })}
             <Form.Item>
               <Space>
                 <Button type="primary" htmlType="submit" loading={saving}>保存设置</Button>

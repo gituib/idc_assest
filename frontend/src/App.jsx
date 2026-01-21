@@ -1,8 +1,9 @@
 import React, { useState, Suspense, lazy } from 'react';
-import { Layout, Menu, theme, Button, Dropdown, Avatar, message, Space, Divider } from 'antd';
+import { Layout, Menu, theme, Button, Dropdown, Avatar, message, Space, Divider, ConfigProvider as AntdConfigProvider } from 'antd';
 import { BarChartOutlined, DatabaseOutlined, CloudServerOutlined, MenuUnfoldOutlined, MenuFoldOutlined, EyeOutlined, BuildOutlined, HomeOutlined, ShoppingCartOutlined, InboxOutlined, ImportOutlined, FileTextOutlined, UserOutlined, LogoutOutlined, HistoryOutlined, AuditOutlined, ToolOutlined, ScheduleOutlined, SettingOutlined } from '@ant-design/icons';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { ConfigProvider, useConfig } from './context/ConfigContext';
 import { Spin } from 'antd';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -131,6 +132,7 @@ const AppLayout = ({ children }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { config } = useConfig();
   
   const handleLogout = () => {
     logout();
@@ -147,6 +149,56 @@ const AppLayout = ({ children }) => {
     if (path.startsWith('/users') || path.startsWith('/login-history') || path.startsWith('/operation-logs') || path.startsWith('/settings')) return 'system-management';
     if (path.startsWith('/tickets')) return 'ticket-management';
     return 'dashboard';
+  };
+
+  // 动态设计令牌
+  const designTokens = {
+    colors: {
+      primary: {
+        main: config.primary_color || '#667eea',
+        gradient: `linear-gradient(135deg, ${config.primary_color || '#667eea'} 0%, ${config.secondary_color || '#764ba2'} 100%)`,
+        light: '#8b9ff0'
+      },
+      success: { main: '#10b981' },
+      warning: { main: '#f59e0b' },
+      error: { main: '#ef4444' },
+      text: {
+        primary: '#1e293b',
+        secondary: '#64748b',
+        inverse: '#ffffff'
+      },
+      background: {
+        primary: '#ffffff',
+        secondary: '#f8fafc',
+        dark: '#1e293b'
+      },
+      border: {
+        light: '#e2e8f0'
+      },
+      sidebar: {
+        bg: '#ffffff',
+        bgHover: 'rgba(102, 126, 234, 0.08)',
+        bgActive: 'rgba(102, 126, 234, 0.15)',
+        text: '#475569',
+        textHover: config.primary_color || '#667eea',
+        textActive: config.primary_color || '#667eea',
+        border: '#e2e8f0'
+      }
+    },
+    shadows: {
+      small: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+      medium: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
+      large: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+    },
+    borderRadius: {
+      small: '6px',
+      medium: '10px'
+    },
+    spacing: {
+      sm: '8px',
+      md: '16px',
+      lg: '24px'
+    }
   };
 
   const menuItems = [
@@ -315,7 +367,7 @@ const AppLayout = ({ children }) => {
                 color: designTokens.colors.primary.main,
                 lineHeight: 1.2
               }}>
-                IDC管理
+                {config.site_name || 'IDC管理'}
               </div>
               <div style={{
                 fontSize: '11px',
@@ -336,7 +388,7 @@ const AppLayout = ({ children }) => {
           <Menu
             mode="inline"
             selectedKeys={[getSelectedKey()]}
-            defaultOpenKeys={['room-management', 'asset-management', 'consumables-management', 'system-management', 'ticket-management']}
+            defaultOpenKeys={[]}
             style={{
               background: 'transparent',
               borderRight: 0,
@@ -451,32 +503,94 @@ const AppLayout = ({ children }) => {
   );
 };
 
+const ThemeConfig = () => {
+  const { config } = useConfig();
+  
+  // 动态设计令牌
+  const designTokens = {
+    colors: {
+      primary: {
+        main: config.primary_color || '#667eea',
+        gradient: `linear-gradient(135deg, ${config.primary_color || '#667eea'} 0%, ${config.secondary_color || '#764ba2'} 100%)`,
+        light: '#8b9ff0'
+      },
+      success: { main: '#10b981' },
+      warning: { main: '#f59e0b' },
+      error: { main: '#ef4444' },
+      text: {
+        primary: '#1e293b',
+        secondary: '#64748b',
+        inverse: '#ffffff'
+      },
+      background: {
+        primary: '#ffffff',
+        secondary: '#f8fafc',
+        dark: '#1e293b'
+      },
+      border: {
+        light: '#e2e8f0'
+      },
+      sidebar: {
+        bg: '#ffffff',
+        bgHover: 'rgba(102, 126, 234, 0.08)',
+        bgActive: 'rgba(102, 126, 234, 0.15)',
+        text: '#475569',
+        textHover: config.primary_color || '#667eea',
+        textActive: config.primary_color || '#667eea',
+        border: '#e2e8f0'
+      }
+    },
+    shadows: {
+      small: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+      medium: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
+      large: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+    },
+    borderRadius: {
+      small: '6px',
+      medium: '10px'
+    },
+    spacing: {
+      sm: '8px',
+      md: '16px',
+      lg: '24px'
+    }
+  };
+
+  return (
+    <AntdConfigProvider theme={{ token: designTokens }}>
+      <Router>
+        <Suspense fallback={<PageLoading />}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+            <Route path="/devices" element={<PrivateRoute><DeviceManagement /></PrivateRoute>} />
+            <Route path="/racks" element={<PrivateRoute><RackManagement /></PrivateRoute>} />
+            <Route path="/rooms" element={<PrivateRoute><RoomManagement /></PrivateRoute>} />
+            <Route path="/fields" element={<PrivateRoute><DeviceFieldManagement /></PrivateRoute>} />
+            <Route path="/visualization" element={<PrivateRoute><RackVisualization /></PrivateRoute>} />
+            <Route path="/consumables" element={<PrivateRoute><ConsumableManagement /></PrivateRoute>} />
+            <Route path="/consumables-categories" element={<PrivateRoute><CategoryManagement /></PrivateRoute>} />
+            <Route path="/consumables-stats" element={<PrivateRoute><ConsumableStatistics /></PrivateRoute>} />
+            <Route path="/consumables-logs" element={<PrivateRoute><ConsumableLogs /></PrivateRoute>} />
+            <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
+            <Route path="/tickets" element={<PrivateRoute><TicketManagement /></PrivateRoute>} />
+            <Route path="/ticket-categories" element={<PrivateRoute><TicketCategoryManagement /></PrivateRoute>} />
+            <Route path="/ticket-statistics" element={<PrivateRoute><TicketStatistics /></PrivateRoute>} />
+            <Route path="/ticket-fields" element={<PrivateRoute><TicketFieldManagement /></PrivateRoute>} />
+            <Route path="/settings" element={<PrivateRoute><SystemSettings /></PrivateRoute>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+      </Router>
+    </AntdConfigProvider>
+  );
+};
+
 function App() {
   return (
-    <Router>
-      <Suspense fallback={<PageLoading />}>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-          <Route path="/devices" element={<PrivateRoute><DeviceManagement /></PrivateRoute>} />
-          <Route path="/racks" element={<PrivateRoute><RackManagement /></PrivateRoute>} />
-          <Route path="/rooms" element={<PrivateRoute><RoomManagement /></PrivateRoute>} />
-          <Route path="/fields" element={<PrivateRoute><DeviceFieldManagement /></PrivateRoute>} />
-          <Route path="/visualization" element={<PrivateRoute><RackVisualization /></PrivateRoute>} />
-          <Route path="/consumables" element={<PrivateRoute><ConsumableManagement /></PrivateRoute>} />
-          <Route path="/consumables-categories" element={<PrivateRoute><CategoryManagement /></PrivateRoute>} />
-          <Route path="/consumables-stats" element={<PrivateRoute><ConsumableStatistics /></PrivateRoute>} />
-          <Route path="/consumables-logs" element={<PrivateRoute><ConsumableLogs /></PrivateRoute>} />
-          <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
-          <Route path="/tickets" element={<PrivateRoute><TicketManagement /></PrivateRoute>} />
-          <Route path="/ticket-categories" element={<PrivateRoute><TicketCategoryManagement /></PrivateRoute>} />
-          <Route path="/ticket-statistics" element={<PrivateRoute><TicketStatistics /></PrivateRoute>} />
-          <Route path="/ticket-fields" element={<PrivateRoute><TicketFieldManagement /></PrivateRoute>} />
-          <Route path="/settings" element={<PrivateRoute><SystemSettings /></PrivateRoute>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
-    </Router>
+    <ConfigProvider>
+      <ThemeConfig />
+    </ConfigProvider>
   );
 }
 

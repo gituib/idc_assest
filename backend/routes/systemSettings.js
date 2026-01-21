@@ -13,7 +13,6 @@ const initDefaultSettings = async () => {
     { settingKey: 'site_logo', settingValue: JSON.stringify(''), settingType: 'string', category: 'general', description: '网站Logo URL', isEditable: true },
     { settingKey: 'timezone', settingValue: JSON.stringify('Asia/Shanghai'), settingType: 'string', category: 'general', description: '时区设置', isEditable: true },
     { settingKey: 'date_format', settingValue: JSON.stringify('YYYY-MM-DD'), settingType: 'string', category: 'general', description: '日期格式', isEditable: true },
-    { settingKey: 'language', settingValue: JSON.stringify('zh-CN'), settingType: 'string', category: 'general', description: '语言设置', isEditable: true },
     { settingKey: 'session_timeout', settingValue: JSON.stringify(30), settingType: 'number', category: 'general', description: '会话超时时间(分钟)', isEditable: true },
     { settingKey: 'max_login_attempts', settingValue: JSON.stringify(5), settingType: 'number', category: 'general', description: '最大登录尝试次数', isEditable: true },
     { settingKey: 'maintenance_mode', settingValue: JSON.stringify(false), settingType: 'boolean', category: 'general', description: '维护模式', isEditable: true },
@@ -21,7 +20,6 @@ const initDefaultSettings = async () => {
     // 外观设置
     { settingKey: 'primary_color', settingValue: JSON.stringify('#667eea'), settingType: 'string', category: 'appearance', description: '主题主色调', isEditable: true },
     { settingKey: 'secondary_color', settingValue: JSON.stringify('#764ba2'), settingType: 'string', category: 'appearance', description: '主题辅助色调', isEditable: true },
-    { settingKey: 'dark_mode', settingValue: JSON.stringify(false), settingType: 'boolean', category: 'appearance', description: '深色模式', isEditable: true },
     { settingKey: 'compact_mode', settingValue: JSON.stringify(false), type: 'boolean', category: 'appearance', description: '紧凑模式', isEditable: true },
     { settingKey: 'sidebar_collapsed', settingValue: JSON.stringify(false), settingType: 'boolean', category: 'appearance', description: '侧边栏默认折叠', isEditable: true },
     { settingKey: 'table_row_height', settingValue: JSON.stringify('default'), settingType: 'string', category: 'appearance', description: '表格行高: small/default/middle/large', isEditable: true },
@@ -234,13 +232,11 @@ router.post('/reset/:key', async (req, res) => {
       site_logo: '',
       timezone: 'Asia/Shanghai',
       date_format: 'YYYY-MM-DD',
-      language: 'zh-CN',
       session_timeout: 30,
       max_login_attempts: 5,
       maintenance_mode: false,
       primary_color: '#667eea',
       secondary_color: '#764ba2',
-      dark_mode: false,
       compact_mode: false,
       sidebar_collapsed: false,
       table_row_height: 'default',
@@ -280,7 +276,19 @@ router.post('/reset/:key', async (req, res) => {
 // 手动执行备份
 router.post('/backup', async (req, res) => {
   try {
-    const backupDir = path.join(__dirname, '../backups');
+    // 获取系统设置中的备份路径
+    const backupPathSetting = await SystemSetting.findByPk('backup_path');
+    const backupPath = backupPathSetting ? JSON.parse(backupPathSetting.settingValue) : './backups';
+    
+    // 解析备份目录路径
+    let backupDir;
+    if (backupPath.startsWith('/') || backupPath.match(/^[A-Za-z]:\//)) {
+      // 绝对路径
+      backupDir = backupPath;
+    } else {
+      // 相对路径，基于项目根目录
+      backupDir = path.join(__dirname, '../', backupPath);
+    }
     
     // 确保备份目录存在
     if (!fs.existsSync(backupDir)) {
@@ -335,7 +343,7 @@ router.post('/backup', async (req, res) => {
     
     res.json({
       message: '备份成功',
-      backupFile: `backups/backup_${timestamp}.json`,
+      backupFile: `${backupPath}/backup_${timestamp}.json`,
       fileSize: fs.statSync(backupFile).size,
       backupCount: backupFiles.length
     });
@@ -345,10 +353,27 @@ router.post('/backup', async (req, res) => {
   }
 });
 
+// 辅助函数：获取备份目录路径
+const getBackupDir = async () => {
+  const backupPathSetting = await SystemSetting.findByPk('backup_path');
+  const backupPath = backupPathSetting ? JSON.parse(backupPathSetting.settingValue) : './backups';
+  
+  let backupDir;
+  if (backupPath.startsWith('/') || backupPath.match(/^[A-Za-z]:\//)) {
+    // 绝对路径
+    backupDir = backupPath;
+  } else {
+    // 相对路径，基于项目根目录
+    backupDir = path.join(__dirname, '../', backupPath);
+  }
+  
+  return backupDir;
+};
+
 // 获取备份列表
 router.get('/backup/list', async (req, res) => {
   try {
-    const backupDir = path.join(__dirname, '../backups');
+    const backupDir = await getBackupDir();
     
     if (!fs.existsSync(backupDir)) {
       return res.json({ backups: [] });
@@ -361,7 +386,7 @@ router.get('/backup/list', async (req, res) => {
         const stats = fs.statSync(filePath);
         return {
           filename: f,
-          path: `backups/${f}`,
+          path: `${path.basename(backupDir)}/${f}`,
           size: stats.size,
           createdAt: stats.birthtime,
           modifiedAt: stats.mtime
@@ -384,7 +409,8 @@ router.post('/backup/restore', async (req, res) => {
       return res.status(400).json({ error: '请提供备份文件名' });
     }
     
-    const backupFile = path.join(__dirname, '../backups', filename);
+    const backupDir = await getBackupDir();
+    const backupFile = path.join(backupDir, filename);
     
     if (!fs.existsSync(backupFile)) {
       return res.status(404).json({ error: '备份文件不存在' });
@@ -433,7 +459,8 @@ router.post('/backup/restore', async (req, res) => {
 router.delete('/backup/:filename', async (req, res) => {
   try {
     const { filename } = req.params;
-    const backupFile = path.join(__dirname, '../backups', filename);
+    const backupDir = await getBackupDir();
+    const backupFile = path.join(backupDir, filename);
     
     if (!fs.existsSync(backupFile)) {
       return res.status(404).json({ error: '备份文件不存在' });
@@ -451,7 +478,8 @@ router.delete('/backup/:filename', async (req, res) => {
 router.get('/backup/download/:filename', async (req, res) => {
   try {
     const { filename } = req.params;
-    const backupFile = path.join(__dirname, '../backups', filename);
+    const backupDir = await getBackupDir();
+    const backupFile = path.join(backupDir, filename);
     
     if (!fs.existsSync(backupFile)) {
       return res.status(404).json({ error: '备份文件不存在' });
