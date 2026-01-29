@@ -54,6 +54,12 @@ const Consumable = sequelize.define('Consumable', {
   status: {
     type: DataTypes.STRING,
     defaultValue: 'active'
+  },
+  version: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: '乐观锁版本号'
   }
 }, {
   tableName: 'consumables',
@@ -61,7 +67,8 @@ const Consumable = sequelize.define('Consumable', {
   indexes: [
     { fields: ['category'] },
     { fields: ['status'] },
-    { fields: ['category', 'status'] }
+    { fields: ['category', 'status'] },
+    { fields: ['updatedAt'] }
   ]
 });
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs, Form, Input, Switch, Select, Button, Card, Space, message, Modal, Table, Tag, Progress, Divider, Descriptions, Alert } from 'antd';
-import { SettingOutlined, GlobalOutlined, BgColorsOutlined, DatabaseOutlined, InfoCircleOutlined, CloudUploadOutlined, DeleteOutlined, ReloadOutlined, DownloadOutlined, SyncOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { Tabs, Form, Input, Switch, Select, Button, Card, Space, message, Modal, Tag, Divider, Descriptions, Alert } from 'antd';
+import { SettingOutlined, GlobalOutlined, BgColorsOutlined, InfoCircleOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useConfig } from '../context/ConfigContext';
 
@@ -12,15 +12,12 @@ const SystemSettings = () => {
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({});
   const [activeTab, setActiveTab] = useState('general');
-  const [backupList, setBackupList] = useState([]);
-  const [backupLoading, setBackupLoading] = useState(false);
   const [systemInfo, setSystemInfo] = useState(null);
   const [form] = Form.useForm();
   const { reloadConfig } = useConfig();
 
   useEffect(() => {
     fetchSettings();
-    fetchBackupList();
     fetchSystemInfo();
   }, []);
 
@@ -39,18 +36,6 @@ const SystemSettings = () => {
       message.error('获取设置失败');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchBackupList = async () => {
-    setBackupLoading(true);
-    try {
-      const response = await axios.get('/api/system-settings/backup/list');
-      setBackupList(response.data.backups || []);
-    } catch (error) {
-      console.error('获取备份列表失败');
-    } finally {
-      setBackupLoading(false);
     }
   };
 
@@ -83,66 +68,6 @@ const SystemSettings = () => {
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleCreateBackup = async () => {
-    Modal.confirm({
-      title: '确认创建备份',
-      icon: <ExclamationCircleOutlined />,
-      content: '确定要创建系统备份吗？这将导出所有设备、机柜、机房和耗材数据。',
-      onOk: async () => {
-        try {
-          message.loading('正在创建备份...', 0);
-          const response = await axios.post('/api/system-settings/backup');
-          message.destroy();
-          message.success('备份创建成功');
-          fetchBackupList();
-        } catch (error) {
-          message.destroy();
-          message.error('备份创建失败');
-        }
-      }
-    });
-  };
-
-  const handleRestoreBackup = (filename) => {
-    Modal.confirm({
-      title: '确认恢复备份',
-      icon: <ExclamationCircleOutlined />,
-      content: `确定要恢复备份 "${filename}" 吗？当前数据将被覆盖，且此操作不可撤销。`,
-      onOk: async () => {
-        try {
-          message.loading('正在恢复备份...', 0);
-          await axios.post('/api/system-settings/backup/restore', { filename });
-          message.destroy();
-          message.success('恢复成功，请刷新页面查看最新数据');
-        } catch (error) {
-          message.destroy();
-          message.error('恢复备份失败');
-        }
-      }
-    });
-  };
-
-  const handleDeleteBackup = (filename) => {
-    Modal.confirm({
-      title: '确认删除备份',
-      icon: <ExclamationCircleOutlined />,
-      content: `确定要删除备份 "${filename}" 吗？`,
-      onOk: async () => {
-        try {
-          await axios.delete(`/api/system-settings/backup/${filename}`);
-          message.success('删除成功');
-          fetchBackupList();
-        } catch (error) {
-          message.error('删除失败');
-        }
-      }
-    });
-  };
-
-  const handleDownloadBackup = (filename) => {
-    window.open(`/api/system-settings/backup/download/${filename}`, '_blank');
   };
 
   const handleResetSetting = (key) => {
@@ -289,10 +214,6 @@ const SystemSettings = () => {
         { value: 'false', label: '展开' },
         { value: 'true', label: '折叠' }
       ],
-      auto_backup_enabled: [
-        { value: 'false', label: '关闭' },
-        { value: 'true', label: '开启' }
-      ]
     };
     return optionsMap[key] || [];
   };
@@ -352,86 +273,7 @@ const SystemSettings = () => {
     );
   };
 
-  const renderBackupSettings = () => {
-    const backupColumns = [
-      {
-        title: '文件名',
-        dataIndex: 'filename',
-        key: 'filename',
-        render: (text) => <code>{text}</code>
-      },
-      {
-        title: '大小',
-        dataIndex: 'size',
-        key: 'size',
-        render: (size) => {
-          const kb = size / 1024;
-          return kb < 1024 ? `${kb.toFixed(2)} KB` : `${(kb / 1024).toFixed(2)} MB`;
-        }
-      },
-      {
-        title: '创建时间',
-        dataIndex: 'createdAt',
-        key: 'createdAt',
-        render: (date) => new Date(date).toLocaleString('zh-CN')
-      },
-      {
-        title: '操作',
-        key: 'action',
-        render: (_, record) => (
-          <Space size="small">
-            <Button size="small" icon={<ReloadOutlined />} onClick={() => handleRestoreBackup(record.filename)}>恢复</Button>
-            <Button size="small" icon={<DownloadOutlined />} onClick={() => handleDownloadBackup(record.filename)}>下载</Button>
-            <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteBackup(record.filename)}>删除</Button>
-          </Space>
-        )
-      }
-    ];
-
-    // 备份设置键列表
-    const backupKeys = ['auto_backup_enabled', 'backup_interval', 'backup_retention', 'backup_path', 'last_backup_time', 'backup_count'];
-
-    return (
-      <div>
-        <Card title="自动备份设置" bordered={false} style={{ marginBottom: 16 }}>
-          <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
-            {backupKeys.map(key => {
-              if (settings[key]) {
-                return renderFormItem(key, settings[key]);
-              }
-              return null;
-            })}
-            <Form.Item>
-              <Space>
-                <Button type="primary" htmlType="submit" loading={saving}>保存设置</Button>
-              </Space>
-            </Form.Item>
-          </Form>
-        </Card>
-
-        <Card title="手动备份管理" bordered={false}>
-          <Alert
-            message="数据安全提示"
-            description="建议定期创建备份，并将备份文件保存到安全的位置。恢复备份前请确保已创建当前数据的备份。"
-            type="warning"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
-          <Space style={{ marginBottom: 16 }}>
-            <Button type="primary" icon={<CloudUploadOutlined />} onClick={handleCreateBackup}>立即备份</Button>
-            <Button icon={<SyncOutlined />} onClick={fetchBackupList}>刷新列表</Button>
-          </Space>
-          <Table
-            dataSource={backupList}
-            columns={backupColumns}
-            rowKey="filename"
-            loading={backupLoading}
-            pagination={{ pageSize: 5 }}
-          />
-        </Card>
-      </div>
-    );
-  };
+  // 数据备份功能已移除
 
   const renderAboutPage = () => {
     const aboutKeys = ['app_version', 'company_name', 'contact_email', 'contact_phone', 'company_address', 'system_description', 'privacy_policy', 'terms_of_service'];
@@ -503,12 +345,6 @@ const SystemSettings = () => {
           key="appearance"
         >
           {renderAppearanceSettings()}
-        </TabPane>
-        <TabPane
-          tab={<span><DatabaseOutlined /> 数据备份</span>}
-          key="backup"
-        >
-          {renderBackupSettings()}
         </TabPane>
         <TabPane
           tab={<span><InfoCircleOutlined /> 关于</span>}

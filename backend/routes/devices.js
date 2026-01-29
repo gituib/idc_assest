@@ -14,9 +14,18 @@ const DeviceField = require('../models/DeviceField');
 const Ticket = require('../models/Ticket');
 const DevicePort = require('../models/DevicePort'); // Import DevicePort
 const Cable = require('../models/Cable'); // Import Cable
+const { validateBody, validateQuery } = require('../middleware/validation');
+const {
+  createDeviceSchema,
+  updateDeviceSchema,
+  batchDeviceIdsSchema,
+  batchStatusSchema,
+  batchMoveSchema,
+  queryDeviceSchema
+} = require('../validation/deviceSchema');
 
 // 获取所有设备（支持搜索和筛选）
-router.get('/', async (req, res) => {
+router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
   try {
     const { keyword, status, type, rackId, page = 1, pageSize = 10 } = req.query;
     const offset = (page - 1) * pageSize;
@@ -80,7 +89,7 @@ router.get('/', async (req, res) => {
 });
 
 // 创建设备
-router.post('/', async (req, res) => {
+router.post('/', validateBody(createDeviceSchema), async (req, res) => {
   try {
     const device = await Device.create(req.body);
     
@@ -602,7 +611,7 @@ router.post('/import', async (req, res) => {
 });
 
 // 批量上线设备
-router.put('/batch-online', async (req, res) => {
+router.put('/batch-online', validateBody(batchDeviceIdsSchema), async (req, res) => {
   try {
     const { deviceIds } = req.body;
     
@@ -626,7 +635,7 @@ router.put('/batch-online', async (req, res) => {
 });
 
 // 批量下线设备
-router.put('/batch-offline', async (req, res) => {
+router.put('/batch-offline', validateBody(batchDeviceIdsSchema), async (req, res) => {
   try {
     const { deviceIds } = req.body;
     
@@ -654,8 +663,6 @@ router.put('/batch-status', async (req, res) => {
   try {
     const { deviceIds, status } = req.body;
     
-    console.log('批量状态变更请求:', { deviceIds, status });
-    
     if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
       return res.status(400).json({ error: '请提供有效的设备ID列表' });
     }
@@ -666,15 +673,11 @@ router.put('/batch-status', async (req, res) => {
       attributes: ['deviceId']
     });
     
-    console.log('数据库中找到的设备:', existingDevices.map(d => d.deviceId));
-    console.log('请求的设备ID:', deviceIds);
-    
     // 检查是否有不存在的设备
     const existingIds = existingDevices.map(d => d.deviceId);
     const missingIds = deviceIds.filter(id => !existingIds.includes(id));
     
     if (missingIds.length > 0) {
-      console.log('不存在的设备ID:', missingIds);
       return res.status(404).json({ error: `设备不存在: ${missingIds.join(', ')}` });
     }
     
@@ -780,7 +783,7 @@ router.get('/:deviceId', async (req, res) => {
 });
 
 // 更新设备
-router.put('/:deviceId', async (req, res) => {
+router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
   try {
     // 获取旧设备信息以更新功率
     const oldDevice = await Device.findByPk(req.params.deviceId);
@@ -843,7 +846,7 @@ router.put('/batch-offline', async (req, res) => {
 });
 
 // 批量删除设备
-router.delete('/batch-delete', async (req, res) => {
+router.delete('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { deviceIds } = req.body;
@@ -1045,8 +1048,6 @@ router.put('/batch-status', async (req, res) => {
   try {
     const { deviceIds, status } = req.body;
     
-    console.log('批量状态变更请求:', { deviceIds, status });
-    
     if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
       return res.status(400).json({ error: '请提供有效的设备ID列表' });
     }
@@ -1057,15 +1058,11 @@ router.put('/batch-status', async (req, res) => {
       attributes: ['deviceId']
     });
     
-    console.log('数据库中找到的设备:', existingDevices.map(d => d.deviceId));
-    console.log('请求的设备ID:', deviceIds);
-    
     // 检查是否有不存在的设备
     const existingIds = existingDevices.map(d => d.deviceId);
     const missingIds = deviceIds.filter(id => !existingIds.includes(id));
     
     if (missingIds.length > 0) {
-      console.log('不存在的设备ID:', missingIds);
       return res.status(404).json({ error: `设备不存在: ${missingIds.join(', ')}` });
     }
     

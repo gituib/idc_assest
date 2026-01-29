@@ -179,7 +179,8 @@ const InstancedStatusLights = ({ count, positions, colors: statusColors, zOffset
     useEffect(() => {
         return () => {
             if (meshRef.current) {
-                meshRef.current.dispose();
+                meshRef.current.geometry?.dispose();
+                meshRef.current.material?.dispose();
             }
         };
     }, []);
@@ -219,8 +220,14 @@ const InstancedDriveBays = ({ count, positions, color, hasDetail = true }) => {
     // 资源清理
     useEffect(() => {
         return () => {
-            if (meshRef.current) meshRef.current.dispose();
-            if (detailRef.current) detailRef.current.dispose();
+            if (meshRef.current) {
+                meshRef.current.geometry?.dispose();
+                meshRef.current.material?.dispose();
+            }
+            if (detailRef.current) {
+                detailRef.current.geometry?.dispose();
+                detailRef.current.material?.dispose();
+            }
         };
     }, []);
 
@@ -265,8 +272,14 @@ const InstancedStorageBays = ({ count, positions, color }) => {
     // 资源清理
     useEffect(() => {
         return () => {
-            if (meshRef.current) meshRef.current.dispose();
-            if (detailRef.current) detailRef.current.dispose();
+            if (meshRef.current) {
+                meshRef.current.geometry?.dispose();
+                meshRef.current.material?.dispose();
+            }
+            if (detailRef.current) {
+                detailRef.current.geometry?.dispose();
+                detailRef.current.material?.dispose();
+            }
         };
     }, []);
 
@@ -335,10 +348,22 @@ const InstancedRJ45Ports = ({ count, positions, statuses, frontZ }) => {
     // 资源清理
     useEffect(() => {
         return () => {
-            if (meshRef.current) meshRef.current.dispose();
-            if (innerRef.current) innerRef.current.dispose();
-            if (tabRef.current) tabRef.current.dispose();
-            if (ledRef.current) ledRef.current.dispose();
+            if (meshRef.current) {
+                meshRef.current.geometry?.dispose();
+                meshRef.current.material?.dispose();
+            }
+            if (innerRef.current) {
+                innerRef.current.geometry?.dispose();
+                innerRef.current.material?.dispose();
+            }
+            if (tabRef.current) {
+                tabRef.current.geometry?.dispose();
+                tabRef.current.material?.dispose();
+            }
+            if (ledRef.current) {
+                ledRef.current.geometry?.dispose();
+                ledRef.current.material?.dispose();
+            }
         };
     }, []);
 
@@ -421,10 +446,22 @@ const InstancedSFPports = ({ count, positions, statuses, frontZ }) => {
     // 资源清理
     useEffect(() => {
         return () => {
-            if (meshRef.current) meshRef.current.dispose();
-            if (innerRef.current) innerRef.current.dispose();
-            if (connectorRef.current) connectorRef.current.dispose();
-            if (ledRef.current) ledRef.current.dispose();
+            if (meshRef.current) {
+                meshRef.current.geometry?.dispose();
+                meshRef.current.material?.dispose();
+            }
+            if (innerRef.current) {
+                innerRef.current.geometry?.dispose();
+                innerRef.current.material?.dispose();
+            }
+            if (connectorRef.current) {
+                connectorRef.current.geometry?.dispose();
+                connectorRef.current.material?.dispose();
+            }
+            if (ledRef.current) {
+                ledRef.current.geometry?.dispose();
+                ledRef.current.material?.dispose();
+            }
         };
     }, []);
 
@@ -443,9 +480,15 @@ const FirewallFace = ({ device, height, frontZ, isSelected }) => {
 
   return (
       <group>
+        {/* 防火墙左侧红色标识条 */}
         <mesh position={[-halfWidth + 0.02, 0, frontZ + 0.006]}>
-           <boxGeometry args={[0.01, height, 0.003]} />
+           <boxGeometry args={[0.015, height - 0.008, 0.003]} />
            <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.3} />
+        </mesh>
+        {/* 防火墙主面板边框 */}
+        <mesh position={[-halfWidth + 0.035, 0, frontZ + 0.005]}>
+           <boxGeometry args={[0.005, height - 0.004, 0.002]} />
+           <meshStandardMaterial color="#dc2626" />
         </mesh>
 
         <mesh position={[0, 0, frontZ + 0.0055]}>
@@ -631,9 +674,15 @@ const DeviceModel = ({ device, rackHeight, isSelected, onClick, onHover, uHeight
 
     return (
       <group>
+         {/* 服务器主面板 - 深蓝色 */}
          <mesh position={[0, 0, frontZ + 0.0055]}>
             <boxGeometry args={[0.44, height - 0.004, 0.002]} />
             <meshStandardMaterial color="#1e293b" roughness={0.7} metalness={0.5} />
+         </mesh>
+         {/* 服务器左侧标识条 - 亮蓝色 */}
+         <mesh position={[-0.21, 0, frontZ + 0.006]}>
+            <boxGeometry args={[0.015, height - 0.008, 0.003]} />
+            <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={0.2} />
          </mesh>
 
          <group position={[-0.18, 0, frontZ + 0.006]}>
@@ -710,11 +759,17 @@ const DeviceModel = ({ device, rackHeight, isSelected, onClick, onHover, uHeight
 
     return (
         <group>
+            {/* 存储设备主面板 - 深紫色 */}
             <mesh position={[0, 0, frontZ + 0.0055]}>
                 <boxGeometry args={[0.44, height - 0.004, 0.002]} />
                 <meshStandardMaterial color="#0f172a" roughness={0.8} />
             </mesh>
-            
+            {/* 存储设备左侧标识条 - 紫色 */}
+            <mesh position={[-0.21, 0, frontZ + 0.006]}>
+                <boxGeometry args={[0.015, height - 0.008, 0.003]} />
+                <meshStandardMaterial color="#8b5cf6" emissive="#8b5cf6" emissiveIntensity={0.2} />
+            </mesh>
+
             <group position={[0, 0, frontZ + 0.008]}>
                 <InstancedStorageBays 
                     count={bayPositions.length} 
@@ -769,9 +824,20 @@ const DeviceModel = ({ device, rackHeight, isSelected, onClick, onHover, uHeight
 
     return (
       <group>
+        {/* 交换机主面板 - 深绿色背景突出显示 */}
         <mesh position={[0, 0, frontZ + 0.0055]}>
             <boxGeometry args={[0.44, height - 0.004, 0.002]} />
-            <meshStandardMaterial color="#334155" roughness={0.6} metalness={0.4} />
+            <meshStandardMaterial color="#064e3b" roughness={0.5} metalness={0.5} />
+        </mesh>
+        {/* 交换机左侧标识条 - 亮绿色 */}
+        <mesh position={[-0.21, 0, frontZ + 0.006]}>
+            <boxGeometry args={[0.015, height - 0.008, 0.003]} />
+            <meshStandardMaterial color="#10b981" emissive="#10b981" emissiveIntensity={0.2} />
+        </mesh>
+        {/* 交换机类型标识 */}
+        <mesh position={[-0.19, height/2 - 0.015, frontZ + 0.007]}>
+            <boxGeometry args={[0.025, 0.012, 0.002]} />
+            <meshStandardMaterial color="#065f46" />
         </mesh>
 
         <group position={[-0.19, 0, frontZ + 0.006]}>
@@ -969,13 +1035,18 @@ const DeviceModel = ({ device, rackHeight, isSelected, onClick, onHover, uHeight
     return (
        <group>
            {/* 默认面板纹理 */}
-           <mesh position={[0, 0, frontZ + 0.005]}>
-              <boxGeometry args={[0.7, height - gap - 0.01, 0.002]} />
-              <meshStandardMaterial color="#1e293b" roughness={0.6} />
+           <mesh position={[0, 0, frontZ + 0.0055]}>
+              <boxGeometry args={[0.44, height - 0.004, 0.002]} />
+              <meshStandardMaterial color="#374151" roughness={0.6} metalness={0.4} />
+           </mesh>
+           {/* 左侧灰色标识条 */}
+           <mesh position={[-0.21, 0, frontZ + 0.006]}>
+               <boxGeometry args={[0.015, height - 0.008, 0.003]} />
+               <meshStandardMaterial color="#6b7280" emissive="#6b7280" emissiveIntensity={0.1} />
            </mesh>
            {/* 装饰线 */}
-           <mesh position={[0, 0, frontZ + 0.006]}>
-               <boxGeometry args={[0.6, 0.005, 0.001]} />
+           <mesh position={[0, 0, frontZ + 0.007]}>
+               <boxGeometry args={[0.4, 0.003, 0.001]} />
                <meshStandardMaterial color={deviceColor} />
            </mesh>
        </group>

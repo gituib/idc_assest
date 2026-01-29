@@ -20,18 +20,10 @@ const initDefaultSettings = async () => {
     // 外观设置
     { settingKey: 'primary_color', settingValue: JSON.stringify('#667eea'), settingType: 'string', category: 'appearance', description: '主题主色调', isEditable: true },
     { settingKey: 'secondary_color', settingValue: JSON.stringify('#764ba2'), settingType: 'string', category: 'appearance', description: '主题辅助色调', isEditable: true },
-    { settingKey: 'compact_mode', settingValue: JSON.stringify(false), type: 'boolean', category: 'appearance', description: '紧凑模式', isEditable: true },
+    { settingKey: 'compact_mode', settingValue: JSON.stringify(false), settingType: 'boolean', category: 'appearance', description: '紧凑模式', isEditable: true },
     { settingKey: 'sidebar_collapsed', settingValue: JSON.stringify(false), settingType: 'boolean', category: 'appearance', description: '侧边栏默认折叠', isEditable: true },
     { settingKey: 'table_row_height', settingValue: JSON.stringify('default'), settingType: 'string', category: 'appearance', description: '表格行高: small/default/middle/large', isEditable: true },
     { settingKey: 'animation_enabled', settingValue: JSON.stringify(true), settingType: 'boolean', category: 'appearance', description: '启用动画效果', isEditable: true },
-    
-    // 数据备份设置
-    { settingKey: 'auto_backup_enabled', settingValue: JSON.stringify(false), settingType: 'boolean', category: 'backup', description: '启用自动备份', isEditable: true },
-    { settingKey: 'backup_interval', settingValue: JSON.stringify(24), settingType: 'number', category: 'backup', description: '备份间隔(小时)', isEditable: true },
-    { settingKey: 'backup_retention', settingValue: JSON.stringify(7), settingType: 'number', category: 'backup', description: '备份保留天数', isEditable: true },
-    { settingKey: 'backup_path', settingValue: JSON.stringify('./backups'), settingType: 'string', category: 'backup', description: '备份存储路径', isEditable: true },
-    { settingKey: 'last_backup_time', settingValue: JSON.stringify(null), settingType: 'string', category: 'backup', description: '上次备份时间', isEditable: false },
-    { settingKey: 'backup_count', settingValue: JSON.stringify(0), settingType: 'number', category: 'backup', description: '备份文件数量', isEditable: false },
     
     // 关于页面
     { settingKey: 'app_version', settingValue: JSON.stringify('1.0.0'), settingType: 'string', category: 'about', description: '应用版本', isEditable: false },
@@ -241,10 +233,6 @@ router.post('/reset/:key', async (req, res) => {
       sidebar_collapsed: false,
       table_row_height: 'default',
       animation_enabled: true,
-      auto_backup_enabled: false,
-      backup_interval: 24,
-      backup_retention: 7,
-      backup_path: './backups',
       company_name: '',
       contact_email: '',
       contact_phone: '',

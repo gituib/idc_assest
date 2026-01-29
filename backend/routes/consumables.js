@@ -250,187 +250,281 @@ router.get('/inout/records', async (req, res) => {
 });
 
 router.post('/quick-inout', async (req, res) => {
-  const transaction = await sequelize.transaction();
-  try {
-    const { consumableId, type, quantity, operator, reason, notes } = req.body;
-    
-    const consumable = await Consumable.findByPk(consumableId, { transaction });
-    if (!consumable) {
-      await transaction.rollback();
-      return res.status(404).json({ error: '耗材不存在' });
-    }
-    
-    const previousStock = parseFloat(consumable.currentStock);
-    let newStock;
-    
-    if (type === 'in') {
-      newStock = previousStock + parseFloat(quantity);
-    } else if (type === 'out') {
-      newStock = previousStock - parseFloat(quantity);
-      if (newStock < 0) {
+  const MAX_RETRIES = 3;
+  let attempt = 0;
+  
+  while (attempt < MAX_RETRIES) {
+    const transaction = await sequelize.transaction();
+    try {
+      const { consumableId, type, quantity, operator, reason, notes } = req.body;
+      
+      const consumable = await Consumable.findByPk(consumableId, { transaction });
+      if (!consumable) {
         await transaction.rollback();
-        return res.status(400).json({ error: '库存不足' });
+        return res.status(404).json({ error: '耗材不存在' });
       }
-    } else {
+      
+      const previousStock = parseFloat(consumable.currentStock);
+      let newStock;
+      
+      if (type === 'in') {
+        newStock = previousStock + parseFloat(quantity);
+      } else if (type === 'out') {
+        newStock = previousStock - parseFloat(quantity);
+        if (newStock < 0) {
+          await transaction.rollback();
+          return res.status(400).json({ error: '库存不足' });
+        }
+      } else {
+        await transaction.rollback();
+        return res.status(400).json({ error: '操作类型无效' });
+      }
+      
+      const [affectedRows] = await Consumable.update(
+        { 
+          currentStock: newStock,
+          version: sequelize.literal('version + 1')
+        },
+        { 
+          where: { 
+            consumableId,
+            version: consumable.version
+          },
+          transaction 
+        }
+      );
+      
+      if (affectedRows === 0) {
+        await transaction.rollback();
+        attempt++;
+        if (attempt >= MAX_RETRIES) {
+          return res.status(409).json({ error: '并发冲突，请稍后重试' });
+        }
+        continue;
+      }
+      
+      const record = await ConsumableRecord.create({
+        consumableId,
+        type,
+        quantity,
+        previousStock,
+        currentStock: newStock,
+        operator,
+        reason,
+        notes
+      }, { transaction });
+      
+      await ConsumableLog.create({
+        consumableId,
+        consumableName: consumable.name,
+        operationType: type,
+        quantity: type === 'in' ? parseFloat(quantity) : -parseFloat(quantity),
+        previousStock,
+        currentStock: newStock,
+        operator,
+        reason,
+        notes
+      }, { transaction });
+      
+      await transaction.commit();
+      
+      res.json({
+        message: '操作成功',
+        record,
+        consumable: await Consumable.findByPk(consumableId)
+      });
+      return;
+    } catch (error) {
       await transaction.rollback();
-      return res.status(400).json({ error: '操作类型无效' });
+      if (attempt >= MAX_RETRIES - 1) {
+        return res.status(500).json({ error: error.message });
+      }
+      attempt++;
     }
-    
-    await consumable.update({ currentStock: newStock }, { transaction });
-    
-    const record = await ConsumableRecord.create({
-      consumableId,
-      type,
-      quantity,
-      previousStock,
-      currentStock: newStock,
-      operator,
-      reason,
-      notes
-    }, { transaction });
-    
-    await ConsumableLog.create({
-      consumableId,
-      consumableName: consumable.name,
-      operationType: type,
-      quantity: type === 'in' ? parseFloat(quantity) : -parseFloat(quantity),
-      previousStock,
-      currentStock: newStock,
-      operator,
-      reason,
-      notes
-    }, { transaction });
-    
-    await transaction.commit();
-    
-    res.json({
-      message: '操作成功',
-      record,
-      consumable: await consumable.reload()
-    });
-  } catch (error) {
-    await transaction.rollback();
-    res.status(500).json({ error: error.message });
   }
 });
 
 router.post('/inout', async (req, res) => {
-  const transaction = await sequelize.transaction();
-  try {
-    const { consumableId, type, quantity, operator, reason, recipient, notes } = req.body;
-    
-    const consumable = await Consumable.findByPk(consumableId, { transaction });
-    if (!consumable) {
-      await transaction.rollback();
-      return res.status(404).json({ error: '耗材不存在' });
-    }
-    
-    const previousStock = parseFloat(consumable.currentStock);
-    let newStock;
-    
-    if (type === 'in') {
-      newStock = previousStock + parseFloat(quantity);
-    } else {
-      newStock = previousStock - parseFloat(quantity);
-      if (newStock < 0) {
+  const MAX_RETRIES = 3;
+  let attempt = 0;
+  
+  while (attempt < MAX_RETRIES) {
+    const transaction = await sequelize.transaction();
+    try {
+      const { consumableId, type, quantity, operator, reason, recipient, notes } = req.body;
+      
+      const consumable = await Consumable.findByPk(consumableId, { transaction });
+      if (!consumable) {
         await transaction.rollback();
-        return res.status(400).json({ error: '库存不足' });
+        return res.status(404).json({ error: '耗材不存在' });
       }
+      
+      const previousStock = parseFloat(consumable.currentStock);
+      let newStock;
+      
+      if (type === 'in') {
+        newStock = previousStock + parseFloat(quantity);
+      } else {
+        newStock = previousStock - parseFloat(quantity);
+        if (newStock < 0) {
+          await transaction.rollback();
+          return res.status(400).json({ error: '库存不足' });
+        }
+      }
+      
+      const [affectedRows] = await Consumable.update(
+        { 
+          currentStock: newStock,
+          version: sequelize.literal('version + 1')
+        },
+        { 
+          where: { 
+            consumableId,
+            version: consumable.version
+          },
+          transaction 
+        }
+      );
+      
+      if (affectedRows === 0) {
+        await transaction.rollback();
+        attempt++;
+        if (attempt >= MAX_RETRIES) {
+          return res.status(409).json({ error: '并发冲突，请稍后重试' });
+        }
+        continue;
+      }
+      
+      const record = await ConsumableRecord.create({
+        consumableId,
+        type,
+        quantity,
+        previousStock,
+        currentStock: newStock,
+        operator,
+        reason,
+        recipient,
+        notes
+      }, { transaction });
+      
+      await ConsumableLog.create({
+        consumableId,
+        consumableName: consumable.name,
+        operationType: type,
+        quantity: type === 'in' ? parseFloat(quantity) : -parseFloat(quantity),
+        previousStock,
+        currentStock: newStock,
+        operator,
+        reason,
+        notes
+      }, { transaction });
+      
+      await transaction.commit();
+      
+      res.json({
+        message: '操作成功',
+        record,
+        consumable: await Consumable.findByPk(consumableId)
+      });
+      return;
+    } catch (error) {
+      await transaction.rollback();
+      if (attempt >= MAX_RETRIES - 1) {
+        return res.status(500).json({ error: error.message });
+      }
+      attempt++;
     }
-    
-    await consumable.update({ currentStock: newStock }, { transaction });
-    
-    const record = await ConsumableRecord.create({
-      consumableId,
-      type,
-      quantity,
-      previousStock,
-      currentStock: newStock,
-      operator,
-      reason,
-      recipient,
-      notes
-    }, { transaction });
-    
-    await ConsumableLog.create({
-      consumableId,
-      consumableName: consumable.name,
-      operationType: type,
-      quantity: type === 'in' ? parseFloat(quantity) : -parseFloat(quantity),
-      previousStock,
-      currentStock: newStock,
-      operator,
-      reason,
-      notes
-    }, { transaction });
-    
-    await transaction.commit();
-    
-    res.json({
-      message: '操作成功',
-      record,
-      consumable: await consumable.reload()
-    });
-  } catch (error) {
-    await transaction.rollback();
-    res.status(500).json({ error: error.message });
   }
 });
 
 router.post('/adjust', async (req, res) => {
-  const transaction = await sequelize.transaction();
-  try {
-    const { consumableId, adjustType, quantity, operator, reason, notes } = req.body;
-    
-    const consumable = await Consumable.findByPk(consumableId, { transaction });
-    if (!consumable) {
-      await transaction.rollback();
-      return res.status(404).json({ error: '耗材不存在' });
-    }
-    
-    const previousStock = parseFloat(consumable.currentStock);
-    let newStock;
-    
-    if (adjustType === 'add') {
-      newStock = previousStock + parseFloat(quantity);
-    } else if (adjustType === 'subtract') {
-      newStock = previousStock - parseFloat(quantity);
-      if (newStock < 0) {
+  const MAX_RETRIES = 3;
+  let attempt = 0;
+  
+  while (attempt < MAX_RETRIES) {
+    const transaction = await sequelize.transaction();
+    try {
+      const { consumableId, adjustType, quantity, operator, reason, notes } = req.body;
+      
+      const consumable = await Consumable.findByPk(consumableId, { transaction });
+      if (!consumable) {
         await transaction.rollback();
-        return res.status(400).json({ error: '调整后库存不能为负' });
+        return res.status(404).json({ error: '耗材不存在' });
       }
-    } else if (adjustType === 'set') {
-      newStock = parseFloat(quantity);
-    } else {
+      
+      const previousStock = parseFloat(consumable.currentStock);
+      let newStock;
+      
+      if (adjustType === 'add') {
+        newStock = previousStock + parseFloat(quantity);
+      } else if (adjustType === 'subtract') {
+        newStock = previousStock - parseFloat(quantity);
+        if (newStock < 0) {
+          await transaction.rollback();
+          return res.status(400).json({ error: '调整后库存不能为负' });
+        }
+      } else if (adjustType === 'set') {
+        newStock = parseFloat(quantity);
+        if (newStock < 0) {
+          await transaction.rollback();
+          return res.status(400).json({ error: '库存不能设置为负数' });
+        }
+      } else {
+        await transaction.rollback();
+        return res.status(400).json({ error: '调整类型无效' });
+      }
+      
+      const [affectedRows] = await Consumable.update(
+        { 
+          currentStock: newStock,
+          version: sequelize.literal('version + 1')
+        },
+        { 
+          where: { 
+            consumableId,
+            version: consumable.version
+          },
+          transaction 
+        }
+      );
+      
+      if (affectedRows === 0) {
+        await transaction.rollback();
+        attempt++;
+        if (attempt >= MAX_RETRIES) {
+          return res.status(409).json({ error: '并发冲突，请稍后重试' });
+        }
+        continue;
+      }
+      
+      const changeQuantity = newStock - previousStock;
+      
+      await ConsumableLog.create({
+        consumableId,
+        consumableName: consumable.name,
+        operationType: 'adjust',
+        quantity: changeQuantity,
+        previousStock,
+        currentStock: newStock,
+        operator,
+        reason: reason || (adjustType === 'set' ? '库存调整为 ' + newStock : reason),
+        notes: adjustType === 'set' ? `库存从 ${previousStock} 调整为 ${newStock}` : notes
+      }, { transaction });
+      
+      await transaction.commit();
+      
+      res.json({
+        message: '调整成功',
+        consumable: await Consumable.findByPk(consumableId)
+      });
+      return;
+    } catch (error) {
       await transaction.rollback();
-      return res.status(400).json({ error: '调整类型无效' });
+      if (attempt >= MAX_RETRIES - 1) {
+        return res.status(500).json({ error: error.message });
+      }
+      attempt++;
     }
-    
-    await consumable.update({ currentStock: newStock }, { transaction });
-    
-    const changeQuantity = newStock - previousStock;
-    
-    await ConsumableLog.create({
-      consumableId,
-      consumableName: consumable.name,
-      operationType: 'adjust',
-      quantity: changeQuantity,
-      previousStock,
-      currentStock: newStock,
-      operator,
-      reason: reason || (adjustType === 'set' ? '库存调整为 ' + newStock : reason),
-      notes: adjustType === 'set' ? `库存从 ${previousStock} 调整为 ${newStock}` : notes
-    }, { transaction });
-    
-    await transaction.commit();
-    
-    res.json({
-      message: '调整成功',
-      consumable: await consumable.reload()
-    });
-  } catch (error) {
-    await transaction.rollback();
-    res.status(500).json({ error: error.message });
   }
 });
 

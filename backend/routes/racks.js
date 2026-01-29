@@ -6,6 +6,8 @@ const Room = require('../models/Room');
 const XLSX = require('xlsx');
 const fs = require('fs');
 const path = require('path');
+const { validateBody, validateQuery } = require('../middleware/validation');
+const { createRackSchema, updateRackSchema, queryRackSchema } = require('../validation/rackSchema');
 
 // 获取所有机柜
 router.get('/', async (req, res) => {
@@ -57,7 +59,7 @@ router.get('/:rackId', async (req, res) => {
 });
 
 // 创建机柜
-router.post('/', async (req, res) => {
+router.post('/', validateBody(createRackSchema), async (req, res) => {
   try {
     const rack = await Rack.create(req.body);
     res.status(201).json(rack);
@@ -67,7 +69,7 @@ router.post('/', async (req, res) => {
 });
 
 // 更新机柜
-router.put('/:rackId', async (req, res) => {
+router.put('/:rackId', validateBody(updateRackSchema), async (req, res) => {
   try {
     const [updated] = await Rack.update(req.body, {
       where: { rackId: req.params.rackId }

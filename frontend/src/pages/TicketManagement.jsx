@@ -4,6 +4,17 @@ import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EyeOutlined
 import axios from 'axios';
 import dayjs from 'dayjs';
 
+// 安全地从 localStorage 获取用户信息
+const getUserFromStorage = () => {
+  try {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : {};
+  } catch (e) {
+    console.error('解析用户信息失败:', e);
+    return {};
+  }
+};
+
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
@@ -412,7 +423,7 @@ function TicketManagement() {
         await axios.put(`/api/tickets/${editingTicket.ticketId}`, ticketData);
         message.success('工单更新成功');
       } else {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = getUserFromStorage();
         ticketData.reporterId = user.userId || localStorage.getItem('userId') || 'USER001';
         ticketData.reporterName = user.username || '系统用户';
         await axios.post('/api/tickets', ticketData);
@@ -457,10 +468,11 @@ function TicketManagement() {
 
   const handleProcessSubmit = useCallback(async (values) => {
     try {
+      const user = getUserFromStorage();
       await axios.put(`/api/tickets/${selectedTicket.ticketId}/process`, {
         ...values,
         operatorId: localStorage.getItem('userId'),
-        operatorName: JSON.parse(localStorage.getItem('user') || '{}').username
+        operatorName: user.username
       });
       message.success('工单处理完成');
       setProcessingModalVisible(false);
@@ -473,10 +485,11 @@ function TicketManagement() {
 
   const handleStatusChange = useCallback(async (ticketId, newStatus) => {
     try {
+      const user = getUserFromStorage();
       await axios.put(`/api/tickets/${ticketId}/status`, {
         status: newStatus,
         operatorId: localStorage.getItem('userId'),
-        operatorName: JSON.parse(localStorage.getItem('user') || '{}').username
+        operatorName: user.username
       });
       message.success('状态更新成功');
       fetchTickets();

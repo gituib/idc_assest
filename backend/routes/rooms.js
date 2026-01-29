@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Room = require('../models/Room');
 const Rack = require('../models/Rack');
+const { validateBody } = require('../middleware/validation');
+const { createRoomSchema, updateRoomSchema } = require('../validation/roomSchema');
 
 // 获取所有机房
 router.get('/', async (req, res) => {
@@ -41,7 +43,7 @@ router.post('/', async (req, res) => {
 });
 
 // 更新机房
-router.put('/:roomId', async (req, res) => {
+router.put('/:roomId', validateBody(updateRoomSchema), async (req, res) => {
   try {
     const [updated] = await Room.update(req.body, {
       where: { roomId: req.params.roomId }

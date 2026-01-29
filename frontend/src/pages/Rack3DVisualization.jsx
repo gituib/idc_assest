@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Layout, Select, Card, Spin, message, Typography, Descriptions, Tag, Button, Space, Empty, Modal, Form, Input, InputNumber, DatePicker, Checkbox, Switch } from 'antd';
-import { CloudServerOutlined, ReloadOutlined, ArrowLeftOutlined, InfoCircleOutlined, UpOutlined, DownOutlined, EditOutlined, SettingOutlined, FullscreenOutlined } from '@ant-design/icons';
+import { CloudServerOutlined, ReloadOutlined, ArrowLeftOutlined, InfoCircleOutlined, UpOutlined, DownOutlined, EditOutlined, SettingOutlined, FullscreenOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import dayjs from 'dayjs';
@@ -17,7 +17,10 @@ const { Option } = Select;
 
 const Rack3DVisualization = () => {
   const navigate = useNavigate();
-  
+
+  // Scene 组件的 ref，用于调用重置视角方法
+  const sceneRef = useRef(null);
+
   // 使用 Scene3DContext 管理3D场景状态
   const {
     devices,
@@ -465,15 +468,25 @@ const Rack3DVisualization = () => {
                     <Option key={rack.rackId} value={rack.rackId}>{rack.name}</Option>
                 ))}
             </Select>
-            <Button 
+            <Button
                 type="primary"
                 ghost
-                icon={<ReloadOutlined />} 
+                icon={<ReloadOutlined />}
                 onClick={() => { fetchRacks(); if(selectedRack) fetchDevices(selectedRack.rackId); }}
                 style={{ borderRadius: '6px', borderColor: 'rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.9)' }}
                 className="hover-bright"
             >
                 刷新
+            </Button>
+            <Button
+                type="primary"
+                ghost
+                icon={<EyeOutlined />}
+                onClick={() => { if(sceneRef.current) sceneRef.current.resetView(); }}
+                style={{ borderRadius: '6px', borderColor: 'rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.9)' }}
+                className="hover-bright"
+            >
+                重置视角
             </Button>
             <div style={{ 
                 display: 'flex', 
@@ -546,9 +559,10 @@ const Rack3DVisualization = () => {
              </div>
           ) : selectedRack ? (
              <>
-                <Scene 
-                    rack={selectedRack} 
-                    devices={devices} 
+                <Scene
+                    ref={sceneRef}
+                    rack={selectedRack}
+                    devices={devices}
                     selectedDeviceId={selectedDevice?.deviceId || selectedDevice?.id}
                     onDeviceClick={handleDeviceClick}
                     onDeviceLeave={handleDeviceLeave}

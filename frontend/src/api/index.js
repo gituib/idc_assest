@@ -15,9 +15,20 @@ api.interceptors.request.use(
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    } else {
-      console.log('[API] No token found in localStorage');
     }
+    
+    // 开发环境下安全日志：过滤敏感字段
+    if (process.env.NODE_ENV === 'development') {
+      const sensitiveFields = ['password', 'oldPassword', 'newPassword', 'confirmPassword'];
+      const safeData = config.data ? { ...config.data } : null;
+      if (safeData) {
+        sensitiveFields.forEach(field => {
+          if (safeData[field]) safeData[field] = '***';
+        });
+      }
+      console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, safeData || '');
+    }
+    
     return config;
   },
   (error) => {
