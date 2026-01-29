@@ -1,21 +1,153 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 const PERFORMANCE_MODE = true;
 
+// 背板渲染控制常量
+const BACK_PANEL_CONFIG = {
+  // 相机在正面时不渲染背板（z > threshold）
+  visibilityThreshold: -0.3,
+  // 距离阈值：太远时不渲染详细背板
+  detailDistanceThreshold: 3.0,
+  // 简化背板距离：超过此距离只显示基础背板
+  simplifiedDistanceThreshold: 1.5,
+};
+
+// ==================== 全局共享几何体和材质缓存 ====================
+// 这些资源只创建一次，所有设备组件共享，大幅减少显存占用
+
+// 基础几何体（使用 scale 调整大小，避免重复创建）
+const SHARED_GEOMETRIES = {
+  // 1x1x1 单位立方体，使用时通过 scale 调整尺寸
+  box: new THREE.BoxGeometry(1, 1, 1),
+  // 圆形几何体
+  circle: new THREE.CircleGeometry(1, 16),
+  // 圆柱体
+  cylinder: new THREE.CylinderGeometry(1, 1, 1, 16),
+};
+
+// 共享材质（按类型分类，避免重复创建相同材质）
+const SHARED_MATERIALS = {
+  // 机身材质 - 深灰色哑光金属
+  chassis: new THREE.MeshStandardMaterial({ 
+    color: "#333333", 
+    roughness: 0.9, 
+    metalness: 0.3 
+  }),
+  // 面板材质 - 灰色塑料
+  panel: new THREE.MeshStandardMaterial({ 
+    color: "#555555", 
+    roughness: 0.8, 
+    metalness: 0.1 
+  }),
+  // 面板高亮材质 - 悬停/选中时使用
+  panelHover: new THREE.MeshStandardMaterial({ 
+    color: "#666666", 
+    roughness: 0.8, 
+    metalness: 0.1 
+  }),
+  // LED 灯材质
+  led: new THREE.MeshBasicMaterial({ 
+    toneMapped: false 
+  }),
+  // 状态灯底座
+  ledBase: new THREE.MeshStandardMaterial({ 
+    color: "#333333" 
+  }),
+  // 深色面板
+  darkPanel: new THREE.MeshStandardMaterial({ 
+    color: "#1e293b", 
+    roughness: 0.7, 
+    metalness: 0.5 
+  }),
+  // 硬盘托架
+  driveBay: new THREE.MeshStandardMaterial({ 
+    color: "#334155", 
+    roughness: 0.6, 
+    metalness: 0.4 
+  }),
+  // 装饰条
+  accent: new THREE.MeshStandardMaterial({ 
+    color: "#000000", 
+    roughness: 0.2 
+  }),
+  // 金属细节
+  metalDetail: new THREE.MeshStandardMaterial({ 
+    color: "#cbd5e1" 
+  }),
+  // 网口
+  networkPort: new THREE.MeshStandardMaterial({ 
+    color: "#1e293b", 
+    roughness: 0.3 
+  }),
+  // 网口发光
+  networkLed: new THREE.MeshBasicMaterial({ 
+    color: "#10b981", 
+    toneMapped: false 
+  }),
+  // 电源
+  powerSupply: new THREE.MeshStandardMaterial({ 
+    color: "#374151", 
+    roughness: 0.5 
+  }),
+  // 风扇
+  fan: new THREE.MeshStandardMaterial({ 
+    color: "#1f2937", 
+    roughness: 0.4 
+  }),
+  // 散热孔
+  vent: new THREE.MeshStandardMaterial({ 
+    color: "#111827" 
+  }),
+};
+
+// InstancedMesh 共享几何体
+const SHARED_INSTANCED_GEOMETRIES = {
+  // 状态灯
+  statusLight: new THREE.CircleGeometry(0.0015, 8),
+  // 硬盘托架
+  driveBay: new THREE.BoxGeometry(0.07, 0.035, 0.004),
+  // 硬盘细节
+  driveDetail: new THREE.BoxGeometry(0.015, 0.025, 0.002),
+  // 存储托架
+  storageBay: new THREE.BoxGeometry(0.08, 0.12, 0.004),
+  // 存储细节
+  storageDetail: new THREE.BoxGeometry(0.06, 0.08, 0.002),
+  // 网口
+  networkPort: new THREE.BoxGeometry(0.012, 0.008, 0.004),
+  // 网口发光
+  networkLed: new THREE.BoxGeometry(0.003, 0.002, 0.001),
+  // SFP端口
+  sfpPort: new THREE.BoxGeometry(0.02, 0.015, 0.005),
+  // SFP内部
+  sfpInner: new THREE.BoxGeometry(0.016, 0.011, 0.002),
+  // SFP连接器
+  sfpConnector: new THREE.BoxGeometry(0.01, 0.002, 0.008),
+  // SFP指示灯
+  sfpLed: new THREE.ConeGeometry(0.002, 0.004, 3),
+};
+
+// InstancedMesh 共享材质
+const SHARED_INSTANCED_MATERIALS = {
+  // 状态灯基础材质
+  statusLight: new THREE.MeshBasicMaterial({ toneMapped: false }),
+  // 硬盘托架
+  driveBay: new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.6, metalness: 0.4 }),
+  // 硬盘细节
+  driveDetail: new THREE.MeshStandardMaterial({ color: '#1e293b' }),
+  // 存储托架
+  storageBay: new THREE.MeshStandardMaterial({ color: '#374151', roughness: 0.5 }),
+  // 存储细节
+  storageDetail: new THREE.MeshStandardMaterial({ color: '#4b5563' }),
+  // 网口
+  networkPort: new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.3 }),
+  // 网口发光
+  networkLed: new THREE.MeshBasicMaterial({ color: '#10b981', toneMapped: false }),
+};
+
 const InstancedStatusLights = ({ count, positions, colors: statusColors, zOffset }) => {
     const meshRef = useRef();
-    const colorArray = useMemo(() => {
-        const arr = new Float32Array(count * 3);
-        for (let i = 0; i < count; i++) {
-            const color = new THREE.Color(statusColors[i] || '#22c55e');
-            arr[i * 3] = color.r;
-            arr[i * 3 + 1] = color.g;
-            arr[i * 3 + 2] = color.b;
-        }
-        return arr;
-    }, [count, statusColors]);
 
     const dummy = useMemo(() => new THREE.Object3D(), []);
 
@@ -30,10 +162,30 @@ const InstancedStatusLights = ({ count, positions, colors: statusColors, zOffset
         }
     }, [count, positions, zOffset, dummy]);
 
+    // 修复：正确更新实例颜色
+    useEffect(() => {
+        if (meshRef.current) {
+            for (let i = 0; i < count; i++) {
+                const color = new THREE.Color(statusColors[i] || '#22c55e');
+                meshRef.current.setColorAt(i, color);
+            }
+            if (meshRef.current.instanceColor) {
+                meshRef.current.instanceColor.needsUpdate = true;
+            }
+        }
+    }, [count, statusColors]);
+
+    // 资源清理
+    useEffect(() => {
+        return () => {
+            if (meshRef.current) {
+                meshRef.current.dispose();
+            }
+        };
+    }, []);
+
     return (
-        <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
-            <circleGeometry args={[0.0015, 8]} />
-            <meshBasicMaterial toneMapped={false} />
+        <instancedMesh ref={meshRef} args={[SHARED_INSTANCED_GEOMETRIES.statusLight, SHARED_INSTANCED_MATERIALS.statusLight, count]}>
         </instancedMesh>
     );
 };
@@ -64,16 +216,20 @@ const InstancedDriveBays = ({ count, positions, color, hasDetail = true }) => {
         }
     }, [count, positions, hasDetail, dummy]);
 
+    // 资源清理
+    useEffect(() => {
+        return () => {
+            if (meshRef.current) meshRef.current.dispose();
+            if (detailRef.current) detailRef.current.dispose();
+        };
+    }, []);
+
     return (
         <group>
-            <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
-                <boxGeometry args={[0.07, 0.035, 0.004]} />
-                <meshStandardMaterial color={color || '#334155'} roughness={0.6} metalness={0.4} />
+            <instancedMesh ref={meshRef} args={[SHARED_INSTANCED_GEOMETRIES.driveBay, SHARED_INSTANCED_MATERIALS.driveBay, count]}>
             </instancedMesh>
             {hasDetail && (
-                <instancedMesh ref={detailRef} args={[undefined, undefined, count]}>
-                    <boxGeometry args={[0.015, 0.025, 0.002]} />
-                    <meshStandardMaterial color="#1e293b" />
+                <instancedMesh ref={detailRef} args={[SHARED_INSTANCED_GEOMETRIES.driveDetail, SHARED_INSTANCED_MATERIALS.driveDetail, count]}>
                 </instancedMesh>
             )}
         </group>
@@ -106,15 +262,19 @@ const InstancedStorageBays = ({ count, positions, color }) => {
         }
     }, [count, positions, dummy]);
 
+    // 资源清理
+    useEffect(() => {
+        return () => {
+            if (meshRef.current) meshRef.current.dispose();
+            if (detailRef.current) detailRef.current.dispose();
+        };
+    }, []);
+
     return (
         <group>
-            <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
-                <boxGeometry args={[0.095, 0.028, 0.005]} />
-                <meshStandardMaterial color={color || '#334155'} metalness={0.6} roughness={0.4} />
+            <instancedMesh ref={meshRef} args={[SHARED_INSTANCED_GEOMETRIES.storageBay, SHARED_INSTANCED_MATERIALS.storageBay, count]}>
             </instancedMesh>
-            <instancedMesh ref={detailRef} args={[undefined, undefined, count]}>
-                <boxGeometry args={[0.02, 0.015, 0.002]} />
-                <meshStandardMaterial color="#000" />
+            <instancedMesh ref={detailRef} args={[SHARED_INSTANCED_GEOMETRIES.storageDetail, SHARED_INSTANCED_MATERIALS.storageDetail, count]}>
             </instancedMesh>
         </group>
     );
@@ -172,24 +332,25 @@ const InstancedRJ45Ports = ({ count, positions, statuses, frontZ }) => {
         return statuses.map(s => s !== 'disconnected' ? (s === 'fault' ? '#ef4444' : '#22c55e') : '#475569');
     }, [statuses]);
 
+    // 资源清理
+    useEffect(() => {
+        return () => {
+            if (meshRef.current) meshRef.current.dispose();
+            if (innerRef.current) innerRef.current.dispose();
+            if (tabRef.current) tabRef.current.dispose();
+            if (ledRef.current) ledRef.current.dispose();
+        };
+    }, []);
+
     return (
         <group>
-            <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
-                <boxGeometry args={[0.011, 0.011, 0.004]} />
-                <meshStandardMaterial color="#cbd5e1" metalness={0.8} />
+            <instancedMesh ref={meshRef} args={[SHARED_INSTANCED_GEOMETRIES.networkPort, SHARED_INSTANCED_MATERIALS.networkPort, count]}>
             </instancedMesh>
-            <instancedMesh ref={innerRef} args={[undefined, undefined, count]}>
-                <boxGeometry args={[0.009, 0.009, 0.002]} />
-                <meshStandardMaterial color="#000" />
+            <instancedMesh ref={innerRef} args={[SHARED_INSTANCED_GEOMETRIES.networkPort, SHARED_INSTANCED_MATERIALS.networkPort, count]}>
             </instancedMesh>
-            <instancedMesh ref={tabRef} args={[undefined, undefined, count]}>
-                <boxGeometry args={[0.007, 0.001, 0.001]} />
-                <meshBasicMaterial color="#facc15" />
+            <instancedMesh ref={tabRef} args={[SHARED_INSTANCED_GEOMETRIES.networkLed, SHARED_INSTANCED_MATERIALS.networkLed, count]}>
             </instancedMesh>
-            <instancedMesh ref={ledRef} args={[undefined, undefined, count]}>
-                <boxGeometry args={[0.002, 0.002, 0.001]} />
-                <meshBasicMaterial toneMapped={false} />
-                <instancedBufferAttribute attach="geometry-attributes-color" args={[new Float32Array(count * 3), 3]} />
+            <instancedMesh ref={ledRef} args={[SHARED_INSTANCED_GEOMETRIES.networkLed, SHARED_INSTANCED_MATERIALS.networkLed, count]}>
             </instancedMesh>
         </group>
     );
@@ -243,28 +404,36 @@ const InstancedSFPports = ({ count, positions, statuses, frontZ }) => {
         }
     }, [count, positions, statuses, frontZ, dummy]);
 
-    const ledColors = useMemo(() => {
-        return positions.map((_, i) => statuses[i] !== 'disconnected' ? '#22c55e' : '#475569');
-    }, [positions, statuses]);
+    // 修复：正确更新SFP指示灯颜色
+    useEffect(() => {
+        if (ledRef.current) {
+            for (let i = 0; i < count; i++) {
+                const isConnected = statuses[i] !== 'disconnected';
+                const color = new THREE.Color(isConnected ? '#22c55e' : '#475569');
+                ledRef.current.setColorAt(i, color);
+            }
+            if (ledRef.current.instanceColor) {
+                ledRef.current.instanceColor.needsUpdate = true;
+            }
+        }
+    }, [count, statuses]);
+
+    // 资源清理
+    useEffect(() => {
+        return () => {
+            if (meshRef.current) meshRef.current.dispose();
+            if (innerRef.current) innerRef.current.dispose();
+            if (connectorRef.current) connectorRef.current.dispose();
+            if (ledRef.current) ledRef.current.dispose();
+        };
+    }, []);
 
     return (
         <group>
-            <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
-                <boxGeometry args={[0.02, 0.015, 0.005]} />
-                <meshStandardMaterial color="#cbd5e1" metalness={0.9} roughness={0.3} />
-            </instancedMesh>
-            <instancedMesh ref={innerRef} args={[undefined, undefined, count]}>
-                <boxGeometry args={[0.016, 0.011, 0.002]} />
-                <meshStandardMaterial color="#1e293b" />
-            </instancedMesh>
-            <instancedMesh ref={connectorRef} args={[undefined, undefined, count]}>
-                <boxGeometry args={[0.01, 0.002, 0.008]} />
-                <meshStandardMaterial color="#3b82f6" />
-            </instancedMesh>
-            <instancedMesh ref={ledRef} args={[undefined, undefined, count]}>
-                <coneGeometry args={[0.002, 0.004, 3]} />
-                <meshBasicMaterial />
-            </instancedMesh>
+            <instancedMesh ref={meshRef} args={[SHARED_INSTANCED_GEOMETRIES.sfpPort, SHARED_INSTANCED_MATERIALS.networkPort, count]} />
+            <instancedMesh ref={innerRef} args={[SHARED_INSTANCED_GEOMETRIES.sfpInner, SHARED_INSTANCED_MATERIALS.driveDetail, count]} />
+            <instancedMesh ref={connectorRef} args={[SHARED_INSTANCED_GEOMETRIES.sfpConnector, SHARED_INSTANCED_MATERIALS.metalDetail, count]} />
+            <instancedMesh ref={ledRef} args={[SHARED_INSTANCED_GEOMETRIES.sfpLed, SHARED_INSTANCED_MATERIALS.networkLed, count]} />
         </group>
     );
 };
@@ -326,23 +495,63 @@ const FirewallFace = ({ device, height, frontZ, isSelected }) => {
 
 const DeviceModel = ({ device, rackHeight, isSelected, onClick, onHover, uHeight: propUHeight, position, rackDepth, slideEnabled = true }) => {
   const mesh = useRef();
+  const groupRef = useRef();
   const [hovered, setHover] = useState(false);
-  const [isExtended, setIsExtended] = useState(false);
-  const [currentZ, setCurrentZ] = useState(0);
+  // 使用 ref 存储动画状态，避免每帧触发 React 状态更新
+  const isExtendedRef = useRef(false);
+  const currentZRef = useRef(0);
+  // 使用 ref 避免重复设置悬停状态
+  const isHoveredRef = useRef(false);
+
+  // 背板渲染控制状态
+  const [backPanelLevel, setBackPanelLevel] = useState(0); // 0: 不渲染, 1: 简化, 2: 完整
+  const { camera } = useThree();
+  const frameCount = useRef(0);
   
   // 使用传入的 uHeight (默认为 0.04445m)
   const uHeight = propUHeight || 0.04445;
   const depth = rackDepth || 1.0; // 机柜深度，默认1米
 
   // 滑轨动画 - 仅在展开时运行且slideEnabled为true
+  // 使用 ref 直接操作 mesh，避免 React 状态更新
   useFrame(() => {
-    if (!slideEnabled || (!isExtended && Math.abs(currentZ) < 0.01)) {
-      if (currentZ !== 0) setCurrentZ(0);
+    if (!slideEnabled || (!isExtendedRef.current && Math.abs(currentZRef.current) < 0.001)) {
       return;
     }
-    const targetZ = isExtended ? 0.6 : 0;
+    const targetZ = isExtendedRef.current ? 0.6 : 0;
     const lerpFactor = 0.1;
-    setCurrentZ(prev => prev + (targetZ - prev) * lerpFactor);
+    currentZRef.current += (targetZ - currentZRef.current) * lerpFactor;
+    
+    // 直接操作 group 的 position，不通过 React state
+    if (groupRef.current) {
+      groupRef.current.position.z = currentZRef.current;
+    }
+  });
+  
+  // 背板渲染控制 - 根据相机位置动态调整
+  // 只在相机绕到背面时才渲染背板
+  useFrame(() => {
+    // 每10帧检查一次，减少计算频率
+    frameCount.current++;
+    if (frameCount.current % 10 !== 0) return;
+
+    if (!groupRef.current) return;
+
+    // 获取相机相对设备的位置
+    const deviceWorldPos = new THREE.Vector3();
+    groupRef.current.getWorldPosition(deviceWorldPos);
+
+    const cameraZ = camera.position.z;
+
+    // 简单逻辑：相机在正面（z > threshold）时不渲染背板
+    // 相机在背面（z <= threshold）时渲染完整背板
+    const shouldShowBackPanel = cameraZ <= BACK_PANEL_CONFIG.visibilityThreshold;
+    const newLevel = shouldShowBackPanel ? 2 : 0;
+
+    // 只有当级别变化时才更新状态
+    if (newLevel !== backPanelLevel) {
+      setBackPanelLevel(newLevel);
+    }
   });
 
   // 尺寸定义 (适配标准 0.6m 机柜)
@@ -617,108 +826,135 @@ const DeviceModel = ({ device, rackHeight, isSelected, onClick, onHover, uHeight
     );
   };
 
-  // 渲染设备背板
+  // 渲染简化版背板（只显示基础背板）
+  const renderSimplifiedBackPanel = (backZ) => {
+    return (
+      <group position={[0, 0, backZ]} rotation={[0, Math.PI, 0]}>
+        {/* 基础背板 - 使用共享几何体 */}
+        <mesh 
+          position={[0, 0, 0.001]}
+          geometry={SHARED_GEOMETRIES.box}
+          material={SHARED_MATERIALS.panel}
+          scale={[chassisWidth, height - gap, 0.002]}
+        />
+      </group>
+    );
+  };
+
+  // 渲染完整版背板（包含 PSU、风扇、网卡等细节）
+  const renderFullBackPanel = (backZ) => {
+    return (
+      <group position={[0, 0, backZ]} rotation={[0, Math.PI, 0]}>
+        {/* 基础背板 - 透明玻璃质感 */}
+        <mesh position={[0, 0, 0.001]}>
+          <boxGeometry args={[chassisWidth, height - gap, 0.002]} />
+          <meshStandardMaterial 
+            color="#94a3b8" 
+            transparent 
+            opacity={0.3}
+            roughness={0.2}
+            metalness={0.8}
+          />
+        </mesh>
+
+        {/* 电源模块 (PSU) - 左侧 */}
+        <group position={[0.25, 0, 0.002]}>
+          {[-0.02, 0.02].map((yOffset, i) => (
+            <group key={i} position={[0, height > 0.15 ? yOffset * 2 : 0, 0]}> 
+              {(height > 0.15 || i === 0) && (
+                <group position={[i === 1 && height <= 0.15 ? -0.06 : 0, 0, 0]}>
+                  {/* PSU 面板 */}
+                  <mesh>
+                    <boxGeometry args={[0.05, height > 0.15 ? 0.04 : 0.08, 0.004]} />
+                    <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.4} />
+                  </mesh>
+                  {/* 把手 */}
+                  <mesh position={[0, 0, 0.004]}>
+                    <boxGeometry args={[0.01, 0.02, 0.004]} />
+                    <meshStandardMaterial color="#000000" />
+                  </mesh>
+                  {/* 电源插口 */}
+                  <mesh position={[0.015, 0, 0.002]}>
+                    <boxGeometry args={[0.012, 0.01, 0.002]} />
+                    <meshStandardMaterial color="#1a202c" />
+                  </mesh>
+                  {/* 状态灯 */}
+                  <mesh position={[-0.015, 0.01, 0.002]}>
+                    <circleGeometry args={[0.002, 8]} />
+                    <meshBasicMaterial color="#22c55e" />
+                  </mesh>
+                </group>
+              )}
+            </group>
+          ))}
+        </group>
+
+        {/* 风扇模块 (Fan Modules) - 中间 */}
+        <group position={[0, 0, 0.002]}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <group key={i} position={[-0.1 + i * 0.1, 0, 0]}>
+              {/* 风扇网罩 */}
+              <mesh>
+                <boxGeometry args={[0.08, height - 0.03, 0.001]} />
+                <meshStandardMaterial color="#1e293b" />
+              </mesh>
+              {/* 风扇叶片 */}
+              <mesh position={[0, 0, 0.001]}>
+                <circleGeometry args={[Math.min(0.035, (height-0.03)/2), 8]} />
+                <meshBasicMaterial color="#334155" />
+              </mesh>
+              {/* 红色拉手 */}
+              <mesh position={[0, -0.01, 0.003]}>
+                <boxGeometry args={[0.01, 0.02, 0.002]} />
+                <meshStandardMaterial color="#ef4444" />
+              </mesh>
+            </group>
+          ))}
+        </group>
+
+        {/* 网卡/扩展模块 (PCIe/LOM) - 右侧 */}
+        <group position={[-0.25, 0, 0.002]}>
+          {Array.from({ length: 2 }).map((_, i) => (
+            <group key={i} position={[i * 0.08, 0, 0]}>
+              <mesh>
+                <boxGeometry args={[0.02, height - 0.02, 0.001]} />
+                <meshStandardMaterial color="#cbd5e1" metalness={0.9} />
+              </mesh>
+              {/* 端口 */}
+              <mesh position={[0, 0.01, 0.002]}>
+                <boxGeometry args={[0.012, 0.012, 0.002]} />
+                <meshStandardMaterial color="#000000" />
+              </mesh>
+              <mesh position={[0, -0.01, 0.002]}>
+                <boxGeometry args={[0.012, 0.012, 0.002]} />
+                <meshStandardMaterial color="#000000" />
+              </mesh>
+            </group>
+          ))}
+        </group>
+      </group>
+    );
+  };
+
+  // 根据级别渲染背板
   const renderBackPanel = () => {
-    // Back face Z position (flush with back of chassis)
+    // Back face Z position
     const backZ = chassisZ - chassisDepth / 2;
     
-    // Rotate 180 deg to face backwards
-    return (
-        <group position={[0, 0, backZ]} rotation={[0, Math.PI, 0]}>
-            {/* 基础背板 - 透明玻璃质感 (Reduced quality for performance) */}
-            <mesh position={[0, 0, 0.001]}>
-                <boxGeometry args={[chassisWidth, height - gap, 0.002]} />
-                <meshStandardMaterial 
-                    color="#94a3b8" 
-                    transparent 
-                    opacity={0.3}
-                    roughness={0.2}
-                    metalness={0.8}
-                />
-            </mesh>
-
-            {/* 电源模块 (PSU) - 左侧 (从背面看是右侧，但我们旋转了) */}
-            {/* 2个 PSU 垂直排列或并排 */}
-            <group position={[0.25, 0, 0.002]}>
-                {[-0.02, 0.02].map((yOffset, i) => (
-                     <group key={i} position={[0, height > 0.15 ? yOffset * 2 : 0, 0]}> 
-                        {/* 如果高度够大(>1U)，垂直排列，否则只显示一个或者水平排列 */}
-                        {/* 简化：1U设备只显示左边一个，2U显示两个 */}
-                        {(height > 0.15 || i === 0) && (
-                            <group position={[i === 1 && height <= 0.15 ? -0.06 : 0, 0, 0]}>
-                                {/* PSU 面板 */}
-                                <mesh>
-                                    <boxGeometry args={[0.05, height > 0.15 ? 0.04 : 0.08, 0.004]} />
-                                    <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.4} />
-                                </mesh>
-                                {/* 把手 */}
-                                <mesh position={[0, 0, 0.004]}>
-                                    <boxGeometry args={[0.01, 0.02, 0.004]} />
-                                    <meshStandardMaterial color="#000000" />
-                                </mesh>
-                                {/* 电源插口 C13 */}
-                                <mesh position={[0.015, 0, 0.002]}>
-                                    <boxGeometry args={[0.012, 0.01, 0.002]} />
-                                    <meshStandardMaterial color="#1a202c" />
-                                </mesh>
-                                {/* 状态灯 */}
-                                <mesh position={[-0.015, 0.01, 0.002]}>
-                                    <circleGeometry args={[0.002, 8]} />
-                                    <meshBasicMaterial color="#22c55e" />
-                                </mesh>
-                            </group>
-                        )}
-                     </group>
-                ))}
-            </group>
-
-            {/* 风扇模块 (Fan Modules) - 中间 */}
-            {/* 3-4个风扇阵列 */}
-            <group position={[0, 0, 0.002]}>
-                {Array.from({ length: 3 }).map((_, i) => (
-                    <group key={i} position={[-0.1 + i * 0.1, 0, 0]}>
-                         {/* 风扇网罩 */}
-                        <mesh>
-                            <boxGeometry args={[0.08, height - 0.03, 0.001]} />
-                            <meshStandardMaterial color="#1e293b" />
-                        </mesh>
-                        {/* 风扇叶片模拟 (纹理) */}
-                        <mesh position={[0, 0, 0.001]}>
-                            <circleGeometry args={[Math.min(0.035, (height-0.03)/2), 8]} />
-                            <meshBasicMaterial color="#334155" />
-                        </mesh>
-                         {/* 红色拉手 (热插拔) */}
-                         <mesh position={[0, -0.01, 0.003]}>
-                            <boxGeometry args={[0.01, 0.02, 0.002]} />
-                            <meshStandardMaterial color="#ef4444" />
-                        </mesh>
-                    </group>
-                ))}
-            </group>
-
-            {/* 网卡/扩展模块 (PCIe/LOM) - 右侧 */}
-            <group position={[-0.25, 0, 0.002]}>
-                {/* 竖向 PCIe 挡板 */}
-                {Array.from({ length: 2 }).map((_, i) => (
-                     <group key={i} position={[i * 0.08, 0, 0]}>
-                        <mesh>
-                            <boxGeometry args={[0.02, height - 0.02, 0.001]} />
-                            <meshStandardMaterial color="#cbd5e1" metalness={0.9} />
-                        </mesh>
-                        {/* 端口 (SFP+ or RJ45) */}
-                         <mesh position={[0, 0.01, 0.002]}>
-                            <boxGeometry args={[0.012, 0.012, 0.002]} />
-                            <meshStandardMaterial color="#000000" />
-                        </mesh>
-                        <mesh position={[0, -0.01, 0.002]}>
-                            <boxGeometry args={[0.012, 0.012, 0.002]} />
-                            <meshStandardMaterial color="#000000" />
-                        </mesh>
-                     </group>
-                ))}
-            </group>
-        </group>
-    );
+    // 根据背板级别决定渲染内容
+    switch (backPanelLevel) {
+      case 0:
+        // 不渲染背板
+        return null;
+      case 1:
+        // 简化背板
+        return renderSimplifiedBackPanel(backZ);
+      case 2:
+        // 完整背板
+        return renderFullBackPanel(backZ);
+      default:
+        return null;
+    }
   };
   const renderDeviceFace = () => {
     const type = device.type?.toLowerCase() || '';
@@ -749,41 +985,46 @@ const DeviceModel = ({ device, rackHeight, isSelected, onClick, onHover, uHeight
   return (
     <group position={position || [0, 0, 0]}>
       <group
-        position={[0, 0, currentZ]}
+        ref={groupRef}
         onClick={(e) => {
           e.stopPropagation();
-          setIsExtended(!isExtended);
+          isExtendedRef.current = !isExtendedRef.current;
           onClick && onClick(device);
         }}
         onPointerOver={(e) => {
           e.stopPropagation();
-          setHover(true);
-          onHover && onHover(device);
+          // 使用 ref 避免重复设置状态
+          if (!isHoveredRef.current) {
+            isHoveredRef.current = true;
+            setHover(true);
+            onHover && onHover(device);
+          }
         }}
         onPointerOut={(e) => {
-          setHover(false);
-          onHover && onHover(null);
+          // 重置 ref 并更新状态
+          if (isHoveredRef.current) {
+            isHoveredRef.current = false;
+            setHover(false);
+            onHover && onHover(null);
+          }
         }}
       >
-        {/* 机身 (Chassis) - 深色金属 */}
-        <mesh ref={mesh} position={[0, 0, chassisZ]}>
-          <boxGeometry args={[chassisWidth, height - gap, chassisDepth]} />
-          <meshStandardMaterial 
-            color="#333333" // 深灰色哑光金属
-            roughness={0.9} // 哑光
-            metalness={0.3}
-          />
-        </mesh>
+        {/* 机身 (Chassis) - 使用共享几何体和材质 */}
+        <mesh 
+          ref={mesh} 
+          position={[0, 0, chassisZ]}
+          geometry={SHARED_GEOMETRIES.box}
+          material={SHARED_MATERIALS.chassis}
+          scale={[chassisWidth, height - gap, chassisDepth]}
+        />
 
-        {/* 前面板底座 (Front Panel Base) */}
-        <mesh position={[0, 0, panelZ]}>
-          <boxGeometry args={[panelWidth, height - gap, panelDepth]} />
-          <meshStandardMaterial 
-            color={hovered || isSelected ? "#666666" : "#555555"} // 稍浅的灰色塑料质感
-            roughness={0.8}
-            metalness={0.1}
-          />
-        </mesh>
+        {/* 前面板底座 (Front Panel Base) - 使用共享资源 */}
+        <mesh 
+          position={[0, 0, panelZ]}
+          geometry={SHARED_GEOMETRIES.box}
+          material={hovered || isSelected ? SHARED_MATERIALS.panelHover : SHARED_MATERIALS.panel}
+          scale={[panelWidth, height - gap, panelDepth]}
+        />
 
         {/* 告警时的红色辉光 (设备两侧) */}
         {(device.status === 'error' || device.status === 'fault') && (
@@ -815,14 +1056,16 @@ const DeviceModel = ({ device, rackHeight, isSelected, onClick, onHover, uHeight
           </Text>
       )} */}
 
-      {/* 状态指示灯 (统一位置) */}
+      {/* 状态指示灯 (统一位置) - 使用共享几何体 */}
       <group position={[panelWidth/2 - 0.03, 0, frontZ + 0.01]}>
          {/* 灯座 */}
-         <mesh position={[0, 0, -0.002]}>
-             <circleGeometry args={[0.01, 16]} />
-             <meshStandardMaterial color="#333" />
-         </mesh>
-         {/* 发光体 */}
+         <mesh 
+           position={[0, 0, -0.002]}
+           geometry={SHARED_GEOMETRIES.circle}
+           material={SHARED_MATERIALS.ledBase}
+           scale={[0.01, 0.01, 1]}
+         />
+         {/* 发光体 - 需要动态颜色，使用克隆材质 */}
          <mesh>
             <circleGeometry args={[0.006, 16]} />
             <meshBasicMaterial color={statusColor} toneMapped={false} />
@@ -834,4 +1077,45 @@ const DeviceModel = ({ device, rackHeight, isSelected, onClick, onHover, uHeight
   );
 };
 
-export default DeviceModel;
+// 使用 React.memo 优化，避免不必要的重渲染
+// 自定义比较函数：只在关键属性变化时才重新渲染
+const DeviceModelMemo = React.memo(DeviceModel, (prevProps, nextProps) => {
+  // 比较设备 ID
+  if (prevProps.device?.id !== nextProps.device?.id) return false;
+  if (prevProps.device?.deviceId !== nextProps.device?.deviceId) return false;
+
+  // 比较选中状态
+  if (prevProps.isSelected !== nextProps.isSelected) return false;
+
+  // 比较滑出动画开关
+  if (prevProps.slideEnabled !== nextProps.slideEnabled) return false;
+
+  // 比较位置（使用 JSON.stringify 简单比较）
+  if (JSON.stringify(prevProps.position) !== JSON.stringify(nextProps.position)) return false;
+
+  // 比较机柜相关属性
+  if (prevProps.rackHeight !== nextProps.rackHeight) return false;
+  if (prevProps.rackDepth !== nextProps.rackDepth) return false;
+  if (prevProps.uHeight !== nextProps.uHeight) return false;
+
+  // 修复：比较设备状态，确保状态变化时正确重渲染
+  if (prevProps.device?.status !== nextProps.device?.status) return false;
+
+  // 修复：比较连接线，确保端口状态变化时正确重渲染
+  const prevCables = prevProps.device?.cables;
+  const nextCables = nextProps.device?.cables;
+  if (Array.isArray(prevCables) && Array.isArray(nextCables)) {
+    if (prevCables.length !== nextCables.length) return false;
+    // 简单比较：检查每个连接线的关键属性
+    for (let i = 0; i < prevCables.length; i++) {
+      if (prevCables[i]?.status !== nextCables[i]?.status) return false;
+    }
+  } else if (prevCables !== nextCables) {
+    return false;
+  }
+
+  // 以上都相同，不需要重新渲染
+  return true;
+});
+
+export default DeviceModelMemo;

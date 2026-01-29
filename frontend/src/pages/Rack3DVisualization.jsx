@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Layout, Select, Card, Spin, message, Typography, Descriptions, Tag, Button, Space, Empty, Modal, Form, Input, InputNumber, DatePicker, Checkbox, Switch } from 'antd';
 import { CloudServerOutlined, ReloadOutlined, ArrowLeftOutlined, InfoCircleOutlined, UpOutlined, DownOutlined, EditOutlined, SettingOutlined, FullscreenOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +9,7 @@ import NetworkCardCreateModal from '../components/NetworkCardCreateModal';
 import PortCreateModal from '../components/PortCreateModal';
 import CableCreateModal from '../components/CableCreateModal';
 import DeviceDetailDrawer from '../components/DeviceDetailDrawer';
+import { useScene3D } from '../context/Scene3DContext';
 
 const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
@@ -16,14 +17,29 @@ const { Option } = Select;
 
 const Rack3DVisualization = () => {
   const navigate = useNavigate();
-  const [racks, setRacks] = useState([]);
-  const [selectedRack, setSelectedRack] = useState(null);
+  
+  // 使用 Scene3DContext 管理3D场景状态
+  const {
+    devices,
+    setDevices,
+    selectedDevice,
+    setSelectedDevice,
+    hoveredDevice,
+    setHoveredDevice,
+    deviceSlideEnabled,
+    setDeviceSlideEnabled,
+    selectedRack,
+    setSelectedRack,
+    racks,
+    setRacks,
+    deviceCables,
+    setDeviceCables,
+    loadingDevices,
+    setLoadingDevices,
+  } = useScene3D();
+  
   const [selectedRoom, setSelectedRoom] = useState(null);
-  const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [loadingDevices, setLoadingDevices] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState(null); // Currently selected device in 3D view
-  const [hoveredDevice, setHoveredDevice] = useState(null); // Currently hovered device
   const [isRackInfoCollapsed, setIsRackInfoCollapsed] = useState(false); // Rack Info Card collapsed state
   
   // Edit Modal State
@@ -44,11 +60,13 @@ const Rack3DVisualization = () => {
   const [operatingDevice, setOperatingDevice] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Device Cables State
-  const [deviceCables, setDeviceCables] = useState([]);
-
-  // Device Slide Animation Toggle
-  const [deviceSlideEnabled, setDeviceSlideEnabled] = useState(false);
+  // 使用 ref 存储模态框状态，避免 handleDeviceHover 频繁重新创建
+  const modalsOpenRef = useRef(false);
+  
+  // 同步 ref 与 state
+  useEffect(() => {
+    modalsOpenRef.current = modalVisible || nicModalVisible || portModalVisible || cableModalVisible;
+  }, [modalVisible, nicModalVisible, portModalVisible, cableModalVisible]);
 
   const fetchDeviceCables = useCallback(async (deviceId) => {
     if (!deviceId) return;
@@ -79,9 +97,14 @@ const Rack3DVisualization = () => {
   // Handle Edit Device Click
   const handleEditDevice = (device) => {
       setEditingDevice(device);
-      
+      setModalVisible(true);
+  };
+
+  // 当 Modal 打开时，初始化表单数据
+  useEffect(() => {
+    if (modalVisible && editingDevice) {
       // Prepare form data (similar to DeviceManagement)
-      const deviceData = { ...device };
+      const deviceData = { ...editingDevice };
       if (deviceData.purchaseDate) deviceData.purchaseDate = dayjs(deviceData.purchaseDate);
       if (deviceData.warrantyExpiry) deviceData.warrantyExpiry = dayjs(deviceData.warrantyExpiry);
       
@@ -107,8 +130,8 @@ const Rack3DVisualization = () => {
       }
 
       form.setFieldsValue(cleanDeviceData);
-      setModalVisible(true);
-  };
+    }
+  }, [modalVisible, editingDevice, form]);
 
   const handleModalCancel = () => {
       setModalVisible(false);
@@ -300,12 +323,13 @@ const Rack3DVisualization = () => {
     });
   }, [selectedRoom, racks]);
 
-  const handleDeviceClick = (device) => {
+  // 使用 useCallback 稳定回调函数引用，避免 DeviceModel 不必要的重渲染
+  const handleDeviceClick = useCallback((device) => {
     setSelectedDevice(device);
     if (device) {
         fetchDeviceCables(device.deviceId || device.id);
     }
-  };
+  }, [fetchDeviceCables]);
 
   const handleDeviceLeave = (device) => {
     // 移除鼠标离开事件，避免抽屉意外关闭
@@ -316,10 +340,12 @@ const Rack3DVisualization = () => {
     // });
   };
 
+  // 优化 handleDeviceHover - 使用 ref 获取最新状态，减少依赖项
   const handleDeviceHover = useCallback((device) => {
-    if (modalVisible || nicModalVisible || portModalVisible) return;
+    // 使用 ref 检查模态框状态，避免频繁重新创建回调
+    if (modalsOpenRef.current) return;
     setHoveredDevice(device);
-  }, [modalVisible, nicModalVisible, portModalVisible]);
+  }, []); // 空依赖项，回调引用永远稳定
 
   const handleClosePortModal = useCallback(() => {
     setPortModalVisible(false);
@@ -627,7 +653,7 @@ const Rack3DVisualization = () => {
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                     {[
-                                        { icon: '🖱️', text: '左键旋转 / 中键平移' },
+                                        { icon: '🖱️', text: '左键旋转视图' },
                                         { icon: '🔍', text: '滚轮缩放视图' },
                                         { icon: '👆', text: '点击设备查看详情' }
                                     ].map((item, i) => (

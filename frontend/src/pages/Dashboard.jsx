@@ -103,35 +103,38 @@ const responsiveConfig = {
 const containerStyle = {
   minHeight: '100vh',
   background: 'linear-gradient(180deg, #f5f7fa 0%, #e8ecf1 100%)',
-  padding: '20px'
+  padding: 'clamp(12px, 3vw, 20px)'
 };
 
 const headerStyle = {
   textAlign: 'center',
   marginBottom: '32px',
-  padding: '32px 48px',
+  padding: 'clamp(20px, 5vw, 32px) clamp(16px, 4vw, 48px)',
   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  borderRadius: '20px',
+  borderRadius: 'clamp(12px, 3vw, 20px)',
   color: '#fff',
   boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3)',
   animation: 'fadeInDown 0.6s ease-out'
 };
 
 const titleStyle = {
-  fontSize: '2.2rem',
+  fontSize: 'clamp(1.4rem, 4vw, 2.2rem)',
   fontWeight: '700',
   color: '#fff',
   margin: '0 0 8px 0',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: '16px'
+  gap: 'clamp(8px, 2vw, 16px)',
+  flexWrap: 'wrap',
+  textAlign: 'center'
 };
 
 const subtitleStyle = {
-  fontSize: '1.1rem',
+  fontSize: 'clamp(0.85rem, 2.5vw, 1.1rem)',
   color: 'rgba(255, 255, 255, 0.85)',
-  margin: '0'
+  margin: '0',
+  textAlign: 'center'
 };
 
 const progressCardStyle = {
@@ -198,7 +201,6 @@ const STAT_CARD_BASE_STYLE = {
   boxShadow: designTokens.shadows.medium,
   background: '#fff',
   transition: `all ${designTokens.transitions.normal}`,
-  position: 'relative',
   overflow: 'hidden',
   cursor: 'pointer',
   height: '100%',
@@ -207,22 +209,20 @@ const STAT_CARD_BASE_STYLE = {
 };
 
 const STAT_ICON_CONTAINER_BASE = {
-  position: 'absolute',
-  top: '20px',
-  right: '20px',
-  width: '64px',
-  height: '64px',
+  width: 'clamp(40px, 8vw, 64px)',
+  height: 'clamp(40px, 8vw, 64px)',
   borderRadius: designTokens.borderRadius.medium,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: '32px',
-  transition: `all ${designTokens.transitions.normal}`
+  fontSize: 'clamp(20px, 4vw, 32px)',
+  transition: `all ${designTokens.transitions.normal}`,
+  flexShrink: 0
 };
 
 const NAV_BUTTON_BASE = {
   height: 'auto',
-  padding: '24px 20px',
+  padding: 'clamp(16px, 4vw, 24px) clamp(12px, 3vw, 20px)',
   borderRadius: designTokens.borderRadius.medium,
   border: '2px solid #f0f0f0',
   background: '#fff',
@@ -230,20 +230,22 @@ const NAV_BUTTON_BASE = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  gap: '12px',
+  gap: 'clamp(8px, 2vw, 12px)',
   cursor: 'pointer',
-  boxShadow: designTokens.shadows.small
+  boxShadow: designTokens.shadows.small,
+  minWidth: '0'
 };
 
 const NAV_ICON_CONTAINER_BASE = {
-  width: '60px',
-  height: '60px',
+  width: 'clamp(44px, 10vw, 60px)',
+  height: 'clamp(44px, 10vw, 60px)',
   borderRadius: designTokens.borderRadius.medium,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: '28px',
-  transition: `all ${designTokens.transitions.normal}`
+  fontSize: 'clamp(20px, 5vw, 28px)',
+  transition: `all ${designTokens.transitions.normal}`,
+  flexShrink: 0
 };
 
 const createStatCardStyle = (color) => ({
@@ -276,8 +278,8 @@ const overviewCardStyle = {
 
 const navigationGridStyle = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-  gap: '16px',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+  gap: 'clamp(8px, 2vw, 16px)',
   marginBottom: '24px'
 };
 
@@ -309,9 +311,14 @@ const navIconContainer = (color) => ({
 });
 
 const navTextStyle = {
-  fontSize: '0.9rem',
+  fontSize: 'clamp(0.75rem, 2vw, 0.9rem)',
   fontWeight: '600',
-  color: designTokens.colors.text.primary
+  color: designTokens.colors.text.primary,
+  textAlign: 'center',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  maxWidth: '100%'
 };
 
 const systemInfoStyle = {
@@ -651,7 +658,7 @@ function Dashboard() {
   const statCards = useMemo(() => [
     {
       key: 'devices',
-      xs: 24, sm: 12, md: 8, lg: 6, xl: 4,
+      xs: 12, sm: 12, md: 8, lg: 6, xl: 4,
       icon: CloudServerOutlined,
       color: designTokens.colors.primary.main,
       statKey: 'totalDevices',
@@ -662,7 +669,7 @@ function Dashboard() {
     },
     {
       key: 'racks',
-      xs: 24, sm: 12, md: 8, lg: 6, xl: 4,
+      xs: 12, sm: 12, md: 8, lg: 6, xl: 4,
       icon: DatabaseOutlined,
       color: designTokens.colors.purple.main,
       statKey: 'totalRacks',
@@ -674,7 +681,7 @@ function Dashboard() {
     },
     {
       key: 'rooms',
-      xs: 24, sm: 12, md: 8, lg: 6, xl: 4,
+      xs: 12, sm: 12, md: 8, lg: 6, xl: 4,
       icon: HomeOutlined,
       color: designTokens.colors.success.main,
       statKey: 'totalRooms',
@@ -686,7 +693,7 @@ function Dashboard() {
     },
     {
       key: 'faults',
-      xs: 24, sm: 12, md: 8, lg: 6, xl: 4,
+      xs: 12, sm: 12, md: 8, lg: 6, xl: 4,
       icon: WarningOutlined,
       color: designTokens.colors.error.main,
       statKey: 'faultDevices',
@@ -697,7 +704,7 @@ function Dashboard() {
     },
     {
       key: 'users',
-      xs: 24, sm: 12, md: 8, lg: 6, xl: 4,
+      xs: 12, sm: 12, md: 8, lg: 6, xl: 4,
       icon: TeamOutlined,
       color: designTokens.colors.cyan.main,
       statKey: 'totalUsers',
@@ -708,7 +715,7 @@ function Dashboard() {
     },
     {
       key: 'tickets',
-      xs: 24, sm: 12, md: 8, lg: 6, xl: 4,
+      xs: 12, sm: 12, md: 8, lg: 6, xl: 4,
       icon: BarChartOutlined,
       color: '#fa8c16',
       statKey: 'activeTickets',
@@ -734,27 +741,31 @@ function Dashboard() {
           style={cardStyle}
           onMouseEnter={() => setHoveredCard(statKey)}
           onMouseLeave={() => setHoveredCard(null)}
+          bodyStyle={{ padding: 'clamp(16px, 3vw, 24px)' }}
         >
-          <div style={{ position: 'relative' }}>
-            <div style={createStatIconContainer(color)}>
-              <Icon style={{ color }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <span style={{
+                fontSize: 'clamp(0.75rem, 2vw, 0.9rem)',
+                fontWeight: '600',
+                color: designTokens.colors.text.secondary,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                flex: 1
+              }}>
+                {title}
+              </span>
+              <div style={createStatIconContainer(color)}>
+                <Icon style={{ color }} />
+              </div>
             </div>
-            <div style={{
-              fontSize: '0.9rem',
-              fontWeight: '600',
-              color: designTokens.colors.text.secondary,
-              marginBottom: '8px'
-            }}>
-              {title}
-            </div>
-            <div style={{
-              fontSize: '2.2rem',
+            <div className="stat-value" style={{
+              fontSize: 'clamp(1.6rem, 4vw, 2.2rem)',
               fontWeight: '700',
-              color: designTokens.colors.text.primary,
-              marginBottom: '8px',
-              background: `linear-gradient(135deg, ${color} 0%, ${color}cc 100%)`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
+              color: color,
+              lineHeight: 1,
+              whiteSpace: 'nowrap'
             }}>
               {loading ? (
                 <Spin size="small" />
@@ -764,26 +775,28 @@ function Dashboard() {
             </div>
             {customStatus ? (
               statKey === 'totalRacks' ? (
-                <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.85rem', color: designTokens.colors.success.main }}>
+                <div style={{ display: 'flex', alignItems: 'center', fontSize: 'clamp(0.7rem, 1.8vw, 0.85rem)', color: designTokens.colors.success.main, whiteSpace: 'nowrap' }}>
                   <span style={{
-                    width: '8px',
-                    height: '8px',
+                    width: '6px',
+                    height: '6px',
                     background: designTokens.colors.success.main,
                     borderRadius: '50%',
-                    marginRight: '8px',
-                    boxShadow: '0 0 8px rgba(82, 196, 26, 0.5)'
+                    marginRight: '6px',
+                    boxShadow: '0 0 6px rgba(82, 196, 26, 0.5)',
+                    flexShrink: 0
                   }} />
                   <span>正常运行中</span>
                 </div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.85rem', color: designTokens.colors.success.main }}>
+                <div style={{ display: 'flex', alignItems: 'center', fontSize: 'clamp(0.7rem, 1.8vw, 0.85rem)', color: designTokens.colors.success.main, whiteSpace: 'nowrap' }}>
                   <span style={{
-                    width: '8px',
-                    height: '8px',
+                    width: '6px',
+                    height: '6px',
                     background: designTokens.colors.success.main,
                     borderRadius: '50%',
-                    marginRight: '8px',
-                    boxShadow: '0 0 8px rgba(82, 196, 26, 0.5)'
+                    marginRight: '6px',
+                    boxShadow: '0 0 6px rgba(82, 196, 26, 0.5)',
+                    flexShrink: 0
                   }} />
                   <span>全部在线</span>
                 </div>
@@ -792,14 +805,15 @@ function Dashboard() {
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                fontSize: '0.875rem',
+                fontSize: 'clamp(0.7rem, 1.8vw, 0.875rem)',
                 fontWeight: '500',
                 color: trend > 0 ? designTokens.colors.success.main : designTokens.colors.error.main,
-                marginTop: '8px'
+                flexWrap: 'wrap',
+                gap: '4px'
               }}>
-                {trend > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
-                <span style={{ marginLeft: '4px' }}>{Math.abs(trend)}%</span>
-                <Tag color={tagColor} style={{ marginLeft: '8px', fontSize: '0.75rem', borderRadius: '4px' }}>环比</Tag>
+                {trend > 0 ? <ArrowUpOutlined style={{ fontSize: '0.75rem' }} /> : <ArrowDownOutlined style={{ fontSize: '0.75rem' }} />}
+                <span>{Math.abs(trend)}%</span>
+                <Tag color={tagColor} style={{ fontSize: 'clamp(0.6rem, 1.5vw, 0.75rem)', borderRadius: '4px', margin: 0, padding: '0 4px', lineHeight: '1.4' }}>环比</Tag>
               </div>
             )}
           </div>
@@ -811,6 +825,7 @@ function Dashboard() {
   const navButtons = useMemo(() => navButtonsData.map(({ key, icon: Icon, text, color }) => (
     <div
       key={key}
+      className="nav-button"
       style={{
         ...createNavButtonStyle(color),
         ...(hoveredCard === `nav-${key}` ? {
@@ -823,10 +838,10 @@ function Dashboard() {
       onMouseEnter={(e) => handleNavHover(e, true, `nav-${key}`)}
       onMouseLeave={(e) => handleNavHover(e, false, `nav-${key}`)}
     >
-      <div style={createNavIconContainer(color)}>
-        <Icon style={{ color, fontSize: '28px' }} />
+      <div className="nav-icon" style={createNavIconContainer(color)}>
+        <Icon style={{ color, fontSize: 'clamp(20px, 5vw, 28px)' }} />
       </div>
-      <span style={navTextStyle}>{text}</span>
+      <span className="nav-text" style={navTextStyle}>{text}</span>
     </div>
   )), [hoveredCard]);
 
@@ -902,13 +917,13 @@ function Dashboard() {
   return (
     <>
       <style>{styles}</style>
-      <div style={containerStyle}>
-        <div style={headerStyle}>
-          <h1 style={titleStyle}>
+      <div style={containerStyle} className="dashboard-container">
+        <div style={headerStyle} className="dashboard-header">
+          <h1 style={titleStyle} className="dashboard-title">
             <DashboardOutlined />
             IDC设备管理系统
           </h1>
-          <p style={subtitleStyle}>实时监控 · 智能管理 · 高效运维</p>
+          <p style={subtitleStyle} className="dashboard-subtitle">实时监控 · 智能管理 · 高效运维</p>
         </div>
 
         <Row gutter={[24, 24]} style={{ marginBottom: '32px' }}>
@@ -1042,7 +1057,7 @@ function Dashboard() {
                 </Col>
               </Row>
 
-              <div style={{ ...navigationGridStyle, animation: 'fadeInUp 0.6s ease-out 0.6s backwards' }}>
+              <div className="nav-grid" style={{ ...navigationGridStyle, animation: 'fadeInUp 0.6s ease-out 0.6s backwards' }}>
                 {navButtons}
               </div>
             </div>
@@ -1051,14 +1066,42 @@ function Dashboard() {
 
         <style>{`
           @media (max-width: 576px) {
-            ${containerStyle} {
-              padding: 16px;
+            .dashboard-container {
+              padding: 12px !important;
             }
-            ${titleStyle} {
-              font-size: 1.6rem;
+            .dashboard-header {
+              padding: 20px 16px !important;
+              border-radius: 12px !important;
             }
-            ${headerStyle} {
-              padding: 24px;
+            .dashboard-title {
+              font-size: 1.4rem !important;
+              gap: 8px !important;
+            }
+            .dashboard-subtitle {
+              font-size: 0.85rem !important;
+            }
+            .stat-value {
+              font-size: 1.6rem !important;
+            }
+            .nav-grid {
+              grid-template-columns: repeat(3, 1fr) !important;
+              gap: 8px !important;
+            }
+            .nav-button {
+              padding: 12px 8px !important;
+            }
+            .nav-icon {
+              width: 40px !important;
+              height: 40px !important;
+              font-size: 20px !important;
+            }
+            .nav-text {
+              font-size: 0.7rem !important;
+            }
+          }
+          @media (max-width: 375px) {
+            .nav-grid {
+              grid-template-columns: repeat(2, 1fr) !important;
             }
           }
         `}</style>

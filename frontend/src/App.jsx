@@ -4,6 +4,7 @@ import { BarChartOutlined, DatabaseOutlined, CloudServerOutlined, MenuUnfoldOutl
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { ConfigProvider, useConfig } from './context/ConfigContext';
+import { Scene3DProvider } from './context/Scene3DContext';
 import { Spin } from 'antd';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -580,7 +581,7 @@ const ThemeConfig = () => {
             <Route path="/racks" element={<PrivateRoute><RackManagement /></PrivateRoute>} />
             <Route path="/rooms" element={<PrivateRoute><RoomManagement /></PrivateRoute>} />
             <Route path="/fields" element={<PrivateRoute><DeviceFieldManagement /></PrivateRoute>} />
-            <Route path="/visualization-3d" element={<PrivateRoute><Rack3DVisualization /></PrivateRoute>} />
+            <Route path="/visualization-3d" element={<PrivateRoute><Scene3DProvider><Rack3DVisualization /></Scene3DProvider></PrivateRoute>} />
             <Route path="/consumables" element={<PrivateRoute><ConsumableManagement /></PrivateRoute>} />
             <Route path="/consumables-categories" element={<PrivateRoute><CategoryManagement /></PrivateRoute>} />
             <Route path="/consumables-stats" element={<PrivateRoute><ConsumableStatistics /></PrivateRoute>} />
