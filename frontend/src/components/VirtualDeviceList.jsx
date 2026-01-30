@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button, Empty, Spin, Badge, Typography, Space, Checkbox, Tooltip } from 'antd';
 import { DownOutlined, UpOutlined, EyeOutlined, EyeInvisibleOutlined, PlusOutlined, CloudServerOutlined } from '@ant-design/icons';
 import ServerBackplanePanel from './ServerBackplanePanel';
+import PortPanel from './PortPanel';
 
 const { Text } = Typography;
 
@@ -298,14 +299,28 @@ const VirtualDeviceList = ({
             {/* 面板内容 - 可折叠 */}
             {isExpanded && (
               <div style={{ padding: '16px' }}>
-                <ServerBackplanePanel
-                  deviceId={deviceId}
-                  deviceName={device.name}
-                  cables={cables}
-                  allDevices={allDevices}
-                  onPortClick={onPortClick}
-                  onManageNetworkCards={() => onManageNetworkCards && onManageNetworkCards(device)}
-                />
+                {device.type === 'switch' ? (
+                  // 交换机使用普通端口面板
+                  <PortPanel
+                    ports={data.ports || []}
+                    deviceName={device.name}
+                    deviceId={deviceId}
+                    cables={cables}
+                    devices={allDevices}
+                    onPortClick={onPortClick}
+                    compact={true}
+                  />
+                ) : (
+                  // 服务器使用背板布局
+                  <ServerBackplanePanel
+                    deviceId={deviceId}
+                    deviceName={device.name}
+                    cables={cables}
+                    allDevices={allDevices}
+                    onPortClick={onPortClick}
+                    onManageNetworkCards={() => onManageNetworkCards && onManageNetworkCards(device)}
+                  />
+                )}
               </div>
             )}
           </div>
