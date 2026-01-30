@@ -5,7 +5,7 @@
 ## 代码仓库
 
 - **GitHub**: https://github.com/gituib/idc_assest
-- **Gitee**: https://gitee.com/zhang1106/idc_assest
+- **Gitee**: https://gitee.com/zhang96110/idc_assest
 
 ## 系统概述
 

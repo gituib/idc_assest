@@ -12,7 +12,7 @@ cd idc_assest
 
 **方式二：从Gitee克隆（国内访问更快）**
 ```bash
-git clone https://gitee.com/zhang1106/idc_assest.git
+git clone https://gitee.com/zhang96110/idc_assest.git
 cd idc_assest
 ```
 
