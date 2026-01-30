@@ -12,6 +12,7 @@ build/
 .env.test.local
 .env.production.local
 .gitignore
+.vercelignore
 
 # Logs
 logs

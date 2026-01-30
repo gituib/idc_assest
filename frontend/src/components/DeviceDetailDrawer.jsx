@@ -183,9 +183,13 @@ function DeviceDetailDrawer({ device, visible, onClose, cables, onRefreshCables,
   return (
     <Drawer
       title={
-        <Space>
-          <CloudServerOutlined style={{ color: designTokens.colors.primary }} />
-          <span>设备详情 - {device.name}</span>
+        <Space style={{ maxWidth: '280px', overflow: 'hidden' }}>
+          <CloudServerOutlined style={{ color: designTokens.colors.primary, flexShrink: 0 }} />
+          <span style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>设备详情 - {device.name}</span>
         </Space>
       }
       placement="right"

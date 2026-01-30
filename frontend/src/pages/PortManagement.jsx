@@ -1,9 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Modal, Form, Input, Select, message, Card, Space, Popconfirm, Tag, Tooltip, InputNumber, Collapse, Empty, Spin, Upload, Progress, Checkbox } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, ExportOutlined, ImportOutlined, DownloadOutlined, UploadOutlined as UploadIcon } from '@ant-design/icons';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Table, Button, Modal, Form, Input, Select, message, Card, Space, Popconfirm, Tag, Tooltip, InputNumber, Collapse, Empty, Spin, Upload, Progress, Checkbox, Tabs, Badge, List, Typography } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, ExportOutlined, ImportOutlined, DownloadOutlined, UploadOutlined as UploadIcon, AppstoreOutlined, UnorderedListOutlined, FilterOutlined, EyeOutlined, CompressOutlined, CloudServerOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
+import PortPanel from '../components/PortPanel';
+import VirtualDeviceList from '../components/VirtualDeviceList';
+import NetworkCardPanel from '../components/NetworkCardPanel';
+import NetworkCardCreateModal from '../components/NetworkCardCreateModal';
+import PortCreateModal from '../components/PortCreateModal';
 
 const { Option } = Select;
 const { Panel } = Collapse;
@@ -48,6 +53,7 @@ const designTokens = {
 function PortManagement() {
   const [ports, setPorts] = useState([]);
   const [devices, setDevices] = useState([]);
+  const [cables, setCables] = useState([]);
   const [groupedPorts, setGroupedPorts] = useState({});
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
@@ -59,7 +65,7 @@ function PortManagement() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingPort, setEditingPort] = useState(null);
   const [form] = Form.useForm();
-  
+
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importFileList, setImportFileList] = useState([]);
   const [importPreview, setImportPreview] = useState([]);
@@ -68,10 +74,30 @@ function PortManagement() {
   const [skipExisting, setSkipExisting] = useState(false);
   const [updateExisting, setUpdateExisting] = useState(false);
 
+  // 视图模式：list 或 panel
+  const [viewMode, setViewMode] = useState('list');
+
+  // 面板视图优化状态
+  const [panelFilters, setPanelFilters] = useState({
+    deviceType: 'all',
+    searchText: '',
+    showOnlyOccupied: false
+  });
+  const [visibleDeviceCount, setVisibleDeviceCount] = useState(10);
+  const [expandedDevices, setExpandedDevices] = useState({});
+
+  // 网卡管理相关状态
+  const [networkCardModalVisible, setNetworkCardModalVisible] = useState(false);
+  const [portCreateModalVisible, setPortCreateModalVisible] = useState(false);
+  const [selectedDeviceForNic, setSelectedDeviceForNic] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   const fetchPorts = useCallback(async () => {
     try {
       setLoading(true);
-      const params = {};
+      const params = {
+        pageSize: 1000 // 获取所有端口，不分页
+      };
       
       if (filters.deviceId) params.deviceId = filters.deviceId;
       if (filters.status !== 'all') params.status = filters.status;
@@ -90,17 +116,28 @@ function PortManagement() {
 
   const fetchDevices = useCallback(async () => {
     try {
-      const response = await axios.get('/api/devices', { params: { pageSize: 1000 } });
+      const response = await axios.get('/api/devices', { params: { pageSize: 100 } });
       setDevices(response.data.devices || response.data || []);
     } catch (error) {
+      message.error('获取设备列表失败');
       console.error('获取设备列表失败:', error);
+    }
+  }, []);
+
+  const fetchCables = useCallback(async () => {
+    try {
+      const response = await axios.get('/api/cables');
+      setCables(response.data.cables || response.data || []);
+    } catch (error) {
+      console.error('获取接线列表失败:', error);
     }
   }, []);
 
   useEffect(() => {
     fetchPorts();
     fetchDevices();
-  }, [fetchPorts, fetchDevices]);
+    fetchCables();
+  }, [fetchPorts, fetchDevices, fetchCables]);
 
   useEffect(() => {
     const grouped = {};
@@ -114,6 +151,25 @@ function PortManagement() {
       }
       grouped[deviceId].ports.push(port);
     });
+    
+    // 对每个设备的端口按名称升序排序
+    Object.keys(grouped).forEach(deviceId => {
+      grouped[deviceId].ports.sort((a, b) => {
+        const extractNumbers = (str) => {
+          const matches = str.match(/\d+/g);
+          return matches ? matches.map(Number) : [];
+        };
+        const numsA = extractNumbers(a.portName);
+        const numsB = extractNumbers(b.portName);
+        for (let i = 0; i < Math.min(numsA.length, numsB.length); i++) {
+          if (numsA[i] !== numsB[i]) {
+            return numsA[i] - numsB[i];
+          }
+        }
+        return a.portName.localeCompare(b.portName);
+      });
+    });
+    
     setGroupedPorts(grouped);
   }, [ports, devices]);
 
@@ -134,6 +190,41 @@ function PortManagement() {
     setEditingPort(null);
     form.resetFields();
     setModalVisible(true);
+  };
+
+  const handleAddPortForDevice = (device) => {
+    setEditingPort(null);
+    form.resetFields();
+    // 自动选中当前设备
+    form.setFieldsValue({
+      deviceId: device.deviceId
+    });
+    setModalVisible(true);
+  };
+
+  // 打开网卡管理模态框
+  const handleManageNetworkCards = (device) => {
+    setSelectedDeviceForNic(device);
+    setNetworkCardModalVisible(true);
+  };
+
+  // 打开添加网卡模态框
+  const handleAddNetworkCard = (device) => {
+    setSelectedDeviceForNic(device);
+    setPortCreateModalVisible(true);
+  };
+
+  // 网卡/端口创建成功回调
+  const handleNicSuccess = () => {
+    message.success('操作成功');
+    setRefreshTrigger(prev => prev + 1);
+    fetchPorts();
+  };
+
+  const handlePortSuccess = () => {
+    message.success('端口添加成功');
+    setRefreshTrigger(prev => prev + 1);
+    fetchPorts();
   };
 
   const handleEdit = (port) => {
@@ -162,6 +253,21 @@ function PortManagement() {
     }
   };
 
+  // 解析端口名称范围，例如 "1/0/1-1/0/48" -> ["1/0/1", "1/0/2", ..., "1/0/48"]
+  const parsePortRange = (portName) => {
+    const rangeMatch = portName.match(/^(.*?)\/(\d+)-\1\/(\d+)$/);
+    if (rangeMatch) {
+      const prefix = rangeMatch[1];
+      const start = parseInt(rangeMatch[2]);
+      const end = parseInt(rangeMatch[3]);
+      
+      if (start <= end && end - start < 100) { // 限制最多100个端口
+        return Array.from({ length: end - start + 1 }, (_, i) => `${prefix}/${start + i}`);
+      }
+    }
+    return [portName]; // 如果不是范围格式，返回原名称
+  };
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
@@ -170,8 +276,35 @@ function PortManagement() {
         await axios.put(`/api/device-ports/${editingPort.portId}`, values);
         message.success('更新成功');
       } else {
-        await axios.post('/api/device-ports', values);
-        message.success('创建成功');
+        // 解析端口名称范围
+        const portNames = parsePortRange(values.portName);
+        
+        if (portNames.length > 1) {
+          // 批量创建端口
+          const portsData = portNames.map((name, index) => ({
+            portId: `PORT-${Date.now()}-${index}`,
+            deviceId: values.deviceId,
+            portName: name,
+            portType: values.portType,
+            portSpeed: values.portSpeed,
+            status: values.status,
+            vlanId: values.vlanId,
+            description: values.description
+          }));
+          
+          const response = await axios.post('/api/device-ports/batch', { ports: portsData });
+          const { success, failed } = response.data;
+          
+          if (failed > 0) {
+            message.warning(`批量创建完成！成功 ${success} 个，失败 ${failed} 个`);
+          } else {
+            message.success(`成功创建 ${success} 个端口`);
+          }
+        } else {
+          // 单个创建
+          await axios.post('/api/device-ports', values);
+          message.success('创建成功');
+        }
       }
       
       setModalVisible(false);
@@ -480,9 +613,12 @@ function PortManagement() {
               onChange={(value) => setFilters(prev => ({ ...prev, deviceId: value }))}
               allowClear
               showSearch
-              filterOption={(input, option) =>
-                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-              }
+              filterOption={(input, option) => {
+                const device = devices.find(d => d.deviceId === option.value);
+                if (!device) return false;
+                const searchText = `${device.name} ${device.deviceId}`.toLowerCase();
+                return searchText.indexOf(input.toLowerCase()) >= 0;
+              }}
             >
               {devices.map(device => (
                 <Option key={device.deviceId} value={device.deviceId}>
@@ -490,7 +626,7 @@ function PortManagement() {
                 </Option>
               ))}
             </Select>
-            
+
             <Select
               placeholder="端口类型"
               style={{ width: 120 }}
@@ -548,32 +684,51 @@ function PortManagement() {
           </Space>
         </div>
         
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Space>
-            <Button 
-              type="primary" 
-              icon={<PlusOutlined />} 
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
               onClick={handleAdd}
               style={{ background: designTokens.colors.primary.gradient, border: 'none' }}
             >
               新增端口
             </Button>
-            
-            <Button 
-              type="primary" 
-              icon={<ImportOutlined />} 
+
+            <Button
+              type="primary"
+              icon={<ImportOutlined />}
               onClick={handleImport}
               style={{ background: designTokens.colors.primary.gradient, border: 'none' }}
             >
               批量导入
             </Button>
-            
+
             <Button icon={<ExportOutlined />}>
               导出
             </Button>
           </Space>
+
+          <Space>
+            <Button.Group>
+              <Button
+                type={viewMode === 'list' ? 'primary' : 'default'}
+                icon={<UnorderedListOutlined />}
+                onClick={() => setViewMode('list')}
+              >
+                列表
+              </Button>
+              <Button
+                type={viewMode === 'panel' ? 'primary' : 'default'}
+                icon={<AppstoreOutlined />}
+                onClick={() => setViewMode('panel')}
+              >
+                面板
+              </Button>
+            </Button.Group>
+          </Space>
         </div>
-        
+
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px' }}>
             <Spin size="large" tip="加载端口数据中..." />
@@ -582,7 +737,21 @@ function PortManagement() {
           <div style={{ textAlign: 'center', padding: '60px' }}>
             <Empty description="暂无端口数据" />
           </div>
+        ) : viewMode === 'panel' ? (
+          // 面板视图 - 使用虚拟滚动优化
+          <VirtualDeviceList
+            devices={Object.values(groupedPorts).map(g => g.device).filter(Boolean)}
+            groupedPorts={groupedPorts}
+            cables={cables}
+            allDevices={devices}
+            onPortClick={(port) => handleEdit(port)}
+            onAddPort={(device) => handleAddPortForDevice(device)}
+            onManageNetworkCards={(device) => handleManageNetworkCards(device)}
+            initialVisibleCount={5}
+            loadMoreCount={5}
+          />
         ) : (
+          // 列表视图
           <Collapse
             defaultActiveKey={Object.keys(groupedPorts).slice(0, 5)}
             style={{ background: '#f5f5f5' }}
@@ -593,7 +762,7 @@ function PortManagement() {
               const freeCount = devicePorts.filter(p => p.status === 'free').length;
               const occupiedCount = devicePorts.filter(p => p.status === 'occupied').length;
               const faultCount = devicePorts.filter(p => p.status === 'fault').length;
-              
+
               return (
                 <Panel
                   key={deviceId}
@@ -611,8 +780,8 @@ function PortManagement() {
                           color: '#fff',
                           fontSize: '18px'
                         }}>
-                          {device?.type?.toLowerCase()?.includes('server') ? '🖥️' : 
-                           device?.type?.toLowerCase()?.includes('switch') ? '🔀' : 
+                          {device?.type?.toLowerCase()?.includes('server') ? '🖥️' :
+                           device?.type?.toLowerCase()?.includes('switch') ? '🔀' :
                            device?.type?.toLowerCase()?.includes('router') ? '🌐' : '📦'}
                         </div>
                         <div>
@@ -629,6 +798,21 @@ function PortManagement() {
                         <Tag color="processing">占用: {occupiedCount}</Tag>
                         <Tag color="error">故障: {faultCount}</Tag>
                         <Tag color="blue">总计: {devicePorts.length}</Tag>
+                        {/* 网卡管理按钮 - 只有服务器显示 */}
+                        {device?.type?.toLowerCase()?.includes('server') && (
+                          <Button
+                            type="primary"
+                            size="small"
+                            icon={<CloudServerOutlined />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleManageNetworkCards(device);
+                            }}
+                            style={{ background: designTokens.colors.primary.gradient, border: 'none' }}
+                          >
+                            网卡管理
+                          </Button>
+                        )}
                       </Space>
                     </div>
                   }
@@ -637,7 +821,12 @@ function PortManagement() {
                     columns={portColumns}
                     dataSource={devicePorts}
                     rowKey="portId"
-                    pagination={false}
+                    pagination={{
+                      pageSize: 10,
+                      showSizeChanger: true,
+                      showTotal: (total) => `共 ${total} 个端口`,
+                      pageSizeOptions: ['10', '20', '50', '100']
+                    }}
                     size="small"
                     scroll={{ x: 1000 }}
                   />
@@ -666,12 +855,15 @@ function PortManagement() {
             label="设备"
             rules={[{ required: true, message: '请选择设备' }]}
           >
-            <Select 
-              placeholder="请选择设备" 
+            <Select
+              placeholder="请选择设备"
               showSearch
-              filterOption={(input, option) =>
-                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-              }
+              filterOption={(input, option) => {
+                const device = devices.find(d => d.deviceId === option.value);
+                if (!device) return false;
+                const searchText = `${device.name} ${device.deviceId}`.toLowerCase();
+                return searchText.indexOf(input.toLowerCase()) >= 0;
+              }}
             >
               {devices.map(device => (
                 <Option key={device.deviceId} value={device.deviceId}>
@@ -685,8 +877,9 @@ function PortManagement() {
             name="portName"
             label="端口名称"
             rules={[{ required: true, message: '请输入端口名称' }]}
+            extra={!editingPort && "支持批量添加，例如: 1/0/1-1/0/48 将创建 48 个端口"}
           >
-            <Input placeholder="例如: eth0/1" />
+            <Input placeholder="例如: eth0/1 或 1/0/1-1/0/48" />
           </Form.Item>
           
           <Form.Item
@@ -896,8 +1089,8 @@ function PortManagement() {
             <div style={{ textAlign: 'center', padding: '24px' }}>
               <Spin size="large" tip="导入中..." />
               <div style={{ marginTop: 16 }}>
-                <Progress 
-                  percent={Math.round((importProgress.current / importProgress.total) * 100)} 
+                <Progress
+                  percent={Math.round((importProgress.current / importProgress.total) * 100)}
                   status="active"
                   strokeColor={{
                     '0%': designTokens.colors.primary.main,
@@ -919,6 +1112,44 @@ function PortManagement() {
           )}
         </div>
       </Modal>
+
+      {/* 网卡管理模态框 */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <CloudServerOutlined style={{ color: '#667eea' }} />
+            <span>网卡管理 - {selectedDeviceForNic?.name}</span>
+          </div>
+        }
+        open={networkCardModalVisible}
+        onCancel={() => {
+          setNetworkCardModalVisible(false);
+          setSelectedDeviceForNic(null);
+        }}
+        footer={null}
+        width={800}
+        destroyOnClose
+      >
+        {selectedDeviceForNic && (
+          <NetworkCardPanel
+            deviceId={selectedDeviceForNic.deviceId}
+            deviceName={selectedDeviceForNic.name}
+            onRefresh={fetchPorts}
+            refreshTrigger={refreshTrigger}
+          />
+        )}
+      </Modal>
+
+      {/* 创建网卡模态框 */}
+      <NetworkCardCreateModal
+        device={selectedDeviceForNic}
+        visible={portCreateModalVisible}
+        onClose={() => {
+          setPortCreateModalVisible(false);
+          setSelectedDeviceForNic(null);
+        }}
+        onSuccess={handleNicSuccess}
+      />
     </div>
   );
 }

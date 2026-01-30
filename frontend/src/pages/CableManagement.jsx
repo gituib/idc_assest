@@ -73,16 +73,17 @@ function CableManagement() {
     try {
       setLoading(true);
       const params = {};
-      
+
       if (filters.switchDeviceId) params.sourceDeviceId = filters.switchDeviceId;
       if (filters.status !== 'all') params.status = filters.status;
       if (filters.cableType !== 'all') params.cableType = filters.cableType;
-      
+
       const response = await axios.get('/api/cables', { params });
-      setCables(response.data.cables || []);
-      
+      const cablesData = response.data.cables || [];
+      setCables(cablesData);
+
       const grouped = {};
-      response.data.cables.forEach(cable => {
+      cablesData.forEach(cable => {
         const switchId = cable.sourceDeviceId;
         if (!grouped[switchId]) {
           grouped[switchId] = {
@@ -93,22 +94,36 @@ function CableManagement() {
         grouped[switchId].cables.push(cable);
       });
       setGroupedCables(grouped);
+
+      // 自动为每个交换机加载端口数据
+      const switchIds = Object.keys(grouped);
+      for (const switchId of switchIds) {
+        if (!devicePorts[switchId]) {
+          try {
+            const portsResponse = await axios.get(`/api/device-ports/device/${switchId}`);
+            setDevicePorts(prev => ({ ...prev, [switchId]: portsResponse.data || [] }));
+          } catch (error) {
+            console.error(`获取交换机 ${switchId} 端口失败:`, error);
+          }
+        }
+      }
     } catch (error) {
       message.error('获取接线列表失败');
       console.error('获取接线列表失败:', error);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, devicePorts]);
 
   const fetchDevices = useCallback(async () => {
     try {
-      const response = await axios.get('/api/devices', { params: { pageSize: 1000 } });
+      const response = await axios.get('/api/devices', { params: { pageSize: 100 } });
       const allDevices = response.data.devices || [];
       const switches = allDevices.filter(device => device.type === 'switch');
       setDevices(allDevices);
       setSwitchDevices(switches);
     } catch (error) {
+      message.error('获取设备列表失败');
       console.error('获取设备列表失败:', error);
     }
   }, []);
@@ -189,24 +204,84 @@ function CableManagement() {
     }
   };
 
+  const [conflictModalVisible, setConflictModalVisible] = useState(false);
+  const [conflictInfo, setConflictInfo] = useState(null);
+  const [pendingSubmitValues, setPendingSubmitValues] = useState(null);
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      
+
+      // 如果是编辑模式，直接提交
       if (editingCable) {
         await axios.put(`/api/cables/${editingCable.cableId}`, values);
         message.success('更新成功');
-      } else {
+        setModalVisible(false);
+        form.resetFields();
+        fetchCables();
+        return;
+      }
+
+      // 创建模式：先检查冲突
+      try {
+        const checkResponse = await axios.post('/api/cables/check-conflict', {
+          sourceDeviceId: values.sourceDeviceId,
+          sourcePort: values.sourcePort,
+          targetDeviceId: values.targetDeviceId,
+          targetPort: values.targetPort
+        });
+
+        if (checkResponse.data.hasConflict) {
+          setConflictInfo(checkResponse.data.conflicts);
+          setPendingSubmitValues(values);
+          setConflictModalVisible(true);
+          return;
+        }
+
+        // 无冲突，直接创建
         await axios.post('/api/cables', values);
         message.success('创建成功');
+        setModalVisible(false);
+        form.resetFields();
+        fetchCables();
+      } catch (error) {
+        if (error.response?.status === 409) {
+          // 冲突错误
+          setConflictInfo([{
+            type: 'unknown',
+            existingCable: error.response.data.existingCable
+          }]);
+          setPendingSubmitValues(values);
+          setConflictModalVisible(true);
+        } else {
+          throw error;
+        }
       }
-      
-      setModalVisible(false);
-      form.resetFields();
-      fetchCables();
     } catch (error) {
       message.error(editingCable ? '更新失败' : '创建失败');
       console.error('提交失败:', error);
+    }
+  };
+
+  const handleForceSubmit = async () => {
+    try {
+      if (!pendingSubmitValues) return;
+
+      await axios.post('/api/cables', {
+        ...pendingSubmitValues,
+        force: true
+      });
+
+      message.success('接线已强制接管并创建成功');
+      setConflictModalVisible(false);
+      setModalVisible(false);
+      form.resetFields();
+      setPendingSubmitValues(null);
+      setConflictInfo(null);
+      fetchCables();
+    } catch (error) {
+      message.error('强制接管失败');
+      console.error('强制接管失败:', error);
     }
   };
 
@@ -562,9 +637,12 @@ function CableManagement() {
               onChange={(value) => setFilters(prev => ({ ...prev, switchDeviceId: value }))}
               allowClear
               showSearch
-              filterOption={(input, option) =>
-                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-              }
+              filterOption={(input, option) => {
+                const device = switchDevices.find(d => d.deviceId === option.value);
+                if (!device) return false;
+                const searchText = `${device.name} ${device.deviceId}`.toLowerCase();
+                return searchText.indexOf(input.toLowerCase()) >= 0;
+              }}
             >
               {switchDevices.map(device => (
                 <Option key={device.deviceId} value={device.deviceId}>
@@ -572,7 +650,7 @@ function CableManagement() {
                 </Option>
               ))}
             </Select>
-            
+
             <Select
               placeholder="线缆类型"
               style={{ width: 120 }}
@@ -762,12 +840,15 @@ function CableManagement() {
             label="源设备"
             rules={[{ required: true, message: '请选择源设备' }]}
           >
-            <Select 
-              placeholder="请选择源设备" 
+            <Select
+              placeholder="请选择源设备"
               showSearch
-              filterOption={(input, option) =>
-                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-              }
+              filterOption={(input, option) => {
+                const device = switchDevices.find(d => d.deviceId === option.value);
+                if (!device) return false;
+                const searchText = `${device.name} ${device.deviceId}`.toLowerCase();
+                return searchText.indexOf(input.toLowerCase()) >= 0;
+              }}
               onChange={(value) => {
                 fetchDevicePorts(value);
                 form.setFieldsValue({ sourcePort: undefined });
@@ -780,18 +861,22 @@ function CableManagement() {
               ))}
             </Select>
           </Form.Item>
-          
+
           <Form.Item
             name="sourcePort"
             label="源设备端口"
             rules={[{ required: true, message: '请选择源设备端口' }]}
           >
-            <Select 
-              placeholder="请先选择源设备" 
+            <Select
+              placeholder="请先选择源设备"
               showSearch
-              filterOption={(input, option) =>
-                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-              }
+              filterOption={(input, option) => {
+                const ports = devicePorts[form.getFieldValue('sourceDeviceId')] || [];
+                const port = ports.find(p => p.portName === option.value);
+                if (!port) return false;
+                const searchText = `${port.portName} ${port.portType} ${port.portSpeed}`.toLowerCase();
+                return searchText.indexOf(input.toLowerCase()) >= 0;
+              }}
               disabled={!form.getFieldValue('sourceDeviceId')}
             >
               {(devicePorts[form.getFieldValue('sourceDeviceId')] || []).map(port => (
@@ -801,18 +886,21 @@ function CableManagement() {
               ))}
             </Select>
           </Form.Item>
-          
+
           <Form.Item
             name="targetDeviceId"
             label="目标设备"
             rules={[{ required: true, message: '请选择目标设备' }]}
           >
-            <Select 
+            <Select
               placeholder="请选择目标设备"
               showSearch
-              filterOption={(input, option) =>
-                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-              }
+              filterOption={(input, option) => {
+                const device = devices.find(d => d.deviceId === option.value);
+                if (!device) return false;
+                const searchText = `${device.name} ${device.deviceId}`.toLowerCase();
+                return searchText.indexOf(input.toLowerCase()) >= 0;
+              }}
               onChange={(value) => {
                 fetchDevicePorts(value);
                 form.setFieldsValue({ targetPort: undefined });
@@ -825,18 +913,22 @@ function CableManagement() {
               ))}
             </Select>
           </Form.Item>
-          
+
           <Form.Item
             name="targetPort"
             label="目标设备端口"
             rules={[{ required: true, message: '请选择目标设备端口' }]}
           >
-            <Select 
-              placeholder="请先选择目标设备" 
+            <Select
+              placeholder="请先选择目标设备"
               showSearch
-              filterOption={(input, option) =>
-                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-              }
+              filterOption={(input, option) => {
+                const ports = devicePorts[form.getFieldValue('targetDeviceId')] || [];
+                const port = ports.find(p => p.portName === option.value);
+                if (!port) return false;
+                const searchText = `${port.portName} ${port.portType} ${port.portSpeed}`.toLowerCase();
+                return searchText.indexOf(input.toLowerCase()) >= 0;
+              }}
               disabled={!form.getFieldValue('targetDeviceId')}
             >
               {(devicePorts[form.getFieldValue('targetDeviceId')] || []).map(port => (
@@ -846,7 +938,7 @@ function CableManagement() {
               ))}
             </Select>
           </Form.Item>
-          
+
           <Form.Item
             name="cableType"
             label="线缆类型"
@@ -1051,6 +1143,85 @@ function CableManagement() {
             </div>
           )}
         </div>
+      </Modal>
+
+      {/* 冲突提示弹窗 */}
+      <Modal
+        title="端口冲突警告"
+        open={conflictModalVisible}
+        onCancel={() => {
+          setConflictModalVisible(false);
+          setConflictInfo(null);
+          setPendingSubmitValues(null);
+        }}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setConflictModalVisible(false);
+              setConflictInfo(null);
+              setPendingSubmitValues(null);
+            }}
+          >
+            取消
+          </Button>,
+          <Button
+            key="force"
+            type="primary"
+            danger
+            onClick={handleForceSubmit}
+          >
+            强制接管
+          </Button>
+        ]}
+        width={600}
+      >
+        {conflictInfo && (
+          <div>
+            <div style={{ marginBottom: 16, color: '#ef4444', fontWeight: 500 }}>
+              <span style={{ fontSize: 20, marginRight: 8 }}>⚠️</span>
+              检测到端口冲突，以下端口已被占用：
+            </div>
+            {conflictInfo.map((conflict, index) => (
+              <Card
+                key={index}
+                size="small"
+                style={{ marginBottom: 12, background: '#fef2f2', border: '1px solid #fecaca' }}
+              >
+                <div style={{ marginBottom: 8 }}>
+                  <Tag color="error">
+                    {conflict.type === 'source' ? '源端口' : conflict.type === 'target' ? '目标端口' : '端口'}
+                  </Tag>
+                  <span style={{ fontWeight: 500, marginLeft: 8 }}>{conflict.port}</span>
+                </div>
+                {conflict.existingCable && (
+                  <div style={{ fontSize: 13, color: '#666' }}>
+                    <div>当前连接：</div>
+                    <div style={{ marginTop: 4, paddingLeft: 12 }}>
+                      <div>
+                        源设备：{conflict.existingCable.sourceDevice?.name || conflict.existingCable.sourceDeviceId}
+                        ({conflict.existingCable.sourcePort})
+                      </div>
+                      <div style={{ marginTop: 2 }}>
+                        目标设备：{conflict.existingCable.targetDevice?.name || conflict.existingCable.targetDeviceId}
+                        ({conflict.existingCable.targetPort})
+                      </div>
+                      <div style={{ marginTop: 2 }}>
+                        线缆类型：{getCableTypeTag(conflict.existingCable.cableType)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            ))}
+            <div style={{ marginTop: 16, padding: 12, background: '#fff7ed', borderRadius: 6, border: '1px solid #fed7aa' }}>
+              <span style={{ color: '#ea580c' }}>💡</span>
+              <span style={{ marginLeft: 8, color: '#9a3412' }}>
+                点击"强制接管"将断开原有连接并创建新接线。此操作不可恢复！
+              </span>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
