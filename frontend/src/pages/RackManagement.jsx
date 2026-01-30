@@ -463,35 +463,6 @@ function RackManagement() {
 
   const tableColumns = [
     {
-      title: (
-        <Checkbox
-          checked={selectedRackIds.length === filteredRacks.length && filteredRacks.length > 0}
-          indeterminate={selectedRackIds.length > 0 && selectedRackIds.length < filteredRacks.length}
-          onChange={(e) => {
-            if (e.target.checked) {
-              setSelectedRackIds(filteredRacks.map(r => r.rackId));
-            } else {
-              setSelectedRackIds([]);
-            }
-          }}
-        />
-      ),
-      key: 'selection',
-      width: 50,
-      render: (_, record) => (
-        <Checkbox
-          checked={selectedRackIds.includes(record.rackId)}
-          onChange={(e) => {
-            if (e.target.checked) {
-              setSelectedRackIds([...selectedRackIds, record.rackId]);
-            } else {
-              setSelectedRackIds(selectedRackIds.filter(id => id !== record.rackId));
-            }
-          }}
-        />
-      )
-    },
-    {
       title: '机柜信息',
       key: 'rackInfo',
       render: (_, record) => (

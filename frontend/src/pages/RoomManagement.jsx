@@ -379,35 +379,6 @@ function RoomManagement() {
 
   const tableColumns = [
     {
-      title: (
-        <Checkbox
-          checked={selectedRoomIds.length === filteredRooms.length && filteredRooms.length > 0}
-          indeterminate={selectedRoomIds.length > 0 && selectedRoomIds.length < filteredRooms.length}
-          onChange={(e) => {
-            if (e.target.checked) {
-              setSelectedRoomIds(filteredRooms.map(r => r.roomId));
-            } else {
-              setSelectedRoomIds([]);
-            }
-          }}
-        />
-      ),
-      key: 'selection',
-      width: 50,
-      render: (_, record) => (
-        <Checkbox
-          checked={selectedRoomIds.includes(record.roomId)}
-          onChange={(e) => {
-            if (e.target.checked) {
-              setSelectedRoomIds([...selectedRoomIds, record.roomId]);
-            } else {
-              setSelectedRoomIds(selectedRoomIds.filter(id => id !== record.roomId));
-            }
-          }}
-        />
-      )
-    },
-    {
       title: '机房信息',
       key: 'roomInfo',
       render: (_, record) => (
