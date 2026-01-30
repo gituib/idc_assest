@@ -173,7 +173,7 @@ const RackCard = ({ rack, onEdit, onDelete, onView, selected, onSelect }) => {
       }}
       onClick={() => onSelect(rack.rackId)}
       onDoubleClick={() => onView(rack)}
-      bodyStyle={{ padding: '20px' }}
+      styles={{ body: { padding: '20px' } }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
         <div>

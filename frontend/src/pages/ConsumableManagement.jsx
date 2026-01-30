@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, Select, InputNumber, message, Card, Space, Popconfirm, Upload, Table as AntTable, Progress } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, InputNumber, message, Card, Space, Popconfirm, Upload, Table as AntTable, Progress, Checkbox } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ExportOutlined, ImportOutlined, UploadOutlined, FileExcelOutlined, InboxOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
@@ -32,6 +32,7 @@ function ConsumableManagement() {
   const [stockRecord, setStockRecord] = useState(null);
   const [stockType, setStockType] = useState('in');
   const [stockForm] = Form.useForm();
+  const [maxStockUnlimited, setMaxStockUnlimited] = useState(false);
 
   const fetchConsumables = useCallback(async (page = 1, pageSize = 10) => {
     try {
@@ -66,8 +67,14 @@ function ConsumableManagement() {
   const showModal = useCallback((consumable = null) => {
     setEditingConsumable(consumable);
     if (consumable) {
-      form.setFieldsValue(consumable);
+      const isUnlimited = consumable.maxStock === null || consumable.maxStock === undefined;
+      setMaxStockUnlimited(isUnlimited);
+      form.setFieldsValue({
+        ...consumable,
+        maxStock: isUnlimited ? undefined : consumable.maxStock
+      });
     } else {
+      setMaxStockUnlimited(true);
       form.resetFields();
     }
     setModalVisible(true);
@@ -80,12 +87,16 @@ function ConsumableManagement() {
 
   const handleSubmit = useCallback(async (values) => {
     try {
+      const submitData = {
+        ...values,
+        maxStock: maxStockUnlimited ? null : values.maxStock
+      };
       if (editingConsumable) {
-        await axios.put(`/api/consumables/${editingConsumable.consumableId}`, values);
+        await axios.put(`/api/consumables/${editingConsumable.consumableId}`, submitData);
         message.success('耗材更新成功');
       } else {
         await axios.post('/api/consumables', {
-          ...values,
+          ...submitData,
           consumableId: `CON${Date.now()}`
         });
         message.success('耗材创建成功');
@@ -97,7 +108,7 @@ function ConsumableManagement() {
       message.error(editingConsumable ? '耗材更新失败' : '耗材创建失败');
       console.error('提交失败:', error);
     }
-  }, [editingConsumable, fetchConsumables]);
+  }, [editingConsumable, fetchConsumables, maxStockUnlimited]);
 
   const handleDelete = useCallback(async (consumableId) => {
     try {
@@ -447,7 +458,8 @@ function ConsumableManagement() {
       title: '最大库存',
       dataIndex: 'maxStock',
       key: 'maxStock',
-      width: 100
+      width: 100,
+      render: (value) => value === null || value === undefined ? '无限制' : value
     },
     {
       title: '单价(元)',
@@ -579,8 +591,25 @@ function ConsumableManagement() {
             <Form.Item name="minStock" label="最小库存" rules={[{ required: true, message: '请输入最小库存' }]}>
               <InputNumber min={0} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="maxStock" label="最大库存" rules={[{ required: true, message: '请输入最大库存' }]}>
-              <InputNumber min={0} style={{ width: '100%' }} />
+            <Form.Item label="最大库存">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Checkbox 
+                  checked={maxStockUnlimited}
+                  onChange={(e) => {
+                    setMaxStockUnlimited(e.target.checked);
+                    if (e.target.checked) {
+                      form.setFieldsValue({ maxStock: undefined });
+                    }
+                  }}
+                >
+                  无限制
+                </Checkbox>
+                {!maxStockUnlimited && (
+                  <Form.Item name="maxStock" noStyle rules={[{ required: true, message: '请输入最大库存' }]}>
+                    <InputNumber min={0} style={{ width: '100%' }} placeholder="请输入最大库存" />
+                  </Form.Item>
+                )}
+              </Space>
             </Form.Item>
           </Space>
           <Form.Item name="unitPrice" label="单价(元)">

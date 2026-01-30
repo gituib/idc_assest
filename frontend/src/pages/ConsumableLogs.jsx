@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Table, Card, Space, Select, DatePicker, Input, Tag, Button, message, Modal, Upload, Radio, Dropdown } from 'antd';
-import { HistoryOutlined, SearchOutlined, FileTextOutlined, DownloadOutlined, UploadOutlined, FileExcelOutlined, FileOutlined, DownOutlined } from '@ant-design/icons';
+import { Table, Card, Space, Select, DatePicker, Input, Tag, Button, message, Modal, Upload, Radio, Dropdown, Form, Tooltip, Timeline } from 'antd';
+import { HistoryOutlined, SearchOutlined, FileTextOutlined, DownloadOutlined, UploadOutlined, FileExcelOutlined, FileOutlined, DownOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
@@ -20,6 +20,13 @@ function ConsumableLogs() {
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importType, setImportType] = useState('excel');
   const [importing, setImporting] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const [currentLog, setCurrentLog] = useState(null);
+  const [logHistory, setLogHistory] = useState([]);
+  const [editLoading, setEditLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [form] = Form.useForm();
   const fileInputRef = useRef(null);
 
   const fetchLogs = async (page = 1, pageSize = 10, currentFilters = filters) => {
@@ -147,6 +154,34 @@ function ConsumableLogs() {
       width: 200,
       render: (value) => value || '-',
       ellipsis: true
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 120,
+      fixed: 'right',
+      render: (_, record) => (
+        <Space>
+          {record.isEditable && (
+            <Tooltip title="编辑">
+              <Button
+                type="link"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => handleEdit(record)}
+              />
+            </Tooltip>
+          )}
+          <Tooltip title="查看历史">
+            <Button
+              type="link"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => handleViewHistory(record)}
+            />
+          </Tooltip>
+        </Space>
+      )
     }
   ];
 
@@ -314,13 +349,64 @@ function ConsumableLogs() {
         '备注': '示例备注'
       }
     ];
-    
+
     const ws = XLSX.utils.json_to_sheet(template);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '日志模板');
     XLSX.writeFile(wb, '耗材操作日志导入模板.xlsx');
-    
+
     message.success('模板下载成功');
+  };
+
+  // 编辑日志
+  const handleEdit = (record) => {
+    setCurrentLog(record);
+    form.setFieldsValue({
+      reason: record.reason,
+      notes: record.notes,
+      modificationReason: ''
+    });
+    setEditModalVisible(true);
+  };
+
+  // 提交编辑
+  const handleEditSubmit = async (values) => {
+    if (!currentLog) return;
+
+    setEditLoading(true);
+    try {
+      const response = await axios.put(`/api/consumables/logs/${currentLog.id}`, {
+        reason: values.reason,
+        notes: values.notes,
+        operator: values.operator || '管理员',
+        modificationReason: values.modificationReason
+      });
+
+      message.success('日志修改成功');
+      setEditModalVisible(false);
+      fetchLogs(pagination.current, pagination.pageSize);
+    } catch (error) {
+      message.error(error.response?.data?.error || '修改失败');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // 查看修改历史
+  const handleViewHistory = async (record) => {
+    setCurrentLog(record);
+    setHistoryModalVisible(true);
+    setHistoryLoading(true);
+
+    try {
+      const response = await axios.get(`/api/consumables/logs/${record.id}/history`);
+      setLogHistory(response.data.history || []);
+    } catch (error) {
+      message.error('获取修改历史失败');
+      setLogHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   return (
@@ -461,6 +547,105 @@ function ConsumableLogs() {
             <li>系统将根据筛选条件过滤需要导出的数据</li>
           </ul>
         </div>
+      </Modal>
+
+      {/* 编辑日志弹窗 */}
+      <Modal
+        title="编辑日志记录"
+        open={editModalVisible}
+        onCancel={() => {
+          setEditModalVisible(false);
+          form.resetFields();
+        }}
+        onOk={() => form.submit()}
+        confirmLoading={editLoading}
+        width={600}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleEditSubmit}
+        >
+          <Form.Item
+            label="操作原因"
+            name="reason"
+          >
+            <Input.TextArea rows={2} placeholder="请输入操作原因" />
+          </Form.Item>
+          <Form.Item
+            label="备注"
+            name="notes"
+          >
+            <Input.TextArea rows={3} placeholder="请输入备注信息" />
+          </Form.Item>
+          <Form.Item
+            label="修改原因"
+            name="modificationReason"
+            rules={[{ required: true, message: '请输入修改原因' }]}
+          >
+            <Input.TextArea rows={2} placeholder="请输入修改原因（必填）" />
+          </Form.Item>
+          <Form.Item
+            label="修改人"
+            name="operator"
+          >
+            <Input placeholder="请输入修改人姓名" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 修改历史弹窗 */}
+      <Modal
+        title="日志修改历史"
+        open={historyModalVisible}
+        onCancel={() => {
+          setHistoryModalVisible(false);
+          setLogHistory([]);
+        }}
+        footer={null}
+        width={700}
+      >
+        {historyLoading ? (
+          <div style={{ textAlign: 'center', padding: '40px' }}>加载中...</div>
+        ) : logHistory.length <= 1 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
+            该记录暂无修改历史
+          </div>
+        ) : (
+          <Timeline mode="left">
+            {logHistory.map((item, index) => (
+              <Timeline.Item
+                key={item.id}
+                color={index === logHistory.length - 1 ? 'green' : 'blue'}
+                label={dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss')}
+              >
+                <div style={{ marginBottom: 8 }}>
+                  <Tag color={getOperationTag(item.operationType).props.color}>
+                    {getOperationTag(item.operationType).props.children}
+                  </Tag>
+                  {item.modifiedBy && (
+                    <Tag color="orange">已修改</Tag>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: '#666' }}>
+                  <p><strong>耗材:</strong> {item.consumableName} ({item.consumableId})</p>
+                  <p><strong>操作人:</strong> {item.operator}</p>
+                  {item.reason && <p><strong>原因:</strong> {item.reason}</p>}
+                  {item.notes && <p><strong>备注:</strong> {item.notes}</p>}
+                  {item.modifiedBy && (
+                    <>
+                      <p><strong>修改人:</strong> {item.modifiedBy}</p>
+                      <p><strong>修改时间:</strong> {dayjs(item.modifiedAt).format('YYYY-MM-DD HH:mm:ss')}</p>
+                      {item.modificationReason && (
+                        <p><strong>修改原因:</strong> {item.modificationReason}</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </Timeline.Item>
+            ))}
+          </Timeline>
+        )}
       </Modal>
     </div>
   );

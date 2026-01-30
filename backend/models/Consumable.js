@@ -33,8 +33,9 @@ const Consumable = sequelize.define('Consumable', {
   },
   maxStock: {
     type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 100
+    allowNull: true,
+    defaultValue: null,
+    comment: '最大库存，null表示无限制'
   },
   unitPrice: {
     type: DataTypes.DECIMAL(10, 2),

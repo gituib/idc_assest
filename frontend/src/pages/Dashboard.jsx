@@ -741,7 +741,7 @@ function Dashboard() {
           style={cardStyle}
           onMouseEnter={() => setHoveredCard(statKey)}
           onMouseLeave={() => setHoveredCard(null)}
-          bodyStyle={{ padding: 'clamp(16px, 3vw, 24px)' }}
+          styles={{ body: { padding: 'clamp(16px, 3vw, 24px)' } }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>

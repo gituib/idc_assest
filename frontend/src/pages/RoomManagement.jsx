@@ -163,7 +163,7 @@ const RoomCard = ({ room, onEdit, onDelete, onView, selected, onSelect }) => {
       }}
       onClick={() => onSelect(room.roomId)}
       onDoubleClick={() => onView(room)}
-      bodyStyle={{ padding: '20px' }}
+      styles={{ body: { padding: '20px' } }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
         <div>

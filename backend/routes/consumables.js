@@ -252,21 +252,21 @@ router.get('/inout/records', async (req, res) => {
 router.post('/quick-inout', async (req, res) => {
   const MAX_RETRIES = 3;
   let attempt = 0;
-  
+
   while (attempt < MAX_RETRIES) {
     const transaction = await sequelize.transaction();
     try {
       const { consumableId, type, quantity, operator, reason, notes } = req.body;
-      
+
       const consumable = await Consumable.findByPk(consumableId, { transaction });
       if (!consumable) {
         await transaction.rollback();
         return res.status(404).json({ error: '耗材不存在' });
       }
-      
+
       const previousStock = parseFloat(consumable.currentStock);
       let newStock;
-      
+
       if (type === 'in') {
         newStock = previousStock + parseFloat(quantity);
       } else if (type === 'out') {
@@ -279,21 +279,21 @@ router.post('/quick-inout', async (req, res) => {
         await transaction.rollback();
         return res.status(400).json({ error: '操作类型无效' });
       }
-      
+
       const [affectedRows] = await Consumable.update(
-        { 
+        {
           currentStock: newStock,
           version: sequelize.literal('version + 1')
         },
-        { 
-          where: { 
+        {
+          where: {
             consumableId,
             version: consumable.version
           },
-          transaction 
+          transaction
         }
       );
-      
+
       if (affectedRows === 0) {
         await transaction.rollback();
         attempt++;
@@ -302,7 +302,7 @@ router.post('/quick-inout', async (req, res) => {
         }
         continue;
       }
-      
+
       const record = await ConsumableRecord.create({
         consumableId,
         type,
@@ -313,7 +313,8 @@ router.post('/quick-inout', async (req, res) => {
         reason,
         notes
       }, { transaction });
-      
+
+      // 系统生成的出入库记录不可编辑
       await ConsumableLog.create({
         consumableId,
         consumableName: consumable.name,
@@ -323,11 +324,12 @@ router.post('/quick-inout', async (req, res) => {
         currentStock: newStock,
         operator,
         reason,
-        notes
+        notes,
+        isEditable: false
       }, { transaction });
-      
+
       await transaction.commit();
-      
+
       res.json({
         message: '操作成功',
         record,
@@ -407,6 +409,7 @@ router.post('/inout', async (req, res) => {
         notes
       }, { transaction });
       
+      // 系统生成的出入库记录不可编辑
       await ConsumableLog.create({
         consumableId,
         consumableName: consumable.name,
@@ -416,11 +419,12 @@ router.post('/inout', async (req, res) => {
         currentStock: newStock,
         operator,
         reason,
-        notes
+        notes,
+        isEditable: false
       }, { transaction });
-      
+
       await transaction.commit();
-      
+
       res.json({
         message: '操作成功',
         record,
@@ -499,6 +503,7 @@ router.post('/adjust', async (req, res) => {
       
       const changeQuantity = newStock - previousStock;
       
+      // 系统生成的调整记录不可编辑
       await ConsumableLog.create({
         consumableId,
         consumableName: consumable.name,
@@ -508,7 +513,8 @@ router.post('/adjust', async (req, res) => {
         currentStock: newStock,
         operator,
         reason: reason || (adjustType === 'set' ? '库存调整为 ' + newStock : reason),
-        notes: adjustType === 'set' ? `库存从 ${previousStock} 调整为 ${newStock}` : notes
+        notes: adjustType === 'set' ? `库存从 ${previousStock} 调整为 ${newStock}` : notes,
+        isEditable: false
       }, { transaction });
       
       await transaction.commit();
@@ -755,27 +761,102 @@ router.delete('/:id', async (req, res) => {
       await transaction.rollback();
       return res.status(404).json({ error: '耗材不存在' });
     }
-    
+
     const consumableId = consumable.consumableId;
     const consumableName = consumable.name;
     const currentStock = consumable.currentStock;
-    
+
     await ConsumableRecord.destroy({
       where: { consumableId },
       transaction
     });
-    
+
     await ConsumableLog.destroy({
       where: { consumableId },
       transaction
     });
-    
+
     await consumable.destroy({ transaction });
-    
+
     await transaction.commit();
     res.json({ message: '删除成功' });
   } catch (error) {
     await transaction.rollback();
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 修改日志记录
+router.put('/logs/:id', async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { reason, notes, operator, modificationReason } = req.body;
+
+    const log = await ConsumableLog.findByPk(id, { transaction });
+    if (!log) {
+      await transaction.rollback();
+      return res.status(404).json({ error: '日志记录不存在' });
+    }
+
+    // 检查是否可编辑
+    if (!log.isEditable) {
+      await transaction.rollback();
+      return res.status(403).json({ error: '该记录为系统自动生成，不可修改' });
+    }
+
+    // 保存原始日志ID（用于追踪修改历史）
+    const originalLogId = log.originalLogId || log.id;
+
+    // 更新当前记录，并标记为已修改
+    await log.update({
+      reason: reason !== undefined ? reason : log.reason,
+      notes: notes !== undefined ? notes : log.notes,
+      modifiedBy: operator || '系统',
+      modifiedAt: new Date(),
+      modificationReason: modificationReason || '用户修改'
+    }, { transaction });
+
+    await transaction.commit();
+
+    res.json({
+      message: '日志修改成功',
+      log: await ConsumableLog.findByPk(id)
+    });
+  } catch (error) {
+    await transaction.rollback();
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 获取日志修改历史
+router.get('/logs/:id/history', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const log = await ConsumableLog.findByPk(id);
+    if (!log) {
+      return res.status(404).json({ error: '日志记录不存在' });
+    }
+
+    // 查询该日志的所有修改历史（包括原始记录）
+    const originalLogId = log.originalLogId || log.id;
+
+    const history = await ConsumableLog.findAll({
+      where: {
+        [Op.or]: [
+          { id: originalLogId },
+          { originalLogId: originalLogId }
+        ]
+      },
+      order: [['createdAt', 'ASC']]
+    });
+
+    res.json({
+      current: log,
+      history: history
+    });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });

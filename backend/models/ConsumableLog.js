@@ -53,6 +53,31 @@ const ConsumableLog = sequelize.define('ConsumableLog', {
   relatedId: {
     type: DataTypes.STRING,
     comment: '关联ID（如订单号、盘点ID等）'
+  },
+  isEditable: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    comment: '是否可编辑（创建、导入的记录可编辑，系统生成的出入库记录不可编辑）'
+  },
+  originalLogId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: '原始日志ID（用于追踪修改历史链）'
+  },
+  modifiedBy: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: '修改人'
+  },
+  modifiedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: '修改时间'
+  },
+  modificationReason: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: '修改原因'
   }
 }, {
   tableName: 'consumable_logs',
@@ -62,7 +87,9 @@ const ConsumableLog = sequelize.define('ConsumableLog', {
     { fields: ['consumableId'] },
     { fields: ['operationType'] },
     { fields: ['createdAt'] },
-    { fields: ['consumableId', 'createdAt'] }
+    { fields: ['consumableId', 'createdAt'] },
+    { fields: ['originalLogId'] },
+    { fields: ['isEditable'] }
   ]
 });
 
