@@ -1879,13 +1879,40 @@ function DeviceManagement() {
             
             <div style={{ marginBottom: '20px', padding: '16px', background: 'linear-gradient(180deg, #fafafa 0%, #ffffff 100%)', borderRadius: '12px', border: '1px solid #f0f0f0' }}>
               <p style={{ fontWeight: '600', marginBottom: '8px', color: '#333' }}>CSV文件格式要求：</p>
-              <ul style={{ paddingLeft: '20px', marginBottom: '10px', color: '#666', fontSize: '13px' }}>
-                <li>必填字段：设备ID、设备名称、设备类型、型号、序列号、所在机柜ID、位置(U)、高度(U)、功率(W)、状态、购买日期、保修到期</li>
-                <li>可选字段：IP地址、描述</li>
-                <li>设备类型：server(服务器)、switch(交换机)、router(路由器)、storage(存储设备)</li>
-                <li>状态值：running(运行中)、maintenance(维护中)、offline(离线)、fault(故障)</li>
-                <li>日期格式：YYYY-MM-DD (例如：2023-01-01)</li>
-              </ul>
+              <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                {(() => {
+                  // 获取必填字段
+                  const requiredFields = deviceFields.filter(f => f.visible && f.required);
+                  // 获取可选字段
+                  const optionalFields = deviceFields.filter(f => f.visible && !f.required);
+                  
+                  return (
+                    <>
+                      {requiredFields.length > 0 && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <span style={{ color: '#d93025', fontWeight: '500' }}>必填字段：</span>
+                          <span style={{ color: '#666', fontSize: '13px' }}>
+                            {requiredFields.map(f => f.displayName).join('、')}
+                          </span>
+                        </div>
+                      )}
+                      {optionalFields.length > 0 && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <span style={{ color: '#666', fontWeight: '500' }}>可选字段：</span>
+                          <span style={{ color: '#666', fontSize: '13px' }}>
+                            {optionalFields.map(f => f.displayName).join('、')}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+                <ul style={{ paddingLeft: '20px', marginBottom: '10px', color: '#666', fontSize: '13px', marginTop: '12px' }}>
+                  <li>设备类型：server(服务器)、switch(交换机)、router(路由器)、storage(存储设备)、other(其他)</li>
+                  <li>状态值：running(运行中)、maintenance(维护中)、offline(离线)、fault(故障)</li>
+                  <li>日期格式：YYYY-MM-DD (例如：2023-01-01)</li>
+                </ul>
+              </div>
             </div>
             
             <div style={{ marginBottom: '20px' }}>
@@ -1894,7 +1921,7 @@ function DeviceManagement() {
                   下载导入模板
                 </Button>
               </a>
-              <span style={{ color: '#999', fontSize: '12px', marginLeft: '10px' }}>包含示例数据的CSV模板文件</span>
+              <span style={{ color: '#999', fontSize: '12px', marginLeft: '10px' }}>包含示例数据的CSV模板文件（根据当前字段配置生成）</span>
             </div>
             
             <Upload

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, Select, message, Card, Space, InputNumber, Switch, Tag, Statistic } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, FontSizeOutlined, NumberOutlined, CheckCircleOutlined, CalendarOutlined, FileTextOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Select, message, Card, Space, InputNumber, Switch, Tag, Statistic, Tooltip } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, FontSizeOutlined, NumberOutlined, CheckCircleOutlined, CalendarOutlined, FileTextOutlined, LockOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
 const { Option = Select.Option } = Select;
@@ -317,7 +317,16 @@ function DeviceFieldManagement() {
       dataIndex: 'fieldName',
       key: 'fieldName',
       width: 150,
-      render: (text) => <span style={tableCellStyle}>{text}</span>
+      render: (text, record) => (
+        <Space>
+          <span style={tableCellStyle}>{text}</span>
+          {record.isSystem && (
+            <Tooltip title="系统字段，不可删除">
+              <LockOutlined style={{ color: '#f59e0b', fontSize: '14px' }} />
+            </Tooltip>
+          )}
+        </Space>
+      )
     },
     {
       title: '显示名称',
@@ -385,9 +394,23 @@ function DeviceFieldManagement() {
           <Button type="text" icon={<EditOutlined />} onClick={() => showModal(record)} style={editButtonStyle}>
             编辑
           </Button>
-          <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.fieldId)} style={deleteButtonStyle}>
-            删除
-          </Button>
+          {record.isSystem ? (
+            <Tooltip title="系统字段不可删除">
+              <Button 
+                type="text" 
+                danger 
+                icon={<DeleteOutlined />} 
+                disabled
+                style={{ ...deleteButtonStyle, opacity: 0.3, cursor: 'not-allowed' }}
+              >
+                删除
+              </Button>
+            </Tooltip>
+          ) : (
+            <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.fieldId)} style={deleteButtonStyle}>
+              删除
+            </Button>
+          )}
         </Space>
       ),
     },

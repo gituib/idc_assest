@@ -2,6 +2,7 @@ const DeviceField = require('./models/DeviceField');
 const { sequelize } = require('./db');
 
 // 默认设备字段配置
+// 系统字段（isSystem: true）是核心字段，不可删除
 const defaultDeviceFields = [
   {
     fieldName: 'deviceId',
@@ -9,7 +10,8 @@ const defaultDeviceFields = [
     fieldType: 'string',
     required: true,
     order: 1,
-    visible: true
+    visible: true,
+    isSystem: true
   },
   {
     fieldName: 'name',
@@ -17,7 +19,8 @@ const defaultDeviceFields = [
     fieldType: 'string',
     required: true,
     order: 2,
-    visible: true
+    visible: true,
+    isSystem: true
   },
   {
     fieldName: 'type',
@@ -26,6 +29,7 @@ const defaultDeviceFields = [
     required: true,
     order: 3,
     visible: true,
+    isSystem: true,
     options: [
       { value: 'server', label: '服务器' },
       { value: 'switch', label: '交换机' },
@@ -40,7 +44,8 @@ const defaultDeviceFields = [
     fieldType: 'string',
     required: true,
     order: 4,
-    visible: true
+    visible: true,
+    isSystem: true
   },
   {
     fieldName: 'serialNumber',
@@ -48,7 +53,8 @@ const defaultDeviceFields = [
     fieldType: 'string',
     required: true,
     order: 5,
-    visible: true
+    visible: true,
+    isSystem: true
   },
   {
     fieldName: 'rackId',
@@ -56,7 +62,8 @@ const defaultDeviceFields = [
     fieldType: 'select',
     required: true,
     order: 6,
-    visible: true
+    visible: true,
+    isSystem: true
   },
   {
     fieldName: 'position',
@@ -64,7 +71,8 @@ const defaultDeviceFields = [
     fieldType: 'number',
     required: true,
     order: 7,
-    visible: true
+    visible: true,
+    isSystem: true
   },
   {
     fieldName: 'height',
@@ -72,7 +80,8 @@ const defaultDeviceFields = [
     fieldType: 'number',
     required: true,
     order: 8,
-    visible: true
+    visible: true,
+    isSystem: true
   },
   {
     fieldName: 'powerConsumption',
@@ -80,7 +89,8 @@ const defaultDeviceFields = [
     fieldType: 'number',
     required: true,
     order: 9,
-    visible: true
+    visible: true,
+    isSystem: true
   },
   {
     fieldName: 'status',
@@ -89,6 +99,7 @@ const defaultDeviceFields = [
     required: true,
     order: 10,
     visible: true,
+    isSystem: true,
     options: [
       { value: 'running', label: '运行中' },
       { value: 'maintenance', label: '维护中' },
@@ -102,7 +113,8 @@ const defaultDeviceFields = [
     fieldType: 'date',
     required: true,
     order: 11,
-    visible: true
+    visible: true,
+    isSystem: true
   },
   {
     fieldName: 'warrantyExpiry',
@@ -110,7 +122,8 @@ const defaultDeviceFields = [
     fieldType: 'date',
     required: true,
     order: 12,
-    visible: true
+    visible: true,
+    isSystem: true
   },
   {
     fieldName: 'ipAddress',
@@ -118,7 +131,8 @@ const defaultDeviceFields = [
     fieldType: 'string',
     required: false,
     order: 13,
-    visible: true
+    visible: true,
+    isSystem: false
   },
   {
     fieldName: 'description',
@@ -126,7 +140,8 @@ const defaultDeviceFields = [
     fieldType: 'textarea',
     required: false,
     order: 14,
-    visible: true
+    visible: true,
+    isSystem: false
   },
   {
     fieldName: 'owner',
@@ -134,7 +149,8 @@ const defaultDeviceFields = [
     fieldType: 'string',
     required: false,
     order: 15,
-    visible: true
+    visible: true,
+    isSystem: false
   },
   {
     fieldName: 'department',
@@ -142,7 +158,8 @@ const defaultDeviceFields = [
     fieldType: 'string',
     required: false,
     order: 16,
-    visible: true
+    visible: true,
+    isSystem: false
   },
   {
     fieldName: 'assetId',
@@ -150,7 +167,8 @@ const defaultDeviceFields = [
     fieldType: 'string',
     required: false,
     order: 17,
-    visible: true
+    visible: true,
+    isSystem: false
   },
   {
     fieldName: 'brand',
@@ -158,7 +176,8 @@ const defaultDeviceFields = [
     fieldType: 'string',
     required: false,
     order: 18,
-    visible: true
+    visible: true,
+    isSystem: false
   }
 ];
 

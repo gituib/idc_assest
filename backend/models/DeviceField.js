@@ -40,6 +40,12 @@ const DeviceField = sequelize.define('DeviceField', {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: true
+  },
+  isSystem: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: '是否为系统字段，系统字段不可删除'
   }
 }, {
   tableName: 'deviceFields',

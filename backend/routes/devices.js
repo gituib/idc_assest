@@ -115,73 +115,131 @@ router.get('/import-template', async (req, res) => {
       order: [['order', 'ASC']]
     });
     
-    // 准备模板数据
-    const templateData = [
-      {
-        '设备ID': 'DEV001',
-        '设备名称': '测试服务器001',
-        '设备类型': 'server',
-        '型号': 'DELL R740',
-        '序列号': 'SN1234567890',
-        '所在机柜ID': 'A01',
-        '位置(U)': '1',
-        '高度(U)': '2',
-        '功率(W)': '500',
-        '状态': 'running',
-        '购买日期': '2023-01-01',
-        '保修到期': '2026-12-31',
-        'IP地址': '192.168.1.100',
-        '描述': '测试用服务器'
-      }
-    ];
+    // 字段类型提示映射
+    const fieldTypeHints = {
+      '设备类型': 'server/switch/router/storage/other',
+      '状态': 'running/maintenance/offline/fault'
+    };
     
-    // 设置基础CSV标题（包含格式说明）
-    const baseHeaders = [
-      { id: '设备ID', title: '设备ID' },
-      { id: '设备名称', title: '设备名称' },
-      { id: '设备类型', title: '设备类型(server/switch/router/storage)' },
-      { id: '型号', title: '型号' },
-      { id: '序列号', title: '序列号' },
-      { id: '所在机柜ID', title: '所在机柜ID' },
-      { id: '位置(U)', title: '位置(U)' },
-      { id: '高度(U)', title: '高度(U)' },
-      { id: '功率(W)', title: '功率(W)' },
-      { id: '状态', title: '状态(running/maintenance/offline/fault)' },
-      { id: '购买日期', title: '购买日期(YYYY-MM-DD)' },
-      { id: '保修到期', title: '保修到期(YYYY-MM-DD)' },
-      { id: 'IP地址', title: 'IP地址(可选)' },
-      { id: '描述', title: '描述(可选)' }
-    ];
+    // 日期字段提示
+    const dateFields = ['购买日期', '保修到期'];
     
-    // 添加自定义字段标题（排除与基础字段重复的字段）
-    const baseFieldTitles = baseHeaders.map(header => header.id);
-    const customHeaders = deviceFields
-      .filter(field => field.visible && !baseFieldTitles.includes(field.displayName))
-      .map(field => ({ 
-        id: field.displayName, 
-        title: `${field.displayName}(${field.required ? '必填' : '可选'})` 
-      }));
+    // 根据字段配置动态生成CSV标题
+    const headers = deviceFields
+      .filter(field => field.visible)
+      .map(field => {
+        let title = field.displayName;
+        
+        // 添加字段类型提示
+        if (fieldTypeHints[field.displayName]) {
+          title = `${field.displayName}(${fieldTypeHints[field.displayName]})`;
+        } else if (dateFields.includes(field.displayName)) {
+          title = `${field.displayName}(YYYY-MM-DD)`;
+        } else if (field.fieldType === 'select' && field.options && field.options.length > 0) {
+          // 下拉选择字段，显示可选值
+          const optionValues = field.options.map(opt => opt.value).join('/');
+          title = `${field.displayName}(${optionValues})`;
+        } else {
+          // 显示必填/可选标识
+          title = `${field.displayName}(${field.required ? '必填' : '可选'})`;
+        }
+        
+        return { id: field.displayName, title };
+      });
+    
+    // 准备示例数据（根据字段配置生成）
+    const exampleData = {};
+    deviceFields
+      .filter(field => field.visible)
+      .forEach(field => {
+        switch (field.fieldName) {
+          case 'deviceId':
+            exampleData[field.displayName] = 'DEV001';
+            break;
+          case 'name':
+            exampleData[field.displayName] = '测试服务器001';
+            break;
+          case 'type':
+            exampleData[field.displayName] = 'server';
+            break;
+          case 'model':
+            exampleData[field.displayName] = 'DELL R740';
+            break;
+          case 'serialNumber':
+            exampleData[field.displayName] = 'SN1234567890';
+            break;
+          case 'rackId':
+            exampleData[field.displayName] = 'A01';
+            break;
+          case 'position':
+            exampleData[field.displayName] = '1';
+            break;
+          case 'height':
+            exampleData[field.displayName] = '2';
+            break;
+          case 'powerConsumption':
+            exampleData[field.displayName] = '500';
+            break;
+          case 'status':
+            exampleData[field.displayName] = 'running';
+            break;
+          case 'purchaseDate':
+            exampleData[field.displayName] = '2023-01-01';
+            break;
+          case 'warrantyExpiry':
+            exampleData[field.displayName] = '2026-12-31';
+            break;
+          case 'ipAddress':
+            exampleData[field.displayName] = '192.168.1.100';
+            break;
+          case 'description':
+            exampleData[field.displayName] = '测试用服务器';
+            break;
+          default:
+            // 自定义字段根据类型生成示例值
+            if (field.fieldType === 'number') {
+              exampleData[field.displayName] = '100';
+            } else if (field.fieldType === 'boolean') {
+              exampleData[field.displayName] = 'true';
+            } else if (field.fieldType === 'date') {
+              exampleData[field.displayName] = '2023-01-01';
+            } else if (field.fieldType === 'select' && field.options && field.options.length > 0) {
+              exampleData[field.displayName] = field.options[0].value;
+            } else {
+              exampleData[field.displayName] = `示例${field.displayName}`;
+            }
+        }
+      });
+    
+    const templateData = [exampleData];
+    
+    // 确保temp目录存在
+    const tempDir = path.join(__dirname, '../temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
     
     const csvWriter = createObjectCsvWriter({
-      path: path.join(__dirname, '../temp/import_template.csv'),
-      header: [...baseHeaders, ...customHeaders]
+      path: path.join(tempDir, 'import_template.csv'),
+      header: headers
     });
     
     // 写入CSV文件
     await csvWriter.writeRecords(templateData);
     
+    // 读取文件并转换为GBK编码
+    const csvContent = fs.readFileSync(path.join(tempDir, 'import_template.csv'), 'utf8');
+    const gbkContent = iconv.encode(csvContent, 'gbk');
+    
     // 设置响应头
     res.setHeader('Content-Type', 'text/csv; charset=gbk');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent('设备导入模板.csv')}`);
     
-    // 发送文件
-    const fileStream = fs.createReadStream(path.join(__dirname, '../temp/import_template.csv'));
-    fileStream.pipe(res);
+    // 发送CSV数据
+    res.send(gbkContent);
     
     // 删除临时文件
-    fileStream.on('end', () => {
-      fs.unlinkSync(path.join(__dirname, '../temp/import_template.csv'));
-    });
+    fs.unlinkSync(path.join(tempDir, 'import_template.csv'));
     
   } catch (error) {
     console.error('生成导入模板失败:', error);
@@ -392,10 +450,16 @@ router.post('/import', async (req, res) => {
     // 获取设备字段配置
     const deviceFields = await DeviceField.findAll();
     
-    // 创建字段映射：displayName -> fieldName
+    // 创建字段映射：displayName -> fieldConfig
     const fieldMapping = {};
     deviceFields.forEach(field => {
       fieldMapping[field.displayName] = field;
+    });
+    
+    // 创建字段名到显示名称的映射（用于识别基础字段）
+    const fieldNameToDisplayName = {};
+    deviceFields.forEach(field => {
+      fieldNameToDisplayName[field.fieldName] = field.displayName;
     });
     
     // 处理导入数据
@@ -436,125 +500,147 @@ router.post('/import', async (req, res) => {
             throw new Error(`缺少必填字段：${missingFields.join('、')}`);
           }
           
+        // 获取动态字段显示名称（支持用户在字段管理中修改后的名称）
+        const getFieldValue = (fieldName) => {
+          const displayName = fieldNameToDisplayName[fieldName];
+          return displayName ? fieldValueMap[displayName] : undefined;
+        };
+        
         // 验证设备类型值
-          const validTypes = ['server', 'switch', 'router', 'storage', 'other'];
-          if (!validTypes.includes(fieldValueMap['设备类型'])) {
-            throw new Error(`设备类型无效，有效值为：${validTypes.join('、')}，当前值：${fieldValueMap['设备类型']}`);
-          }
-          
-          // 验证设备ID是否已存在
-          const existingDeviceById = await Device.findOne({
-            where: { deviceId: fieldValueMap['设备ID'] }
+        const validTypes = ['server', 'switch', 'router', 'storage', 'other'];
+        const deviceType = getFieldValue('type');
+        if (!validTypes.includes(deviceType)) {
+          throw new Error(`设备类型无效，有效值为：${validTypes.join('、')}，当前值：${deviceType}`);
+        }
+        
+        // 验证设备ID是否已存在
+        const deviceId = getFieldValue('deviceId');
+        if (!deviceId) {
+          throw new Error('设备ID不能为空');
+        }
+        const existingDeviceById = await Device.findOne({
+          where: { deviceId: deviceId }
+        });
+        if (existingDeviceById) {
+          throw new Error(`设备ID已存在：${deviceId}`);
+        }
+        
+        // 验证序列号是否已存在
+        const serialNumber = getFieldValue('serialNumber');
+        if (!serialNumber) {
+          throw new Error('序列号不能为空');
+        }
+        const existingDevice = await Device.findOne({
+          where: { serialNumber: serialNumber }
+        });
+        if (existingDevice) {
+          throw new Error(`序列号已存在：${serialNumber}`);
+        }
+        
+        // 验证机柜ID是否为空
+        const rackId = getFieldValue('rackId');
+        if (!rackId || rackId.trim() === '') {
+          throw new Error('所在机柜ID不能为空');
+        }
+        
+        // 验证机柜是否存在，如果不存在则自动创建
+        if (!rackIds.includes(rackId)) {
+          // 自动创建机柜
+          const newRack = await Rack.create({
+            rackId: rackId,
+            name: rackId, // 使用机柜ID作为默认名称
+            height: 42, // 默认42U高度
+            maxPower: 10000, // 默认最大功耗10000W
+            currentPower: 0,
+            status: 'active',
+            roomId: defaultRoomId
           });
-          if (existingDeviceById) {
-            throw new Error(`设备ID已存在：${fieldValueMap['设备ID']}`);
-          }
           
-          // 验证序列号是否已存在
-          const existingDevice = await Device.findOne({
-            where: { serialNumber: fieldValueMap['序列号'] }
-          });
-          if (existingDevice) {
-            throw new Error(`序列号已存在：${fieldValueMap['序列号']}`);
-          }
-          
-          // 验证机柜ID是否为空
-          if (!fieldValueMap['所在机柜ID'] || fieldValueMap['所在机柜ID'].trim() === '') {
-            throw new Error('所在机柜ID不能为空');
-          }
-          
-          // 验证机柜是否存在，如果不存在则自动创建
-          if (!rackIds.includes(fieldValueMap['所在机柜ID'])) {
-            // 自动创建机柜
-            const newRack = await Rack.create({
-              rackId: fieldValueMap['所在机柜ID'],
-              name: fieldValueMap['所在机柜ID'], // 使用机柜ID作为默认名称
-              height: 42, // 默认42U高度
-              maxPower: 10000, // 默认最大功耗10000W
-              currentPower: 0,
-              status: 'active',
-              roomId: defaultRoomId
-            });
-            
-            // 更新机柜列表和ID列表
-            racks.push(newRack);
-            rackIds.push(newRack.rackId);
-          }
-          
-          // 验证状态值
-          const validStatus = ['running', 'maintenance', 'offline', 'fault'];
-          if (!validStatus.includes(fieldValueMap['状态'])) {
-            throw new Error(`状态值无效，有效值为：${validStatus.join('、')}，当前值：${fieldValueMap['状态']}`);
-          }
-          
-          // 验证数字字段
-          const numericFields = {
-            '位置(U)': fieldValueMap['位置(U)'],
-            '高度(U)': fieldValueMap['高度(U)'],
-            '功率(W)': fieldValueMap['功率(W)']
-          };
-          
-          for (const [fieldName, value] of Object.entries(numericFields)) {
-            if (isNaN(Number(value))) {
-              throw new Error(`${fieldName}必须是数字，当前值：${value}`);
-            }
-          }
-          
-          // 验证日期格式并解析日期
-          const purchaseDate = new Date(fieldValueMap['购买日期']);
-          const warrantyExpiry = new Date(fieldValueMap['保修到期']);
-          if (isNaN(purchaseDate.getTime())) {
-            throw new Error(`购买日期格式无效：${fieldValueMap['购买日期']}，请使用YYYY-MM-DD格式`);
-          }
-          if (isNaN(warrantyExpiry.getTime())) {
-            throw new Error(`保修到期日期格式无效：${fieldValueMap['保修到期']}，请使用YYYY-MM-DD格式`);
-          }
-          
-          // 验证日期逻辑
-          if (warrantyExpiry <= purchaseDate) {
-            throw new Error(`保修到期日期必须晚于购买日期：购买日期${fieldValueMap['购买日期']}，保修到期${fieldValueMap['保修到期']}`);
-          }
+          // 更新机柜列表和ID列表
+          racks.push(newRack);
+          rackIds.push(newRack.rackId);
+        }
+        
+        // 验证状态值
+        const validStatus = ['running', 'maintenance', 'offline', 'fault'];
+        const status = getFieldValue('status');
+        if (!validStatus.includes(status)) {
+          throw new Error(`状态值无效，有效值为：${validStatus.join('、')}，当前值：${status}`);
+        }
+        
+        // 验证数字字段
+        const position = getFieldValue('position');
+        const height = getFieldValue('height');
+        const powerConsumption = getFieldValue('powerConsumption');
+        
+        if (position !== undefined && isNaN(Number(position))) {
+          throw new Error(`${fieldNameToDisplayName['position']}必须是数字，当前值：${position}`);
+        }
+        if (height !== undefined && isNaN(Number(height))) {
+          throw new Error(`${fieldNameToDisplayName['height']}必须是数字，当前值：${height}`);
+        }
+        if (powerConsumption !== undefined && isNaN(Number(powerConsumption))) {
+          throw new Error(`${fieldNameToDisplayName['powerConsumption']}必须是数字，当前值：${powerConsumption}`);
+        }
+        
+        // 验证日期格式并解析日期
+        const purchaseDateValue = getFieldValue('purchaseDate');
+        const warrantyExpiryValue = getFieldValue('warrantyExpiry');
+        const purchaseDate = purchaseDateValue ? new Date(purchaseDateValue) : null;
+        const warrantyExpiry = warrantyExpiryValue ? new Date(warrantyExpiryValue) : null;
+        
+        if (purchaseDateValue && isNaN(purchaseDate.getTime())) {
+          throw new Error(`${fieldNameToDisplayName['purchaseDate']}格式无效：${purchaseDateValue}，请使用YYYY-MM-DD格式`);
+        }
+        if (warrantyExpiryValue && isNaN(warrantyExpiry.getTime())) {
+          throw new Error(`${fieldNameToDisplayName['warrantyExpiry']}格式无效：${warrantyExpiryValue}，请使用YYYY-MM-DD格式`);
+        }
+        
+        // 验证日期逻辑
+        if (purchaseDate && warrantyExpiry && warrantyExpiry <= purchaseDate) {
+          throw new Error(`${fieldNameToDisplayName['warrantyExpiry']}必须晚于${fieldNameToDisplayName['purchaseDate']}：${purchaseDateValue} ~ ${warrantyExpiryValue}`);
+        }
         
         // 构建设备数据
         const deviceData = {
-          deviceId: fieldValueMap['设备ID'],
-          name: fieldValueMap['设备名称'],
-          type: fieldValueMap['设备类型'],
-          model: fieldValueMap['型号'],
-          serialNumber: fieldValueMap['序列号'],
-          rackId: fieldValueMap['所在机柜ID'],
-          position: parseInt(fieldValueMap['位置(U)']),
-          height: parseInt(fieldValueMap['高度(U)']),
-          powerConsumption: parseFloat(fieldValueMap['功率(W)']),
-          ipAddress: fieldValueMap['IP地址'] || '',
-          status: fieldValueMap['状态'],
+          deviceId: deviceId,
+          name: getFieldValue('name'),
+          type: deviceType,
+          model: getFieldValue('model'),
+          serialNumber: serialNumber,
+          rackId: rackId,
+          position: position ? parseInt(position) : 0,
+          height: height ? parseInt(height) : 1,
+          powerConsumption: powerConsumption ? parseFloat(powerConsumption) : 0,
+          ipAddress: getFieldValue('ipAddress') || '',
+          status: status,
           purchaseDate: purchaseDate,
           warrantyExpiry: warrantyExpiry,
-          description: fieldValueMap['描述'] || ''
+          description: getFieldValue('description') || ''
         };
         
-        // 处理自定义字段
+        // 处理自定义字段（排除基础字段）
         const customFields = {};
+        const baseFieldNames = ['deviceId', 'name', 'type', 'model', 'serialNumber', 'rackId', 'position', 'height', 'powerConsumption', 'ipAddress', 'status', 'purchaseDate', 'warrantyExpiry', 'description'];
+        
         Object.entries(row).forEach(([displayName, value]) => {
-          // 跳过基础字段
-          const originalFieldName = extractFieldName(displayName);
-          const baseFields = ['设备ID', '设备名称', '设备类型', '型号', '序列号', '所在机柜ID', '位置(U)', '高度(U)', '功率(W)', '状态', '购买日期', '保修到期', 'IP地址', '描述'];
-          if (!baseFields.includes(originalFieldName)) {
-            // 查找对应的字段配置（同时尝试原始字段名和带格式的字段名）
-            const fieldConfig = fieldMapping[displayName] || fieldMapping[originalFieldName];
-            if (fieldConfig) {
-              // 根据字段类型处理值
-              let processedValue = value;
-              if (fieldConfig.fieldType === 'number') {
-                processedValue = parseFloat(value);
-              } else if (fieldConfig.fieldType === 'boolean') {
-                processedValue = value.toLowerCase() === 'true' || value === '1' || value.toLowerCase() === '是';
-              } else if (fieldConfig.fieldType === 'date') {
-                processedValue = new Date(value);
-              }
-              
-              customFields[fieldConfig.fieldName] = processedValue;
+          // 从带格式的字段名中提取原始显示名称
+          const originalDisplayName = extractFieldName(displayName);
+          // 查找对应的字段配置
+          const fieldConfig = fieldMapping[originalDisplayName];
+          
+          if (fieldConfig && !baseFieldNames.includes(fieldConfig.fieldName)) {
+            // 这是自定义字段，根据字段类型处理值
+            let processedValue = value;
+            if (fieldConfig.fieldType === 'number') {
+              processedValue = value ? parseFloat(value) : null;
+            } else if (fieldConfig.fieldType === 'boolean') {
+              processedValue = value ? (value.toLowerCase() === 'true' || value === '1' || value.toLowerCase() === '是') : false;
+            } else if (fieldConfig.fieldType === 'date') {
+              processedValue = value ? new Date(value) : null;
             }
+            
+            customFields[fieldConfig.fieldName] = processedValue;
           }
         });
         
@@ -567,7 +653,7 @@ router.post('/import', async (req, res) => {
         const device = await Device.create(deviceData);
         
         // 更新机柜当前功率
-        const rack = await Rack.findByPk(row['所在机柜ID']);
+        const rack = await Rack.findByPk(rackId);
         if (rack) {
           await rack.update({
             currentPower: rack.currentPower + device.powerConsumption

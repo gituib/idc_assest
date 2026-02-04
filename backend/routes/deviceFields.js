@@ -57,9 +57,22 @@ router.put('/:fieldId', async (req, res) => {
 // 删除字段配置
 router.delete('/:fieldId', async (req, res) => {
   try {
+    // 先查询字段信息
+    const field = await DeviceField.findByPk(req.params.fieldId);
+    
+    if (!field) {
+      return res.status(404).json({ error: '字段不存在' });
+    }
+    
+    // 检查是否为系统字段
+    if (field.isSystem) {
+      return res.status(403).json({ error: '系统字段不可删除' });
+    }
+    
     const deleted = await DeviceField.destroy({
       where: { fieldId: req.params.fieldId }
     });
+    
     if (deleted) {
       res.status(204).json();
     } else {
