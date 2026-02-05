@@ -594,3 +594,4 @@ router.get('/frontend/status', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.initDefaultSettings = initDefaultSettings;
