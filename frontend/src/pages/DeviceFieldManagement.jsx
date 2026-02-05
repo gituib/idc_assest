@@ -218,6 +218,14 @@ function DeviceFieldManagement() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingField, setEditingField] = useState(null);
   const [form] = Form.useForm();
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    pageSizeOptions: ['10', '20', '50', '100'],
+    showSizeChanger: true,
+    showQuickJumper: true,
+    showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条 / 共 ${total} 条`
+  });
 
   const fetchFields = async () => {
     try {
@@ -434,11 +442,13 @@ function DeviceFieldManagement() {
           dataSource={fields}
           rowKey="fieldId"
           loading={loading}
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条 / 共 ${total} 条`
+          pagination={pagination}
+          onChange={(newPagination) => {
+            setPagination({
+              ...pagination,
+              current: newPagination.current,
+              pageSize: newPagination.pageSize
+            });
           }}
           scroll={{ x: 900 }}
           style={tableStyle}
