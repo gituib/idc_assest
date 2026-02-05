@@ -889,98 +889,119 @@ async function confirmConfiguration() {
 
 /**
  * 显示 Linux Nginx 安装指引
+ * 根据是否 root 用户显示相应的命令
  */
 function showNginxInstallGuideLinux() {
   const distro = detectLinuxDistro();
+  const root = isRootUser();
+  const sudoPrefix = root ? '' : 'sudo ';
   
   console.log('\n' + colors.bright + 'Nginx 安装命令：' + colors.reset);
+  if (root) {
+    console.log(colors.gray + '（当前以 root 用户运行，无需 sudo）' + colors.reset);
+  }
   
   switch (distro) {
     case 'ubuntu':
     case 'debian':
-      console.log(`  ${colors.cyan}sudo apt update${colors.reset}`);
-      console.log(`  ${colors.cyan}sudo apt install -y nginx${colors.reset}`);
-      console.log(`  ${colors.cyan}sudo systemctl start nginx${colors.reset}`);
-      console.log(`  ${colors.cyan}sudo systemctl enable nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}${sudoPrefix}apt update${colors.reset}`);
+      console.log(`  ${colors.cyan}${sudoPrefix}apt install -y nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}${sudoPrefix}systemctl start nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}${sudoPrefix}systemctl enable nginx${colors.reset}`);
       break;
       
     case 'centos':
     case 'rhel':
     case 'fedora':
-      console.log(`  ${colors.cyan}sudo yum install -y epel-release${colors.reset}`);
-      console.log(`  ${colors.cyan}sudo yum install -y nginx${colors.reset}`);
-      console.log(`  ${colors.cyan}sudo systemctl start nginx${colors.reset}`);
-      console.log(`  ${colors.cyan}sudo systemctl enable nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}${sudoPrefix}yum install -y epel-release${colors.reset}`);
+      console.log(`  ${colors.cyan}${sudoPrefix}yum install -y nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}${sudoPrefix}systemctl start nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}${sudoPrefix}systemctl enable nginx${colors.reset}`);
       break;
       
     case 'arch':
-      console.log(`  ${colors.cyan}sudo pacman -S --noconfirm nginx${colors.reset}`);
-      console.log(`  ${colors.cyan}sudo systemctl start nginx${colors.reset}`);
-      console.log(`  ${colors.cyan}sudo systemctl enable nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}${sudoPrefix}pacman -S --noconfirm nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}${sudoPrefix}systemctl start nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}${sudoPrefix}systemctl enable nginx${colors.reset}`);
       break;
       
     default:
       console.log(`  ${colors.cyan}# Ubuntu/Debian${colors.reset}`);
-      console.log(`  sudo apt update && sudo apt install -y nginx`);
+      console.log(`  ${sudoPrefix}apt update && ${sudoPrefix}apt install -y nginx`);
       console.log(`\n  ${colors.cyan}# CentOS/RHEL/Fedora${colors.reset}`);
-      console.log(`  sudo yum install -y epel-release && sudo yum install -y nginx`);
+      console.log(`  ${sudoPrefix}yum install -y epel-release && ${sudoPrefix}yum install -y nginx`);
       console.log(`\n  ${colors.cyan}# Arch Linux${colors.reset}`);
-      console.log(`  sudo pacman -S nginx`);
+      console.log(`  ${sudoPrefix}pacman -S nginx`);
   }
   
   console.log('\n' + colors.gray + '安装完成后，请重新运行此部署脚本。' + colors.reset);
 }
 
 /**
+ * 检测是否以 root 用户运行
+ * 
+ * @returns {boolean} 是否 root 用户
+ */
+function isRootUser() {
+  return process.getuid && process.getuid() === 0;
+}
+
+/**
  * Linux 系统自动安装 Nginx
  * 
  * 根据检测到的发行版，使用包管理器自动安装 Nginx
+ * 自动检测是否以 root 用户运行，决定是否使用 sudo
  * 
  * @returns {Promise<boolean>} 安装是否成功
  */
 async function autoInstallNginxLinux() {
   const distro = detectLinuxDistro();
+  const root = isRootUser();
+  const sudoPrefix = root ? '' : 'sudo ';
   
   log.step('自动安装 Nginx');
   log.info(`检测到 Linux 发行版: ${distro}`);
+  if (root) {
+    log.info('当前以 root 用户运行，无需 sudo');
+  }
   
   try {
     let installCommand = '';
-    let startCommand = 'sudo systemctl start nginx';
-    let enableCommand = 'sudo systemctl enable nginx';
+    let startCommand = `${sudoPrefix}systemctl start nginx`;
+    let enableCommand = `${sudoPrefix}systemctl enable nginx`;
     
     switch (distro) {
       case 'ubuntu':
       case 'debian':
         log.info('使用 apt 安装 Nginx...');
-        log.info('执行: sudo apt update');
-        const updateResult = runCommand('sudo apt update');
+        log.info(`执行: ${sudoPrefix}apt update`);
+        const updateResult = runCommand(`${sudoPrefix}apt update`);
         if (!updateResult.success) {
           log.warning('apt update 失败，尝试继续安装...');
         }
         
-        log.info('执行: sudo apt install -y nginx');
-        installCommand = 'sudo apt install -y nginx';
+        log.info(`执行: ${sudoPrefix}apt install -y nginx`);
+        installCommand = `${sudoPrefix}apt install -y nginx`;
         break;
         
       case 'centos':
       case 'rhel':
       case 'fedora':
         log.info('使用 yum 安装 Nginx...');
-        log.info('执行: sudo yum install -y epel-release');
-        const epelResult = runCommand('sudo yum install -y epel-release');
+        log.info(`执行: ${sudoPrefix}yum install -y epel-release`);
+        const epelResult = runCommand(`${sudoPrefix}yum install -y epel-release`);
         if (!epelResult.success) {
           log.warning('epel-release 安装失败，尝试继续...');
         }
         
-        log.info('执行: sudo yum install -y nginx');
-        installCommand = 'sudo yum install -y nginx';
+        log.info(`执行: ${sudoPrefix}yum install -y nginx`);
+        installCommand = `${sudoPrefix}yum install -y nginx`;
         break;
         
       case 'arch':
         log.info('使用 pacman 安装 Nginx...');
-        log.info('执行: sudo pacman -S --noconfirm nginx');
-        installCommand = 'sudo pacman -S --noconfirm nginx';
+        log.info(`执行: ${sudoPrefix}pacman -S --noconfirm nginx`);
+        installCommand = `${sudoPrefix}pacman -S --noconfirm nginx`;
         break;
         
       default:
