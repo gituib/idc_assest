@@ -804,12 +804,30 @@ async function configureServices() {
           console.log(`  下载地址: ${colors.cyan}https://nginx.org/en/download.html${colors.reset}`);
           console.log(`  安装路径建议: ${colors.cyan}C:/nginx${colors.reset}`);
         }
+      } else if (process.platform === 'linux') {
+        // Linux 下询问是否自动安装
+        const autoInstall = await ask('是否自动安装 Nginx? (Y/n)', 'Y');
+        if (autoInstall.toLowerCase() === 'y') {
+          const installed = await autoInstallNginxLinux();
+          if (!installed) {
+            log.error('Nginx 自动安装失败');
+            log.info('请手动安装后重新运行脚本');
+            showNginxInstallGuideLinux();
+            process.exit(1);
+          }
+        } else {
+          log.info('已跳过自动安装');
+          showNginxInstallGuideLinux();
+          const continueDeploy = await ask('是否继续部署（后端将启动，前端需手动配置 Nginx）? (Y/n)', 'Y');
+          if (continueDeploy.toLowerCase() !== 'y') {
+            log.info('已取消部署，请安装 Nginx 后重新运行');
+            process.exit(0);
+          }
+        }
       } else {
-        // Linux/Mac 下提供安装命令
-        log.info('请根据您的系统手动安装 Nginx：');
-        console.log(`  ${colors.cyan}Ubuntu/Debian:${colors.reset} sudo apt update && sudo apt install nginx`);
-        console.log(`  ${colors.cyan}CentOS/RHEL:${colors.reset}  sudo yum install nginx`);
-        console.log(`  ${colors.cyan}Mac:${colors.reset}         brew install nginx`);
+        // macOS 下提供安装命令
+        log.info('请使用 Homebrew 安装 Nginx：');
+        console.log(`  ${colors.cyan}brew install nginx${colors.reset}`);
         console.log(`\n安装完成后，请重新运行此脚本继续部署。\n`);
 
         const continueDeploy = await ask('是否继续部署（后端将启动，前端需手动配置 Nginx）? (Y/n)', 'Y');
@@ -866,7 +884,150 @@ async function confirmConfiguration() {
 }
 
 // =============================================================================
-// Nginx 自动安装函数（仅 Windows）
+// Nginx 安装指引函数（Linux）
+// =============================================================================
+
+/**
+ * 显示 Linux Nginx 安装指引
+ */
+function showNginxInstallGuideLinux() {
+  const distro = detectLinuxDistro();
+  
+  console.log('\n' + colors.bright + 'Nginx 安装命令：' + colors.reset);
+  
+  switch (distro) {
+    case 'ubuntu':
+    case 'debian':
+      console.log(`  ${colors.cyan}sudo apt update${colors.reset}`);
+      console.log(`  ${colors.cyan}sudo apt install -y nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}sudo systemctl start nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}sudo systemctl enable nginx${colors.reset}`);
+      break;
+      
+    case 'centos':
+    case 'rhel':
+    case 'fedora':
+      console.log(`  ${colors.cyan}sudo yum install -y epel-release${colors.reset}`);
+      console.log(`  ${colors.cyan}sudo yum install -y nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}sudo systemctl start nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}sudo systemctl enable nginx${colors.reset}`);
+      break;
+      
+    case 'arch':
+      console.log(`  ${colors.cyan}sudo pacman -S --noconfirm nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}sudo systemctl start nginx${colors.reset}`);
+      console.log(`  ${colors.cyan}sudo systemctl enable nginx${colors.reset}`);
+      break;
+      
+    default:
+      console.log(`  ${colors.cyan}# Ubuntu/Debian${colors.reset}`);
+      console.log(`  sudo apt update && sudo apt install -y nginx`);
+      console.log(`\n  ${colors.cyan}# CentOS/RHEL/Fedora${colors.reset}`);
+      console.log(`  sudo yum install -y epel-release && sudo yum install -y nginx`);
+      console.log(`\n  ${colors.cyan}# Arch Linux${colors.reset}`);
+      console.log(`  sudo pacman -S nginx`);
+  }
+  
+  console.log('\n' + colors.gray + '安装完成后，请重新运行此部署脚本。' + colors.reset);
+}
+
+/**
+ * Linux 系统自动安装 Nginx
+ * 
+ * 根据检测到的发行版，使用包管理器自动安装 Nginx
+ * 
+ * @returns {Promise<boolean>} 安装是否成功
+ */
+async function autoInstallNginxLinux() {
+  const distro = detectLinuxDistro();
+  
+  log.step('自动安装 Nginx');
+  log.info(`检测到 Linux 发行版: ${distro}`);
+  
+  try {
+    let installCommand = '';
+    let startCommand = 'sudo systemctl start nginx';
+    let enableCommand = 'sudo systemctl enable nginx';
+    
+    switch (distro) {
+      case 'ubuntu':
+      case 'debian':
+        log.info('使用 apt 安装 Nginx...');
+        log.info('执行: sudo apt update');
+        const updateResult = runCommand('sudo apt update');
+        if (!updateResult.success) {
+          log.warning('apt update 失败，尝试继续安装...');
+        }
+        
+        log.info('执行: sudo apt install -y nginx');
+        installCommand = 'sudo apt install -y nginx';
+        break;
+        
+      case 'centos':
+      case 'rhel':
+      case 'fedora':
+        log.info('使用 yum 安装 Nginx...');
+        log.info('执行: sudo yum install -y epel-release');
+        const epelResult = runCommand('sudo yum install -y epel-release');
+        if (!epelResult.success) {
+          log.warning('epel-release 安装失败，尝试继续...');
+        }
+        
+        log.info('执行: sudo yum install -y nginx');
+        installCommand = 'sudo yum install -y nginx';
+        break;
+        
+      case 'arch':
+        log.info('使用 pacman 安装 Nginx...');
+        log.info('执行: sudo pacman -S --noconfirm nginx');
+        installCommand = 'sudo pacman -S --noconfirm nginx';
+        break;
+        
+      default:
+        log.error('未知的 Linux 发行版，无法自动安装');
+        return false;
+    }
+    
+    // 执行安装
+    const installResult = runCommand(installCommand);
+    if (!installResult.success) {
+      log.error('Nginx 安装失败');
+      return false;
+    }
+    
+    log.success('Nginx 安装完成');
+    
+    // 启动 Nginx
+    log.info('启动 Nginx 服务...');
+    const startResult = runCommand(startCommand);
+    if (!startResult.success) {
+      log.warning('Nginx 启动失败，可能需要手动启动');
+    } else {
+      log.success('Nginx 服务已启动');
+    }
+    
+    // 设置开机自启
+    log.info('设置开机自启...');
+    runCommand(enableCommand, { silent: true });
+    
+    // 验证安装
+    const checkResult = runCommand('nginx -v', { silent: true });
+    if (checkResult.success) {
+      log.success(`Nginx 安装成功: ${checkResult.output.trim()}`);
+      return true;
+    } else {
+      log.error('Nginx 安装验证失败');
+      return false;
+    }
+    
+  } catch (error) {
+    log.error(`自动安装失败: ${error.message}`);
+    return false;
+  }
+}
+
+// =============================================================================
+// Nginx 自动安装函数（Windows）
 // =============================================================================
 
 /**
