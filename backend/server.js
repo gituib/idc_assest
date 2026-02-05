@@ -44,6 +44,15 @@ sequelize.authenticate()
     const SystemSetting = require('./models/SystemSetting');
     return SystemSetting.sync();
   })
+  .then(() => {
+    // 初始化系统设置默认值（关键：确保部署时数据正确初始化）
+    console.log('开始初始化系统设置默认值...');
+    const { initDefaultSettings } = require('./routes/systemSettings');
+    return initDefaultSettings();
+  })
+  .then(() => {
+    console.log('系统设置初始化完成');
+  })
   .catch(err => console.error('数据库操作失败:', err));
 
 // 导入路由

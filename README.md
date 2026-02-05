@@ -62,8 +62,13 @@ jigui/
 │   ├── routes/              # API路由
 │   ├── middleware/          # 中间件
 │   └── server.js            # 服务入口
+├── deploy/                   # 部署配置 ⭐ NEW
+│   ├── ecosystem.config.js  # PM2配置
+│   └── nginx-idc.conf       # Nginx配置
 ├── docs/                     # 项目文档
 │   └── api/                 # 接口文档
+├── install.js                # 交互式安装脚本 ⭐ NEW
+├── update.js                 # 一键更新脚本 ⭐ NEW
 ├── README.md                 # 项目说明
 ├── CHANGELOG.md              # 版本记录
 └── DEPLOYMENT.md             # 部署指南
@@ -71,28 +76,99 @@ jigui/
 
 ## 快速开始
 
-### 环境要求
+### 方式一：一键部署脚本（推荐）⭐ NEW
 
-- Node.js ≥14.0.0
-- npm ≥6.0.0 或 pnpm ≥8.0.0
-- 操作系统：Windows 10/11、macOS、Linux
-
-### 安装步骤
+我们提供了交互式安装脚本，自动完成所有部署步骤：
 
 ```bash
-# 1. 安装后端依赖
+# 克隆项目
+git clone https://github.com/gituib/idc_assest.git
+cd idc_assest
+
+# 运行交互式安装脚本
+npm run deploy
+# 或
+node install.js
+```
+
+**脚本功能：**
+- ✅ 自动检测 Node.js、npm、PM2、Nginx
+- ✅ **Linux 支持自动安装 Node.js**（交互式）
+- ✅ 交互式配置数据库（SQLite/MySQL）
+- ✅ 交互式选择运行环境（development/production）
+- ✅ 交互式选择前端部署方式（Nginx/PM2 serve）
+- ✅ 自动安装项目依赖
+- ✅ 自动初始化数据库
+- ✅ 自动构建前端项目
+- ✅ 使用 PM2 启动和管理服务
+
+**交互配置示例：**
+```
+▶ 环境检测
+✓ Node.js v20.11.0
+✓ npm 10.2.4
+✓ PM2 已安装
+
+▶ 数据库配置
+选择数据库类型：
+  1. SQLite（零配置，适合开发/小规模）
+  2. MySQL（生产环境推荐）
+请选择 (1): 1
+
+▶ 服务配置
+后端服务端口 (8000): 
+选择运行环境：
+  1. production（生产模式，性能优化，推荐正式部署）
+  2. development（开发模式，详细日志，便于调试）
+请选择 (1): 1
+前端部署方式：
+  1. Nginx（性能最优，推荐生产环境）
+  2. PM2 serve（简单快捷，无需额外安装）
+请选择 (1): 1
+
+▶ 配置确认
+部署配置摘要：
+  数据库类型: sqlite
+  后端端口: 8000
+  运行环境: production
+  前端部署: nginx
+  前端端口: 80
+确认以上配置并开始部署? (Y/n): Y
+
+✓ 后端环境变量文件已生成 (.env)
+✓ PM2 配置文件已生成 (deploy/ecosystem.config.js)
+✓ Nginx 配置文件已生成 (deploy/nginx-idc.conf)
+✓ 安装部署完成！
+```
+
+### 方式二：手动安装
+
+#### 环境要求
+
+- Node.js ≥14.0.0（推荐 20.x LTS）
+- npm ≥6.0.0
+- 操作系统：Windows 10/11、macOS、Linux
+
+#### 安装步骤
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/gituib/idc_assest.git
+cd idc_assest
+
+# 2. 安装后端依赖
 cd backend
 npm install
 
-# 2. 安装前端依赖
+# 3. 安装前端依赖
 cd ../frontend
 npm install
 
-# 3. 配置环境变量
+# 4. 配置环境变量
 cd ../backend
 cp .env.example .env
 
-# 4. 启动服务
+# 5. 启动服务
 # 启动后端（端口8000）
 npm run dev
 
@@ -104,6 +180,32 @@ npm run dev
 **访问地址**：
 - 前端应用：http://localhost:3000
 - 后端API：http://localhost:8000/api
+
+## 更新升级
+
+### 一键更新（推荐）⭐ NEW
+
+```bash
+npm run update
+```
+
+功能：自动备份 → 拉取代码 → 更新依赖 → 重建前端 → 重启服务
+
+### 手动更新
+
+```bash
+# 拉取最新代码
+git pull
+
+# 更新后端
+cd backend && npm install
+
+# 更新前端并构建
+cd ../frontend && npm install && npm run build
+
+# 重启服务
+pm2 restart idc-backend
+```
 
 ## 主要功能
 
@@ -178,6 +280,22 @@ npm run dev
 - 使用Nginx作为反向代理
 - 配置SSL证书
 - 建议使用PM2管理进程
+
+### 服务管理命令
+
+```bash
+# 查看服务状态
+pm2 status
+
+# 查看日志
+pm2 logs idc-backend
+
+# 重启服务
+pm2 restart idc-backend
+
+# 停止服务
+pm2 stop idc-backend
+```
 
 ## 版本历史
 

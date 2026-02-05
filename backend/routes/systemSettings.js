@@ -17,7 +17,7 @@ const initDefaultSettings = async () => {
     { settingKey: 'max_login_attempts', settingValue: JSON.stringify(5), settingType: 'number', category: 'general', description: '最大登录尝试次数', isEditable: true },
     { settingKey: 'maintenance_mode', settingValue: JSON.stringify(false), settingType: 'boolean', category: 'general', description: '维护模式', isEditable: true },
     { settingKey: 'frontend_port', settingValue: JSON.stringify(3000), settingType: 'number', category: 'general', description: '前端服务端口(修改后需重启前端服务)', isEditable: true },
-    
+
     // 外观设置
     { settingKey: 'primary_color', settingValue: JSON.stringify('#667eea'), settingType: 'string', category: 'appearance', description: '主题主色调', isEditable: true },
     { settingKey: 'secondary_color', settingValue: JSON.stringify('#764ba2'), settingType: 'string', category: 'appearance', description: '主题辅助色调', isEditable: true },
@@ -25,7 +25,7 @@ const initDefaultSettings = async () => {
     { settingKey: 'sidebar_collapsed', settingValue: JSON.stringify(false), settingType: 'boolean', category: 'appearance', description: '侧边栏默认折叠', isEditable: true },
     { settingKey: 'table_row_height', settingValue: JSON.stringify('default'), settingType: 'string', category: 'appearance', description: '表格行高: small/default/middle/large', isEditable: true },
     { settingKey: 'animation_enabled', settingValue: JSON.stringify(true), settingType: 'boolean', category: 'appearance', description: '启用动画效果', isEditable: true },
-    
+
     // 关于页面
     { settingKey: 'app_version', settingValue: JSON.stringify('1.0.0'), settingType: 'string', category: 'about', description: '应用版本', isEditable: false },
     { settingKey: 'company_name', settingValue: JSON.stringify(''), settingType: 'string', category: 'about', description: '公司/组织名称', isEditable: true },
@@ -36,21 +36,34 @@ const initDefaultSettings = async () => {
     { settingKey: 'privacy_policy', settingValue: JSON.stringify(''), settingType: 'string', category: 'about', description: '隐私政策URL', isEditable: true },
     { settingKey: 'terms_of_service', settingValue: JSON.stringify(''), settingType: 'string', category: 'about', description: '服务条款URL', isEditable: true },
   ];
-  
+
+  let createdCount = 0;
+  let updatedCount = 0;
+  let errorCount = 0;
+
   for (const setting of defaultSettings) {
     try {
       const existing = await SystemSetting.findByPk(setting.settingKey);
       if (!existing) {
         await SystemSetting.create(setting);
+        createdCount++;
+      } else if (existing.description !== setting.description) {
+        // 更新描述（用于修复英文描述问题）
+        await existing.update({ description: setting.description });
+        updatedCount++;
       }
     } catch (error) {
-      console.error(`初始化设置 ${setting.settingKey} 失败:`, error);
+      console.error(`初始化设置 ${setting.settingKey} 失败:`, error.message);
+      errorCount++;
     }
   }
+
+  console.log(`系统设置初始化结果: 创建 ${createdCount} 个, 更新 ${updatedCount} 个, 失败 ${errorCount} 个`);
+  return { createdCount, updatedCount, errorCount };
 };
 
-// 初始化默认设置
-initDefaultSettings();
+// 注意：初始化现在由 server.js 统一调用，避免重复初始化
+// initDefaultSettings();
 
 // 获取所有设置
 router.get('/', async (req, res) => {

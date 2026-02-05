@@ -185,15 +185,8 @@ const defaultDeviceFields = [
 async function initDeviceFields() {
   try {
     console.log('开始初始化设备字段配置...');
-    
-    // 连接数据库
-    await sequelize.authenticate();
-    console.log('数据库连接成功');
-    
-    // 同步表结构
-    await sequelize.sync();
-    console.log('数据库表结构同步完成');
-    
+    // 注意：数据库连接和表结构同步已在 server.js 中完成，这里直接初始化数据
+
     // 批量创建默认字段
     for (const field of defaultDeviceFields) {
       // 检查字段是否已存在

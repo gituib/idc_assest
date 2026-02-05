@@ -1,6 +1,10 @@
 /**
  * 数据库初始化脚本
  * 用于生产环境首次部署时创建表结构
+ * 
+ * 注意：此脚本为独立运行脚本，与 server.js 的初始化逻辑重复
+ * 如果 server.js 已能正常完成初始化，则无需单独运行此脚本
+ * 如需单独运行：node backend/scripts/init-database.js
  */
 
 const { sequelize } = require('../db');
