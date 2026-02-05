@@ -1302,17 +1302,93 @@ server {
   fs.writeFileSync(path.join(deployDir, 'nginx-idc.conf'), nginxConfig);
   log.success('Nginx 配置文件已生成 (deploy/nginx-idc.conf)');
 
+  // 自动配置 Nginx（Linux 系统）
+  if (!isWindows && config.frontendDeploy === 'nginx') {
+    autoConfigureNginx();
+  }
+
   // 输出平台特定的配置指引
   if (isWindows) {
     log.info('Windows Nginx 配置路径示例:');
     console.log(`  将配置文件复制到: ${colors.cyan}C:/nginx/conf/conf.d/idc.conf${colors.reset}`);
     console.log(`  或修改主配置 include: ${colors.cyan}C:/nginx/conf/nginx.conf${colors.reset}`);
-  } else {
-    console.log(`\n${colors.yellow}Nginx 配置启用命令:${colors.reset}`);
-    console.log(`  sudo cp deploy/nginx-idc.conf /etc/nginx/sites-available/idc`);
-    console.log(`  sudo ln -s /etc/nginx/sites-available/idc /etc/nginx/sites-enabled/`);
-    console.log(`  sudo nginx -t`);
-    console.log(`  sudo systemctl restart nginx`);
+  }
+}
+
+/**
+ * 自动配置 Nginx（Linux）
+ * 
+ * 自动复制配置文件到系统目录并启用
+ */
+function autoConfigureNginx() {
+  log.step('自动配置 Nginx');
+
+  const root = isRootUser();
+  const sudoPrefix = root ? '' : 'sudo ';
+  const configSource = path.join(__dirname, 'deploy', 'nginx-idc.conf');
+
+  try {
+    // 检测 Nginx 配置目录结构
+    let configDir = '';
+    let useSitesAvailable = false;
+
+    if (fs.existsSync('/etc/nginx/sites-available')) {
+      configDir = '/etc/nginx/sites-available';
+      useSitesAvailable = true;
+    } else if (fs.existsSync('/etc/nginx/conf.d')) {
+      configDir = '/etc/nginx/conf.d';
+      useSitesAvailable = false;
+    } else {
+      log.warning('未找到标准 Nginx 配置目录，请手动配置');
+      return;
+    }
+
+    // 复制配置文件
+    const configDest = path.join(configDir, 'idc');
+    log.info(`复制配置到 ${configDest}...`);
+
+    const copyResult = runCommand(`${sudoPrefix}cp "${configSource}" "${configDest}"`);
+    if (!copyResult.success) {
+      log.error('配置文件复制失败');
+      return;
+    }
+
+    // 如果使用 sites-available，创建软链接
+    if (useSitesAvailable) {
+      log.info('创建站点软链接...');
+      const linkResult = runCommand(`${sudoPrefix}ln -sf "${configDest}" /etc/nginx/sites-enabled/idc`);
+      if (!linkResult.success) {
+        log.warning('软链接创建失败');
+      }
+
+      // 删除默认配置（如果存在）
+      if (fs.existsSync('/etc/nginx/sites-enabled/default')) {
+        log.info('删除默认站点配置...');
+        runCommand(`${sudoPrefix}rm -f /etc/nginx/sites-enabled/default`, { silent: true });
+      }
+    }
+
+    // 测试配置
+    log.info('测试 Nginx 配置...');
+    const testResult = runCommand(`${sudoPrefix}nginx -t`);
+    if (!testResult.success) {
+      log.error('Nginx 配置测试失败');
+      return;
+    }
+
+    // 重载 Nginx
+    log.info('重载 Nginx 服务...');
+    const reloadResult = runCommand(`${sudoPrefix}nginx -s reload`);
+    if (reloadResult.success) {
+      log.success('Nginx 配置完成并已生效');
+    } else {
+      log.warning('Nginx 重载失败，尝试启动服务...');
+      runCommand(`${sudoPrefix}systemctl start nginx`, { silent: true });
+    }
+
+  } catch (error) {
+    log.error(`自动配置失败: ${error.message}`);
+    log.info('请手动配置 Nginx');
   }
 }
 
