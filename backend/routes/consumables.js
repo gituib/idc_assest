@@ -53,7 +53,13 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
-    const consumable = await Consumable.create(req.body, { transaction });
+    console.log('接收到的数据:', JSON.stringify(req.body, null, 2));
+    const consumableData = {
+      ...req.body,
+      consumableId: req.body.consumableId || `CON${Date.now()}`
+    };
+    console.log('处理后的数据:', JSON.stringify(consumableData, null, 2));
+    const consumable = await Consumable.create(consumableData, { transaction });
     
     await ConsumableLog.create({
       consumableId: consumable.consumableId,
@@ -71,7 +77,13 @@ router.post('/', async (req, res) => {
     res.status(201).json(consumable);
   } catch (error) {
     await transaction.rollback();
-    res.status(400).json({ error: error.message });
+    console.error('创建耗材错误:', error);
+    if (error.name === 'SequelizeValidationError') {
+      const messages = error.errors.map(e => `${e.path}: ${e.message}`).join(', ');
+      res.status(400).json({ error: `Validation error: ${messages}` });
+    } else {
+      res.status(400).json({ error: error.message });
+    }
   }
 });
 

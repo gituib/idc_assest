@@ -67,7 +67,7 @@ function ConsumableManagement() {
   const showModal = useCallback((consumable = null) => {
     setEditingConsumable(consumable);
     if (consumable) {
-      const isUnlimited = consumable.maxStock === null || consumable.maxStock === undefined;
+      const isUnlimited = consumable.maxStock === 0 || consumable.maxStock === null || consumable.maxStock === undefined;
       setMaxStockUnlimited(isUnlimited);
       form.setFieldsValue({
         ...consumable,
@@ -76,6 +76,13 @@ function ConsumableManagement() {
     } else {
       setMaxStockUnlimited(true);
       form.resetFields();
+      form.setFieldsValue({
+        unit: '个',
+        currentStock: 0,
+        minStock: 0,
+        status: 'active',
+        unitPrice: 0
+      });
     }
     setModalVisible(true);
   }, [form]);
@@ -89,7 +96,8 @@ function ConsumableManagement() {
     try {
       const submitData = {
         ...values,
-        maxStock: maxStockUnlimited ? null : values.maxStock
+        maxStock: maxStockUnlimited ? 0 : values.maxStock,
+        unitPrice: values.unitPrice || 0
       };
       if (editingConsumable) {
         await axios.put(`/api/consumables/${editingConsumable.consumableId}`, submitData);
@@ -411,12 +419,6 @@ function ConsumableManagement() {
 
   const columns = useMemo(() => [
     {
-      title: '耗材ID',
-      dataIndex: 'consumableId',
-      key: 'consumableId',
-      width: 150
-    },
-    {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
@@ -459,7 +461,7 @@ function ConsumableManagement() {
       dataIndex: 'maxStock',
       key: 'maxStock',
       width: 100,
-      render: (value) => value === null || value === undefined ? '无限制' : value
+      render: (value) => value === 0 || value === null || value === undefined ? '无限制' : value
     },
     {
       title: '单价(元)',
@@ -481,6 +483,14 @@ function ConsumableManagement() {
       key: 'location',
       width: 120,
       render: (value) => value || '-'
+    },
+    {
+      title: '描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 200,
+      render: (value) => value || '-',
+      ellipsis: true
     },
     {
       title: '状态',
