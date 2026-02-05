@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Card, Table, Button, Space, Modal, Form, Input, Select, message, Tag, Popconfirm, Avatar, Tooltip, Badge } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, ReloadOutlined, LockOutlined, CameraOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, ReloadOutlined, LockOutlined, CameraOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { userAPI, roleAPI } from '../api';
 
 const { Option } = Select;
@@ -17,6 +17,7 @@ const UserManagement = () => {
   const [passwordUser, setPasswordUser] = useState(null);
   const [avatarUser, setAvatarUser] = useState(null);
   const [uploadLoading, setUploadLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
   const [form] = Form.useForm();
   const [passwordForm] = Form.useForm();
   const fileInputRef = useRef(null);
@@ -29,10 +30,14 @@ const UserManagement = () => {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await userAPI.list({
+      const params = {
         page: pagination.current,
         pageSize: pagination.pageSize
-      });
+      };
+      if (activeTab !== 'all') {
+        params.status = activeTab;
+      }
+      const response = await userAPI.list(params);
       if (response.success) {
         setUsers(response.data.users);
         setPagination(prev => ({ ...prev, total: response.data.total }));
@@ -42,7 +47,7 @@ const UserManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.current, pagination.pageSize]);
+  }, [pagination.current, pagination.pageSize, activeTab]);
 
   const fetchRoles = useCallback(async () => {
     try {
@@ -207,7 +212,8 @@ const UserManagement = () => {
     const colors = {
       active: 'green',
       inactive: 'red',
-      locked: 'orange'
+      locked: 'orange',
+      pending: 'blue'
     };
     return colors[status] || 'default';
   };
@@ -216,10 +222,39 @@ const UserManagement = () => {
     const texts = {
       active: '正常',
       inactive: '禁用',
-      locked: '锁定'
+      locked: '锁定',
+      pending: '待审核'
     };
     return texts[status] || status;
   };
+
+  const handleApprove = useCallback(async (userId) => {
+    try {
+      const response = await userAPI.approve(userId);
+      if (response.success) {
+        message.success('审核通过');
+        fetchUsers();
+      } else {
+        message.error(response.message || '审核失败');
+      }
+    } catch (error) {
+      message.error('审核失败');
+    }
+  }, [fetchUsers]);
+
+  const handleReject = useCallback(async (userId) => {
+    try {
+      const response = await userAPI.reject(userId);
+      if (response.success) {
+        message.success('已拒绝该用户的注册申请');
+        fetchUsers();
+      } else {
+        message.error(response.message || '操作失败');
+      }
+    } catch (error) {
+      message.error('操作失败');
+    }
+  }, [fetchUsers]);
 
   const getAvatarUrl = (user) => {
     if (!user?.avatar) return null;
@@ -302,52 +337,88 @@ const UserManagement = () => {
         </div>
       )
     },
-    {title: '操作',
+    {
+      title: '操作',
       key: 'action',
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title="编辑">
-            <Button 
-              type="text" 
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          <Tooltip title="重置密码">
-            <Button 
-              type="text" 
-              icon={<LockOutlined />}
-              onClick={() => handleResetPassword(record)}
-            />
-          </Tooltip>
-          <Popconfirm
-            title={record.status === 'locked' ? '确定要解锁此用户吗？' : '确定要锁定此用户吗？'}
-            onConfirm={() => handleLockUnlock(record)}
-            okText="确定"
-            cancelText="取消"
-          >
-            <Tooltip title={record.status === 'locked' ? '解锁' : '锁定'}>
-              <Button 
-                type="text" 
-                icon={record.status === 'locked' ? <ReloadOutlined /> : <LockOutlined />}
-                style={{ color: record.status === 'locked' ? '#52c41a' : '#faad14' }}
-              />
-            </Tooltip>
-          </Popconfirm>
-          <Popconfirm
-            title="确定要删除此用户吗？"
-            onConfirm={() => handleDelete(record.userId)}
-            okText="确定"
-            cancelText="取消"
-          >
-            <Tooltip title="删除">
-              <Button type="text" danger icon={<DeleteOutlined />} />
-            </Tooltip>
-          </Popconfirm>
+          {record.status === 'pending' ? (
+            <>
+              <Popconfirm
+                title="确定要通过该用户的注册申请吗？"
+                onConfirm={() => handleApprove(record.userId)}
+                okText="通过"
+                cancelText="取消"
+              >
+                <Tooltip title="通过">
+                  <Button
+                    type="text"
+                    icon={<CheckOutlined />}
+                    style={{ color: '#52c41a' }}
+                  />
+                </Tooltip>
+              </Popconfirm>
+              <Popconfirm
+                title="确定要拒绝该用户的注册申请吗？"
+                onConfirm={() => handleReject(record.userId)}
+                okText="拒绝"
+                cancelText="取消"
+              >
+                <Tooltip title="拒绝">
+                  <Button
+                    type="text"
+                    icon={<CloseOutlined />}
+                    style={{ color: '#ff4d4f' }}
+                  />
+                </Tooltip>
+              </Popconfirm>
+            </>
+          ) : (
+            <>
+              <Tooltip title="编辑">
+                <Button
+                  type="text"
+                  icon={<EditOutlined />}
+                  onClick={() => handleEdit(record)}
+                />
+              </Tooltip>
+              <Tooltip title="重置密码">
+                <Button
+                  type="text"
+                  icon={<LockOutlined />}
+                  onClick={() => handleResetPassword(record)}
+                />
+              </Tooltip>
+              <Popconfirm
+                title={record.status === 'locked' ? '确定要解锁此用户吗？' : '确定要锁定此用户吗？'}
+                onConfirm={() => handleLockUnlock(record)}
+                okText="确定"
+                cancelText="取消"
+              >
+                <Tooltip title={record.status === 'locked' ? '解锁' : '锁定'}>
+                  <Button
+                    type="text"
+                    icon={record.status === 'locked' ? <ReloadOutlined /> : <LockOutlined />}
+                    style={{ color: record.status === 'locked' ? '#52c41a' : '#faad14' }}
+                  />
+                </Tooltip>
+              </Popconfirm>
+              <Popconfirm
+                title="确定要删除此用户吗？"
+                onConfirm={() => handleDelete(record.userId)}
+                okText="确定"
+                cancelText="取消"
+              >
+                <Tooltip title="删除">
+                  <Button type="text" danger icon={<DeleteOutlined />} />
+                </Tooltip>
+              </Popconfirm>
+            </>
+          )}
         </Space>
       )
     }
-  ], [handleAvatarClick, handleEdit, handleResetPassword, handleDelete, handleLockUnlock]);
+  ], [handleAvatarClick, handleEdit, handleResetPassword, handleDelete, handleLockUnlock, handleApprove, handleReject]);
 
   const pageHeaderStyle = {
     marginBottom: '24px',
@@ -454,7 +525,22 @@ const UserManagement = () => {
         </Space>
       </div>
 
-      <Card style={cardStyle} styles={{ header: cardHeadStyle, body: { padding: '20px 24px' } }}>
+      <Card
+        style={cardStyle}
+        styles={{ header: cardHeadStyle, body: { padding: '20px 24px' } }}
+        tabList={[
+          { key: 'all', tab: '全部用户' },
+          { key: 'pending', tab: '待审核' },
+          { key: 'active', tab: '正常' },
+          { key: 'locked', tab: '锁定' },
+          { key: 'inactive', tab: '禁用' }
+        ]}
+        activeTabKey={activeTab}
+        onTabChange={(key) => {
+          setActiveTab(key);
+          setPagination(prev => ({ ...prev, current: 1 }));
+        }}
+      >
         <Table
           columns={tableColumns}
           dataSource={users}

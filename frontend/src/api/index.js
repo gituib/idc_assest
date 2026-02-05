@@ -95,7 +95,9 @@ export const userAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
-  deleteAvatar: (userId) => api.delete(`/users/${userId}/avatar`)
+  deleteAvatar: (userId) => api.delete(`/users/${userId}/avatar`),
+  approve: (userId) => api.put(`/users/${userId}/approve`),
+  reject: (userId) => api.put(`/users/${userId}/reject`)
 };
 
 export const roleAPI = {

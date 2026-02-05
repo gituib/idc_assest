@@ -465,4 +465,82 @@ router.delete('/:userId/avatar', authMiddleware, async (req, res) => {
   }
 });
 
+router.put('/:userId/approve', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+
+    if (user.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: '该用户不在待审核状态'
+      });
+    }
+
+    user.status = 'active';
+    await user.save();
+
+    res.json({
+      success: true,
+      message: '用户审核通过',
+      data: {
+        userId: user.userId,
+        username: user.username,
+        status: user.status
+      }
+    });
+  } catch (error) {
+    console.error('审核用户错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '审核用户失败'
+    });
+  }
+});
+
+router.put('/:userId/reject', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+
+    if (user.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: '该用户不在待审核状态'
+      });
+    }
+
+    user.status = 'inactive';
+    await user.save();
+
+    res.json({
+      success: true,
+      message: '已拒绝该用户的注册申请',
+      data: {
+        userId: user.userId,
+        username: user.username,
+        status: user.status
+      }
+    });
+  } catch (error) {
+    console.error('拒绝用户错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '操作失败'
+    });
+  }
+});
+
 module.exports = router;

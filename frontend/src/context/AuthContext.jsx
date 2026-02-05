@@ -91,7 +91,7 @@ export const AuthProvider = ({ children }) => {
         setUser(userData);
         return { success: true };
       }
-      return { success: false, message: response.message };
+      return { success: false, message: response.message, code: response.code };
     } catch (error) {
       return { success: false, message: error };
     }
@@ -101,12 +101,14 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authAPI.register(userData);
       if (response.success) {
-        const { token: newToken, user: newUser } = response.data;
-        localStorage.setItem('token', newToken);
-        localStorage.setItem('user', JSON.stringify(newUser));
-        setToken(newToken);
-        setUser(newUser);
-        return { success: true, isFirstUser: response.data.isFirstUser };
+        const { token: newToken, user: newUser, isFirstUser, pendingApproval } = response.data;
+        if (newToken) {
+          localStorage.setItem('token', newToken);
+          localStorage.setItem('user', JSON.stringify(newUser));
+          setToken(newToken);
+          setUser(newUser);
+        }
+        return { success: true, isFirstUser, pendingApproval };
       }
       return { success: false, message: response.message };
     } catch (error) {

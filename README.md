@@ -4,7 +4,6 @@
 
 ## 代码仓库
 
-- **GitHub**: https://github.com/gituib/idc_assest
 - **Gitee**: https://gitee.com/zhang96110/idc_assest
 
 ## 系统概述
@@ -119,7 +118,7 @@ jigui/
 
 ```bash
 # 克隆项目
-git clone https://github.com/gituib/idc_assest.git
+git clone https://gitee.com/zhang96110/idc_assest.git
 cd idc_assest
 
 # 运行交互式安装脚本
@@ -192,7 +191,7 @@ node install.js
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/gituib/idc_assest.git
+git clone https://gitee.com/zhang96110/idc_assest.git
 cd idc_assest
 
 # 2. 安装后端依赖
@@ -220,129 +219,6 @@ npm run dev
 - 前端应用：http://localhost:3000
 - 后端API：http://localhost:8000/api
 - 健康检查：http://localhost:8000/health
-
-## 安装部署脚本
-
-项目提供多个实用脚本，简化安装、更新、卸载等操作：
-
-### 脚本列表
-
-| 脚本 | 命令 | 功能说明 |
-|------|------|----------|
-| **install.js** | `npm run deploy` / `node install.js` | 交互式安装部署脚本 |
-| **update.js** | `npm run update` / `node update.js` | 一键更新脚本 |
-| **uninstall.js** | `node uninstall.js` | 卸载清理脚本 |
-| **check.js** | `node check.js` | 环境检查脚本 |
-| **modify.js** | `node modify.js` | 配置修改脚本 |
-
-### install.js - 交互式安装部署
-
-**功能特性：**
-- ✅ 自动检测 Node.js、npm、PM2、Nginx 环境
-- ✅ **Linux 支持自动安装 Node.js**（交互式）
-- ✅ 交互式配置数据库（SQLite/MySQL）
-- ✅ 交互式选择运行环境（development/production）
-- ✅ 交互式选择前端部署方式（Nginx/PM2 serve）
-- ✅ 自动安装项目依赖
-- ✅ 自动初始化数据库
-- ✅ 自动构建前端项目
-- ✅ 使用 PM2 启动和管理服务
-
-**使用方式：**
-```bash
-# 方式一：使用 npm 命令
-npm run deploy
-
-# 方式二：直接运行脚本
-node install.js
-```
-
-### update.js - 一键更新
-
-**功能特性：**
-- ✅ 自动备份数据
-- ✅ 拉取最新代码
-- ✅ 更新前后端依赖
-- ✅ 重建前端项目
-- ✅ 重启服务
-
-**使用方式：**
-```bash
-# 方式一：使用 npm 命令
-npm run update
-
-# 方式二：直接运行脚本
-node update.js
-```
-
-### uninstall.js - 卸载清理
-
-**功能特性：**
-- ✅ 停止 PM2 服务
-- ✅ 删除 PM2 进程配置
-- ✅ 清理 Nginx 配置（可选）
-- ✅ 备份数据（可选）
-- ✅ 清理日志文件（可选）
-
-**使用方式：**
-```bash
-node uninstall.js
-```
-
-**卸载流程：**
-```
-▶ 停止服务
-✓ 已停止 idc-backend
-✓ 已停止 idc-frontend
-
-▶ 删除 PM2 配置
-✓ 已删除 PM2 进程
-
-▶ 清理 Nginx 配置
-是否删除 Nginx 配置? (y/N): n
-
-▶ 数据备份
-是否备份数据库? (Y/n): y
-✓ 数据库已备份到 backup/database_20240205_143022.sql
-
-▶ 清理完成
-✓ 卸载完成，感谢使用！
-```
-
-**注意事项：**
-- 卸载前建议备份数据
-- 默认保留数据库文件，可手动删除
-- 上传的文件（avatars、uploads）需手动清理
-
-### check.js - 环境检查
-
-**功能特性：**
-- ✅ 检查 Node.js 版本
-- ✅ 检查 npm 版本
-- ✅ 检查 PM2 安装状态
-- ✅ 检查 Nginx 安装状态
-- ✅ 检查端口占用情况
-- ✅ 检查磁盘空间
-
-**使用方式：**
-```bash
-node check.js
-```
-
-### modify.js - 配置修改
-
-**功能特性：**
-- ✅ 修改数据库配置
-- ✅ 修改服务端口
-- ✅ 修改运行环境
-- ✅ 修改前端部署方式
-
-**使用方式：**
-```bash
-node modify.js
-```
-
----
 
 ## 更新升级
 

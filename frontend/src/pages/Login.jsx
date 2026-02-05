@@ -48,7 +48,11 @@ const Login = () => {
         message.success('登录成功');
         navigate('/');
       } else {
-        message.error(result.message || '登录失败');
+        if (result.code === 'PENDING_APPROVAL') {
+          message.warning('账户待审核，请联系管理员激活');
+        } else {
+          message.error(result.message || '登录失败');
+        }
       }
     } catch (error) {
       message.error(error || '登录失败');
@@ -91,8 +95,16 @@ const Login = () => {
       });
 
       if (result.success) {
-        message.success(result.isFirstUser ? '注册成功，已为您创建管理员账户' : '注册成功');
-        navigate('/');
+        if (result.isFirstUser) {
+          message.success('注册成功，已为您创建管理员账户');
+          navigate('/');
+        } else if (result.pendingApproval) {
+          message.success('注册成功，请等待管理员审核');
+          setRegisterMode(false);
+        } else {
+          message.success('注册成功');
+          navigate('/');
+        }
       } else {
         message.error(result.message || '注册失败');
       }

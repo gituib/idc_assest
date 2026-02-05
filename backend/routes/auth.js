@@ -58,12 +58,12 @@ router.post('/register', async (req, res) => {
       email,
       phone,
       realName: realName || username,
-      status: 'active'
+      status: isFirstUser ? 'active' : 'pending'
     });
 
     if (isFirstUser) {
       let adminRole = await Role.findOne({ where: { roleCode: 'admin' } });
-      
+
       if (!adminRole) {
         adminRole = await Role.create({
           roleId: 'role_admin',
@@ -74,37 +74,53 @@ router.post('/register', async (req, res) => {
           permissions: []
         });
       }
-      
+
       await UserRole.create({
         UserId: user.userId,
         RoleId: adminRole.roleId
       });
+
+      const token = generateToken(user);
+
+      res.status(201).json({
+        success: true,
+        message: '注册成功，已为您分配管理员权限',
+        data: {
+          user: {
+            userId: user.userId,
+            username: user.username,
+            email: user.email,
+            realName: user.realName
+          },
+          token,
+          isFirstUser: true
+        }
+      });
     } else {
       const defaultRole = await Role.findOne({ where: { roleCode: 'viewer' } });
-      
+
       if (defaultRole) {
         await UserRole.create({
           UserId: user.userId,
           RoleId: defaultRole.roleId
         });
       }
+
+      res.status(201).json({
+        success: true,
+        message: '注册成功，请等待管理员审核',
+        data: {
+          user: {
+            userId: user.userId,
+            username: user.username,
+            email: user.email,
+            realName: user.realName
+          },
+          isFirstUser: false,
+          pendingApproval: true
+        }
+      });
     }
-
-    const token = generateToken(user);
-
-    res.status(201).json({
-      success: true,
-      message: isFirstUser ? '注册成功，已为您分配管理员权限' : '注册成功',
-      data: {
-        user: {
-          userId: user.userId,
-          username: user.username,
-          email: user.email,
-          realName: user.realName
-        },
-        token
-      }
-    });
   } catch (error) {
     console.error('注册错误:', error);
     res.status(500).json({
@@ -145,6 +161,14 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({
         success: false,
         message: '账户已禁用'
+      });
+    }
+
+    if (user.status === 'pending') {
+      return res.status(403).json({
+        success: false,
+        code: 'PENDING_APPROVAL',
+        message: '账户待审核，请联系管理员激活'
       });
     }
 
