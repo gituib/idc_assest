@@ -135,7 +135,7 @@ MYSQL_DATABASE=idc_management
 #### 2. 安装生产依赖
 
 ```bash
-npm install --only=production
+npm install
 ```
 
 #### 3. 配置数据库

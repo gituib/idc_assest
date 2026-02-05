@@ -71,71 +71,102 @@ const SystemSettings = () => {
 
       await axios.put('/api/system-settings', { settings: updates });
 
-      // 如果修改了前端端口，同步配置并自动重启
+      // 如果修改了前端端口，同步配置并自动重启（仅开发环境）
       if ('frontend_port' in updates) {
         try {
           // 1. 同步端口到配置文件
           await axios.post('/api/system-settings/frontend/port/sync');
 
-          // 2. 显示确认对话框
-          Modal.confirm({
-            title: '前端端口已修改',
-            icon: <ExclamationCircleOutlined />,
-            content: (
-              <div>
-                <p>前端端口已从 <strong>{settings.frontend_port?.value}</strong> 更改为 <strong>{updates.frontend_port}</strong></p>
-                <p>是否立即重启前端服务以应用新端口？</p>
-                <Alert
-                  message="注意"
-                  description="重启后页面将自动跳转到新地址，如果新端口无法访问，请手动使用原端口访问。"
-                  type="warning"
-                  showIcon
-                  style={{ marginTop: 16 }}
-                />
-              </div>
-            ),
-            okText: '立即重启',
-            cancelText: '稍后手动重启',
-            onOk: async () => {
-              const newPort = updates.frontend_port;
-              const newUrl = `http://localhost:${newPort}`;
+          // 2. 检查是否为生产环境
+          const statusRes = await axios.get('/api/system-settings/frontend/status');
+          const isProduction = statusRes.data.isProduction;
 
-              // 先显示跳转提示，再调用重启API
-              // 因为重启API会导致当前服务中断
-              Modal.success({
-                title: '正在重启前端服务',
-                content: (
-                  <div>
-                    <p>前端服务正在重启，新端口：<strong>{newPort}</strong></p>
-                    <p>页面将在3秒后自动跳转到新地址...</p>
-                    <p>如果跳转失败，请手动访问：<a href={newUrl}>{newUrl}</a></p>
-                  </div>
-                ),
-                okText: '立即跳转',
-                closable: false,
-                maskClosable: false,
-                onOk: () => {
+          if (isProduction) {
+            // 生产环境：只显示提示，不自动重启
+            Modal.info({
+              title: '前端端口已修改（生产环境）',
+              content: (
+                <div>
+                  <p>前端端口已从 <strong>{settings.frontend_port?.value}</strong> 更改为 <strong>{updates.frontend_port}</strong></p>
+                  <Alert
+                    message="请手动更新服务器配置"
+                    description={
+                      <div>
+                        <p>生产环境由 Nginx 或其他服务器托管，请手动更新服务器配置文件：</p>
+                        <p>1. 更新 Nginx 配置中的监听端口</p>
+                        <p>2. 重启 Nginx 服务</p>
+                        <p>3. 更新 vite.config.js 中的端口配置（用于下次构建）</p>
+                      </div>
+                    }
+                    type="info"
+                    showIcon
+                    style={{ marginTop: 16 }}
+                  />
+                </div>
+              ),
+              okText: '知道了'
+            });
+          } else {
+            // 开发环境：显示确认对话框并自动重启
+            Modal.confirm({
+              title: '前端端口已修改',
+              icon: <ExclamationCircleOutlined />,
+              content: (
+                <div>
+                  <p>前端端口已从 <strong>{settings.frontend_port?.value}</strong> 更改为 <strong>{updates.frontend_port}</strong></p>
+                  <p>是否立即重启前端服务以应用新端口？</p>
+                  <Alert
+                    message="注意"
+                    description="重启后页面将自动跳转到新地址，如果新端口无法访问，请手动使用原端口访问。"
+                    type="warning"
+                    showIcon
+                    style={{ marginTop: 16 }}
+                  />
+                </div>
+              ),
+              okText: '立即重启',
+              cancelText: '稍后手动重启',
+              onOk: async () => {
+                const newPort = updates.frontend_port;
+                const newUrl = `http://localhost:${newPort}`;
+
+                // 先显示跳转提示，再调用重启API
+                // 因为重启API会导致当前服务中断
+                Modal.success({
+                  title: '正在重启前端服务',
+                  content: (
+                    <div>
+                      <p>前端服务正在重启，新端口：<strong>{newPort}</strong></p>
+                      <p>页面将在3秒后自动跳转到新地址...</p>
+                      <p>如果跳转失败，请手动访问：<a href={newUrl}>{newUrl}</a></p>
+                    </div>
+                  ),
+                  okText: '立即跳转',
+                  closable: false,
+                  maskClosable: false,
+                  onOk: () => {
+                    window.location.href = newUrl;
+                  }
+                });
+
+                // 延迟调用重启API，让用户看到提示
+                setTimeout(async () => {
+                  try {
+                    // 调用重启API（这个请求可能会因为服务重启而失败）
+                    await axios.post('/api/system-settings/frontend/restart', {}, { timeout: 5000 });
+                  } catch (error) {
+                    // 忽略错误，因为服务重启会导致连接中断
+                    console.log('重启请求已发送，服务正在重启...');
+                  }
+                }, 1000);
+
+                // 延迟3秒后跳转
+                setTimeout(() => {
                   window.location.href = newUrl;
-                }
-              });
-
-              // 延迟调用重启API，让用户看到提示
-              setTimeout(async () => {
-                try {
-                  // 调用重启API（这个请求可能会因为服务重启而失败）
-                  await axios.post('/api/system-settings/frontend/restart', {}, { timeout: 5000 });
-                } catch (error) {
-                  // 忽略错误，因为服务重启会导致连接中断
-                  console.log('重启请求已发送，服务正在重启...');
-                }
-              }, 1000);
-
-              // 延迟3秒后跳转
-              setTimeout(() => {
-                window.location.href = newUrl;
-              }, 3000);
-            }
-          });
+                }, 3000);
+              }
+            });
+          }
         } catch (syncError) {
           console.warn('同步前端端口配置失败:', syncError);
           message.warning('端口配置已保存，但同步到配置文件失败');
@@ -314,12 +345,15 @@ const SystemSettings = () => {
       <Card title="全局配置" bordered={false}>
         {frontendStatus && (
           <Alert
-            message="前端服务状态"
+            message={frontendStatus.isProduction ? "前端服务状态（生产环境）" : "前端服务状态（开发环境）"}
             description={
               <div>
                 <p>当前端口：<strong>{frontendStatus.port}</strong></p>
                 <p>运行状态：{frontendStatus.isRunning ? <Tag color="success">运行中</Tag> : <Tag color="error">未运行</Tag>}</p>
                 {frontendStatus.portInUse && <p style={{ color: '#ff4d4f' }}>警告：端口被其他程序占用</p>}
+                {frontendStatus.isProduction && (
+                  <p style={{ color: '#1890ff' }}>提示：生产环境由 Nginx 或其他服务器托管，如需修改端口请更新服务器配置</p>
+                )}
                 <p>访问地址：<a href={frontendStatus.url} target="_blank" rel="noopener noreferrer">{frontendStatus.url}</a></p>
               </div>
             }

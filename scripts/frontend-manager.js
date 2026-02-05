@@ -169,12 +169,22 @@ const getStatus = async () => {
   // 检查端口实际占用情况
   const portAvailable = await checkPort(port);
 
+  // 检测是否为生产环境（通过检查是否存在 dist 目录）
+  const frontendDir = path.join(__dirname, '../frontend');
+  const distDir = path.join(frontendDir, 'dist');
+  const isProduction = fs.existsSync(distDir);
+
+  // 生产环境：只要端口被占用就认为服务在运行（Nginx/其他服务器）
+  // 开发环境：通过 PID 判断
+  const isServiceRunning = isProduction ? !portAvailable : isRunning;
+
   return {
     pid,
     port,
-    isRunning,
-    portInUse: !portAvailable && !isRunning, // 端口被占用但服务未运行
-    url: `http://localhost:${port}`
+    isRunning: isServiceRunning,
+    portInUse: !portAvailable && !isServiceRunning, // 端口被占用但服务未运行
+    url: `http://localhost:${port}`,
+    isProduction // 是否为生产环境
   };
 };
 
