@@ -13,13 +13,24 @@ const SystemSettings = () => {
   const [settings, setSettings] = useState({});
   const [activeTab, setActiveTab] = useState('general');
   const [systemInfo, setSystemInfo] = useState(null);
+  const [frontendStatus, setFrontendStatus] = useState(null);
   const [form] = Form.useForm();
   const { reloadConfig } = useConfig();
 
   useEffect(() => {
     fetchSettings();
     fetchSystemInfo();
+    fetchFrontendStatus();
   }, []);
+
+  const fetchFrontendStatus = async () => {
+    try {
+      const response = await axios.get('/api/system-settings/frontend/status');
+      setFrontendStatus(response.data);
+    } catch (error) {
+      console.error('获取前端服务状态失败:', error);
+    }
+  };
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -59,7 +70,80 @@ const SystemSettings = () => {
       });
 
       await axios.put('/api/system-settings', { settings: updates });
-      message.success('设置保存成功');
+
+      // 如果修改了前端端口，同步配置并自动重启
+      if ('frontend_port' in updates) {
+        try {
+          // 1. 同步端口到配置文件
+          await axios.post('/api/system-settings/frontend/port/sync');
+
+          // 2. 显示确认对话框
+          Modal.confirm({
+            title: '前端端口已修改',
+            icon: <ExclamationCircleOutlined />,
+            content: (
+              <div>
+                <p>前端端口已从 <strong>{settings.frontend_port?.value}</strong> 更改为 <strong>{updates.frontend_port}</strong></p>
+                <p>是否立即重启前端服务以应用新端口？</p>
+                <Alert
+                  message="注意"
+                  description="重启后页面将自动跳转到新地址，如果新端口无法访问，请手动使用原端口访问。"
+                  type="warning"
+                  showIcon
+                  style={{ marginTop: 16 }}
+                />
+              </div>
+            ),
+            okText: '立即重启',
+            cancelText: '稍后手动重启',
+            onOk: async () => {
+              const newPort = updates.frontend_port;
+              const newUrl = `http://localhost:${newPort}`;
+
+              // 先显示跳转提示，再调用重启API
+              // 因为重启API会导致当前服务中断
+              Modal.success({
+                title: '正在重启前端服务',
+                content: (
+                  <div>
+                    <p>前端服务正在重启，新端口：<strong>{newPort}</strong></p>
+                    <p>页面将在3秒后自动跳转到新地址...</p>
+                    <p>如果跳转失败，请手动访问：<a href={newUrl}>{newUrl}</a></p>
+                  </div>
+                ),
+                okText: '立即跳转',
+                closable: false,
+                maskClosable: false,
+                onOk: () => {
+                  window.location.href = newUrl;
+                }
+              });
+
+              // 延迟调用重启API，让用户看到提示
+              setTimeout(async () => {
+                try {
+                  // 调用重启API（这个请求可能会因为服务重启而失败）
+                  await axios.post('/api/system-settings/frontend/restart', {}, { timeout: 5000 });
+                } catch (error) {
+                  // 忽略错误，因为服务重启会导致连接中断
+                  console.log('重启请求已发送，服务正在重启...');
+                }
+              }, 1000);
+
+              // 延迟3秒后跳转
+              setTimeout(() => {
+                window.location.href = newUrl;
+              }, 3000);
+            }
+          });
+        } catch (syncError) {
+          console.warn('同步前端端口配置失败:', syncError);
+          message.warning('端口配置已保存，但同步到配置文件失败');
+        }
+      } else {
+        message.success('设置保存成功');
+      }
+
       fetchSettings();
       // 重新加载全局配置，使更改立即生效
       await reloadConfig();
@@ -115,14 +199,20 @@ const SystemSettings = () => {
           </Form.Item>
         );
       case 'number':
+        const isPortField = key === 'frontend_port';
         return (
           <Form.Item
             key={key}
             label={data.description || key}
             name={key}
-            rules={[{ required: false, message: `请输入${data.description || key}` }]}
+            rules={[
+              { required: false, message: `请输入${data.description || key}` },
+              ...(isPortField ? [
+                { type: 'number', min: 1, max: 65535, message: '端口号必须在 1-65535 之间', transform: value => Number(value) }
+              ] : [])
+            ]}
           >
-            <Input type="number" style={{ width: '100%' }} />
+            <Input type="number" style={{ width: '100%' }} min={isPortField ? 1 : undefined} max={isPortField ? 65535 : undefined} />
           </Form.Item>
         );
       case 'select':
@@ -219,9 +309,25 @@ const SystemSettings = () => {
   };
 
   const renderGeneralSettings = () => {
-    const generalKeys = ['site_name', 'site_logo', 'timezone', 'date_format', 'session_timeout', 'max_login_attempts', 'maintenance_mode'];
+    const generalKeys = ['site_name', 'site_logo', 'timezone', 'date_format', 'session_timeout', 'max_login_attempts', 'maintenance_mode', 'frontend_port'];
     return (
       <Card title="全局配置" bordered={false}>
+        {frontendStatus && (
+          <Alert
+            message="前端服务状态"
+            description={
+              <div>
+                <p>当前端口：<strong>{frontendStatus.port}</strong></p>
+                <p>运行状态：{frontendStatus.isRunning ? <Tag color="success">运行中</Tag> : <Tag color="error">未运行</Tag>}</p>
+                {frontendStatus.portInUse && <p style={{ color: '#ff4d4f' }}>警告：端口被其他程序占用</p>}
+                <p>访问地址：<a href={frontendStatus.url} target="_blank" rel="noopener noreferrer">{frontendStatus.url}</a></p>
+              </div>
+            }
+            type={frontendStatus.isRunning ? 'success' : 'warning'}
+            showIcon
+            style={{ marginBottom: 24 }}
+          />
+        )}
         <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
           {generalKeys.map(key => {
             // 确保时区和日期格式使用select类型

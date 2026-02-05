@@ -16,6 +16,7 @@ const initDefaultSettings = async () => {
     { settingKey: 'session_timeout', settingValue: JSON.stringify(30), settingType: 'number', category: 'general', description: '会话超时时间(分钟)', isEditable: true },
     { settingKey: 'max_login_attempts', settingValue: JSON.stringify(5), settingType: 'number', category: 'general', description: '最大登录尝试次数', isEditable: true },
     { settingKey: 'maintenance_mode', settingValue: JSON.stringify(false), settingType: 'boolean', category: 'general', description: '维护模式', isEditable: true },
+    { settingKey: 'frontend_port', settingValue: JSON.stringify(3000), settingType: 'number', category: 'general', description: '前端服务端口(修改后需重启前端服务)', isEditable: true },
     
     // 外观设置
     { settingKey: 'primary_color', settingValue: JSON.stringify('#667eea'), settingType: 'string', category: 'appearance', description: '主题主色调', isEditable: true },
@@ -227,6 +228,7 @@ router.post('/reset/:key', async (req, res) => {
       session_timeout: 30,
       max_login_attempts: 5,
       maintenance_mode: false,
+      frontend_port: 3000,
       primary_color: '#667eea',
       secondary_color: '#764ba2',
       compact_mode: false,
@@ -513,6 +515,79 @@ router.get('/system/info', async (req, res) => {
       },
       timestamp: new Date().toISOString()
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 获取前端端口配置（供 vite.config.js 使用）
+router.get('/frontend/port', async (req, res) => {
+  try {
+    const portSetting = await SystemSetting.findByPk('frontend_port');
+    const port = portSetting ? JSON.parse(portSetting.settingValue) : 3000;
+    res.json({ port });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 同步前端端口到配置文件（供前端保存设置后调用）
+router.post('/frontend/port/sync', async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+
+    const portSetting = await SystemSetting.findByPk('frontend_port');
+    const port = portSetting ? JSON.parse(portSetting.settingValue) : 3000;
+
+    // 写入前端配置文件
+    const frontendDir = path.join(__dirname, '../../frontend');
+    const configPath = path.join(frontendDir, '.frontend-port');
+
+    fs.writeFileSync(configPath, port.toString(), 'utf-8');
+
+    res.json({
+      message: '前端端口配置已同步',
+      port,
+      configPath: '.frontend-port',
+      notice: '配置已更新，请重启前端服务以应用新端口'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 重启前端服务
+router.post('/frontend/restart', async (req, res) => {
+  try {
+    const { restartFrontend, getStatus } = require('../../scripts/frontend-manager');
+
+    // 先获取当前状态
+    const beforeStatus = await getStatus();
+
+    // 执行重启
+    const result = await restartFrontend();
+
+    res.json({
+      message: '前端服务重启成功',
+      before: beforeStatus,
+      after: {
+        pid: result.pid,
+        port: result.port,
+        url: `http://localhost:${result.port}`
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 获取前端服务状态
+router.get('/frontend/status', async (req, res) => {
+  try {
+    const { getStatus } = require('../../scripts/frontend-manager');
+    const status = await getStatus();
+    res.json(status);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
