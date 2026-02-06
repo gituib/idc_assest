@@ -167,7 +167,7 @@ const formatDate = (date, fieldName) => {
 
 // 默认设备字段配置
 const defaultDeviceFields = [
-  { fieldName: 'deviceId', displayName: '设备ID', fieldType: 'string', required: true, order: 1, visible: true },
+  { fieldName: 'deviceId', displayName: '设备ID', fieldType: 'string', required: false, order: 1, visible: false },
   { fieldName: 'name', displayName: '设备名称', fieldType: 'string', required: true, order: 2, visible: true },
   { fieldName: 'type', displayName: '设备类型', fieldType: 'select', required: true, order: 3, visible: true, 
     options: [{ value: 'server', label: '服务器' }, { value: 'switch', label: '交换机' }, { value: 'router', label: '路由器' }, { value: 'storage', label: '存储设备' }, { value: 'other', label: '其他设备' }] },
@@ -1770,7 +1770,7 @@ function DeviceManagement() {
           layout="vertical"
           onFinish={handleSubmit}
         >
-          {deviceFields.map(field => {
+          {deviceFields.filter(field => field.fieldName !== 'deviceId').map(field => {
             let control = null;
             
             switch (field.fieldType) {
@@ -1822,7 +1822,7 @@ function DeviceManagement() {
                 key={field.fieldName}
                 name={field.fieldName}
                 label={field.displayName}
-                rules={field.required ? [{ required: true, message: `请输入${field.displayName}` }] : []}
+                rules={field.required && field.fieldName !== 'deviceId' ? [{ required: true, message: `请输入${field.displayName}` }] : []}
               >
                 {control}
               </Form.Item>
@@ -1861,7 +1861,7 @@ function DeviceManagement() {
         >
           <div style={{ maxHeight: 400, overflowY: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-              {deviceFields.map(field => (
+              {deviceFields.filter(field => field.fieldName !== 'deviceId').map(field => (
                 <Form.Item
                   key={field.fieldName}
                   name={field.fieldName}

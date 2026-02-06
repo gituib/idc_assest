@@ -9,14 +9,12 @@ const DEVICE_STATUS = ['running', 'maintenance', 'offline', 'fault'];
 // 创建设备验证Schema
 const createDeviceSchema = Joi.object({
   deviceId: Joi.string()
-    .required()
     .max(50)
     .pattern(/^[a-zA-Z0-9_-]+$/)
+    .allow('', null)
     .messages({
-      'string.empty': '设备ID不能为空',
       'string.max': '设备ID不能超过50个字符',
-      'string.pattern.base': '设备ID只能包含字母、数字、下划线和横线',
-      'any.required': '设备ID是必填字段'
+      'string.pattern.base': '设备ID只能包含字母、数字、下划线和横线'
     }),
 
   name: Joi.string()

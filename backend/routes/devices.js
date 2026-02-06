@@ -88,16 +88,50 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
   }
 });
 
+// 生成设备ID的辅助函数
+async function generateDeviceId() {
+  // 获取当前最大的设备ID序号
+  const devices = await Device.findAll({
+    where: {
+      deviceId: {
+        [require('sequelize').Op.like]: 'DEV%'
+      }
+    }
+  });
+  
+  let maxNumber = 0;
+  devices.forEach(device => {
+    const match = device.deviceId.match(/^DEV(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNumber) {
+        maxNumber = num;
+      }
+    }
+  });
+  
+  // 生成新的设备ID，序号+1，至少3位数字
+  const newNumber = maxNumber + 1;
+  return `DEV${String(newNumber).padStart(3, '0')}`;
+}
+
 // 创建设备
 router.post('/', validateBody(createDeviceSchema), async (req, res) => {
   try {
-    const device = await Device.create(req.body);
+    const deviceData = { ...req.body };
+    
+    // 如果没有提供deviceId或为空，则自动生成
+    if (!deviceData.deviceId || deviceData.deviceId.trim() === '') {
+      deviceData.deviceId = await generateDeviceId();
+    }
+    
+    const device = await Device.create(deviceData);
     
     // 更新机柜当前功率
-    const rack = await Rack.findByPk(req.body.rackId);
+    const rack = await Rack.findByPk(deviceData.rackId);
     if (rack) {
       await rack.update({
-        currentPower: rack.currentPower + req.body.powerConsumption
+        currentPower: rack.currentPower + deviceData.powerConsumption
       });
     }
     
@@ -513,16 +547,38 @@ router.post('/import', async (req, res) => {
           throw new Error(`设备类型无效，有效值为：${validTypes.join('、')}，当前值：${deviceType}`);
         }
         
-        // 验证设备ID是否已存在
-        const deviceId = getFieldValue('deviceId');
-        if (!deviceId) {
-          throw new Error('设备ID不能为空');
-        }
-        const existingDeviceById = await Device.findOne({
-          where: { deviceId: deviceId }
-        });
-        if (existingDeviceById) {
-          throw new Error(`设备ID已存在：${deviceId}`);
+        // 处理设备ID：如果为空则自动生成
+        let deviceId = getFieldValue('deviceId');
+        if (!deviceId || deviceId.trim() === '') {
+          // 自动生成设备ID
+          const allDevices = await Device.findAll({
+            where: {
+              deviceId: {
+                [require('sequelize').Op.like]: 'DEV%'
+              }
+            }
+          });
+          
+          let maxNumber = 0;
+          allDevices.forEach(device => {
+            const match = device.deviceId.match(/^DEV(\d+)$/);
+            if (match) {
+              const num = parseInt(match[1], 10);
+              if (num > maxNumber) {
+                maxNumber = num;
+              }
+            }
+          });
+          
+          deviceId = `DEV${String(maxNumber + 1).padStart(3, '0')}`;
+        } else {
+          // 验证设备ID是否已存在
+          const existingDeviceById = await Device.findOne({
+            where: { deviceId: deviceId }
+          });
+          if (existingDeviceById) {
+            throw new Error(`设备ID已存在：${deviceId}`);
+          }
         }
         
         // 验证序列号是否已存在
