@@ -159,9 +159,24 @@ router.get('/import-template', async (req, res) => {
     const dateFields = ['购买日期', '保修到期'];
     
     // 根据字段配置动态生成CSV标题（排除设备ID，由系统自动生成）
-    const headers = deviceFields
+    // 将rackId字段替换为机房名称+机柜名称，以便唯一定位
+    const headers = [];
+    deviceFields
       .filter(field => field.visible && field.fieldName !== 'deviceId')
-      .map(field => {
+      .forEach(field => {
+        // 如果是机柜字段，拆分为机房名称和机柜名称两列
+        if (field.fieldName === 'rackId') {
+          headers.push({ 
+            id: '所在机房名称', 
+            title: '所在机房名称(必填)' 
+          });
+          headers.push({ 
+            id: '所在机柜名称', 
+            title: '所在机柜名称(必填)' 
+          });
+          return;
+        }
+        
         let title = field.displayName;
         
         // 添加字段类型提示
@@ -178,7 +193,7 @@ router.get('/import-template', async (req, res) => {
           title = `${field.displayName}(${field.required ? '必填' : '可选'})`;
         }
         
-        return { id: field.displayName, title };
+        headers.push({ id: field.displayName, title });
       });
     
     // 准备示例数据（根据字段配置生成，排除设备ID）
@@ -186,6 +201,13 @@ router.get('/import-template', async (req, res) => {
     deviceFields
       .filter(field => field.visible && field.fieldName !== 'deviceId')
       .forEach(field => {
+        // 如果是机柜字段，拆分为机房名称和机柜名称
+        if (field.fieldName === 'rackId') {
+          exampleData['所在机房名称'] = '测试机房';
+          exampleData['所在机柜名称'] = 'A01';
+          return;
+        }
+        
         switch (field.fieldName) {
           case 'name':
             exampleData[field.displayName] = '测试服务器001';
@@ -198,9 +220,6 @@ router.get('/import-template', async (req, res) => {
             break;
           case 'serialNumber':
             exampleData[field.displayName] = 'SN1234567890';
-            break;
-          case 'rackId':
-            exampleData[field.displayName] = 'A01';
             break;
           case 'position':
             exampleData[field.displayName] = '1';
@@ -455,28 +474,19 @@ router.post('/import', async (req, res) => {
       .on('error', reject);
     });
     
-    // 获取所有机柜信息用于验证
-    const racks = await Rack.findAll();
-    const rackIds = racks.map(rack => rack.rackId);
+    // 获取所有机房和机柜信息用于验证
+    const rooms = await Room.findAll();
+    const roomNameToIdMap = new Map(rooms.map(room => [room.name, room.roomId]));
+    const racks = await Rack.findAll({
+      include: [{ model: Room }]
+    });
     
-    // 获取所有机房信息，用于自动创建机柜时的默认机房
-    let rooms = await Room.findAll();
-    let defaultRoomId;
-    
-    // 如果没有机房，创建一个默认机房
-    if (rooms.length === 0) {
-      const defaultRoom = await Room.create({
-        roomId: 'ROOM001',
-        name: '默认机房',
-        location: '默认位置',
-        area: 100,
-        capacity: 100
-      });
-      defaultRoomId = defaultRoom.roomId;
-    } else {
-      // 使用第一个机房作为默认机房
-      defaultRoomId = rooms[0].roomId;
-    }
+    // 创建机柜查找映射：机房名称+机柜名称 -> rackId
+    const rackLocationMap = new Map();
+    racks.forEach(rack => {
+      const key = `${rack.Room?.name || ''}_${rack.name}`;
+      rackLocationMap.set(key, rack.rackId);
+    });
     
     // 获取设备字段配置
     const deviceFields = await DeviceField.findAll();
@@ -590,28 +600,63 @@ router.post('/import', async (req, res) => {
           throw new Error(`序列号已存在：${serialNumber}`);
         }
         
-        // 验证机柜ID是否为空
-        const rackId = getFieldValue('rackId');
-        if (!rackId || rackId.trim() === '') {
-          throw new Error('所在机柜ID不能为空');
+        // 获取机房名称和机柜名称
+        const roomName = fieldValueMap['所在机房名称'];
+        const rackName = fieldValueMap['所在机柜名称'];
+        
+        if (!roomName || roomName.trim() === '') {
+          throw new Error('所在机房名称不能为空');
+        }
+        if (!rackName || rackName.trim() === '') {
+          throw new Error('所在机柜名称不能为空');
         }
         
-        // 验证机柜是否存在，如果不存在则自动创建
-        if (!rackIds.includes(rackId)) {
-          // 自动创建机柜
-          const newRack = await Rack.create({
-            rackId: rackId,
-            name: rackId, // 使用机柜ID作为默认名称
-            height: 42, // 默认42U高度
-            maxPower: 10000, // 默认最大功耗10000W
-            currentPower: 0,
-            status: 'active',
-            roomId: defaultRoomId
+        // 验证机房是否存在
+        const roomId = roomNameToIdMap.get(roomName.trim());
+        if (!roomId) {
+          throw new Error(`机房不存在：${roomName}，请先创建机房`);
+        }
+        
+        // 根据机房名称+机柜名称查找机柜
+        const locationKey = `${roomName.trim()}_${rackName.trim()}`;
+        let rackId = rackLocationMap.get(locationKey);
+        
+        // 如果机柜不存在，自动创建
+        if (!rackId) {
+          // 生成新的机柜ID
+          const existingRacks = await Rack.findAll({
+            where: {
+              rackId: {
+                [require('sequelize').Op.like]: 'RACK%'
+              }
+            }
           });
           
-          // 更新机柜列表和ID列表
-          racks.push(newRack);
-          rackIds.push(newRack.rackId);
+          let maxNumber = 0;
+          existingRacks.forEach(rack => {
+            const match = rack.rackId.match(/^RACK(\d+)$/);
+            if (match) {
+              const num = parseInt(match[1], 10);
+              if (num > maxNumber) {
+                maxNumber = num;
+              }
+            }
+          });
+          
+          const newRackId = `RACK${String(maxNumber + 1).padStart(3, '0')}`;
+          
+          const newRack = await Rack.create({
+            rackId: newRackId,
+            name: rackName.trim(),
+            height: 42,
+            maxPower: 10000,
+            currentPower: 0,
+            status: 'active',
+            roomId: roomId
+          });
+          
+          rackId = newRack.rackId;
+          rackLocationMap.set(locationKey, rackId);
         }
         
         // 验证状态值
