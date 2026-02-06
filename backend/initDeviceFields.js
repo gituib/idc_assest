@@ -144,38 +144,11 @@ const defaultDeviceFields = [
     isSystem: false
   },
   {
-    fieldName: 'owner',
-    displayName: '责任人',
-    fieldType: 'string',
-    required: false,
-    order: 15,
-    visible: true,
-    isSystem: false
-  },
-  {
-    fieldName: 'department',
-    displayName: '所属部门',
-    fieldType: 'string',
-    required: false,
-    order: 16,
-    visible: true,
-    isSystem: false
-  },
-  {
-    fieldName: 'assetId',
-    displayName: '资产编号',
-    fieldType: 'string',
-    required: false,
-    order: 17,
-    visible: true,
-    isSystem: false
-  },
-  {
     fieldName: 'brand',
     displayName: '品牌',
     fieldType: 'string',
     required: false,
-    order: 18,
+    order: 15,
     visible: true,
     isSystem: false
   }
