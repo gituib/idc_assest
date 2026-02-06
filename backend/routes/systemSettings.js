@@ -16,7 +16,6 @@ const initDefaultSettings = async () => {
     { settingKey: 'session_timeout', settingValue: JSON.stringify(30), settingType: 'number', category: 'general', description: '会话超时时间(分钟)', isEditable: true },
     { settingKey: 'max_login_attempts', settingValue: JSON.stringify(5), settingType: 'number', category: 'general', description: '最大登录尝试次数', isEditable: true },
     { settingKey: 'maintenance_mode', settingValue: JSON.stringify(false), settingType: 'boolean', category: 'general', description: '维护模式', isEditable: true },
-    { settingKey: 'frontend_port', settingValue: JSON.stringify(3000), settingType: 'number', category: 'general', description: '前端服务端口(修改后需重启前端服务)', isEditable: true },
 
     // 外观设置
     { settingKey: 'primary_color', settingValue: JSON.stringify('#667eea'), settingType: 'string', category: 'appearance', description: '主题主色调', isEditable: true },
@@ -590,17 +589,6 @@ router.post('/frontend/restart', async (req, res) => {
         url: `http://localhost:${result.port}`
       }
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 获取前端服务状态
-router.get('/frontend/status', async (req, res) => {
-  try {
-    const { getStatus } = require('../../scripts/frontend-manager');
-    const status = await getStatus();
-    res.json(status);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

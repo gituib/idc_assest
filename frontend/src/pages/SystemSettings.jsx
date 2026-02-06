@@ -13,24 +13,13 @@ const SystemSettings = () => {
   const [settings, setSettings] = useState({});
   const [activeTab, setActiveTab] = useState('general');
   const [systemInfo, setSystemInfo] = useState(null);
-  const [frontendStatus, setFrontendStatus] = useState(null);
   const [form] = Form.useForm();
   const { reloadConfig } = useConfig();
 
   useEffect(() => {
     fetchSettings();
     fetchSystemInfo();
-    fetchFrontendStatus();
   }, []);
-
-  const fetchFrontendStatus = async () => {
-    try {
-      const response = await axios.get('/api/system-settings/frontend/status');
-      setFrontendStatus(response.data);
-    } catch (error) {
-      console.error('获取前端服务状态失败:', error);
-    }
-  };
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -340,28 +329,9 @@ const SystemSettings = () => {
   };
 
   const renderGeneralSettings = () => {
-    const generalKeys = ['site_name', 'site_logo', 'timezone', 'date_format', 'session_timeout', 'max_login_attempts', 'maintenance_mode', 'frontend_port'];
+    const generalKeys = ['site_name', 'site_logo', 'timezone', 'date_format', 'session_timeout', 'max_login_attempts', 'maintenance_mode'];
     return (
       <Card title="全局配置" bordered={false}>
-        {frontendStatus && (
-          <Alert
-            message={frontendStatus.isProduction ? "前端服务状态（生产环境）" : "前端服务状态（开发环境）"}
-            description={
-              <div>
-                <p>当前端口：<strong>{frontendStatus.port}</strong></p>
-                <p>运行状态：{frontendStatus.isRunning ? <Tag color="success">运行中</Tag> : <Tag color="error">未运行</Tag>}</p>
-                {frontendStatus.portInUse && <p style={{ color: '#ff4d4f' }}>警告：端口被其他程序占用</p>}
-                {frontendStatus.isProduction && (
-                  <p style={{ color: '#1890ff' }}>提示：生产环境由 Nginx 或其他服务器托管，如需修改端口请更新服务器配置</p>
-                )}
-                <p>访问地址：<a href={frontendStatus.url} target="_blank" rel="noopener noreferrer">{frontendStatus.url}</a></p>
-              </div>
-            }
-            type={frontendStatus.isRunning ? 'success' : 'warning'}
-            showIcon
-            style={{ marginBottom: 24 }}
-          />
-        )}
         <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
           {generalKeys.map(key => {
             // 确保时区和日期格式使用select类型
