@@ -1196,7 +1196,7 @@ function DeviceManagement() {
     ...actionButtonStyle,
     background: designTokens.colors.primary.gradient,
     border: 'none',
-    color: '#ffffff',
+    color: '#ffffff !important',
     boxShadow: designTokens.shadows.small
   };
 
@@ -1477,28 +1477,44 @@ function DeviceManagement() {
           
           <div style={{ display: 'flex', gap: designTokens.spacing.sm, flexWrap: 'wrap' }}>
             <Button
-              style={primaryActionStyle}
+              style={{
+                ...secondaryActionStyle,
+                color: designTokens.colors.primary.main,
+                borderColor: designTokens.colors.primary.main
+              }}
               icon={<PlusOutlined />}
               onClick={() => showModal()}
             >
               添加设备
             </Button>
             <Button
-              style={secondaryActionStyle}
+              style={{
+                ...secondaryActionStyle,
+                color: designTokens.colors.primary.main,
+                borderColor: designTokens.colors.primary.main
+              }}
               icon={<UploadOutlined />}
               onClick={() => setImportModalVisible(true)}
             >
               导入
             </Button>
             <Button
-              style={secondaryActionStyle}
+              style={{
+                ...secondaryActionStyle,
+                color: designTokens.colors.primary.main,
+                borderColor: designTokens.colors.primary.main
+              }}
               icon={<ExportOutlined />}
               onClick={showExportModal}
             >
               导出
             </Button>
             <Button
-              style={secondaryActionStyle}
+              style={{
+                ...secondaryActionStyle,
+                color: designTokens.colors.primary.main,
+                borderColor: designTokens.colors.primary.main
+              }}
               icon={<SettingOutlined />}
               onClick={() => setFieldConfigModalVisible(true)}
             >
@@ -1507,8 +1523,8 @@ function DeviceManagement() {
             <Button
               style={{
                 ...secondaryActionStyle,
-                color: selectedDevices.length > 0 ? designTokens.colors.success.main : undefined,
-                borderColor: selectedDevices.length > 0 ? designTokens.colors.success.main : undefined
+                color: designTokens.colors.primary.main,
+                borderColor: designTokens.colors.primary.main
               }}
               icon={<ReloadOutlined />}
               disabled={selectedDevices.length === 0}
@@ -1517,11 +1533,10 @@ function DeviceManagement() {
               状态变更 ({selectedDevices.length})
             </Button>
             <Button
-              danger
               style={{
                 ...secondaryActionStyle,
-                color: selectedDevices.length > 0 ? designTokens.colors.error.main : undefined,
-                borderColor: selectedDevices.length > 0 ? designTokens.colors.error.main : undefined
+                color: designTokens.colors.primary.main,
+                borderColor: designTokens.colors.primary.main
               }}
               icon={<DeleteOutlined />}
               disabled={selectedDevices.length === 0}
