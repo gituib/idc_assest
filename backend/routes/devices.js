@@ -525,9 +525,9 @@ router.post('/import', async (req, res) => {
       
       try {
           // 真正的必填字段列表（与前端表单一致）
-          // 注意：设备ID由系统自动生成，功率/购买日期/保修到期已改为非必填
+          // 注意：设备ID由系统自动生成，型号/功率/购买日期/保修到期已改为非必填
           const trulyRequiredFields = [
-            '设备名称', '设备类型', '型号', '序列号',
+            '设备名称', '设备类型', '序列号',
             '所在机房名称', '所在机柜名称', '位置(U)', '高度(U)', '状态'
           ];
 
@@ -535,12 +535,14 @@ router.post('/import', async (req, res) => {
           const missingFields = [];
           for (const fieldName of trulyRequiredFields) {
             const value = fieldValueMap[fieldName];
+            console.log(`验证字段: ${fieldName}, 值:`, value);
             if (!value || (typeof value === 'string' && value.trim() === '')) {
               missingFields.push(fieldName);
             }
           }
 
           if (missingFields.length > 0) {
+            console.log('fieldValueMap:', fieldValueMap);
             throw new Error(`缺少必填字段：${missingFields.join('、')}`);
           }
           
