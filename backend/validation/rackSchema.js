@@ -6,14 +6,12 @@ const RACK_STATUS = ['active', 'inactive', 'maintenance'];
 // 创建机柜验证Schema
 const createRackSchema = Joi.object({
   rackId: Joi.string()
-    .required()
     .max(50)
     .pattern(/^[a-zA-Z0-9_-]+$/)
+    .allow('', null)
     .messages({
-      'string.empty': '机柜ID不能为空',
       'string.max': '机柜ID不能超过50个字符',
-      'string.pattern.base': '机柜ID只能包含字母、数字、下划线和横线',
-      'any.required': '机柜ID是必填字段'
+      'string.pattern.base': '机柜ID只能包含字母、数字、下划线和横线'
     }),
 
   name: Joi.string()

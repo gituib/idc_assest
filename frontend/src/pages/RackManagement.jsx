@@ -794,7 +794,7 @@ function RackManagement() {
         destroyOnHidden
         styles={{
           body: { padding: '24px' },
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 50px 16px 24px' }
         }}
         style={{ borderRadius: '16px' }}
       >
@@ -803,10 +803,9 @@ function RackManagement() {
             <Col span={12}>
               <Form.Item
                 name="rackId"
-                label="机柜ID"
-                rules={[{ required: true, message: '请输入机柜ID' }]}
+                label="机柜ID（留空自动生成）"
               >
-                <Input placeholder="请输入机柜ID" style={{ borderRadius: '8px' }} />
+                <Input placeholder="如：RACK001，留空则自动生成" style={{ borderRadius: '8px' }} />
               </Form.Item>
             </Col>
             <Col span={12}>
