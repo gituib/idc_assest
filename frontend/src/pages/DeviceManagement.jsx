@@ -1304,6 +1304,24 @@ function DeviceManagement() {
   return (
     <div style={pageContainerStyle}>
       <style>{`
+        .device-modal .ant-modal-close {
+          top: 16px;
+          right: 24px;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .device-modal .ant-modal-close-x {
+          font-size: 16px;
+          line-height: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
         .device-table-wrapper {
           display: flex;
           flex-direction: column;
@@ -1744,7 +1762,8 @@ function DeviceManagement() {
         footer={null}
         width={700}
         style={{ borderRadius: '16px' }}
-        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
+        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 50px 16px 24px' }, body: { padding: '24px' } }}
+        className="device-modal"
       >
         <Form
           form={form}
