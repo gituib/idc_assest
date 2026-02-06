@@ -14,6 +14,7 @@ const DeviceField = require('../models/DeviceField');
 const Ticket = require('../models/Ticket');
 const DevicePort = require('../models/DevicePort'); // Import DevicePort
 const Cable = require('../models/Cable'); // Import Cable
+const NetworkCard = require('../models/NetworkCard'); // Import NetworkCard
 const { validateBody, validateQuery } = require('../middleware/validation');
 const {
   createDeviceSchema,
@@ -1078,19 +1079,25 @@ router.delete('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, r
       transaction: t
     });
 
-    // 2. 删除相关端口 (Delete associated DevicePorts)
+    // 2. 删除相关网卡 (Delete associated NetworkCards)
+    await NetworkCard.destroy({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      transaction: t
+    });
+
+    // 3. 删除相关端口 (Delete associated DevicePorts)
     await DevicePort.destroy({
       where: { deviceId: { [Op.in]: deviceIds } },
       transaction: t
     });
     
-    // 3. 解除工单关联
+    // 4. 解除工单关联
     await Ticket.update(
       { deviceId: null },
       { where: { deviceId: { [Op.in]: deviceIds } }, transaction: t }
     );
     
-    // 4. 删除设备
+    // 5. 删除设备
     const deletedCount = await Device.destroy({
       where: { deviceId: { [Op.in]: deviceIds } },
       transaction: t
@@ -1116,7 +1123,8 @@ router.delete('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, r
     });
   } catch (error) {
     await t.rollback();
-    res.status(500).json({ error: error.message });
+    console.error('批量删除设备错误:', error);
+    res.status(500).json({ error: error.message, stack: error.stack });
   }
 });
 
@@ -1145,20 +1153,26 @@ router.delete('/:deviceId', async (req, res) => {
       transaction: t
     });
     
-    // 2. 删除相关端口 (Delete associated DevicePorts)
+    // 2. 删除相关网卡 (Delete associated NetworkCards)
+    const deletedNetworkCards = await NetworkCard.destroy({
+      where: { deviceId: deviceId },
+      transaction: t
+    });
+
+    // 3. 删除相关端口 (Delete associated DevicePorts)
     // 必须在删除设备之前删除，否则触发外键约束错误
     const deletedPorts = await DevicePort.destroy({
       where: { deviceId: deviceId },
       transaction: t
     });
 
-    // 3. 解除工单关联 (Unlink Tickets)
+    // 4. 解除工单关联 (Unlink Tickets)
     await Ticket.update(
       { deviceId: null },
       { where: { deviceId: deviceId }, transaction: t }
     );
     
-    // 4. 删除设备 (Delete Device)
+    // 5. 删除设备 (Delete Device)
     await Device.destroy({
       where: { deviceId: deviceId },
       transaction: t

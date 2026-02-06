@@ -404,6 +404,48 @@ function RackManagement() {
     message.success('模板下载成功');
   }, []);
 
+  // 导出租机柜数据
+  const handleExport = useCallback(async () => {
+    try {
+      message.loading('正在导出租机柜数据...', 0);
+      
+      const response = await axios.get('/api/racks/export', {
+        responseType: 'blob'
+      });
+      
+      // 创建下载链接
+      const blob = new Blob([response.data], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // 从响应头获取文件名，或使用默认文件名
+      const contentDisposition = response.headers['content-disposition'];
+      let fileName = '机柜导出.xlsx';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename\*?=(?:UTF-8'')?([^;]+)/);
+        if (match) {
+          fileName = decodeURIComponent(match[1].replace(/['"]/g, ''));
+        }
+      }
+      
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      message.destroy();
+      message.success('机柜导出成功');
+    } catch (error) {
+      message.destroy();
+      message.error('机柜导出失败');
+      console.error('机柜导出失败:', error);
+    }
+  }, []);
+
   const handleImport = useCallback(async (file) => {
     try {
       setIsImporting(true);
@@ -702,6 +744,13 @@ function RackManagement() {
               style={actionButtonStyle}
             >
               导入
+            </Button>
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+              style={actionButtonStyle}
+            >
+              导出
             </Button>
             <Button
               type="primary"

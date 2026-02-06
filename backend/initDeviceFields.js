@@ -8,9 +8,9 @@ const defaultDeviceFields = [
     fieldName: 'deviceId',
     displayName: '设备ID',
     fieldType: 'string',
-    required: true,
+    required: false,
     order: 1,
-    visible: true,
+    visible: false,
     isSystem: true
   },
   {

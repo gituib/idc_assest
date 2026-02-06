@@ -452,4 +452,101 @@ router.post('/import', async (req, res) => {
   }
 });
 
+// 导出租机柜数据
+router.get('/export', async (req, res) => {
+  try {
+    // 获取所有机柜数据（包含机房信息）
+    const racks = await Rack.findAll({
+      include: [
+        { model: Room, attributes: ['name'] },
+        { model: Device, attributes: ['deviceId', 'name', 'powerConsumption'] }
+      ],
+      order: [['rackId', 'ASC']]
+    });
+
+    // 准备导出数据
+    const exportData = racks.map(rack => {
+      const deviceCount = rack.Devices ? rack.Devices.length : 0;
+      const totalPower = rack.Devices ? rack.Devices.reduce((sum, d) => sum + (d.powerConsumption || 0), 0) : 0;
+      
+      return {
+        '机柜ID': rack.rackId,
+        '机柜名称': rack.name,
+        '所属机房': rack.Room ? rack.Room.name : '',
+        '机柜高度(U)': rack.height,
+        '最大功耗(W)': rack.maxPower,
+        '当前功耗(W)': rack.currentPower || 0,
+        '设备数量': deviceCount,
+        '设备总功耗(W)': totalPower,
+        '状态': rack.status === 'active' ? '启用' : '停用',
+        '创建时间': rack.createdAt ? new Date(rack.createdAt).toLocaleString() : ''
+      };
+    });
+
+    // 创建工作簿
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    
+    // 设置列宽
+    ws['!cols'] = [
+      { wch: 15 }, // 机柜ID
+      { wch: 20 }, // 机柜名称
+      { wch: 20 }, // 所属机房
+      { wch: 12 }, // 机柜高度
+      { wch: 15 }, // 最大功耗
+      { wch: 15 }, // 当前功耗
+      { wch: 12 }, // 设备数量
+      { wch: 15 }, // 设备总功耗
+      { wch: 10 }, // 状态
+      { wch: 20 }  // 创建时间
+    ];
+    
+    XLSX.utils.book_append_sheet(wb, ws, '机柜列表');
+    
+    // 生成文件名
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const fileName = `机柜导出_${timestamp}.xlsx`;
+    
+    // 确保temp目录存在
+    const tempDir = path.join(__dirname, '../temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    const filePath = path.join(tempDir, fileName);
+    
+    // 写入文件
+    XLSX.writeFile(wb, filePath);
+    
+    // 发送文件
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+    
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+    
+    // 发送完成后删除临时文件
+    fileStream.on('close', () => {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+    
+    fileStream.on('error', (err) => {
+      console.error('文件流错误:', err);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+    
+  } catch (error) {
+    console.error('导出租机柜数据失败:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: '导出失败',
+      error: error.message 
+    });
+  }
+});
+
 module.exports = router;
