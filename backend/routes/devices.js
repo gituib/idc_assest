@@ -508,9 +508,13 @@ router.post('/import', async (req, res) => {
       const row = results[i];
       const rowNum = i + 2; // CSV行号（第一行是标题）
       
-      // 辅助函数：从带格式说明的字段名中提取原始字段名（如从"设备类型(server/switch/router/storage)"提取"设备类型"）
+      // 辅助函数：从带格式说明的字段名中提取原始字段名
+      // 例如："设备类型(server/switch/router/storage)" -> "设备类型"
+      //       "位置(U)(必填)" -> "位置(U)"
       const extractFieldName = (fieldNameWithFormat) => {
-        const match = fieldNameWithFormat.match(/^([^\(]+)/);
+        // 匹配规则：提取到 "(必填)"、"(可选)"、"(YYYY-MM-DD)" 或类似格式说明之前的内容
+        // 但保留字段名本身的括号，如 "位置(U)"
+        const match = fieldNameWithFormat.match(/^(.+?)(\(必填\)|\(可选\)|\([a-zA-Z0-9\-\/]+\))$/);
         return match ? match[1].trim() : fieldNameWithFormat;
       };
       
@@ -535,14 +539,12 @@ router.post('/import', async (req, res) => {
           const missingFields = [];
           for (const fieldName of trulyRequiredFields) {
             const value = fieldValueMap[fieldName];
-            console.log(`验证字段: ${fieldName}, 值:`, value);
             if (!value || (typeof value === 'string' && value.trim() === '')) {
               missingFields.push(fieldName);
             }
           }
 
           if (missingFields.length > 0) {
-            console.log('fieldValueMap:', fieldValueMap);
             throw new Error(`缺少必填字段：${missingFields.join('、')}`);
           }
           
