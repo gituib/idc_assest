@@ -158,9 +158,9 @@ router.get('/import-template', async (req, res) => {
     // 日期字段提示
     const dateFields = ['购买日期', '保修到期'];
     
-    // 根据字段配置动态生成CSV标题
+    // 根据字段配置动态生成CSV标题（排除设备ID，由系统自动生成）
     const headers = deviceFields
-      .filter(field => field.visible)
+      .filter(field => field.visible && field.fieldName !== 'deviceId')
       .map(field => {
         let title = field.displayName;
         
@@ -181,15 +181,12 @@ router.get('/import-template', async (req, res) => {
         return { id: field.displayName, title };
       });
     
-    // 准备示例数据（根据字段配置生成）
+    // 准备示例数据（根据字段配置生成，排除设备ID）
     const exampleData = {};
     deviceFields
-      .filter(field => field.visible)
+      .filter(field => field.visible && field.fieldName !== 'deviceId')
       .forEach(field => {
         switch (field.fieldName) {
-          case 'deviceId':
-            exampleData[field.displayName] = 'DEV001';
-            break;
           case 'name':
             exampleData[field.displayName] = '测试服务器001';
             break;
