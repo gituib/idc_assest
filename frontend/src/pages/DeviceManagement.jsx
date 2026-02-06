@@ -179,8 +179,8 @@ const defaultDeviceFields = [
   { fieldName: 'powerConsumption', displayName: '功率(W)', fieldType: 'number', required: true, order: 9, visible: true },
   { fieldName: 'status', displayName: '状态', fieldType: 'select', required: true, order: 10, visible: true, 
     options: [{ value: 'running', label: '运行中' }, { value: 'maintenance', label: '维护中' }, { value: 'offline', label: '离线' }, { value: 'fault', label: '故障' }] },
-  { fieldName: 'purchaseDate', displayName: '购买日期', fieldType: 'date', required: true, order: 11, visible: true },
-  { fieldName: 'warrantyExpiry', displayName: '保修到期', fieldType: 'date', required: true, order: 12, visible: true },
+  { fieldName: 'purchaseDate', displayName: '购买日期', fieldType: 'date', required: false, order: 11, visible: true },
+  { fieldName: 'warrantyExpiry', displayName: '保修到期', fieldType: 'date', required: false, order: 12, visible: true },
   { fieldName: 'ipAddress', displayName: 'IP地址', fieldType: 'string', required: false, order: 13, visible: true },
   { fieldName: 'description', displayName: '描述', fieldType: 'textarea', required: false, order: 14, visible: true }
 ];

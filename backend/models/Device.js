@@ -53,11 +53,11 @@ const Device = sequelize.define('Device', {
   },
   purchaseDate: {
     type: DataTypes.DATE,
-    allowNull: false
+    allowNull: true
   },
   warrantyExpiry: {
     type: DataTypes.DATE,
-    allowNull: false
+    allowNull: true
   },
   ipAddress: {
     type: DataTypes.STRING
