@@ -528,12 +528,27 @@ router.post('/import', async (req, res) => {
       });
       
       try {
-          // 真正的必填字段列表（与前端表单一致）
-          // 注意：设备ID由系统自动生成，型号/功率/购买日期/保修到期已改为非必填
-          const trulyRequiredFields = [
-            '设备名称', '设备类型', '序列号',
-            '所在机房名称', '所在机柜名称', '位置(U)', '高度(U)', '状态'
-          ];
+          // 动态构建必填字段列表（从数据库配置读取，保持与字段管理页面同步）
+          const trulyRequiredFields = [];
+          
+          deviceFields.forEach(field => {
+            // 跳过设备ID（系统生成）
+            if (field.fieldName === 'deviceId') return;
+            
+            // 机柜字段特殊处理：拆分为机房名称+机柜名称
+            if (field.fieldName === 'rackId') {
+              if (field.required) {
+                trulyRequiredFields.push('所在机房名称');
+                trulyRequiredFields.push('所在机柜名称');
+              }
+              return;
+            }
+            
+            // 其他字段根据数据库配置
+            if (field.required) {
+              trulyRequiredFields.push(field.displayName);
+            }
+          });
 
           // 验证必填字段
           const missingFields = [];
