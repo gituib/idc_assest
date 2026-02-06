@@ -354,21 +354,25 @@ const AppLayout = ({ children }) => {
           boxShadow: designTokens.shadows.small,
           position: 'sticky',
           top: 0,
-          zIndex: 99
+          zIndex: 99,
+          overflow: 'visible'
         }}>
           {user && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '12px'
+              gap: '12px',
+              height: '100%'
             }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '6px 12px',
+                padding: '4px 12px',
                 background: designTokens.colors.background.secondary,
-                borderRadius: designTokens.borderRadius.medium
+                borderRadius: designTokens.borderRadius.medium,
+                height: '40px',
+                boxSizing: 'border-box'
               }}>
                 <Avatar 
                   style={{ 
