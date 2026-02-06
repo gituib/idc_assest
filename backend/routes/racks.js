@@ -218,8 +218,14 @@ router.post('/import', async (req, res) => {
 
     const file = req.files.file;
     
+    // 确保temp目录存在
+    const tempDir = path.join(__dirname, '../temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
     // 保存临时文件
-    const tempFilePath = path.join(__dirname, '../temp', `${Date.now()}_${file.name}`);
+    const tempFilePath = path.join(tempDir, `${Date.now()}_${file.name}`);
     try {
       await file.mv(tempFilePath);
     } catch (saveError) {
