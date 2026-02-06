@@ -42,7 +42,7 @@ const defaultDeviceFields = [
     fieldName: 'model',
     displayName: '型号',
     fieldType: 'string',
-    required: true,
+    required: false,
     order: 4,
     visible: true,
     isSystem: true
@@ -87,7 +87,7 @@ const defaultDeviceFields = [
     fieldName: 'powerConsumption',
     displayName: '功率(W)',
     fieldType: 'number',
-    required: true,
+    required: false,
     order: 9,
     visible: true,
     isSystem: true
@@ -111,7 +111,7 @@ const defaultDeviceFields = [
     fieldName: 'purchaseDate',
     displayName: '购买日期',
     fieldType: 'date',
-    required: true,
+    required: false,
     order: 11,
     visible: true,
     isSystem: true
@@ -120,7 +120,7 @@ const defaultDeviceFields = [
     fieldName: 'warrantyExpiry',
     displayName: '保修到期',
     fieldType: 'date',
-    required: true,
+    required: false,
     order: 12,
     visible: true,
     isSystem: true
