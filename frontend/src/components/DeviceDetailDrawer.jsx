@@ -59,12 +59,16 @@ function DeviceDetailDrawer({ device, visible, onClose, cables, onRefreshCables,
       const fieldKey = field.field;
       if (fieldKey === 'status') return getStatusTag(device.status);
       
+      // 优先从device对象获取值，如果没有则从customFields中获取
       let value = device[fieldKey];
+      if ((value === undefined || value === null) && device.customFields && typeof device.customFields === 'object') {
+          value = device.customFields[fieldKey];
+      }
       
       if (fieldKey === 'type') value = getDeviceTypeName(value);
       else if (fieldKey === 'position') value = `U${device.position} ${device.height ? `(${device.height}U)` : ''}`;
       
-      return <Text strong style={{ fontSize: '14px' }}>{value || '-'}</Text>;
+      return <Text strong style={{ fontSize: '14px' }}>{value !== undefined && value !== null ? value : '-'}</Text>;
   }, [getStatusTag, getDeviceTypeName]);
 
   const displayFields = useMemo(() => {
