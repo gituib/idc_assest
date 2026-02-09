@@ -283,7 +283,13 @@ function RackManagement() {
     try {
       setLoading(true);
       const response = await axios.get('/api/racks', {
-        params: { page, pageSize }
+        params: {
+          page,
+          pageSize,
+          roomId: roomFilter,
+          status: statusFilter,
+          keyword: searchKeyword || undefined
+        }
       });
       const { racks: data, total } = response.data;
       setRacks(data);
@@ -294,7 +300,7 @@ function RackManagement() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [roomFilter, statusFilter, searchKeyword]);
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -310,6 +316,12 @@ function RackManagement() {
     fetchRacks(pagination.current, pagination.pageSize);
     fetchRooms();
   }, [fetchRacks, fetchRooms]);
+
+  // 当筛选条件变化时，重置到第一页并重新加载
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, current: 1 }));
+    fetchRacks(1, pagination.pageSize);
+  }, [roomFilter, statusFilter, searchKeyword]);
 
   const handleTableChange = useCallback((pagination) => {
     fetchRacks(pagination.current, pagination.pageSize);
@@ -482,18 +494,8 @@ function RackManagement() {
     }
   }, [fetchRacks]);
 
-  const filteredRacks = useMemo(() => {
-    return racks.filter(rack => {
-      const matchKeyword = !searchKeyword ||
-        rack.name?.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-        rack.rackId?.toLowerCase().includes(searchKeyword.toLowerCase());
-
-      const matchStatus = statusFilter === 'all' || rack.status === statusFilter;
-      const matchRoom = roomFilter === 'all' || rack.roomId === roomFilter;
-
-      return matchKeyword && matchStatus && matchRoom;
-    });
-  }, [racks, searchKeyword, statusFilter, roomFilter]);
+  // 后端已过滤，直接使用 racks 数据
+  const filteredRacks = racks;
 
   const stats = useMemo(() => ({
     total: racks.length,

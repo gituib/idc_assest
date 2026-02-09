@@ -17,11 +17,30 @@ router.get('/', async (req, res) => {
     const pageSize = parseInt(req.query.pageSize) || 10;
     const offset = (page - 1) * pageSize;
 
-    // 获取总记录数
-    const total = await Rack.count();
-    
+    // 筛选参数
+    const { roomId, status, keyword } = req.query;
+
+    // 构建查询条件
+    const where = {};
+    if (roomId && roomId !== 'all') {
+      where.roomId = roomId;
+    }
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+    if (keyword) {
+      where[require('sequelize').Op.or] = [
+        { rackId: { [require('sequelize').Op.like]: `%${keyword}%` } },
+        { name: { [require('sequelize').Op.like]: `%${keyword}%` } }
+      ];
+    }
+
+    // 获取总记录数（带筛选条件）
+    const total = await Rack.count({ where });
+
     // 获取分页数据
     const racks = await Rack.findAll({
+      where,
       include: [
         { model: Room },
         { model: Device }
@@ -29,7 +48,7 @@ router.get('/', async (req, res) => {
       limit: pageSize,
       offset: offset
     });
-    
+
     // 返回带分页信息的响应
     res.json({
       racks,
