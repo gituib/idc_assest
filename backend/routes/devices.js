@@ -152,9 +152,10 @@ router.get('/import-template', async (req, res) => {
     
     // 根据字段配置动态生成CSV标题（排除设备ID，由系统自动生成）
     // 将rackId字段替换为机房名称+机柜名称，以便唯一定位
+    // 注意：导入模板包含所有字段（不论visible状态），确保数据完整性
     const headers = [];
     deviceFields
-      .filter(field => field.visible && field.fieldName !== 'deviceId')
+      .filter(field => field.fieldName !== 'deviceId')
       .forEach(field => {
         // 如果是机柜字段，拆分为机房名称和机柜名称两列
         if (field.fieldName === 'rackId') {
@@ -174,9 +175,10 @@ router.get('/import-template', async (req, res) => {
       });
     
     // 准备示例数据（根据字段配置生成，排除设备ID）
+    // 注意：包含所有字段（不论visible状态）
     const exampleData = {};
     deviceFields
-      .filter(field => field.visible && field.fieldName !== 'deviceId')
+      .filter(field => field.fieldName !== 'deviceId')
       .forEach(field => {
         // 如果是机柜字段，拆分为机房名称和机柜名称
         if (field.fieldName === 'rackId') {
