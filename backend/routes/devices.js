@@ -150,15 +150,6 @@ router.get('/import-template', async (req, res) => {
       order: [['order', 'ASC']]
     });
     
-    // 字段类型提示映射
-    const fieldTypeHints = {
-      '设备类型': 'server/switch/router/storage/other',
-      '状态': 'running/maintenance/offline/fault'
-    };
-    
-    // 日期字段提示
-    const dateFields = ['购买日期', '保修到期'];
-    
     // 根据字段配置动态生成CSV标题（排除设备ID，由系统自动生成）
     // 将rackId字段替换为机房名称+机柜名称，以便唯一定位
     const headers = [];
@@ -169,32 +160,17 @@ router.get('/import-template', async (req, res) => {
         if (field.fieldName === 'rackId') {
           headers.push({ 
             id: '所在机房名称', 
-            title: '所在机房名称(必填)' 
+            title: '所在机房名称' 
           });
           headers.push({ 
             id: '所在机柜名称', 
-            title: '所在机柜名称(必填)' 
+            title: '所在机柜名称' 
           });
           return;
         }
         
-        let title = field.displayName;
-        
-        // 添加字段类型提示
-        if (fieldTypeHints[field.displayName]) {
-          title = `${field.displayName}(${fieldTypeHints[field.displayName]})`;
-        } else if (dateFields.includes(field.displayName)) {
-          title = `${field.displayName}(YYYY-MM-DD)`;
-        } else if (field.fieldType === 'select' && field.options && field.options.length > 0) {
-          // 下拉选择字段，显示可选值
-          const optionValues = field.options.map(opt => opt.value).join('/');
-          title = `${field.displayName}(${optionValues})`;
-        } else {
-          // 显示必填/可选标识
-          title = `${field.displayName}(${field.required ? '必填' : '可选'})`;
-        }
-        
-        headers.push({ id: field.displayName, title });
+        // 直接使用displayName作为列名，不添加任何后缀
+        headers.push({ id: field.displayName, title: field.displayName });
       });
     
     // 准备示例数据（根据字段配置生成，排除设备ID）
@@ -334,45 +310,44 @@ router.get('/export', async (req, res) => {
       return res.status(404).json({ error: '未找到指定的设备' });
     }
     
-    // 准备CSV数据
+    // 创建字段名到displayName的映射
+    const fieldNameToDisplayName = {};
+    deviceFields.forEach(field => {
+      fieldNameToDisplayName[field.fieldName] = field.displayName;
+    });
+    
+    // 准备CSV数据 - 根据字段配置动态生成，与导入模板保持一致
     const csvData = devices.map(device => {
-      // 创建基础数据对象
-      const deviceData = {
-        '设备ID': device.deviceId,
-        '设备名称': device.name,
-        '设备类型': device.type,
-        '型号': device.model,
-        '序列号': device.serialNumber,
-        '所在机房ID': device.Rack?.Room?.roomId || '',
-        '所在机房名称': device.Rack?.Room?.name || '',
-        '所在机柜ID': device.rackId,
-        '所在机柜名称': device.Rack?.name || '',
-        '位置(U)': device.position,
-        '高度(U)': device.height,
-        '功率(W)': device.powerConsumption,
-        'IP地址': device.ipAddress,
-        '状态': device.status,
-        '购买日期': device.purchaseDate ? new Date(device.purchaseDate).toLocaleDateString() : '',
-        '保修到期': device.warrantyExpiry ? new Date(device.warrantyExpiry).toLocaleDateString() : '',
-        '描述': device.description,
-        '创建时间': device.createdAt ? new Date(device.createdAt).toLocaleString() : ''
-      };
+      const deviceData = {};
       
-      // 添加自定义字段（排除基础字段）
+      // 根据字段配置生成数据（排除deviceId）
+      deviceFields
+        .filter(field => field.visible && field.fieldName !== 'deviceId')
+        .forEach(field => {
+          // rackId字段拆分为机房名称和机柜名称
+          if (field.fieldName === 'rackId') {
+            deviceData['所在机房名称'] = device.Rack?.Room?.name || '';
+            deviceData['所在机柜名称'] = device.Rack?.name || '';
+            return;
+          }
+          
+          // 其他字段使用displayName作为列名
+          const value = device[field.fieldName];
+          
+          // 日期格式处理
+          if (field.fieldType === 'date' && value) {
+            deviceData[field.displayName] = new Date(value).toLocaleDateString();
+          } else {
+            deviceData[field.displayName] = value !== undefined && value !== null ? value : '';
+          }
+        });
+      
+      // 添加自定义字段
       if (device.customFields) {
-        // 定义基础字段的显示名称
-        const baseFieldDisplayNames = [
-          '设备ID', '设备名称', '设备类型', '型号', '序列号', 
-          '所在机房ID', '所在机房名称', '所在机柜ID', '所在机柜名称', '位置(U)', '高度(U)', 
-          '功率(W)', 'IP地址', '状态', '购买日期', '保修到期', '描述', '创建时间'
-        ];
-        
-        deviceFields.forEach(field => {
-          // 只添加未在基础字段中出现的自定义字段
-          if (field.visible && 
-              device.customFields[field.fieldName] && 
-              !baseFieldDisplayNames.includes(field.displayName)) {
-            deviceData[field.displayName] = device.customFields[field.fieldName];
+        Object.entries(device.customFields).forEach(([fieldName, value]) => {
+          const field = deviceFields.find(f => f.fieldName === fieldName);
+          if (field && field.visible) {
+            deviceData[field.displayName] = value;
           }
         });
       }
@@ -380,37 +355,24 @@ router.get('/export', async (req, res) => {
       return deviceData;
     });
     
-    // 设置CSV标题（包含自定义字段）
-    const baseHeaders = [
-      { id: '设备ID', title: '设备ID' },
-      { id: '设备名称', title: '设备名称' },
-      { id: '设备类型', title: '设备类型' },
-      { id: '型号', title: '型号' },
-      { id: '序列号', title: '序列号' },
-      { id: '所在机房ID', title: '所在机房ID' },
-      { id: '所在机房名称', title: '所在机房名称' },
-      { id: '所在机柜ID', title: '所在机柜ID' },
-      { id: '所在机柜名称', title: '所在机柜名称' },
-      { id: '位置(U)', title: '位置(U)' },
-      { id: '高度(U)', title: '高度(U)' },
-      { id: '功率(W)', title: '功率(W)' },
-      { id: 'IP地址', title: 'IP地址' },
-      { id: '状态', title: '状态' },
-      { id: '购买日期', title: '购买日期' },
-      { id: '保修到期', title: '保修到期' },
-      { id: '描述', title: '描述' },
-      { id: '创建时间', title: '创建时间' }
-    ];
-    
-    // 添加自定义字段标题（排除与基础字段重复的字段）
-    const baseFieldTitles = baseHeaders.map(header => header.id);
-    const customHeaders = deviceFields
-      .filter(field => field.visible && !baseFieldTitles.includes(field.displayName))
-      .map(field => ({ id: field.displayName, title: field.displayName }));
+    // 设置CSV标题 - 与导入模板保持一致
+    const headers = [];
+    deviceFields
+      .filter(field => field.visible && field.fieldName !== 'deviceId')
+      .forEach(field => {
+        // rackId拆分为两个列
+        if (field.fieldName === 'rackId') {
+          headers.push({ id: '所在机房名称', title: '所在机房名称' });
+          headers.push({ id: '所在机柜名称', title: '所在机柜名称' });
+          return;
+        }
+        
+        headers.push({ id: field.displayName, title: field.displayName });
+      });
     
     const csvWriter = createObjectCsvWriter({
       path: path.join(__dirname, '../temp/devices.csv'),
-      header: [...baseHeaders, ...customHeaders],
+      header: headers,
       encoding: 'utf8'
     });
     
