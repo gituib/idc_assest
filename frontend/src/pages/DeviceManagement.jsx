@@ -599,6 +599,29 @@ function DeviceManagement() {
     });
   };
 
+  // 一键删除所有设备
+  const handleDeleteAll = async () => {
+    Modal.confirm({
+      title: '危险操作确认',
+      content: '确定要删除所有设备吗？此操作将清空所有设备数据，包括相关的接线、网卡、端口等信息，且不可恢复！',
+      okText: '确认删除所有',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await axios.delete('/api/devices/delete-all');
+          message.success(response.data.message || '成功删除所有设备');
+          setSelectedDevices([]);
+          setSelectAll(false);
+          fetchDevices(1, 10, true);
+        } catch (error) {
+          message.error('删除所有设备失败');
+          console.error('删除所有设备失败:', error);
+        }
+      }
+    });
+  };
+
   // 删除设备
   const handleDelete = async (deviceId) => {
     Modal.confirm({
@@ -1561,6 +1584,13 @@ function DeviceManagement() {
               onClick={handleBatchDelete}
             >
               批量删除 ({selectedDevices.length})
+            </Button>
+            <Button
+              style={dangerActionStyle}
+              icon={<DeleteOutlined />}
+              onClick={handleDeleteAll}
+            >
+              删除所有
             </Button>
           </div>
         </div>

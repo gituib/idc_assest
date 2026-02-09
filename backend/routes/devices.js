@@ -1092,6 +1092,80 @@ router.delete('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, r
   }
 });
 
+// 删除所有设备（一键清空）
+router.delete('/delete-all', async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    // 获取所有设备
+    const allDevices = await Device.findAll({ transaction: t });
+    
+    if (allDevices.length === 0) {
+      await t.rollback();
+      return res.json({ message: '没有设备需要删除', deletedCount: 0 });
+    }
+    
+    const deviceIds = allDevices.map(d => d.deviceId);
+    
+    // 1. 删除相关接线
+    await Cable.destroy({
+      where: {
+        [Op.or]: [
+          { sourceDeviceId: { [Op.in]: deviceIds } },
+          { targetDeviceId: { [Op.in]: deviceIds } }
+        ]
+      },
+      transaction: t
+    });
+    
+    // 2. 删除相关网卡
+    await NetworkCard.destroy({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      transaction: t
+    });
+    
+    // 3. 删除相关端口
+    await DevicePort.destroy({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      transaction: t
+    });
+    
+    // 4. 解除工单关联
+    await Ticket.update(
+      { deviceId: null },
+      { where: { deviceId: { [Op.in]: deviceIds } }, transaction: t }
+    );
+    
+    // 5. 更新机柜功率
+    for (const device of allDevices) {
+      if (device.rackId) {
+        const rack = await Rack.findByPk(device.rackId, { transaction: t });
+        if (rack) {
+          await rack.update({
+            currentPower: Math.max(0, rack.currentPower - device.powerConsumption)
+          }, { transaction: t });
+        }
+      }
+    }
+    
+    // 6. 删除所有设备
+    const deletedCount = await Device.destroy({
+      where: {},
+      transaction: t
+    });
+    
+    await t.commit();
+    
+    res.json({
+      message: `成功删除所有设备，共删除 ${deletedCount} 个设备`,
+      deletedCount
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error('删除所有设备错误:', error);
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
 // 删除设备
 router.delete('/:deviceId', async (req, res) => {
   const t = await sequelize.transaction();
