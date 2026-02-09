@@ -3,6 +3,7 @@ const router = express.Router();
 const Rack = require('../models/Rack');
 const Device = require('../models/Device');
 const Room = require('../models/Room');
+const { sequelize } = require('../db');
 const XLSX = require('xlsx');
 const fs = require('fs');
 const path = require('path');
@@ -320,11 +321,14 @@ router.delete('/:rackId', async (req, res) => {
   }
 });
 
-// 导入机柜数据
+// 导入机柜数据 - 优化版：使用事务+批量插入
 router.post('/import', async (req, res) => {
+  const t = await sequelize.transaction();
+  
   try {
     // 检查是否有上传文件
     if (!req.files || !req.files.file) {
+      await t.rollback();
       return res.status(400).json({ 
         success: false, 
         message: '没有上传文件',
@@ -345,6 +349,7 @@ router.post('/import', async (req, res) => {
     try {
       await file.mv(tempFilePath);
     } catch (saveError) {
+      await t.rollback();
       return res.status(500).json({ 
         success: false, 
         message: '文件保存失败',
@@ -358,6 +363,7 @@ router.post('/import', async (req, res) => {
       try {
         workbook = XLSX.readFile(tempFilePath);
       } catch (readError) {
+        await t.rollback();
         return res.status(400).json({ 
           success: false, 
           message: '文件解析失败',
@@ -367,6 +373,7 @@ router.post('/import', async (req, res) => {
       
       // 获取第一个工作表
       if (!workbook.SheetNames.length) {
+        await t.rollback();
         return res.status(400).json({ 
           success: false, 
           message: '文件格式错误',
@@ -381,17 +388,11 @@ router.post('/import', async (req, res) => {
       
       // 定义列名映射（支持导入模板格式和导出文件格式）
       const columnMapping = {
-        // 机柜ID - 支持多种列名
         rackId: ['机柜ID(留空自动生成)', '机柜ID'],
-        // 机柜名称
         name: ['机柜名称'],
-        // 所属机房名称
         roomName: ['所属机房名称', '所属机房'],
-        // 高度(U)
         height: ['高度(U)', '机柜高度(U)'],
-        // 最大功率/最大功耗
         maxPower: ['最大功率(W)', '最大功耗(W)'],
-        // 状态
         status: ['状态']
       };
       
@@ -409,6 +410,7 @@ router.post('/import', async (req, res) => {
       const requiredColumns = ['name', 'roomName', 'height', 'maxPower', 'status'];
       const missingColumns = requiredColumns.filter(col => columnIndexMap[col] === undefined);
       if (missingColumns.length > 0) {
+        await t.rollback();
         return res.status(400).json({ 
           success: false, 
           message: 'Excel列名格式不正确',
@@ -416,14 +418,13 @@ router.post('/import', async (req, res) => {
         });
       }
       
-      // 转换为JSON格式（使用检测到的列索引）
+      // 转换为JSON格式
       const rawData = XLSX.utils.sheet_to_json(worksheet, {
         header: headerRow.map((h, i) => `col_${i}`),
-        range: 1, // 从第2行开始读取数据
-        blankrows: false // 跳过空行
+        range: 1,
+        blankrows: false
       });
       
-      // 根据列映射转换数据
       const jsonData = rawData.map(row => {
         const item = {};
         Object.keys(columnIndexMap).forEach(field => {
@@ -434,6 +435,7 @@ router.post('/import', async (req, res) => {
       });
 
       if (jsonData.length === 0) {
+        await t.rollback();
         return res.status(400).json({ 
           success: false, 
           message: '没有找到有效数据',
@@ -441,43 +443,47 @@ router.post('/import', async (req, res) => {
         });
       }
 
-      // 状态值转换映射（中文 → 英文）
+      // 状态值转换映射
       const statusMapping = {
-        '启用': 'active',
-        '在用': 'active',
-        '停用': 'inactive',
-        '禁用': 'inactive',
-        '维护中': 'maintenance',
-        'active': 'active',
-        'inactive': 'inactive',
-        'maintenance': 'maintenance'
+        '启用': 'active', '在用': 'active', '停用': 'inactive',
+        '禁用': 'inactive', '维护中': 'maintenance',
+        'active': 'active', 'inactive': 'inactive', 'maintenance': 'maintenance'
       };
       
       const validStatuses = ['active', 'maintenance', 'inactive'];
       const validationResults = [];
       
-      // 获取所有有效的机房信息（名称到ID的映射）
-      const allRooms = await Room.findAll();
+      // 【优化1】批量查询机房信息（单次查询）
+      const allRooms = await Room.findAll({ transaction: t });
       const roomNameToIdMap = new Map(allRooms.map(room => [room.name, room.roomId]));
       const validRoomNames = new Set(roomNameToIdMap.keys());
       
-      // 处理数据（转换状态值、处理空rackId）
+      // 【优化2】批量查询现有最大机柜ID（单次查询）
+      const maxRackResult = await Rack.findOne({
+        attributes: [[sequelize.fn('MAX', sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('rackId'), 5), 'INTEGER')), 'maxNum']],
+        where: {
+          rackId: {
+            [require('sequelize').Op.like]: 'RACK%'
+          }
+        },
+        transaction: t
+      });
+      let maxNumber = maxRackResult?.get('maxNum') || 0;
+      
+      // 处理数据
       const processedData = jsonData.map((item, index) => {
         const rowNumber = index + 2;
-        
-        // 转换状态值（中文转英文）
         const rawStatus = String(item.status || '').trim();
         const normalizedStatus = statusMapping[rawStatus] || rawStatus.toLowerCase();
-        
-        // 如果rackId为空或列不存在，标记为需要自动生成
         const rawRackId = item.rackId ? String(item.rackId).trim() : '';
+        
         if (!rawRackId || rawRackId === '') {
+          maxNumber++;
           return { 
             ...item, 
-            rackId: null, 
+            rackId: `RACK${String(maxNumber).padStart(3, '0')}`, 
             status: normalizedStatus,
-            rowNumber, 
-            _autoGenerate: true 
+            rowNumber
           };
         }
         
@@ -485,8 +491,7 @@ router.post('/import', async (req, res) => {
           ...item, 
           rackId: rawRackId, 
           status: normalizedStatus,
-          rowNumber, 
-          _autoGenerate: false 
+          rowNumber
         };
       });
       
@@ -494,46 +499,34 @@ router.post('/import', async (req, res) => {
       processedData.forEach((item) => {
         const errors = [];
         
-        // rackId为null表示需要自动生成，跳过格式验证
-        if (item.rackId !== null) {
-          // 验证机柜ID格式
-          if (!/^RACK\d+$/.test(item.rackId)) {
-            errors.push('机柜ID格式应为RACK+数字，如RACK001');
-          }
+        if (!/^RACK\d+$/.test(item.rackId)) {
+          errors.push('机柜ID格式应为RACK+数字，如RACK001');
         }
-        
         if (!item.name || String(item.name).trim() === '') {
           errors.push('机柜名称不能为空');
         }
-        
         if (!item.roomName || String(item.roomName).trim() === '') {
           errors.push('所属机房名称不能为空');
         } else if (!validRoomNames.has(String(item.roomName).trim())) {
           errors.push(`所属机房名称不存在: ${item.roomName}`);
         }
-        
         if (typeof item.height !== 'number' || item.height <= 0) {
           errors.push('高度必须是大于0的数字');
         }
-        
         if (typeof item.maxPower !== 'number' || item.maxPower < 0) {
           errors.push('最大功率必须是大于等于0的数字');
         }
-        
         if (!item.status || !validStatuses.includes(item.status)) {
-          errors.push(`状态必须是以下值之一: ${validStatuses.join(', ')} (或对应中文: 启用/在用、停用/禁用、维护中)`);
+          errors.push(`状态必须是以下值之一: ${validStatuses.join(', ')}`);
         }
         
         if (errors.length > 0) {
-          validationResults.push({
-            row: item.rowNumber,
-            data: item,
-            errors: errors
-          });
+          validationResults.push({ row: item.rowNumber, data: item, errors });
         }
       });
 
       if (validationResults.length > 0) {
+        await t.rollback();
         return res.status(400).json({ 
           success: false, 
           message: '数据验证失败',
@@ -542,86 +535,40 @@ router.post('/import', async (req, res) => {
         });
       }
 
-      // 批量创建机柜
-      let createdCount = 0;
-      let duplicateCount = 0;
-      let autoGeneratedCount = 0;
+      // 【优化3】批量查询已存在的机柜ID（单次查询）
+      const existingRacks = await Rack.findAll({
+        where: {
+          rackId: processedData.map(item => item.rackId)
+        },
+        transaction: t
+      });
       
-      try {
-        // 获取当前最大的机柜ID序号（用于自动生成）
-        const allRacks = await Rack.findAll({
-          where: {
-            rackId: {
-              [require('sequelize').Op.like]: 'RACK%'
-            }
-          }
+      const existingIds = new Set(existingRacks.map(rack => rack.rackId));
+      const newData = processedData.filter(item => !existingIds.has(item.rackId));
+      const duplicateCount = processedData.length - newData.length;
+      
+      // 【优化4】批量插入数据
+      let createdCount = 0;
+      if (newData.length > 0) {
+        const dataWithRoomId = newData.map(item => ({
+          rackId: item.rackId,
+          name: item.name,
+          height: item.height,
+          maxPower: item.maxPower,
+          status: item.status,
+          roomId: roomNameToIdMap.get(item.roomName.trim()),
+          currentPower: 0
+        }));
+        
+        const result = await Rack.bulkCreate(dataWithRoomId, {
+          transaction: t,
+          ignoreDuplicates: true
         });
-        
-        let maxNumber = 0;
-        allRacks.forEach(rack => {
-          const match = rack.rackId.match(/^RACK(\d+)$/);
-          if (match) {
-            const num = parseInt(match[1], 10);
-            if (num > maxNumber) {
-              maxNumber = num;
-            }
-          }
-        });
-        
-        // 为需要自动生成的记录分配rackId
-        const dataWithGeneratedIds = processedData.map(item => {
-          if (item._autoGenerate) {
-            maxNumber++;
-            autoGeneratedCount++;
-            return {
-              ...item,
-              rackId: `RACK${String(maxNumber).padStart(3, '0')}`
-            };
-          }
-          return item;
-        });
-        
-        // 检查重复的机柜ID
-        const existingRacks = await Rack.findAll({
-          where: {
-            rackId: dataWithGeneratedIds.map(item => item.rackId)
-          }
-        });
-        
-        const existingIds = new Set(existingRacks.map(rack => rack.rackId));
-        const newData = dataWithGeneratedIds.filter(item => !existingIds.has(item.rackId));
-        const duplicateData = dataWithGeneratedIds.filter(item => existingIds.has(item.rackId));
-        
-        duplicateCount = duplicateData.length;
-        
-        // 将roomName转换为roomId
-        const dataWithRoomId = newData.map(item => {
-          const trimmedRoomName = item.roomName.trim();
-          return {
-            rackId: item.rackId,
-            name: item.name,
-            height: item.height,
-            maxPower: item.maxPower,
-            status: item.status,
-            roomId: roomNameToIdMap.get(trimmedRoomName),
-            currentPower: 0
-          };
-        });
-        
-        // 只创建新的机柜
-        if (dataWithRoomId.length > 0) {
-          const result = await Rack.bulkCreate(dataWithRoomId, {
-            ignoreDuplicates: true // 忽略重复的机柜ID
-          });
-          createdCount = result.length;
-        }
-      } catch (dbError) {
-        return res.status(500).json({ 
-          success: false, 
-          message: '数据库操作失败',
-          error: `保存机柜数据失败: ${dbError.message}` 
-        });
+        createdCount = result.length;
       }
+      
+      // 提交事务
+      await t.commit();
 
       res.status(200).json({ 
         success: true, 
@@ -637,6 +584,7 @@ router.post('/import', async (req, res) => {
       }
     }
   } catch (error) {
+    await t.rollback();
     res.status(500).json({ 
       success: false, 
       message: '服务器内部错误',

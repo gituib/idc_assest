@@ -405,10 +405,13 @@ router.get('/export', async (req, res) => {
   }
 });
 
-// 导入设备数据从CSV
+// 导入设备数据从CSV - 优化版：使用事务+批量插入
 router.post('/import', async (req, res) => {
+  const t = await sequelize.transaction();
+  
   try {
     if (!req.files || !req.files.csvFile) {
+      await t.rollback();
       return res.status(400).json({ error: '请上传CSV文件' });
     }
     
@@ -439,218 +442,155 @@ router.post('/import', async (req, res) => {
       .on('error', reject);
     });
     
-    // 获取所有机房和机柜信息用于验证
-    const rooms = await Room.findAll();
+    // 【优化1】批量查询所有必要数据（单次查询）
+    const [rooms, racks, deviceFields, maxDeviceResult] = await Promise.all([
+      Room.findAll({ transaction: t }),
+      Rack.findAll({ include: [{ model: Room }], transaction: t }),
+      DeviceField.findAll({ transaction: t }),
+      // 查询最大设备ID序号
+      Device.findOne({
+        attributes: [[sequelize.fn('MAX', sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('deviceId'), 4), 'INTEGER')), 'maxNum']],
+        where: { deviceId: { [Op.like]: 'DEV%' } },
+        transaction: t
+      })
+    ]);
+    
+    // 创建查找映射
     const roomNameToIdMap = new Map(rooms.map(room => [room.name, room.roomId]));
-    const racks = await Rack.findAll({
-      include: [{ model: Room }]
-    });
-    
-    // 创建机柜查找映射：机房名称+机柜名称 -> rackId
-    const rackLocationMap = new Map();
-    racks.forEach(rack => {
-      const key = `${rack.Room?.name || ''}_${rack.name}`;
-      rackLocationMap.set(key, rack.rackId);
-    });
-    
-    // 获取设备字段配置
-    const deviceFields = await DeviceField.findAll();
-    
-    // 创建字段映射：displayName -> fieldConfig
+    const rackLocationMap = new Map(racks.map(rack => [`${rack.Room?.name || ''}_${rack.name}`, rack.rackId]));
     const fieldMapping = {};
-    deviceFields.forEach(field => {
-      fieldMapping[field.displayName] = field;
-    });
-    
-    // 创建字段名到显示名称的映射（用于识别基础字段）
     const fieldNameToDisplayName = {};
     deviceFields.forEach(field => {
+      fieldMapping[field.displayName] = field;
       fieldNameToDisplayName[field.fieldName] = field.displayName;
     });
     
-    // 处理导入数据
+    // 设备ID生成器
+    let maxDeviceNum = maxDeviceResult?.get('maxNum') || 0;
+    const generateDeviceId = () => {
+      maxDeviceNum++;
+      return `DEV${String(maxDeviceNum).padStart(3, '0')}`;
+    };
+    
+    // 辅助函数：提取字段名
+    const extractFieldName = (fieldNameWithFormat) => {
+      const match = fieldNameWithFormat.match(/^(.+?)(\(必填\)|\(可选\)|\([a-zA-Z0-9\-\/]+\))$/);
+      return match ? match[1].trim() : fieldNameWithFormat;
+    };
+    
+    // 【优化2】收集所有需要验证的唯一键
+    const allDeviceIds = new Set();
+    const allSerialNumbers = new Set();
+    const validTypes = ['server', 'switch', 'router', 'storage', 'other'];
+    const validStatuses = ['running', 'maintenance', 'offline', 'fault'];
+    const baseFieldNames = ['deviceId', 'name', 'type', 'model', 'serialNumber', 'rackId', 'position', 'height', 'powerConsumption', 'ipAddress', 'status', 'purchaseDate', 'warrantyExpiry', 'description'];
+    
+    // 第一遍：验证和收集数据
+    const validDevices = [];
+    
     for (let i = 0; i < results.length; i++) {
       const row = results[i];
-      const rowNum = i + 2; // CSV行号（第一行是标题）
-      
-      // 辅助函数：从带格式说明的字段名中提取原始字段名
-      // 例如："设备类型(server/switch/router/storage)" -> "设备类型"
-      //       "位置(U)(必填)" -> "位置(U)"
-      const extractFieldName = (fieldNameWithFormat) => {
-        // 匹配规则：提取到 "(必填)"、"(可选)"、"(YYYY-MM-DD)" 或类似格式说明之前的内容
-        // 但保留字段名本身的括号，如 "位置(U)"
-        const match = fieldNameWithFormat.match(/^(.+?)(\(必填\)|\(可选\)|\([a-zA-Z0-9\-\/]+\))$/);
-        return match ? match[1].trim() : fieldNameWithFormat;
-      };
-      
-      // 创建一个映射，将原始字段名映射到CSV中的值
-      const fieldValueMap = {};
-      Object.entries(row).forEach(([displayName, value]) => {
-        const originalFieldName = extractFieldName(displayName);
-        fieldValueMap[originalFieldName] = value;
-        // 同时保留原始字段名的映射，以便兼容不同格式
-        fieldValueMap[displayName] = value;
-      });
+      const rowNum = i + 2;
       
       try {
-          // 动态构建必填字段列表（从数据库配置读取，保持与字段管理页面同步）
-          const trulyRequiredFields = [];
-          
-          deviceFields.forEach(field => {
-            // 跳过设备ID（系统生成）
-            if (field.fieldName === 'deviceId') return;
-            
-            // 机柜字段特殊处理：拆分为机房名称+机柜名称
-            if (field.fieldName === 'rackId') {
-              if (field.required) {
-                trulyRequiredFields.push('所在机房名称');
-                trulyRequiredFields.push('所在机柜名称');
-              }
-              return;
-            }
-            
-            // 其他字段根据数据库配置
-            if (field.required) {
-              trulyRequiredFields.push(field.displayName);
-            }
-          });
-
-          // 验证必填字段
-          const missingFields = [];
-          for (const fieldName of trulyRequiredFields) {
-            const value = fieldValueMap[fieldName];
-            if (!value || (typeof value === 'string' && value.trim() === '')) {
-              missingFields.push(fieldName);
-            }
-          }
-
-          if (missingFields.length > 0) {
-            throw new Error(`缺少必填字段：${missingFields.join('、')}`);
-          }
-          
-        // 获取动态字段显示名称（支持用户在字段管理中修改后的名称）
+        // 解析字段值
+        const fieldValueMap = {};
+        Object.entries(row).forEach(([displayName, value]) => {
+          const originalFieldName = extractFieldName(displayName);
+          fieldValueMap[originalFieldName] = value;
+          fieldValueMap[displayName] = value;
+        });
+        
         const getFieldValue = (fieldName) => {
           const displayName = fieldNameToDisplayName[fieldName];
           return displayName ? fieldValueMap[displayName] : undefined;
         };
         
-        // 验证设备类型值
-        const validTypes = ['server', 'switch', 'router', 'storage', 'other'];
+        // 验证必填字段
+        const trulyRequiredFields = [];
+        deviceFields.forEach(field => {
+          if (field.fieldName === 'deviceId') return;
+          if (field.fieldName === 'rackId') {
+            if (field.required) {
+              trulyRequiredFields.push('所在机房名称', '所在机柜名称');
+            }
+            return;
+          }
+          if (field.required) trulyRequiredFields.push(field.displayName);
+        });
+        
+        const missingFields = trulyRequiredFields.filter(fieldName => {
+          const value = fieldValueMap[fieldName];
+          return !value || (typeof value === 'string' && value.trim() === '');
+        });
+        
+        if (missingFields.length > 0) {
+          throw new Error(`缺少必填字段：${missingFields.join('、')}`);
+        }
+        
+        // 验证设备类型
         const deviceType = getFieldValue('type');
         if (!validTypes.includes(deviceType)) {
-          throw new Error(`设备类型无效，有效值为：${validTypes.join('、')}，当前值：${deviceType}`);
+          throw new Error(`设备类型无效：${deviceType}`);
         }
         
-        // 处理设备ID：如果为空则自动生成
+        // 处理设备ID
         let deviceId = getFieldValue('deviceId');
         if (!deviceId || deviceId.trim() === '') {
-          // 自动生成设备ID
-          const allDevices = await Device.findAll({
-            where: {
-              deviceId: {
-                [require('sequelize').Op.like]: 'DEV%'
-              }
-            }
-          });
-          
-          let maxNumber = 0;
-          allDevices.forEach(device => {
-            const match = device.deviceId.match(/^DEV(\d+)$/);
-            if (match) {
-              const num = parseInt(match[1], 10);
-              if (num > maxNumber) {
-                maxNumber = num;
-              }
-            }
-          });
-          
-          deviceId = `DEV${String(maxNumber + 1).padStart(3, '0')}`;
-        } else {
-          // 验证设备ID是否已存在
-          const existingDeviceById = await Device.findOne({
-            where: { deviceId: deviceId }
-          });
-          if (existingDeviceById) {
-            throw new Error(`设备ID已存在：${deviceId}`);
-          }
+          deviceId = generateDeviceId();
+        } else if (allDeviceIds.has(deviceId)) {
+          throw new Error(`设备ID重复：${deviceId}`);
         }
+        allDeviceIds.add(deviceId);
         
-        // 验证序列号是否已存在
+        // 验证序列号
         const serialNumber = getFieldValue('serialNumber');
-        if (!serialNumber) {
-          throw new Error('序列号不能为空');
+        if (!serialNumber) throw new Error('序列号不能为空');
+        if (allSerialNumbers.has(serialNumber)) {
+          throw new Error(`序列号重复：${serialNumber}`);
         }
-        const existingDevice = await Device.findOne({
-          where: { serialNumber: serialNumber }
-        });
-        if (existingDevice) {
-          throw new Error(`序列号已存在：${serialNumber}`);
-        }
+        allSerialNumbers.add(serialNumber);
         
-        // 获取机房名称和机柜名称
+        // 验证机房和机柜
         const roomName = fieldValueMap['所在机房名称'];
         const rackName = fieldValueMap['所在机柜名称'];
+        if (!roomName?.trim()) throw new Error('所在机房名称不能为空');
+        if (!rackName?.trim()) throw new Error('所在机柜名称不能为空');
         
-        if (!roomName || roomName.trim() === '') {
-          throw new Error('所在机房名称不能为空');
-        }
-        if (!rackName || rackName.trim() === '') {
-          throw new Error('所在机柜名称不能为空');
-        }
-        
-        // 验证机房是否存在
         const roomId = roomNameToIdMap.get(roomName.trim());
-        if (!roomId) {
-          throw new Error(`机房不存在：${roomName}，请先创建机房`);
-        }
+        if (!roomId) throw new Error(`机房不存在：${roomName}`);
         
-        // 根据机房名称+机柜名称查找机柜
         const locationKey = `${roomName.trim()}_${rackName.trim()}`;
         let rackId = rackLocationMap.get(locationKey);
         
-        // 如果机柜不存在，自动创建
+        // 机柜不存在则自动创建
         if (!rackId) {
-          // 生成新的机柜ID
-          const existingRacks = await Rack.findAll({
-            where: {
-              rackId: {
-                [require('sequelize').Op.like]: 'RACK%'
-              }
-            }
+          const maxRackResult = await Rack.findOne({
+            attributes: [[sequelize.fn('MAX', sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('rackId'), 5), 'INTEGER')), 'maxNum']],
+            where: { rackId: { [Op.like]: 'RACK%' } },
+            transaction: t
           });
-          
-          let maxNumber = 0;
-          existingRacks.forEach(rack => {
-            const match = rack.rackId.match(/^RACK(\d+)$/);
-            if (match) {
-              const num = parseInt(match[1], 10);
-              if (num > maxNumber) {
-                maxNumber = num;
-              }
-            }
-          });
-          
-          const newRackId = `RACK${String(maxNumber + 1).padStart(3, '0')}`;
+          let maxRackNum = maxRackResult?.get('maxNum') || 0;
+          maxRackNum++;
           
           const newRack = await Rack.create({
-            rackId: newRackId,
+            rackId: `RACK${String(maxRackNum).padStart(3, '0')}`,
             name: rackName.trim(),
             height: 42,
             maxPower: 10000,
             currentPower: 0,
             status: 'active',
             roomId: roomId
-          });
+          }, { transaction: t });
           
           rackId = newRack.rackId;
           rackLocationMap.set(locationKey, rackId);
         }
         
-        // 验证状态值
-        const validStatus = ['running', 'maintenance', 'offline', 'fault'];
+        // 验证状态
         const status = getFieldValue('status');
-        if (!validStatus.includes(status)) {
-          throw new Error(`状态值无效，有效值为：${validStatus.join('、')}，当前值：${status}`);
+        if (!validStatuses.includes(status)) {
+          throw new Error(`状态值无效：${status}`);
         }
         
         // 验证数字字段
@@ -659,63 +599,38 @@ router.post('/import', async (req, res) => {
         const powerConsumption = getFieldValue('powerConsumption');
         
         if (position !== undefined && isNaN(Number(position))) {
-          throw new Error(`${fieldNameToDisplayName['position']}必须是数字，当前值：${position}`);
+          throw new Error(`位置必须是数字：${position}`);
         }
         if (height !== undefined && isNaN(Number(height))) {
-          throw new Error(`${fieldNameToDisplayName['height']}必须是数字，当前值：${height}`);
+          throw new Error(`高度必须是数字：${height}`);
         }
         if (powerConsumption !== undefined && isNaN(Number(powerConsumption))) {
-          throw new Error(`${fieldNameToDisplayName['powerConsumption']}必须是数字，当前值：${powerConsumption}`);
+          throw new Error(`功率必须是数字：${powerConsumption}`);
         }
         
-        // 验证日期格式并解析日期
+        // 验证日期
         const purchaseDateValue = getFieldValue('purchaseDate');
         const warrantyExpiryValue = getFieldValue('warrantyExpiry');
         const purchaseDate = purchaseDateValue ? new Date(purchaseDateValue) : null;
         const warrantyExpiry = warrantyExpiryValue ? new Date(warrantyExpiryValue) : null;
         
         if (purchaseDateValue && isNaN(purchaseDate.getTime())) {
-          throw new Error(`${fieldNameToDisplayName['purchaseDate']}格式无效：${purchaseDateValue}，请使用YYYY-MM-DD格式`);
+          throw new Error(`购买日期格式无效：${purchaseDateValue}`);
         }
         if (warrantyExpiryValue && isNaN(warrantyExpiry.getTime())) {
-          throw new Error(`${fieldNameToDisplayName['warrantyExpiry']}格式无效：${warrantyExpiryValue}，请使用YYYY-MM-DD格式`);
+          throw new Error(`保修日期格式无效：${warrantyExpiryValue}`);
         }
-        
-        // 验证日期逻辑
         if (purchaseDate && warrantyExpiry && warrantyExpiry <= purchaseDate) {
-          throw new Error(`${fieldNameToDisplayName['warrantyExpiry']}必须晚于${fieldNameToDisplayName['purchaseDate']}：${purchaseDateValue} ~ ${warrantyExpiryValue}`);
+          throw new Error(`保修日期必须晚于购买日期`);
         }
         
-        // 构建设备数据
-        const deviceData = {
-          deviceId: deviceId,
-          name: getFieldValue('name'),
-          type: deviceType,
-          model: getFieldValue('model'),
-          serialNumber: serialNumber,
-          rackId: rackId,
-          position: position ? parseInt(position) : 0,
-          height: height ? parseInt(height) : 1,
-          powerConsumption: powerConsumption ? parseFloat(powerConsumption) : 0,
-          ipAddress: getFieldValue('ipAddress') || '',
-          status: status,
-          purchaseDate: purchaseDate,
-          warrantyExpiry: warrantyExpiry,
-          description: getFieldValue('description') || ''
-        };
-        
-        // 处理自定义字段（排除基础字段）
+        // 处理自定义字段
         const customFields = {};
-        const baseFieldNames = ['deviceId', 'name', 'type', 'model', 'serialNumber', 'rackId', 'position', 'height', 'powerConsumption', 'ipAddress', 'status', 'purchaseDate', 'warrantyExpiry', 'description'];
-        
         Object.entries(row).forEach(([displayName, value]) => {
-          // 从带格式的字段名中提取原始显示名称
           const originalDisplayName = extractFieldName(displayName);
-          // 查找对应的字段配置
           const fieldConfig = fieldMapping[originalDisplayName];
           
           if (fieldConfig && !baseFieldNames.includes(fieldConfig.fieldName)) {
-            // 这是自定义字段，根据字段类型处理值
             let processedValue = value;
             if (fieldConfig.fieldType === 'number') {
               processedValue = value ? parseFloat(value) : null;
@@ -724,59 +639,98 @@ router.post('/import', async (req, res) => {
             } else if (fieldConfig.fieldType === 'date') {
               processedValue = value ? new Date(value) : null;
             }
-            
             customFields[fieldConfig.fieldName] = processedValue;
           }
         });
         
-        // 如果有自定义字段，添加到设备数据中
-        if (Object.keys(customFields).length > 0) {
-          deviceData.customFields = customFields;
-        }
+        // 收集有效设备数据
+        validDevices.push({
+          deviceId,
+          name: getFieldValue('name'),
+          type: deviceType,
+          model: getFieldValue('model'),
+          serialNumber,
+          rackId,
+          position: position ? parseInt(position) : 0,
+          height: height ? parseInt(height) : 1,
+          powerConsumption: powerConsumption ? parseFloat(powerConsumption) : 0,
+          ipAddress: getFieldValue('ipAddress') || '',
+          status,
+          purchaseDate,
+          warrantyExpiry,
+          description: getFieldValue('description') || '',
+          customFields: Object.keys(customFields).length > 0 ? customFields : null
+        });
         
-        // 创建设备
-        const device = await Device.create(deviceData);
-        
-        // 更新机柜当前功率
-        const rack = await Rack.findByPk(rackId);
-        if (rack) {
-          await rack.update({
-            currentPower: rack.currentPower + device.powerConsumption
-          });
-        }
-        
-        stats.success++;
       } catch (error) {
         stats.failed++;
-        let errorMessage = error.message;
-        
-        if (error.name === 'SequelizeUniqueConstraintError') {
-          const errors = error.errors || [];
-          for (const err of errors) {
-            if (err.path === 'deviceId') {
-              errorMessage = `设备ID已存在`;
-              break;
-            } else if (err.path === 'serialNumber') {
-              errorMessage = `序列号已存在`;
-              break;
-            }
-          }
-        } else if (error.name === 'SequelizeValidationError') {
-          errorMessage = '数据验证失败，请检查字段格式';
-        }
-        
-        stats.errors.push({ row: rowNum, error: errorMessage, data: row });
+        stats.errors.push({ row: rowNum, error: error.message, data: row });
       }
     }
     
-    fs.unlinkSync(filePath);
+    // 【优化3】批量查询已存在的设备ID和序列号（单次查询）
+    if (validDevices.length > 0) {
+      const existingDevices = await Device.findAll({
+        where: {
+          [Op.or]: [
+            { deviceId: validDevices.map(d => d.deviceId) },
+            { serialNumber: validDevices.map(d => d.serialNumber) }
+          ]
+        },
+        attributes: ['deviceId', 'serialNumber'],
+        transaction: t
+      });
+      
+      const existingDeviceIds = new Set(existingDevices.map(d => d.deviceId));
+      const existingSerialNumbers = new Set(existingDevices.map(d => d.serialNumber));
+      
+      // 过滤掉已存在的设备
+      const newDevices = validDevices.filter(device => {
+        if (existingDeviceIds.has(device.deviceId)) {
+          stats.failed++;
+          stats.errors.push({ row: 0, error: `设备ID已存在：${device.deviceId}`, data: {} });
+          return false;
+        }
+        if (existingSerialNumbers.has(device.serialNumber)) {
+          stats.failed++;
+          stats.errors.push({ row: 0, error: `序列号已存在：${device.serialNumber}`, data: {} });
+          return false;
+        }
+        return true;
+      });
+      
+      // 【优化4】批量创建设备
+      if (newDevices.length > 0) {
+        await Device.bulkCreate(newDevices, { transaction: t });
+        stats.success = newDevices.length;
+        
+        // 【优化5】批量更新机柜功率
+        const rackPowerMap = new Map();
+        newDevices.forEach(device => {
+          const current = rackPowerMap.get(device.rackId) || 0;
+          rackPowerMap.set(device.rackId, current + device.powerConsumption);
+        });
+        
+        for (const [rackId, powerToAdd] of rackPowerMap) {
+          await Rack.update(
+            { currentPower: sequelize.literal(`currentPower + ${powerToAdd}`) },
+            { where: { rackId }, transaction: t }
+          );
+        }
+      }
+    }
     
+    // 提交事务
+    await t.commit();
+    
+    fs.unlinkSync(filePath);
     res.json({ statistics: stats });
+    
   } catch (error) {
+    await t.rollback();
     console.error('导入设备数据失败:', error);
-    const errorMessage = error.message || '导入过程中发生未知错误';
     res.status(500).json({ 
-      errors: [{ row: 0, error: errorMessage }] 
+      errors: [{ row: 0, error: error.message || '导入过程中发生未知错误' }] 
     });
   }
 });
