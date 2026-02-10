@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
-const { sequelize } = require('../db'); // Import sequelize for transactions
+const { sequelize, dbDialect } = require('../db'); // Import sequelize and dbDialect for transactions
 const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
@@ -30,39 +30,74 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
   try {
     const { keyword, status, type, rackId, page = 1, pageSize = 10 } = req.query;
     const offset = (page - 1) * pageSize;
-    
+
     // 构建查询条件
     const where = {};
-    
-    // 关键词搜索（所有文本字段）
+
+    // 关键词搜索（所有文本字段 + 自定义字段）
     if (keyword) {
-      where[Op.or] = [
-        { deviceId: { [Op.like]: `%${keyword}%` } },
-        { name: { [Op.like]: `%${keyword}%` } },
-        { type: { [Op.like]: `%${keyword}%` } },
-        { model: { [Op.like]: `%${keyword}%` } },
-        { serialNumber: { [Op.like]: `%${keyword}%` } },
-        { position: { [Op.like]: `%${keyword}%` } },
-        { ipAddress: { [Op.like]: `%${keyword}%` } },
-        { description: { [Op.like]: `%${keyword}%` } }
+      console.log('搜索关键词:', keyword);
+      console.log('数据库类型:', dbDialect);
+      
+      // 转义关键词中的特殊字符，防止SQL注入
+      const escapedKeyword = keyword.replace(/'/g, "''");
+      
+      // 基础字段搜索条件（只包含文本类型字段）
+      const searchConditions = [
+        { deviceId: { [Op.like]: `%${escapedKeyword}%` } },
+        { name: { [Op.like]: `%${escapedKeyword}%` } },
+        { type: { [Op.like]: `%${escapedKeyword}%` } },
+        { model: { [Op.like]: `%${escapedKeyword}%` } },
+        { serialNumber: { [Op.like]: `%${escapedKeyword}%` } },
+        { ipAddress: { [Op.like]: `%${escapedKeyword}%` } },
+        { description: { [Op.like]: `%${escapedKeyword}%` } }
       ];
+
+      // 动态获取文本类型的自定义字段
+      const customFields = await DeviceField.findAll({
+        where: {
+          isSystem: false,
+          fieldType: { [Op.in]: ['string', 'textarea'] }
+        }
+      });
+      
+      console.log('找到的自定义字段:', customFields.map(f => f.fieldName));
+
+      // 构建自定义字段搜索条件（使用原始SQL，兼容SQLite和MySQL）
+      if (customFields.length > 0) {
+        // 使用原始SQL查询JSON字段
+        const jsonConditions = customFields.map(field => {
+          const fieldName = field.fieldName;
+          // 使用 sequelize.literal 构建原始SQL条件
+          if (dbDialect === 'mysql') {
+            return sequelize.literal(`JSON_EXTRACT(customFields, '$."${fieldName}"') LIKE '%${escapedKeyword}%'`);
+          } else {
+            return sequelize.literal(`json_extract(customFields, '$.${fieldName}') LIKE '%${escapedKeyword}%'`);
+          }
+        });
+        searchConditions.push(...jsonConditions);
+      }
+
+      // 合并所有搜索条件
+      where[Op.or] = searchConditions;
+      console.log('搜索条件数量:', searchConditions.length);
     }
-    
+
     // 状态筛选
     if (status && status !== 'all') {
       where.status = status;
     }
-    
+
     // 分类筛选
     if (type && type !== 'all') {
       where.type = type;
     }
-    
+
     // 机柜筛选（用于机柜可视化功能）
     if (rackId) {
       where.rackId = rackId;
     }
-    
+
     // 执行查询
     const { count, rows } = await Device.findAndCountAll({
       where,
@@ -77,7 +112,7 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
       offset,
       limit: parseInt(pageSize)
     });
-    
+
     res.json({
       total: count,
       devices: rows,
@@ -85,7 +120,12 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
       pageSize: parseInt(pageSize)
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('搜索设备失败:', error);
+    console.error('错误详情:', error.message);
+    if (error.sql) {
+      console.error('SQL:', error.sql);
+    }
+    res.status(500).json({ error: error.message, sql: error.sql });
   }
 });
 

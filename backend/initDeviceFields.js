@@ -160,21 +160,20 @@ async function initDeviceFields() {
     console.log('开始初始化设备字段配置...');
     // 注意：数据库连接和表结构同步已在 server.js 中完成，这里直接初始化数据
 
-    // 批量创建默认字段
+    // 批量创建默认字段（只创建不存在的字段，保留用户自定义配置）
     for (const field of defaultDeviceFields) {
       // 检查字段是否已存在
       const existingField = await DeviceField.findOne({
         where: { fieldName: field.fieldName }
       });
       
-      if (existingField) {
-        // 更新已有字段
-        await existingField.update(field);
-        console.log(`更新字段: ${field.displayName}`);
-      } else {
-        // 创建新字段
+      if (!existingField) {
+        // 只创建新字段，不更新已存在的字段
         await DeviceField.create(field);
         console.log(`创建字段: ${field.displayName}`);
+      } else {
+        // 已存在的字段跳过，保留用户自定义配置
+        console.log(`跳过已存在字段: ${field.displayName}`);
       }
     }
     

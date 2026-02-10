@@ -3,112 +3,73 @@ import { Table, Button, Modal, Form, Input, Select, DatePicker, message, Card, S
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, UploadOutlined, DownloadOutlined, SettingOutlined, UndoOutlined, CloudServerOutlined, SafetyOutlined, DatabaseOutlined, AppstoreOutlined, MoreOutlined, ReloadOutlined, ExportOutlined, FileExcelOutlined, SwapOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
+import { designTokens } from '../config/theme';
+import {
+  PAGINATION_CONFIG,
+  DEBOUNCE_DELAY,
+  TABLE_SCROLL_CONFIG,
+  DEFAULT_DEVICE_FIELDS,
+  BASE_FIELD_NAMES,
+  SYSTEM_FIELDS,
+  FIXED_FIELDS,
+  IMPORT_CONFIG,
+  EXPORT_CONFIG,
+  MODAL_CONFIG,
+  DEVICE_TYPE_OPTIONS,
+  DEVICE_STATUS_OPTIONS,
+  COLUMN_WIDTH_CONFIG,
+  EMPTY_STATE_CONFIG
+} from '../constants/deviceManagementConstants';
+import {
+  pageContainerStyle,
+  headerStyle,
+  titleRowStyle,
+  titleSectionStyle,
+  titleIconStyle,
+  titleTextStyle,
+  pageTitleStyle,
+  pageSubtitleStyle,
+  primaryActionStyle,
+  secondaryActionStyle,
+  statsRowStyle,
+  statCardStyle,
+  statValueStyle,
+  statLabelStyle,
+  statCardRunningStyle,
+  statCardMaintenanceStyle,
+  statCardFaultStyle,
+  cardStyle,
+  filterCardStyle,
+  modalHeaderStyle,
+  tableStyles,
+  searchInputStyle,
+  selectStyle,
+  refreshButtonStyle,
+  searchButtonStyle,
+  resetButtonStyle,
+  importModalStyles,
+  detailModalStyles,
+  exportModalStyles,
+  generateGlobalStyles
+} from '../styles/deviceManagementStyles';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
-const designTokens = {
-  colors: {
-    primary: {
-      main: '#667eea',
-      gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      light: '#8b9ff0',
-      dark: '#4f5db8'
-    },
-    success: {
-      main: '#10b981',
-      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-      light: '#34d399',
-      dark: '#047857'
-    },
-    warning: {
-      main: '#f59e0b',
-      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-      light: '#fbbf24',
-      dark: '#b45309'
-    },
-    error: {
-      main: '#ef4444',
-      gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-      light: '#f87171',
-      dark: '#b91c1c'
-    },
-    text: {
-      primary: '#1e293b',
-      secondary: '#64748b',
-      tertiary: '#94a3b8',
-      inverse: '#ffffff'
-    },
-    background: {
-      primary: '#ffffff',
-      secondary: '#f8fafc',
-      tertiary: '#f1f5f9',
-      dark: '#1e293b'
-    },
-    border: {
-      light: '#e2e8f0',
-      medium: '#cbd5e1',
-      dark: '#94a3b8'
-    },
-    device: {
-      server: '#3b82f6',
-      switch: '#22c55e',
-      router: '#f59e0b',
-      storage: '#8b5cf6',
-      other: '#64748b'
-    },
-    status: {
-      normal: '#10b981',
-      running: '#10b981',
-      warning: '#f59e0b',
-      error: '#ef4444',
-      fault: '#ef4444',
-      offline: '#6b7280',
-      maintenance: '#3b82f6'
-    }
-  },
-  shadows: {
-    small: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-    medium: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
-    large: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
-    xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-    glow: '0 0 20px rgba(102, 126, 234, 0.3)'
-  },
-  borderRadius: {
-    small: '6px',
-    medium: '10px',
-    large: '16px',
-    xl: '24px',
-    round: '50%'
-  },
-  transitions: {
-    fast: '150ms cubic-bezier(0.4, 0, 0.2, 1)',
-    normal: '300ms cubic-bezier(0.4, 0, 0.2, 1)',
-    slow: '500ms cubic-bezier(0.4, 0, 0.2, 1)'
-  },
-  spacing: {
-    xs: '4px',
-    sm: '8px',
-    md: '16px',
-    lg: '24px',
-    xl: '32px'
-  }
-};
-
 // 防抖 Hook
-function useDebounce(value, delay) {
+function useDebounce(value, delay = DEBOUNCE_DELAY) {
   const [debouncedValue, setDebouncedValue] = useState(value);
-
+  
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);
-
+    
     return () => {
       clearTimeout(handler);
     };
   }, [value, delay]);
-
+  
   return debouncedValue;
 }
 
@@ -165,25 +126,8 @@ const formatDate = (date, fieldName) => {
   return formattedDate;
 };
 
-// 默认设备字段配置
-const defaultDeviceFields = [
-  { fieldName: 'deviceId', displayName: '设备ID', fieldType: 'string', required: false, order: 1, visible: false },
-  { fieldName: 'name', displayName: '设备名称', fieldType: 'string', required: true, order: 2, visible: true },
-  { fieldName: 'type', displayName: '设备类型', fieldType: 'select', required: true, order: 3, visible: true, 
-    options: [{ value: 'server', label: '服务器' }, { value: 'switch', label: '交换机' }, { value: 'router', label: '路由器' }, { value: 'storage', label: '存储设备' }, { value: 'other', label: '其他设备' }] },
-  { fieldName: 'model', displayName: '型号', fieldType: 'string', required: true, order: 4, visible: true },
-  { fieldName: 'serialNumber', displayName: '序列号', fieldType: 'string', required: true, order: 5, visible: true },
-  { fieldName: 'rackId', displayName: '所在机柜', fieldType: 'select', required: true, order: 6, visible: true },
-  { fieldName: 'position', displayName: '位置(U)', fieldType: 'number', required: true, order: 7, visible: true },
-  { fieldName: 'height', displayName: '高度(U)', fieldType: 'number', required: true, order: 8, visible: true },
-  { fieldName: 'powerConsumption', displayName: '功率(W)', fieldType: 'number', required: true, order: 9, visible: true },
-  { fieldName: 'status', displayName: '状态', fieldType: 'select', required: true, order: 10, visible: true, 
-    options: [{ value: 'running', label: '运行中' }, { value: 'maintenance', label: '维护中' }, { value: 'offline', label: '离线' }, { value: 'fault', label: '故障' }] },
-  { fieldName: 'purchaseDate', displayName: '购买日期', fieldType: 'date', required: false, order: 11, visible: true },
-  { fieldName: 'warrantyExpiry', displayName: '保修到期', fieldType: 'date', required: false, order: 12, visible: true },
-  { fieldName: 'ipAddress', displayName: 'IP地址', fieldType: 'string', required: false, order: 13, visible: true },
-  { fieldName: 'description', displayName: '描述', fieldType: 'textarea', required: false, order: 14, visible: true }
-];
+// 使用从常量文件导入的默认设备字段配置
+const defaultDeviceFields = DEFAULT_DEVICE_FIELDS;
   
   // 简单的可调整列宽的表头组件
   const ResizableTitle = (props) => {
@@ -263,14 +207,14 @@ function DeviceManagement() {
   const [status, setStatus] = useState('all');
   const [type, setType] = useState('all');
   const [searchForm] = Form.useForm();
-  // 分页状态
+  // 分页状态 - 使用常量配置
   const [pagination, setPagination] = useState({ 
     current: 1, 
-    pageSize: 10, 
+    pageSize: PAGINATION_CONFIG.defaultPageSize, 
     total: 0,
-    pageSizeOptions: ['10', '20', '30', '50', '100'],
-    showSizeChanger: true,
-    showTotal: (total) => `共 ${total} 条记录`
+    pageSizeOptions: PAGINATION_CONFIG.pageSizeOptions,
+    showSizeChanger: PAGINATION_CONFIG.showSizeChanger,
+    showTotal: PAGINATION_CONFIG.showTotal
   });
   
   // 设备字段配置
@@ -312,8 +256,8 @@ function DeviceManagement() {
   // 列宽状态
   const [columnWidths, setColumnWidths] = useState({});
 
-  // 防抖搜索关键词
-  const debouncedKeyword = useDebounce(keyword, 300);
+  // 防抖搜索关键词 - 使用常量配置的延迟时间
+  const debouncedKeyword = useDebounce(keyword, DEBOUNCE_DELAY);
 
   // 使用 useMemo 缓存筛选后的设备数据（现在直接使用 allDevices，因为后端已经处理了筛选）
   const filteredDevicesMemo = useMemo(() => {
@@ -1149,360 +1093,11 @@ function DeviceManagement() {
     message.success('字段配置已重置为默认值');
   };
 
-  const pageContainerStyle = {
-    minHeight: '100vh',
-    background: designTokens.colors.background.secondary,
-    padding: designTokens.spacing.lg
-  };
-
-  const headerStyle = {
-    marginBottom: designTokens.spacing.lg
-  };
-
-  const titleRowStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: designTokens.spacing.lg,
-    flexWrap: 'wrap',
-    gap: designTokens.spacing.md
-  };
-
-  const titleSectionStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: designTokens.spacing.md
-  };
-
-  const titleIconStyle = {
-    width: '44px',
-    height: '44px',
-    borderRadius: designTokens.borderRadius.medium,
-    background: designTokens.colors.primary.gradient,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: designTokens.shadows.medium
-  };
-
-  const titleTextStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2px'
-  };
-
-  const pageTitleStyle = {
-    fontSize: '22px',
-    fontWeight: '700',
-    margin: 0,
-    color: designTokens.colors.text.primary,
-    lineHeight: 1.2
-  };
-
-  const pageSubtitleStyle = {
-    fontSize: '13px',
-    color: designTokens.colors.text.secondary,
-    margin: 0
-  };
-
-  const actionButtonStyle = {
-    height: '36px',
-    borderRadius: designTokens.borderRadius.small,
-    fontSize: '13px',
-    fontWeight: '500',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px'
-  };
-
-  const primaryActionStyle = {
-    ...actionButtonStyle,
-    background: designTokens.colors.primary.gradient,
-    border: 'none',
-    color: '#ffffff !important',
-    boxShadow: designTokens.shadows.small
-  };
-
-  const secondaryActionStyle = {
-    ...actionButtonStyle,
-    background: designTokens.colors.background.primary,
-    border: `1px solid ${designTokens.colors.border.light}`,
-    color: designTokens.colors.text.primary
-  };
-
-  const dangerActionStyle = {
-    ...actionButtonStyle,
-    background: designTokens.colors.error.main,
-    border: 'none',
-    color: '#ffffff'
-  };
-
-  const primaryButtonStyle = {
-    height: '40px',
-    borderRadius: designTokens.borderRadius.small,
-    background: designTokens.colors.primary.gradient,
-    border: 'none',
-    color: '#ffffff',
-    boxShadow: designTokens.shadows.small,
-    fontWeight: '500',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center'
-  };
-
-  const statsRowStyle = {
-    display: 'flex',
-    gap: designTokens.spacing.md,
-    marginBottom: designTokens.spacing.lg,
-    flexWrap: 'wrap'
-  };
-
-  const statCardStyle = {
-    flex: 1,
-    minWidth: '140px',
-    maxWidth: '200px',
-    padding: `${designTokens.spacing.md}px ${designTokens.spacing.lg}px`,
-    background: designTokens.colors.background.primary,
-    borderRadius: designTokens.borderRadius.medium,
-    border: `1px solid ${designTokens.colors.border.light}`,
-    boxShadow: designTokens.shadows.small,
-    transition: `all ${designTokens.transitions.fast}`
-  };
-
-  const statValueStyle = {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: designTokens.colors.text.primary,
-    lineHeight: 1.2
-  };
-
-  const statLabelStyle = {
-    fontSize: '12px',
-    color: designTokens.colors.text.secondary,
-    marginTop: '4px'
-  };
-
-  const statCardRunningStyle = {
-    ...statCardStyle,
-    borderLeft: `3px solid ${designTokens.colors.success.main}`,
-    background: `${designTokens.colors.success.main}08`
-  };
-
-  const statCardMaintenanceStyle = {
-    ...statCardStyle,
-    borderLeft: `3px solid ${designTokens.colors.warning.main}`,
-    background: `${designTokens.colors.warning.main}08`
-  };
-
-  const statCardFaultStyle = {
-    ...statCardStyle,
-    borderLeft: `3px solid ${designTokens.colors.error.main}`,
-    background: `${designTokens.colors.error.main}08`
-  };
-
-  const cardStyle = {
-    borderRadius: designTokens.borderRadius.large,
-    border: 'none',
-    boxShadow: designTokens.shadows.medium,
-    overflow: 'hidden',
-    background: designTokens.colors.background.primary
-  };
-
-  const filterCardStyle = {
-    borderRadius: designTokens.borderRadius.medium,
-    border: 'none',
-    boxShadow: designTokens.shadows.small,
-    background: designTokens.colors.background.primary,
-    marginBottom: designTokens.spacing.lg
-  };
-
-  const modalHeaderStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: designTokens.spacing.sm,
-    fontSize: '18px',
-    fontWeight: '600'
-  };
+  // 样式已从外部样式文件导入，无需在组件内定义
 
   return (
     <div style={pageContainerStyle}>
-      <style>{`
-        .device-modal .ant-modal-close {
-          top: 16px;
-          right: 24px;
-          width: 32px;
-          height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        
-        .device-modal .ant-modal-close-x {
-          font-size: 16px;
-          line-height: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        
-        .device-table-wrapper {
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-        }
-        
-        .device-table-wrapper .ant-table {
-          width: 100% !important;
-          max-width: 100% !important;
-        }
-        
-        .device-table-wrapper .ant-table-container {
-          width: 100% !important;
-          max-width: 100% !important;
-          display: flex;
-          flex-direction: column;
-        }
-        
-        .device-table-wrapper .ant-table-content {
-          width: 100% !important;
-          max-width: 100% !important;
-          overflow-x: hidden !important;
-        }
-        
-        .device-table-wrapper .ant-table-thead {
-          flex-shrink: 0;
-        }
-        
-        .device-table-wrapper .ant-table-thead > tr > th {
-          white-space: normal !important;
-          word-break: break-word !important;
-          font-size: 14px !important;
-          font-weight: 600 !important;
-          line-height: 1.4 !important;
-          padding: 14px 12px !important;
-          background: ${designTokens.colors.background.tertiary} !important;
-          color: ${designTokens.colors.text.primary} !important;
-          border-bottom: 1px solid ${designTokens.colors.border.light} !important;
-        }
-        
-        .device-table-wrapper .ant-table-tbody {
-          flex-shrink: 1;
-          min-height: 0;
-        }
-        
-        .device-table-wrapper .ant-table-tbody > tr > td {
-          white-space: normal !important;
-          word-break: break-word !important;
-          line-height: 1.6 !important;
-          max-width: 250px !important;
-          padding: 12px !important;
-          border-bottom: 1px solid ${designTokens.colors.border.light} !important;
-        }
-        
-        .device-table-wrapper .ant-table-tbody > tr > td .ant-typography,
-        .device-table-wrapper .ant-table-tbody > tr > td .ant-typography-expand,
-        .device-table-wrapper .ant-table-tbody > tr > td span {
-          white-space: normal !important;
-          word-break: break-word !important;
-        }
-        
-        .device-table-wrapper .ant-table-cell {
-          word-break: break-word !important;
-        }
-        
-        .device-table-wrapper .ant-table-row-even {
-          background-color: ${designTokens.colors.background.primary};
-        }
-        
-        .device-table-wrapper .ant-table-row-odd {
-          background-color: ${designTokens.colors.background.secondary};
-        }
-        
-        .device-table-wrapper .ant-table-row-selected {
-          background-color: ${designTokens.colors.primary.main}15 !important;
-        }
-        
-        .device-table-wrapper .ant-table-row-selected:hover > td {
-          background-color: ${designTokens.colors.primary.main}25 !important;
-        }
-        
-        .device-table-wrapper .ant-table-tbody > tr:hover > td {
-          background-color: ${designTokens.colors.background.tertiary} !important;
-        }
-        
-        .device-table-wrapper .ant-table-selection-column {
-          position: sticky !important;
-          left: 0 !important;
-          z-index: 2 !important;
-          background: inherit !important;
-        }
-        
-        .device-table-wrapper .ant-table-tbody > tr > td:last-child {
-          min-width: 120px !important;
-          max-width: 150px !important;
-        }
-        
-        .device-table-wrapper .ant-pagination {
-          margin: 16px 0 !important;
-          flex-wrap: wrap !important;
-          justify-content: center !important;
-          padding: 12px 16px !important;
-          background: ${designTokens.colors.background.primary};
-          border-radius: ${designTokens.borderRadius.medium};
-          margin-top: 16px !important;
-        }
-        
-        .device-table-wrapper .ant-pagination-item-active {
-          background: ${designTokens.colors.primary.gradient} !important;
-          border: none !important;
-        }
-        
-        .device-table-wrapper .ant-pagination-item-active a {
-          color: #ffffff !important;
-        }
-        
-        .device-table-wrapper .ant-table-cell-fix-left,
-        .device-table-wrapper .ant-table-cell-fix-right {
-          background: inherit !important;
-        }
-        
-        @media screen and (max-width: 768px) {
-          .device-table-wrapper .ant-table-tbody > tr > td {
-            max-width: 150px !important;
-            font-size: 13px !important;
-          }
-          
-          .device-table-wrapper .ant-table-thead > tr > th {
-            font-size: 13px !important;
-          }
-        }
-        
-        @media (max-width: 768px) {
-          .page-header {
-            flex-direction: column;
-            align-items: flex-start !important;
-            gap: 16px !important;
-          }
-          
-          .stat-cards {
-            flex-wrap: wrap;
-          }
-          
-          .stat-card {
-            min-width: calc(50% - 8px) !important;
-          }
-        }
-        
-        @media (max-width: 480px) {
-          .stat-card {
-            min-width: 100% !important;
-          }
-          
-          .filter-form .ant-form-item {
-            margin-bottom: 12px !important;
-          }
-        }
-      `}</style>
+      <style>{generateGlobalStyles(designTokens)}</style>
       
       <div style={headerStyle}>
         <div style={titleRowStyle}>
@@ -1586,7 +1181,18 @@ function DeviceManagement() {
               批量删除 ({selectedDevices.length})
             </Button>
             <Button
-              style={dangerActionStyle}
+              style={{
+                height: '36px',
+                borderRadius: designTokens.borderRadius.small,
+                fontSize: '13px',
+                fontWeight: '500',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: designTokens.colors.error.main,
+                border: 'none',
+                color: '#ffffff'
+              }}
               icon={<DeleteOutlined />}
               onClick={handleDeleteAll}
             >
@@ -1862,7 +1468,7 @@ function DeviceManagement() {
           <Form.Item style={{ textAlign: 'right', marginTop: '24px' }}>
             <Space>
               <Button onClick={handleCancel} style={secondaryActionStyle}>取消</Button>
-              <Button type="primary" htmlType="submit" style={primaryButtonStyle}>确定</Button>
+              <Button type="primary" htmlType="submit" style={{ height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>确定</Button>
             </Space>
           </Form.Item>
         </Form>
@@ -1910,7 +1516,7 @@ function DeviceManagement() {
             <Space>
               <Button onClick={() => setFieldConfigModalVisible(false)} style={secondaryActionStyle}>取消</Button>
               <Button onClick={handleResetFieldConfig} style={secondaryActionStyle}>重置默认</Button>
-              <Button type="primary" htmlType="submit" style={primaryButtonStyle}>保存</Button>
+              <Button type="primary" htmlType="submit" style={{ height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>保存</Button>
             </Space>
           </Form.Item>
         </Form>
@@ -1995,7 +1601,7 @@ function DeviceManagement() {
               beforeUpload={handleImport}
               maxCount={1}
             >
-              <Button type="primary" icon={<UploadOutlined />} block style={primaryButtonStyle}>
+              <Button type="primary" icon={<UploadOutlined />} block style={{ height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                 选择CSV文件
               </Button>
             </Upload>
@@ -2086,7 +1692,7 @@ function DeviceManagement() {
                   setImportResult(null);
                   setIsImporting(false);
                   fetchDevices();
-                }} style={{ marginTop: '20px', ...primaryButtonStyle, height: '40px' }}>
+                }} style={{ marginTop: '20px', height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   确定
                 </Button>
               </div>
@@ -2115,7 +1721,7 @@ function DeviceManagement() {
           <Button key="edit" type="primary" onClick={() => {
             setDetailModalVisible(false);
             showModal(selectedDevice);
-          }} style={primaryButtonStyle}>
+          }} style={{ height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
             编辑
           </Button>
         ]}
@@ -2240,7 +1846,7 @@ function DeviceManagement() {
           <Button key="cancel" onClick={() => setBatchStatusModalVisible(false)} style={secondaryActionStyle}>
             取消
           </Button>,
-          <Button key="submit" type="primary" loading={batchStatusLoading} onClick={handleBatchStatusChange} style={primaryButtonStyle}>
+          <Button key="submit" type="primary" loading={batchStatusLoading} onClick={handleBatchStatusChange} style={{ height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
             确定
           </Button>
         ]}
@@ -2279,7 +1885,7 @@ function DeviceManagement() {
           <Button key="cancel" onClick={() => setExportModalVisible(false)} style={secondaryActionStyle}>
             取消
           </Button>,
-          <Button key="submit" type="primary" loading={exportLoading} onClick={handleEnhancedExport} style={primaryButtonStyle}>
+          <Button key="submit" type="primary" loading={exportLoading} onClick={handleEnhancedExport} style={{ height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
             导出
           </Button>
         ]}
