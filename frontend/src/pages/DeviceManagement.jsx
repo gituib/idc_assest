@@ -56,6 +56,8 @@ import {
   DEVICE_STATUS_OPTIONS,
   COLUMN_WIDTH_CONFIG,
   EMPTY_STATE_CONFIG,
+  STATUS_MAP,
+  TYPE_MAP,
 } from '../constants/deviceManagementConstants';
 import {
   pageContainerStyle,
@@ -88,6 +90,10 @@ import {
   detailModalStyles,
   exportModalStyles,
   generateGlobalStyles,
+  emptyStateStyle,
+  emptyStateIconStyle,
+  tableContainerStyle,
+  resizableTitleStyles,
 } from '../styles/deviceManagementStyles';
 
 const { Option } = Select;
@@ -199,36 +205,14 @@ const ResizableTitle = props => {
 
   return (
     <th {...restProps} style={{ position: 'relative' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          width: '100%',
-        }}
-      >
-        <span
-          style={{
-            flex: 1,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
+      <div style={resizableTitleStyles.container}>
+        <span style={resizableTitleStyles.text}>
           {children}
         </span>
         {onResize && (
           <div
             onMouseDown={handleMouseDown}
-            style={{
-              width: '8px',
-              height: '20px',
-              backgroundColor: '#e0e0e0',
-              borderRadius: '4px',
-              cursor: 'col-resize',
-              marginLeft: '8px',
-              flexShrink: 0,
-            }}
+            style={resizableTitleStyles.resizeHandle}
           />
         )}
       </div>
@@ -1012,22 +996,7 @@ function DeviceManagement() {
     return false;
   };
 
-  // 状态标签映射
-  const statusMap = {
-    running: { text: '运行中', color: 'green' },
-    maintenance: { text: '维护中', color: 'orange' },
-    offline: { text: '离线', color: 'gray' },
-    fault: { text: '故障', color: 'red' },
-  };
-
-  // 设备类型映射
-  const typeMap = {
-    server: '服务器',
-    switch: '交换机',
-    router: '路由器',
-    storage: '存储设备',
-    other: '其他设备',
-  };
+  // 使用从常量导入的映射，避免每次渲染重新创建
 
   // 获取设备类型图标
   const getDeviceTypeIcon = type => {
@@ -1100,7 +1069,7 @@ function DeviceManagement() {
             return (
               <Space>
                 {getDeviceTypeIcon(type)}
-                <span>{typeMap[type]}</span>
+                <span>{TYPE_MAP[type]}</span>
               </Space>
             );
           },
@@ -1119,16 +1088,16 @@ function DeviceManagement() {
               return (
                 <Space>
                   {status.map(s => (
-                    <span key={s} style={{ color: statusMap[s]?.color || 'black' }}>
-                      {statusMap[s]?.text || s}
+                    <span key={s} style={{ color: STATUS_MAP[s]?.color || 'black' }}>
+                      {STATUS_MAP[s]?.text || s}
                     </span>
                   ))}
                 </Space>
               );
             }
             return (
-              <span style={{ color: statusMap[status]?.color || 'black' }}>
-                {statusMap[status]?.text || status}
+              <span style={{ color: STATUS_MAP[status]?.color || 'black' }}>
+                {STATUS_MAP[status]?.text || status}
               </span>
             );
           },
@@ -1509,16 +1478,13 @@ function DeviceManagement() {
         {!loading && filteredDevicesMemo.length === 0 && !searching && (
           <div
             style={{
-              textAlign: 'center',
-              padding: '60px 20px',
+              ...emptyStateStyle,
               color: designTokens.colors.text.secondary,
-              fontSize: '15px',
             }}
           >
             <SearchOutlined
               style={{
-                fontSize: '48px',
-                marginBottom: '16px',
+                ...emptyStateIconStyle,
                 color: designTokens.colors.border.light,
               }}
             />
@@ -1529,8 +1495,8 @@ function DeviceManagement() {
           <div
             className="device-table-wrapper"
             style={{
+              ...tableContainerStyle,
               borderRadius: designTokens.borderRadius.medium,
-              overflow: 'hidden',
             }}
           >
             <Table

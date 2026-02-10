@@ -406,6 +406,50 @@ export const exportModalStyles = {
   },
 };
 
+// 空状态样式
+export const emptyStateStyle = {
+  textAlign: 'center',
+  padding: '60px 20px',
+  fontSize: '15px',
+};
+
+// 空状态图标样式
+export const emptyStateIconStyle = {
+  fontSize: '48px',
+  marginBottom: '16px',
+};
+
+// 表格容器样式
+export const tableContainerStyle = {
+  borderRadius: borderRadius.medium,
+  overflow: 'hidden',
+};
+
+// ResizableTitle 组件样式
+export const resizableTitleStyles = {
+  container: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  text: {
+    flex: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  resizeHandle: {
+    width: '8px',
+    height: '20px',
+    backgroundColor: '#e0e0e0',
+    borderRadius: '4px',
+    cursor: 'col-resize',
+    marginLeft: '8px',
+    flexShrink: 0,
+  },
+};
+
 // CSS-in-JS 样式字符串生成函数
 export const generateGlobalStyles = tokens => `
   .device-modal .ant-modal-close {

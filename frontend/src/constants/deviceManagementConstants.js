@@ -276,3 +276,20 @@ export const ACTION_BUTTON_CONFIG = {
   // 单个删除确认消息
   singleDeleteConfirmMessage: name => `确定要删除设备 "${name}" 吗？此操作不可恢复。`,
 };
+
+// 状态标签映射
+export const STATUS_MAP = {
+  running: { text: '运行中', color: 'green' },
+  maintenance: { text: '维护中', color: 'orange' },
+  offline: { text: '离线', color: 'gray' },
+  fault: { text: '故障', color: 'red' },
+};
+
+// 设备类型映射
+export const TYPE_MAP = {
+  server: '服务器',
+  switch: '交换机',
+  router: '路由器',
+  storage: '存储设备',
+  other: '其他设备',
+};
