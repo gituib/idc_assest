@@ -1,7 +1,41 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'idc-management-secret-key-2024';
+/**
+ * 获取 JWT Secret
+ * - 生产环境：强制从环境变量读取，未设置则抛出错误
+ * - 开发环境：未设置时自动生成临时密钥（重启后失效）
+ */
+function getJwtSecret() {
+  const envSecret = process.env.JWT_SECRET;
+
+  // 生产环境强制校验
+  if (process.env.NODE_ENV === 'production') {
+    if (!envSecret) {
+      throw new Error(
+        '[致命错误] 生产环境未设置 JWT_SECRET 环境变量！\n' +
+        '请在服务器环境变量中设置强密钥（至少32位随机字符）。\n' +
+        '生成命令（PowerShell）：-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 64 | ForEach-Object { [char]$_ })'
+      );
+    }
+    if (envSecret.length < 32) {
+      throw new Error('[致命错误] 生产环境 JWT_SECRET 长度必须至少32位！当前长度：' + envSecret.length);
+    }
+    return envSecret;
+  }
+
+  // 开发环境：使用环境变量或临时密钥
+  if (!envSecret) {
+    const tempSecret = crypto.randomBytes(32).toString('hex');
+    console.warn('⚠️  [开发模式] JWT_SECRET 未设置，使用临时密钥（重启后所有 Token 失效）');
+    return tempSecret;
+  }
+
+  return envSecret;
+}
+
+const JWT_SECRET = getJwtSecret();
 const TOKEN_EXPIRY = process.env.TOKEN_EXPIRY || '24h';
 
 const getBrowserInfo = (userAgent) => {
