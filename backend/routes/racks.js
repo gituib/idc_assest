@@ -39,16 +39,34 @@ router.get('/', async (req, res) => {
     // 获取总记录数（带筛选条件）
     const total = await Rack.count({ where });
 
-    // 获取分页数据 - 优化：使用 JOIN 避免 N+1 查询问题
+    // 获取分页数据 - 先查询机柜基本信息
     const racks = await Rack.findAll({
       where,
       include: [
-        { model: Room, separate: false },
-        { model: Device, separate: false }
+        { model: Room, separate: false }
       ],
       limit: pageSize,
-      offset: offset,
-      subQuery: false  // 避免子查询导致的性能问题
+      offset: offset
+    });
+
+    // 单独查询每个机柜的设备信息（避免 JOIN 导致的数据重复问题）
+    const rackIds = racks.map(r => r.rackId);
+    const devices = await Device.findAll({
+      where: { rackId: rackIds },
+      attributes: ['deviceId', 'rackId', 'name', 'powerConsumption']
+    });
+
+    // 将设备信息关联到对应的机柜
+    const deviceMap = {};
+    devices.forEach(d => {
+      if (!deviceMap[d.rackId]) {
+        deviceMap[d.rackId] = [];
+      }
+      deviceMap[d.rackId].push(d);
+    });
+
+    racks.forEach(rack => {
+      rack.dataValues.Devices = deviceMap[rack.rackId] || [];
     });
 
     // 返回带分页信息的响应

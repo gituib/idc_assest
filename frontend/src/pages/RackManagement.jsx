@@ -25,6 +25,7 @@ import {
   Statistic,
   Upload,
   Spin,
+  Pagination,
 } from 'antd';
 import {
   PlusOutlined,
@@ -946,6 +947,23 @@ function RackManagement() {
               </Col>
             )}
           </Row>
+        )}
+
+        {/* 卡片视图分页 - 始终显示当总数据大于0时 */}
+        {viewMode === 'card' && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
+            <Pagination
+              current={pagination.current}
+              pageSize={pagination.pageSize}
+              total={pagination.total}
+              pageSizeOptions={pagination.pageSizeOptions}
+              showSizeChanger={pagination.showSizeChanger}
+              showTotal={pagination.showTotal}
+              onChange={(page, pageSize) => {
+                handleTableChange({ current: page, pageSize });
+              }}
+            />
+          </div>
         )}
       </Card>
 
