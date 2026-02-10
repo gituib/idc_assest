@@ -1,6 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs, Form, Input, Switch, Select, Button, Card, Space, message, Modal, Tag, Divider, Descriptions, Alert } from 'antd';
-import { SettingOutlined, GlobalOutlined, BgColorsOutlined, InfoCircleOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import {
+  Tabs,
+  Form,
+  Input,
+  Switch,
+  Select,
+  Button,
+  Card,
+  Space,
+  message,
+  Modal,
+  Tag,
+  Divider,
+  Descriptions,
+  Alert,
+} from 'antd';
+import {
+  SettingOutlined,
+  GlobalOutlined,
+  BgColorsOutlined,
+  InfoCircleOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+} from '@ant-design/icons';
 import axios from 'axios';
 import { useConfig } from '../context/ConfigContext';
 
@@ -26,7 +48,7 @@ const SystemSettings = () => {
     try {
       const response = await axios.get('/api/system-settings');
       setSettings(response.data);
-      
+
       const formValues = {};
       Object.entries(response.data).forEach(([key, data]) => {
         formValues[key] = data.value;
@@ -48,7 +70,7 @@ const SystemSettings = () => {
     }
   };
 
-  const handleSaveSettings = async (values) => {
+  const handleSaveSettings = async values => {
     setSaving(true);
     try {
       const updates = {};
@@ -76,7 +98,10 @@ const SystemSettings = () => {
               title: '前端端口已修改（生产环境）',
               content: (
                 <div>
-                  <p>前端端口已从 <strong>{settings.frontend_port?.value}</strong> 更改为 <strong>{updates.frontend_port}</strong></p>
+                  <p>
+                    前端端口已从 <strong>{settings.frontend_port?.value}</strong> 更改为{' '}
+                    <strong>{updates.frontend_port}</strong>
+                  </p>
                   <Alert
                     message="请手动更新服务器配置"
                     description={
@@ -93,7 +118,7 @@ const SystemSettings = () => {
                   />
                 </div>
               ),
-              okText: '知道了'
+              okText: '知道了',
             });
           } else {
             // 开发环境：显示确认对话框并自动重启
@@ -102,7 +127,10 @@ const SystemSettings = () => {
               icon: <ExclamationCircleOutlined />,
               content: (
                 <div>
-                  <p>前端端口已从 <strong>{settings.frontend_port?.value}</strong> 更改为 <strong>{updates.frontend_port}</strong></p>
+                  <p>
+                    前端端口已从 <strong>{settings.frontend_port?.value}</strong> 更改为{' '}
+                    <strong>{updates.frontend_port}</strong>
+                  </p>
                   <p>是否立即重启前端服务以应用新端口？</p>
                   <Alert
                     message="注意"
@@ -125,9 +153,13 @@ const SystemSettings = () => {
                   title: '正在重启前端服务',
                   content: (
                     <div>
-                      <p>前端服务正在重启，新端口：<strong>{newPort}</strong></p>
+                      <p>
+                        前端服务正在重启，新端口：<strong>{newPort}</strong>
+                      </p>
                       <p>页面将在3秒后自动跳转到新地址...</p>
-                      <p>如果跳转失败，请手动访问：<a href={newUrl}>{newUrl}</a></p>
+                      <p>
+                        如果跳转失败，请手动访问：<a href={newUrl}>{newUrl}</a>
+                      </p>
                     </div>
                   ),
                   okText: '立即跳转',
@@ -135,14 +167,18 @@ const SystemSettings = () => {
                   maskClosable: false,
                   onOk: () => {
                     window.location.href = newUrl;
-                  }
+                  },
                 });
 
                 // 延迟调用重启API，让用户看到提示
                 setTimeout(async () => {
                   try {
                     // 调用重启API（这个请求可能会因为服务重启而失败）
-                    await axios.post('/api/system-settings/frontend/restart', {}, { timeout: 5000 });
+                    await axios.post(
+                      '/api/system-settings/frontend/restart',
+                      {},
+                      { timeout: 5000 }
+                    );
                   } catch (error) {
                     // 忽略错误，因为服务重启会导致连接中断
                     console.log('重启请求已发送，服务正在重启...');
@@ -153,7 +189,7 @@ const SystemSettings = () => {
                 setTimeout(() => {
                   window.location.href = newUrl;
                 }, 3000);
-              }
+              },
             });
           }
         } catch (syncError) {
@@ -174,7 +210,7 @@ const SystemSettings = () => {
     }
   };
 
-  const handleResetSetting = (key) => {
+  const handleResetSetting = key => {
     Modal.confirm({
       title: '确认重置',
       icon: <ExclamationCircleOutlined />,
@@ -189,18 +225,14 @@ const SystemSettings = () => {
         } catch (error) {
           message.error('重置失败');
         }
-      }
+      },
     });
   };
 
   const renderFormItem = (key, data) => {
     if (!data.isEditable) {
       return (
-        <Form.Item
-          key={key}
-          label={data.description || key}
-          name={key}
-        >
+        <Form.Item key={key} label={data.description || key} name={key}>
           <Input disabled suffix={<LockOutlined />} />
         </Form.Item>
       );
@@ -209,12 +241,7 @@ const SystemSettings = () => {
     switch (data.type) {
       case 'boolean':
         return (
-          <Form.Item
-            key={key}
-            label={data.description || key}
-            name={key}
-            valuePropName="checked"
-          >
+          <Form.Item key={key} label={data.description || key} name={key} valuePropName="checked">
             <Switch />
           </Form.Item>
         );
@@ -227,56 +254,63 @@ const SystemSettings = () => {
             name={key}
             rules={[
               { required: false, message: `请输入${data.description || key}` },
-              ...(isPortField ? [
-                { type: 'number', min: 1, max: 65535, message: '端口号必须在 1-65535 之间', transform: value => Number(value) }
-              ] : [])
+              ...(isPortField
+                ? [
+                    {
+                      type: 'number',
+                      min: 1,
+                      max: 65535,
+                      message: '端口号必须在 1-65535 之间',
+                      transform: value => Number(value),
+                    },
+                  ]
+                : []),
             ]}
           >
-            <Input type="number" style={{ width: '100%' }} min={isPortField ? 1 : undefined} max={isPortField ? 65535 : undefined} />
+            <Input
+              type="number"
+              style={{ width: '100%' }}
+              min={isPortField ? 1 : undefined}
+              max={isPortField ? 65535 : undefined}
+            />
           </Form.Item>
         );
       case 'select':
         const options = getSelectOptions(key);
         return (
-          <Form.Item
-            key={key}
-            label={data.description || key}
-            name={key}
-          >
+          <Form.Item key={key} label={data.description || key} name={key}>
             <Select>
               {options.map(opt => (
-                <Option key={opt.value} value={opt.value}>{opt.label}</Option>
+                <Option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </Option>
               ))}
             </Select>
           </Form.Item>
         );
       default:
         return (
-          <Form.Item
-            key={key}
-            label={data.description || key}
-            name={key}
-          >
+          <Form.Item key={key} label={data.description || key} name={key}>
             <Input />
           </Form.Item>
         );
     }
   };
 
-  const getSelectOptions = (key) => {
+  const getSelectOptions = key => {
     const optionsMap = {
       timezone: [
         { value: 'Asia/Shanghai', label: '亚洲/上海 (UTC+8)' },
         { value: 'Asia/Beijing', label: '亚洲/北京 (UTC+8)' },
         { value: 'America/New_York', label: '美洲/纽约 (UTC-5)' },
         { value: 'Europe/London', label: '欧洲/伦敦 (UTC+0)' },
-        { value: 'UTC', label: 'UTC (UTC+0)' }
+        { value: 'UTC', label: 'UTC (UTC+0)' },
       ],
       date_format: [
         { value: 'YYYY-MM-DD', label: '2024-01-01' },
         { value: 'YYYY/MM/DD', label: '2024/01/01' },
         { value: 'DD/MM/YYYY', label: '01/01/2024' },
-        { value: 'MM/DD/YYYY', label: '01/01/2024' }
+        { value: 'MM/DD/YYYY', label: '01/01/2024' },
       ],
       primary_color: [
         { value: '#667eea', label: '蓝色 (#667eea)' },
@@ -288,7 +322,7 @@ const SystemSettings = () => {
         { value: '#fee140', label: '黄色 (#fee140)' },
         { value: '#00b4db', label: '青色 (#00b4db)' },
         { value: '#0083b0', label: '深蓝色 (#0083b0)' },
-        { value: '#fcb045', label: '橙色 (#fcb045)' }
+        { value: '#fcb045', label: '橙色 (#fcb045)' },
       ],
       secondary_color: [
         { value: '#764ba2', label: '紫色 (#764ba2)' },
@@ -300,36 +334,44 @@ const SystemSettings = () => {
         { value: '#00b4db', label: '青色 (#00b4db)' },
         { value: '#0083b0', label: '深蓝色 (#0083b0)' },
         { value: '#fcb045', label: '橙色 (#fcb045)' },
-        { value: '#f093fb', label: '粉色 (#f093fb)' }
+        { value: '#f093fb', label: '粉色 (#f093fb)' },
       ],
       table_row_height: [
         { value: 'small', label: '紧凑 (Small)' },
         { value: 'default', label: '默认 (Default)' },
         { value: 'middle', label: '中等 (Middle)' },
-        { value: 'large', label: '宽松 (Large)' }
+        { value: 'large', label: '宽松 (Large)' },
       ],
       dark_mode: [
         { value: 'false', label: '关闭' },
-        { value: 'true', label: '开启' }
+        { value: 'true', label: '开启' },
       ],
       compact_mode: [
         { value: 'false', label: '关闭' },
-        { value: 'true', label: '开启' }
+        { value: 'true', label: '开启' },
       ],
       animation_enabled: [
         { value: 'false', label: '关闭' },
-        { value: 'true', label: '开启' }
+        { value: 'true', label: '开启' },
       ],
       sidebar_collapsed: [
         { value: 'false', label: '展开' },
-        { value: 'true', label: '折叠' }
+        { value: 'true', label: '折叠' },
       ],
     };
     return optionsMap[key] || [];
   };
 
   const renderGeneralSettings = () => {
-    const generalKeys = ['site_name', 'site_logo', 'timezone', 'date_format', 'session_timeout', 'max_login_attempts', 'maintenance_mode'];
+    const generalKeys = [
+      'site_name',
+      'site_logo',
+      'timezone',
+      'date_format',
+      'session_timeout',
+      'max_login_attempts',
+      'maintenance_mode',
+    ];
     return (
       <Card title="全局配置" bordered={false}>
         <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
@@ -343,7 +385,9 @@ const SystemSettings = () => {
           })}
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit" loading={saving}>保存设置</Button>
+              <Button type="primary" htmlType="submit" loading={saving}>
+                保存设置
+              </Button>
               <Button onClick={() => fetchSettings()}>重置表单</Button>
             </Space>
           </Form.Item>
@@ -353,7 +397,14 @@ const SystemSettings = () => {
   };
 
   const renderAppearanceSettings = () => {
-    const appearanceKeys = ['primary_color', 'secondary_color', 'compact_mode', 'sidebar_collapsed', 'table_row_height', 'animation_enabled'];
+    const appearanceKeys = [
+      'primary_color',
+      'secondary_color',
+      'compact_mode',
+      'sidebar_collapsed',
+      'table_row_height',
+      'animation_enabled',
+    ];
     return (
       <Card title="外观设置" bordered={false}>
         <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
@@ -374,7 +425,9 @@ const SystemSettings = () => {
           })}
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit" loading={saving}>保存设置</Button>
+              <Button type="primary" htmlType="submit" loading={saving}>
+                保存设置
+              </Button>
               <Button onClick={() => fetchSettings()}>重置表单</Button>
             </Space>
           </Form.Item>
@@ -386,14 +439,25 @@ const SystemSettings = () => {
   // 数据备份功能已移除
 
   const renderAboutPage = () => {
-    const aboutKeys = ['app_version', 'company_name', 'contact_email', 'contact_phone', 'company_address', 'system_description', 'privacy_policy', 'terms_of_service'];
+    const aboutKeys = [
+      'app_version',
+      'company_name',
+      'contact_email',
+      'contact_phone',
+      'company_address',
+      'system_description',
+      'privacy_policy',
+      'terms_of_service',
+    ];
 
     return (
       <div>
         <Card title="关于系统" bordered={false} style={{ marginBottom: 16 }}>
           <Descriptions column={{ xs: 1, sm: 2, md: 3 }} bordered>
             <Descriptions.Item label="系统名称">机柜管理系统</Descriptions.Item>
-            <Descriptions.Item label="版本号">{settings.app_version?.value || '1.0.0'}</Descriptions.Item>
+            <Descriptions.Item label="版本号">
+              {settings.app_version?.value || '1.0.0'}
+            </Descriptions.Item>
             <Descriptions.Item label="系统状态">
               <Tag color="success">运行正常</Tag>
             </Descriptions.Item>
@@ -405,7 +469,14 @@ const SystemSettings = () => {
             {aboutKeys.slice(1).map(key => settings[key] && renderFormItem(key, settings[key]))}
             <Form.Item>
               <Space>
-                <Button type="primary" htmlType="submit" loading={saving} onClick={() => form.submit()}>保存信息</Button>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={saving}
+                  onClick={() => form.submit()}
+                >
+                  保存信息
+                </Button>
                 <Button onClick={() => fetchSettings()}>重置</Button>
               </Space>
             </Form.Item>
@@ -415,24 +486,42 @@ const SystemSettings = () => {
         {systemInfo && (
           <Card title="系统统计信息" bordered={false}>
             <Descriptions column={{ xs: 1, sm: 2, md: 4 }} bordered size="small">
-              <Descriptions.Item label="设备总数">{systemInfo.statistics?.devices || 0}</Descriptions.Item>
-              <Descriptions.Item label="机柜总数">{systemInfo.statistics?.racks || 0}</Descriptions.Item>
-              <Descriptions.Item label="机房总数">{systemInfo.statistics?.rooms || 0}</Descriptions.Item>
-              <Descriptions.Item label="用户总数">{systemInfo.statistics?.users || 0}</Descriptions.Item>
+              <Descriptions.Item label="设备总数">
+                {systemInfo.statistics?.devices || 0}
+              </Descriptions.Item>
+              <Descriptions.Item label="机柜总数">
+                {systemInfo.statistics?.racks || 0}
+              </Descriptions.Item>
+              <Descriptions.Item label="机房总数">
+                {systemInfo.statistics?.rooms || 0}
+              </Descriptions.Item>
+              <Descriptions.Item label="用户总数">
+                {systemInfo.statistics?.users || 0}
+              </Descriptions.Item>
             </Descriptions>
             <Divider />
             <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
-              <Descriptions.Item label="Node.js 版本">{systemInfo.system?.nodeVersion}</Descriptions.Item>
-              <Descriptions.Item label="运行平台">{systemInfo.system?.platform} ({systemInfo.system?.arch})</Descriptions.Item>
+              <Descriptions.Item label="Node.js 版本">
+                {systemInfo.system?.nodeVersion}
+              </Descriptions.Item>
+              <Descriptions.Item label="运行平台">
+                {systemInfo.system?.platform} ({systemInfo.system?.arch})
+              </Descriptions.Item>
               <Descriptions.Item label="进程 ID">{systemInfo.system?.pid}</Descriptions.Item>
               <Descriptions.Item label="运行时间">
-                {systemInfo.system?.uptime ? `${Math.floor(systemInfo.system.uptime / 3600)}小时${Math.floor((systemInfo.system.uptime % 3600) / 60)}分钟` : '-'}
+                {systemInfo.system?.uptime
+                  ? `${Math.floor(systemInfo.system.uptime / 3600)}小时${Math.floor((systemInfo.system.uptime % 3600) / 60)}分钟`
+                  : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="内存使用">
-                {systemInfo.system?.memoryUsage ? `${(systemInfo.system.memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB` : '-'}
+                {systemInfo.system?.memoryUsage
+                  ? `${(systemInfo.system.memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`
+                  : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="系统时间">
-                {systemInfo.timestamp ? new Date(systemInfo.timestamp).toLocaleString('zh-CN') : '-'}
+                {systemInfo.timestamp
+                  ? new Date(systemInfo.timestamp).toLocaleString('zh-CN')
+                  : '-'}
               </Descriptions.Item>
             </Descriptions>
           </Card>
@@ -445,19 +534,31 @@ const SystemSettings = () => {
     <div style={{ padding: 24 }}>
       <Tabs activeKey={activeTab} onChange={setActiveTab}>
         <TabPane
-          tab={<span><GlobalOutlined /> 全局配置</span>}
+          tab={
+            <span>
+              <GlobalOutlined /> 全局配置
+            </span>
+          }
           key="general"
         >
           {renderGeneralSettings()}
         </TabPane>
         <TabPane
-          tab={<span><BgColorsOutlined /> 外观设置</span>}
+          tab={
+            <span>
+              <BgColorsOutlined /> 外观设置
+            </span>
+          }
           key="appearance"
         >
           {renderAppearanceSettings()}
         </TabPane>
         <TabPane
-          tab={<span><InfoCircleOutlined /> 关于</span>}
+          tab={
+            <span>
+              <InfoCircleOutlined /> 关于
+            </span>
+          }
           key="about"
         >
           {renderAboutPage()}

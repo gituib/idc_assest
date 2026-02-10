@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, Select, message, Card, Space, Popconfirm, Tag } from 'antd';
+import {
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  InputNumber,
+  Select,
+  message,
+  Card,
+  Space,
+  Popconfirm,
+  Tag,
+} from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
@@ -15,7 +28,7 @@ function CategoryManagement() {
     current: 1,
     pageSize: 10,
     total: 0,
-    showTotal: (total) => `共 ${total} 条记录`
+    showTotal: total => `共 ${total} 条记录`,
   });
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState('all');
@@ -24,7 +37,7 @@ function CategoryManagement() {
     try {
       setLoading(true);
       const response = await axios.get('/api/consumable-categories', {
-        params: { page, pageSize, keyword, status }
+        params: { page, pageSize, keyword, status },
       });
       setCategories(response.data.categories);
       setPagination(prev => ({ ...prev, current: page, pageSize, total: response.data.total }));
@@ -56,7 +69,7 @@ function CategoryManagement() {
     setEditingCategory(null);
   };
 
-  const handleSubmit = async (values) => {
+  const handleSubmit = async values => {
     try {
       if (editingCategory) {
         await axios.put(`/api/consumable-categories/${editingCategory.id}`, values);
@@ -69,12 +82,14 @@ function CategoryManagement() {
       fetchCategories();
       setEditingCategory(null);
     } catch (error) {
-      message.error(error.response?.data?.error || (editingCategory ? '分类更新失败' : '分类创建失败'));
+      message.error(
+        error.response?.data?.error || (editingCategory ? '分类更新失败' : '分类创建失败')
+      );
       console.error('提交失败:', error);
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async id => {
     try {
       await axios.delete(`/api/consumable-categories/${id}`);
       message.success('删除成功');
@@ -90,44 +105,44 @@ function CategoryManagement() {
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
-      width: 80
+      width: 80,
     },
     {
       title: '分类名称',
       dataIndex: 'name',
       key: 'name',
-      width: 150
+      width: 150,
     },
     {
       title: '描述',
       dataIndex: 'description',
       key: 'description',
       width: 200,
-      render: (value) => value || '-'
+      render: value => value || '-',
     },
     {
       title: '排序',
       dataIndex: 'sortOrder',
       key: 'sortOrder',
-      width: 80
+      width: 80,
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
       width: 100,
-      render: (value) => (
+      render: value => (
         <Tag color={value === 'active' ? 'green' : 'red'}>
           {value === 'active' ? '启用' : '停用'}
         </Tag>
-      )
+      ),
     },
     {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 180,
-      render: (value) => value ? new Date(value).toLocaleString('zh-CN') : '-'
+      render: value => (value ? new Date(value).toLocaleString('zh-CN') : '-'),
     },
     {
       title: '操作',
@@ -135,26 +150,40 @@ function CategoryManagement() {
       width: 150,
       render: (_, record) => (
         <Space>
-          <Button type="primary" icon={<EditOutlined />} size="small" onClick={() => showModal(record)}>编辑</Button>
+          <Button
+            type="primary"
+            icon={<EditOutlined />}
+            size="small"
+            onClick={() => showModal(record)}
+          >
+            编辑
+          </Button>
           <Popconfirm title="确定删除?" onConfirm={() => handleDelete(record.id)}>
-            <Button danger icon={<DeleteOutlined />} size="small">删除</Button>
+            <Button danger icon={<DeleteOutlined />} size="small">
+              删除
+            </Button>
           </Popconfirm>
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
   return (
     <div>
-      <Card title="耗材分类管理" extra={
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>添加分类</Button>
-      }>
+      <Card
+        title="耗材分类管理"
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
+            添加分类
+          </Button>
+        }
+      >
         <Card size="small" style={{ marginBottom: 16 }}>
           <Space>
             <Input.Search
               placeholder="搜索分类名称、描述"
               style={{ width: 300 }}
-              onSearch={(value) => setKeyword(value)}
+              onSearch={value => setKeyword(value)}
               allowClear
             />
             <Select value={status} onChange={setStatus} style={{ width: 120 }}>
@@ -172,7 +201,7 @@ function CategoryManagement() {
           rowKey="id"
           loading={loading}
           pagination={pagination}
-          onChange={(pagination) => fetchCategories(pagination.current, pagination.pageSize)}
+          onChange={pagination => fetchCategories(pagination.current, pagination.pageSize)}
           scroll={{ x: 1000 }}
         />
       </Card>
@@ -185,7 +214,14 @@ function CategoryManagement() {
         width={500}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item name="name" label="分类名称" rules={[{ required: true, message: '请输入分类名称' }, { max: 50, message: '分类名称不能超过50个字符' }]}>
+          <Form.Item
+            name="name"
+            label="分类名称"
+            rules={[
+              { required: true, message: '请输入分类名称' },
+              { max: 50, message: '分类名称不能超过50个字符' },
+            ]}
+          >
             <Input placeholder="请输入分类名称" />
           </Form.Item>
           <Form.Item name="description" label="描述">
@@ -202,7 +238,9 @@ function CategoryManagement() {
           </Form.Item>
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit">{editingCategory ? '更新' : '创建'}</Button>
+              <Button type="primary" htmlType="submit">
+                {editingCategory ? '更新' : '创建'}
+              </Button>
               <Button onClick={handleCancel}>取消</Button>
             </Space>
           </Form.Item>

@@ -1,6 +1,32 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, Select, message, Card, Space, InputNumber, Switch, Tag, Statistic, Tooltip } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, FontSizeOutlined, NumberOutlined, CheckCircleOutlined, CalendarOutlined, FileTextOutlined, LockOutlined } from '@ant-design/icons';
+import {
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  Select,
+  message,
+  Card,
+  Space,
+  InputNumber,
+  Switch,
+  Tag,
+  Statistic,
+  Tooltip,
+} from 'antd';
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  AppstoreOutlined,
+  FontSizeOutlined,
+  NumberOutlined,
+  CheckCircleOutlined,
+  CalendarOutlined,
+  FileTextOutlined,
+  LockOutlined,
+} from '@ant-design/icons';
 import axios from 'axios';
 
 const { Option = Select.Option } = Select;
@@ -11,35 +37,35 @@ const designTokens = {
       main: '#667eea',
       gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       light: '#8b9ff0',
-      dark: '#4f5db8'
+      dark: '#4f5db8',
     },
     success: {
       main: '#10b981',
-      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
     },
     warning: {
       main: '#f59e0b',
-      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
     },
     error: {
       main: '#ef4444',
-      gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+      gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
     },
     text: {
       primary: '#1e293b',
       secondary: '#64748b',
       tertiary: '#94a3b8',
-      inverse: '#ffffff'
+      inverse: '#ffffff',
     },
     background: {
       primary: '#ffffff',
       secondary: '#f8fafc',
-      tertiary: '#f1f5f9'
+      tertiary: '#f1f5f9',
     },
     border: {
       light: '#e2e8f0',
       medium: '#cbd5e1',
-      dark: '#94a3b8'
+      dark: '#94a3b8',
     },
     fieldType: {
       string: '#3b82f6',
@@ -47,44 +73,44 @@ const designTokens = {
       boolean: '#f59e0b',
       select: '#8b5cf6',
       date: '#06b6d4',
-      textarea: '#64748b'
-    }
+      textarea: '#64748b',
+    },
   },
   shadows: {
     small: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
     medium: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
     large: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
-    glow: '0 0 20px rgba(102, 126, 234, 0.15)'
+    glow: '0 0 20px rgba(102, 126, 234, 0.15)',
   },
   borderRadius: {
     small: '6px',
     medium: '10px',
-    large: '16px'
+    large: '16px',
   },
   transitions: {
     fast: '150ms cubic-bezier(0.4, 0, 0.2, 1)',
-    normal: '300ms cubic-bezier(0.4, 0, 0.2, 1)'
+    normal: '300ms cubic-bezier(0.4, 0, 0.2, 1)',
   },
   spacing: {
     xs: '4px',
     sm: '8px',
     md: '16px',
     lg: '24px',
-    xl: '32px'
-  }
+    xl: '32px',
+  },
 };
 
 const pageContainerStyle = {
   minHeight: '100vh',
   background: designTokens.colors.background.secondary,
-  padding: designTokens.spacing.lg
+  padding: designTokens.spacing.lg,
 };
 
 const titleRowStyle = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  marginBottom: designTokens.spacing.lg
+  marginBottom: designTokens.spacing.lg,
 };
 
 const titleStyle = {
@@ -93,7 +119,7 @@ const titleStyle = {
   gap: designTokens.spacing.sm,
   fontSize: '20px',
   fontWeight: '600',
-  color: designTokens.colors.text.primary
+  color: designTokens.colors.text.primary,
 };
 
 const actionButtonStyle = {
@@ -103,7 +129,7 @@ const actionButtonStyle = {
   fontSize: '13px',
   display: 'flex',
   alignItems: 'center',
-  gap: designTokens.spacing.xs
+  gap: designTokens.spacing.xs,
 };
 
 const primaryActionStyle = {
@@ -111,7 +137,7 @@ const primaryActionStyle = {
   background: designTokens.colors.primary.gradient,
   border: 'none',
   color: '#ffffff',
-  boxShadow: designTokens.shadows.small
+  boxShadow: designTokens.shadows.small,
 };
 
 const tableCardStyle = {
@@ -119,34 +145,34 @@ const tableCardStyle = {
   borderRadius: designTokens.borderRadius.large,
   boxShadow: designTokens.shadows.small,
   border: `1px solid ${designTokens.colors.border.light}`,
-  overflow: 'hidden'
+  overflow: 'hidden',
 };
 
 const tableStyle = {
-  background: designTokens.colors.background.primary
+  background: designTokens.colors.background.primary,
 };
 
 const titleIconStyle = {
-  color: designTokens.colors.primary.main
+  color: designTokens.colors.primary.main,
 };
 
 const modalTitleStyle = {
-  fontWeight: '600'
+  fontWeight: '600',
 };
 
 const formLabelStyle = {
-  fontWeight: '500'
+  fontWeight: '500',
 };
 
 const tableCellStyle = {
   fontWeight: '500',
-  color: designTokens.colors.text.primary
+  color: designTokens.colors.text.primary,
 };
 
 const typeTagStyle = {
   border: 'none',
   borderRadius: designTokens.borderRadius.small,
-  fontWeight: '500'
+  fontWeight: '500',
 };
 
 const orderBadgeStyle = {
@@ -154,44 +180,44 @@ const orderBadgeStyle = {
   padding: '2px 8px',
   borderRadius: designTokens.borderRadius.small,
   fontSize: '12px',
-  fontWeight: '500'
+  fontWeight: '500',
 };
 
 const editButtonStyle = {
   color: designTokens.colors.primary.main,
   height: '28px',
-  padding: '0 8px'
+  padding: '0 8px',
 };
 
 const deleteButtonStyle = {
   height: '28px',
-  padding: '0 8px'
+  padding: '0 8px',
 };
 
 const formRowStyle = {
   display: 'flex',
-  gap: designTokens.spacing.md
+  gap: designTokens.spacing.md,
 };
 
 const formItemFlexStyle = {
-  flex: 1
+  flex: 1,
 };
 
 const textAreaStyle = {
-  fontFamily: 'monospace'
+  fontFamily: 'monospace',
 };
 
 const modalBodyStyle = {
-  padding: designTokens.spacing.lg
+  padding: designTokens.spacing.lg,
 };
 
 const formActionsStyle = {
   marginBottom: 0,
-  textAlign: 'right'
+  textAlign: 'right',
 };
 
 const modalStyle = {
-  borderRadius: designTokens.borderRadius.large
+  borderRadius: designTokens.borderRadius.large,
 };
 
 const FIELD_TYPE_MAP = {
@@ -200,7 +226,7 @@ const FIELD_TYPE_MAP = {
   boolean: { text: '布尔值', color: designTokens.colors.fieldType.boolean },
   select: { text: '下拉选择', color: designTokens.colors.fieldType.select },
   date: { text: '日期', color: designTokens.colors.fieldType.date },
-  textarea: { text: '多行文本', color: designTokens.colors.fieldType.textarea }
+  textarea: { text: '多行文本', color: designTokens.colors.fieldType.textarea },
 };
 
 const FIELD_TYPE_OPTIONS = [
@@ -209,7 +235,7 @@ const FIELD_TYPE_OPTIONS = [
   { value: 'boolean', label: '布尔值' },
   { value: 'select', label: '下拉选择' },
   { value: 'date', label: '日期' },
-  { value: 'textarea', label: '多行文本' }
+  { value: 'textarea', label: '多行文本' },
 ];
 
 function DeviceFieldManagement() {
@@ -224,7 +250,7 @@ function DeviceFieldManagement() {
     pageSizeOptions: ['10', '20', '50', '100'],
     showSizeChanger: true,
     showQuickJumper: true,
-    showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条 / 共 ${total} 条`
+    showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条 / 共 ${total} 条`,
   });
 
   const fetchFields = async () => {
@@ -249,7 +275,7 @@ function DeviceFieldManagement() {
     if (field) {
       const fieldData = {
         ...field,
-        options: field.options ? JSON.stringify(field.options, null, 2) : ''
+        options: field.options ? JSON.stringify(field.options, null, 2) : '',
       };
       form.setFieldsValue(fieldData);
     } else {
@@ -263,11 +289,11 @@ function DeviceFieldManagement() {
     setEditingField(null);
   };
 
-  const handleSubmit = async (values) => {
+  const handleSubmit = async values => {
     try {
       const fieldData = {
         ...values,
-        options: values.options ? JSON.parse(values.options) : null
+        options: values.options ? JSON.parse(values.options) : null,
       };
 
       if (editingField) {
@@ -287,7 +313,7 @@ function DeviceFieldManagement() {
     }
   };
 
-  const handleDelete = async (fieldId) => {
+  const handleDelete = async fieldId => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个字段吗？',
@@ -303,126 +329,149 @@ function DeviceFieldManagement() {
           message.error('字段删除失败');
           console.error('字段删除失败:', error);
         }
-      }
+      },
     });
   };
 
-  const getFieldTypeIcon = (type) => {
+  const getFieldTypeIcon = type => {
     const iconMap = {
       string: <FontSizeOutlined />,
       number: <NumberOutlined />,
       boolean: <CheckCircleOutlined />,
       select: <AppstoreOutlined />,
       date: <CalendarOutlined />,
-      textarea: <FileTextOutlined />
+      textarea: <FileTextOutlined />,
     };
     return iconMap[type] || <FontSizeOutlined />;
   };
 
-  const columns = useMemo(() => [
-    {
-      title: '字段名称',
-      dataIndex: 'fieldName',
-      key: 'fieldName',
-      width: 150,
-      render: (text, record) => (
-        <Space>
-          <span style={tableCellStyle}>{text}</span>
-          {record.isSystem && (
-            <Tooltip title="系统字段，不可删除">
-              <LockOutlined style={{ color: '#f59e0b', fontSize: '14px' }} />
-            </Tooltip>
-          )}
-        </Space>
-      )
-    },
-    {
-      title: '显示名称',
-      dataIndex: 'displayName',
-      key: 'displayName',
-      width: 120,
-    },
-    {
-      title: '字段类型',
-      dataIndex: 'fieldType',
-      key: 'fieldType',
-      width: 110,
-      render: (type) => {
-        const config = FIELD_TYPE_MAP[type] || { text: type, color: designTokens.colors.text.tertiary };
-        return (
-          <Tag style={{ ...typeTagStyle, background: `${config.color}15`, color: config.color }}>
-            {getFieldTypeIcon(type)}
-            <span style={{ marginLeft: '4px' }}>{config.text}</span>
-          </Tag>
-        );
-      }
-    },
-    {
-      title: '必填',
-      dataIndex: 'required',
-      key: 'required',
-      width: 80,
-      render: (required) => (
-        <span style={{
-          color: required ? designTokens.colors.success.main : designTokens.colors.text.tertiary,
-          ...tableCellStyle
-        }}>
-          {required ? '是' : '否'}
-        </span>
-      )
-    },
-    {
-      title: '可见',
-      dataIndex: 'visible',
-      key: 'visible',
-      width: 80,
-      render: (visible) => (
-        <span style={{
-          color: visible ? designTokens.colors.primary.main : designTokens.colors.text.tertiary,
-          ...tableCellStyle
-        }}>
-          {visible ? '是' : '否'}
-        </span>
-      )
-    },
-    {
-      title: '顺序',
-      dataIndex: 'order',
-      key: 'order',
-      width: 80,
-      render: (order) => <span style={orderBadgeStyle}>{order}</span>
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 160,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Button type="text" icon={<EditOutlined />} onClick={() => showModal(record)} style={editButtonStyle}>
-            编辑
-          </Button>
-          {record.isSystem ? (
-            <Tooltip title="系统字段不可删除">
-              <Button 
-                type="text" 
-                danger 
-                icon={<DeleteOutlined />} 
-                disabled
-                style={{ ...deleteButtonStyle, opacity: 0.3, cursor: 'not-allowed' }}
+  const columns = useMemo(
+    () => [
+      {
+        title: '字段名称',
+        dataIndex: 'fieldName',
+        key: 'fieldName',
+        width: 150,
+        render: (text, record) => (
+          <Space>
+            <span style={tableCellStyle}>{text}</span>
+            {record.isSystem && (
+              <Tooltip title="系统字段，不可删除">
+                <LockOutlined style={{ color: '#f59e0b', fontSize: '14px' }} />
+              </Tooltip>
+            )}
+          </Space>
+        ),
+      },
+      {
+        title: '显示名称',
+        dataIndex: 'displayName',
+        key: 'displayName',
+        width: 120,
+      },
+      {
+        title: '字段类型',
+        dataIndex: 'fieldType',
+        key: 'fieldType',
+        width: 110,
+        render: type => {
+          const config = FIELD_TYPE_MAP[type] || {
+            text: type,
+            color: designTokens.colors.text.tertiary,
+          };
+          return (
+            <Tag style={{ ...typeTagStyle, background: `${config.color}15`, color: config.color }}>
+              {getFieldTypeIcon(type)}
+              <span style={{ marginLeft: '4px' }}>{config.text}</span>
+            </Tag>
+          );
+        },
+      },
+      {
+        title: '必填',
+        dataIndex: 'required',
+        key: 'required',
+        width: 80,
+        render: required => (
+          <span
+            style={{
+              color: required
+                ? designTokens.colors.success.main
+                : designTokens.colors.text.tertiary,
+              ...tableCellStyle,
+            }}
+          >
+            {required ? '是' : '否'}
+          </span>
+        ),
+      },
+      {
+        title: '可见',
+        dataIndex: 'visible',
+        key: 'visible',
+        width: 80,
+        render: visible => (
+          <span
+            style={{
+              color: visible ? designTokens.colors.primary.main : designTokens.colors.text.tertiary,
+              ...tableCellStyle,
+            }}
+          >
+            {visible ? '是' : '否'}
+          </span>
+        ),
+      },
+      {
+        title: '顺序',
+        dataIndex: 'order',
+        key: 'order',
+        width: 80,
+        render: order => <span style={orderBadgeStyle}>{order}</span>,
+      },
+      {
+        title: '操作',
+        key: 'action',
+        width: 160,
+        fixed: 'right',
+        render: (_, record) => (
+          <Space size="small">
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => showModal(record)}
+              style={editButtonStyle}
+            >
+              编辑
+            </Button>
+            {record.isSystem ? (
+              <Tooltip title="系统字段不可删除">
+                <Button
+                  type="text"
+                  danger
+                  icon={<DeleteOutlined />}
+                  disabled
+                  style={{ ...deleteButtonStyle, opacity: 0.3, cursor: 'not-allowed' }}
+                >
+                  删除
+                </Button>
+              </Tooltip>
+            ) : (
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleDelete(record.fieldId)}
+                style={deleteButtonStyle}
               >
                 删除
               </Button>
-            </Tooltip>
-          ) : (
-            <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.fieldId)} style={deleteButtonStyle}>
-              删除
-            </Button>
-          )}
-        </Space>
-      ),
-    },
-  ], []);
+            )}
+          </Space>
+        ),
+      },
+    ],
+    []
+  );
 
   return (
     <div style={pageContainerStyle}>
@@ -431,7 +480,12 @@ function DeviceFieldManagement() {
           <AppstoreOutlined style={titleIconStyle} />
           设备字段管理
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()} style={primaryActionStyle}>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => showModal()}
+          style={primaryActionStyle}
+        >
           添加字段
         </Button>
       </div>
@@ -443,11 +497,11 @@ function DeviceFieldManagement() {
           rowKey="fieldId"
           loading={loading}
           pagination={pagination}
-          onChange={(newPagination) => {
+          onChange={newPagination => {
             setPagination({
               ...pagination,
               current: newPagination.current,
-              pageSize: newPagination.pageSize
+              pageSize: newPagination.pageSize,
             });
           }}
           scroll={{ x: 900 }}
@@ -488,7 +542,9 @@ function DeviceFieldManagement() {
           >
             <Select placeholder="请选择字段类型">
               {FIELD_TYPE_OPTIONS.map(opt => (
-                <Option key={opt.value} value={opt.value}>{opt.label}</Option>
+                <Option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </Option>
               ))}
             </Select>
           </Form.Item>
@@ -526,13 +582,19 @@ function DeviceFieldManagement() {
             label={<span style={formLabelStyle}>选项配置（JSON格式）</span>}
             tooltip="格式示例：[{value: 'option1', label: '选项1'}]，仅下拉选择类型需要配置"
           >
-            <Input.TextArea rows={3} placeholder="请输入JSON格式的选项配置，使用单引号" style={textAreaStyle} />
+            <Input.TextArea
+              rows={3}
+              placeholder="请输入JSON格式的选项配置，使用单引号"
+              style={textAreaStyle}
+            />
           </Form.Item>
 
           <Form.Item style={formActionsStyle}>
             <Space>
               <Button onClick={handleCancel}>取消</Button>
-              <Button type="primary" htmlType="submit">确定</Button>
+              <Button type="primary" htmlType="submit">
+                确定
+              </Button>
             </Space>
           </Form.Item>
         </Form>

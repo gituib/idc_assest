@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button, Empty, Spin, Badge, Typography, Space, Checkbox, Tooltip } from 'antd';
-import { DownOutlined, UpOutlined, EyeOutlined, EyeInvisibleOutlined, PlusOutlined, CloudServerOutlined } from '@ant-design/icons';
+import {
+  DownOutlined,
+  UpOutlined,
+  EyeOutlined,
+  EyeInvisibleOutlined,
+  PlusOutlined,
+  CloudServerOutlined,
+} from '@ant-design/icons';
 import ServerBackplanePanel from './ServerBackplanePanel';
 import PortPanel from './PortPanel';
 
@@ -9,7 +16,7 @@ const { Text } = Typography;
 /**
  * 虚拟设备列表组件
  * 用于优化大量设备面板的渲染性能
- * 
+ *
  * @param {Object[]} devices - 设备列表
  * @param {Object} groupedPorts - 按设备分组的端口数据
  * @param {Object[]} cables - 接线列表
@@ -29,7 +36,7 @@ const VirtualDeviceList = ({
   onAddPort,
   onManageNetworkCards,
   initialVisibleCount = 5,
-  loadMoreCount = 5
+  loadMoreCount = 5,
 }) => {
   const [visibleCount, setVisibleCount] = useState(initialVisibleCount);
   const [loading, setLoading] = useState(false);
@@ -54,10 +61,10 @@ const VirtualDeviceList = ({
     const options = {
       root: null,
       rootMargin: '100px',
-      threshold: 0.1
+      threshold: 0.1,
     };
 
-    observerRef.current = new IntersectionObserver((entries) => {
+    observerRef.current = new IntersectionObserver(entries => {
       entries.forEach(entry => {
         if (entry.isIntersecting && !loading && visibleCount < devices.length) {
           loadMore();
@@ -79,7 +86,7 @@ const VirtualDeviceList = ({
 
   const loadMore = useCallback(() => {
     if (loading || visibleCount >= devices.length) return;
-    
+
     setLoading(true);
     // 模拟异步加载，实际可以直接同步更新
     setTimeout(() => {
@@ -110,10 +117,10 @@ const VirtualDeviceList = ({
     setShowAll(false);
   }, [devices]);
 
-  const toggleDeviceExpand = (deviceId) => {
+  const toggleDeviceExpand = deviceId => {
     setExpandedDevices(prev => ({
       ...prev,
-      [deviceId]: !prev[deviceId]
+      [deviceId]: !prev[deviceId],
     }));
   };
 
@@ -121,42 +128,38 @@ const VirtualDeviceList = ({
   const hasMore = visibleCount < devices.length;
 
   if (devices.length === 0) {
-    return (
-      <Empty 
-        description="暂无设备数据" 
-        style={{ padding: '60px 0' }}
-      />
-    );
+    return <Empty description="暂无设备数据" style={{ padding: '60px 0' }} />;
   }
 
   return (
     <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* 控制栏 */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '12px 16px',
-        background: '#f8fafc',
-        borderRadius: '8px',
-        border: '1px solid #e2e8f0'
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '12px 16px',
+          background: '#f8fafc',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+        }}
+      >
         <Space align="center">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Text strong style={{ fontSize: '14px' }}>设备列表</Text>
-            <Badge 
-              count={devices.length} 
-              style={{ backgroundColor: '#667eea' }}
-            />
+            <Text strong style={{ fontSize: '14px' }}>
+              设备列表
+            </Text>
+            <Badge count={devices.length} style={{ backgroundColor: '#667eea' }} />
           </div>
           <Text type="secondary" style={{ fontSize: '12px' }}>
             显示 {visibleDevices.length} / {devices.length}
           </Text>
         </Space>
-        
+
         <Space>
-          <Button 
-            size="small" 
+          <Button
+            size="small"
             icon={showAll ? <UpOutlined /> : <DownOutlined />}
             onClick={showAll ? handleCollapseAll : handleShowAll}
           >
@@ -166,7 +169,7 @@ const VirtualDeviceList = ({
       </div>
 
       {/* 设备面板列表 */}
-      {visibleDevices.map((device) => {
+      {visibleDevices.map(device => {
         const deviceId = device.deviceId;
         const data = groupedPorts[deviceId] || { device, ports: [] };
         const isExpanded = expandedDevices[deviceId];
@@ -174,14 +177,14 @@ const VirtualDeviceList = ({
         const occupiedCount = data.ports?.filter(p => p.status === 'occupied').length || 0;
 
         return (
-          <div 
+          <div
             key={deviceId}
             style={{
               border: '1px solid #e2e8f0',
               borderRadius: '12px',
               overflow: 'hidden',
               background: '#fff',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
             }}
           >
             {/* 设备标题栏 */}
@@ -195,31 +198,37 @@ const VirtualDeviceList = ({
                 background: isExpanded ? '#f1f5f9' : '#fff',
                 cursor: 'pointer',
                 borderBottom: isExpanded ? '1px solid #e2e8f0' : 'none',
-                transition: 'background 0.2s'
+                transition: 'background 0.2s',
               }}
-              onMouseEnter={(e) => {
+              onMouseEnter={e => {
                 e.currentTarget.style.background = '#f1f5f9';
               }}
-              onMouseLeave={(e) => {
+              onMouseLeave={e => {
                 if (!isExpanded) {
                   e.currentTarget.style.background = '#fff';
                 }
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '20px'
-                }}>
-                  {device.type?.toLowerCase()?.includes('server') ? '🖥️' :
-                   device.type?.toLowerCase()?.includes('switch') ? '🔀' :
-                   device.type?.toLowerCase()?.includes('router') ? '🌐' : '📦'}
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '20px',
+                  }}
+                >
+                  {device.type?.toLowerCase()?.includes('server')
+                    ? '🖥️'
+                    : device.type?.toLowerCase()?.includes('switch')
+                      ? '🔀'
+                      : device.type?.toLowerCase()?.includes('router')
+                        ? '🌐'
+                        : '📦'}
                 </div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '15px', color: '#1e293b' }}>
@@ -233,16 +242,16 @@ const VirtualDeviceList = ({
 
               <Space size="middle">
                 <Space size="small">
-                  <Badge 
-                    count={occupiedCount} 
+                  <Badge
+                    count={occupiedCount}
                     style={{ backgroundColor: '#3b82f6' }}
                     overflowCount={999}
                   />
                   <Text type="secondary" style={{ fontSize: '12px' }}>
                     已用
                   </Text>
-                  <Badge 
-                    count={portCount} 
+                  <Badge
+                    count={portCount}
                     style={{ backgroundColor: '#10b981' }}
                     overflowCount={999}
                   />
@@ -257,13 +266,13 @@ const VirtualDeviceList = ({
                     type="primary"
                     size="small"
                     icon={<CloudServerOutlined />}
-                    onClick={(e) => {
+                    onClick={e => {
                       e.stopPropagation(); // 防止触发折叠
                       onManageNetworkCards && onManageNetworkCards(device);
                     }}
                     style={{
                       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      border: 'none'
+                      border: 'none',
                     }}
                   >
                     网卡管理
@@ -275,13 +284,13 @@ const VirtualDeviceList = ({
                   type="primary"
                   size="small"
                   icon={<PlusOutlined />}
-                  onClick={(e) => {
+                  onClick={e => {
                     e.stopPropagation(); // 防止触发折叠
                     onAddPort && onAddPort(device);
                   }}
                   style={{
                     background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    border: 'none'
+                    border: 'none',
                   }}
                 >
                   添加端口
@@ -318,7 +327,9 @@ const VirtualDeviceList = ({
                     cables={cables}
                     allDevices={allDevices}
                     onPortClick={onPortClick}
-                    onManageNetworkCards={() => onManageNetworkCards && onManageNetworkCards(device)}
+                    onManageNetworkCards={() =>
+                      onManageNetworkCards && onManageNetworkCards(device)
+                    }
                   />
                 )}
               </div>
@@ -329,20 +340,18 @@ const VirtualDeviceList = ({
 
       {/* 加载更多触发器 */}
       {hasMore && !showAll && (
-        <div 
+        <div
           id="load-more-trigger"
           style={{
             textAlign: 'center',
             padding: '20px',
-            color: '#64748b'
+            color: '#64748b',
           }}
         >
           {loading ? (
             <Spin size="small" tip="加载更多设备..." />
           ) : (
-            <Text type="secondary">
-              向下滚动加载更多 ({devices.length - visibleCount} 个设备)
-            </Text>
+            <Text type="secondary">向下滚动加载更多 ({devices.length - visibleCount} 个设备)</Text>
           )}
         </div>
       )}

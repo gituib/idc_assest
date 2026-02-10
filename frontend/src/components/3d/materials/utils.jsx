@@ -1,10 +1,10 @@
 import { MATERIAL_CONFIGS, MATERIAL_TYPES } from './constants.js';
 
-export const getMaterialConfig = (type) => {
+export const getMaterialConfig = type => {
   return MATERIAL_CONFIGS[type] || null;
 };
 
-export const getMaterialType = (type) => {
+export const getMaterialType = type => {
   return MATERIAL_TYPES[type] || null;
 };
 

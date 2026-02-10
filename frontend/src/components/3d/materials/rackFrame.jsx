@@ -3,32 +3,79 @@ import { MATERIAL_CONFIGS, MATERIAL_TYPES } from './constants.js';
 
 export const createRackFrameMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.RACK_FRAME];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} envMapIntensity={config.envMapIntensity} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      envMapIntensity={config.envMapIntensity}
+      {...options}
+    />
+  );
 };
 
 export const createRailMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.RAIL];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} envMapIntensity={config.envMapIntensity} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      envMapIntensity={config.envMapIntensity}
+      {...options}
+    />
+  );
 };
 
 export const createRailHoleMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.RAIL_HOLE];
-  return <meshBasicMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} {...options} />;
+  return (
+    <meshBasicMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      {...options}
+    />
+  );
 };
 
 export const createSidePanelMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.SIDE_PANEL];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} envMapIntensity={config.envMapIntensity} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      envMapIntensity={config.envMapIntensity}
+      {...options}
+    />
+  );
 };
 
 export const createTopPlateMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.TOP_PLATE];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} envMapIntensity={config.envMapIntensity} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      envMapIntensity={config.envMapIntensity}
+      {...options}
+    />
+  );
 };
 
 export const createBottomPlateMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.BOTTOM_PLATE];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} envMapIntensity={config.envMapIntensity} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      envMapIntensity={config.envMapIntensity}
+      {...options}
+    />
+  );
 };
 
 export const createTextLabelMaterial = (color = '#ffffff') => {

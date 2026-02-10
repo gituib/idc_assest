@@ -9,12 +9,12 @@ const { TextArea } = Input;
 const designTokens = {
   colors: {
     primary: {
-      main: '#667eea'
-    }
+      main: '#667eea',
+    },
   },
   borderRadius: {
-    medium: '10px'
-  }
+    medium: '10px',
+  },
 };
 
 function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
@@ -33,7 +33,7 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
         description: values.description,
         model: values.model,
         manufacturer: values.manufacturer,
-        status: values.status
+        status: values.status,
       });
 
       message.success('网卡创建成功');
@@ -77,7 +77,7 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
         form={form}
         layout="vertical"
         initialValues={{
-          status: 'normal'
+          status: 'normal',
         }}
       >
         <Form.Item
@@ -92,24 +92,15 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
           }
           rules={[
             { required: true, message: '请输入网卡名称' },
-            { max: 50, message: '名称不能超过50个字符' }
+            { max: 50, message: '名称不能超过50个字符' },
           ]}
         >
           <Input placeholder="例如: 网卡1、eth0、LAN1" />
         </Form.Item>
 
         <Space style={{ display: 'flex', width: '100%' }}>
-          <Form.Item
-            name="slotNumber"
-            label="插槽编号"
-            style={{ flex: 1 }}
-          >
-            <InputNumber
-              placeholder="可选"
-              min={1}
-              max={100}
-              style={{ width: '100%' }}
-            />
+          <Form.Item name="slotNumber" label="插槽编号" style={{ flex: 1 }}>
+            <InputNumber placeholder="可选" min={1} max={100} style={{ width: '100%' }} />
           </Form.Item>
 
           <Form.Item
@@ -128,27 +119,16 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
         </Space>
 
         <Space style={{ display: 'flex', width: '100%' }}>
-          <Form.Item
-            name="manufacturer"
-            label="制造商"
-            style={{ flex: 1 }}
-          >
+          <Form.Item name="manufacturer" label="制造商" style={{ flex: 1 }}>
             <Input placeholder="如: Intel、Realtek、Broadcom" />
           </Form.Item>
 
-          <Form.Item
-            name="model"
-            label="型号"
-            style={{ flex: 1 }}
-          >
+          <Form.Item name="model" label="型号" style={{ flex: 1 }}>
             <Input placeholder="如: X520-DA2" />
           </Form.Item>
         </Space>
 
-        <Form.Item
-          name="description"
-          label="描述"
-        >
+        <Form.Item name="description" label="描述">
           <TextArea rows={2} placeholder="请输入描述信息（可选）" />
         </Form.Item>
       </Form>

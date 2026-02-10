@@ -1,6 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Space, Tag, Tooltip, Popconfirm, Empty, Spin, Badge, Collapse, Card } from 'antd';
-import { PlusOutlined, DeleteOutlined, ReloadOutlined, ApiOutlined, CloudServerOutlined, FolderOutlined } from '@ant-design/icons';
+import {
+  Table,
+  Button,
+  Space,
+  Tag,
+  Tooltip,
+  Popconfirm,
+  Empty,
+  Spin,
+  Badge,
+  Collapse,
+  Card,
+} from 'antd';
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  ReloadOutlined,
+  ApiOutlined,
+  CloudServerOutlined,
+  FolderOutlined,
+} from '@ant-design/icons';
 import axios from 'axios';
 import PortCreateModal from './PortCreateModal';
 import NetworkCardCreateModal from './NetworkCardCreateModal';
@@ -10,12 +29,12 @@ const { Panel } = Collapse;
 const designTokens = {
   colors: {
     primary: {
-      main: '#667eea'
+      main: '#667eea',
     },
     success: '#10b981',
     error: '#ef4444',
-    warning: '#f59e0b'
-  }
+    warning: '#f59e0b',
+  },
 };
 
 function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
@@ -34,7 +53,7 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
       setLoading(true);
       const [cardsResponse, networkCardsResponse] = await Promise.all([
         axios.get(`/api/network-cards/device/${deviceId}/with-ports`),
-        axios.get(`/api/network-cards/device/${deviceId}`)
+        axios.get(`/api/network-cards/device/${deviceId}`),
       ]);
 
       const cardsData = cardsResponse.data || [];
@@ -58,27 +77,35 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
     fetchData();
   }, [fetchData, refreshTrigger]);
 
-  const handleDeleteCard = useCallback(async (card) => {
-    try {
-      await axios.delete(`/api/network-cards/${card.nicId}`);
-      import('antd').then(({ message }) => message.success('网卡删除成功'));
-      fetchData();
-      onRefresh?.();
-    } catch (error) {
-      import('antd').then(({ message }) => message.error(error.response?.data?.error || '网卡删除失败'));
-    }
-  }, [fetchData, onRefresh]);
+  const handleDeleteCard = useCallback(
+    async card => {
+      try {
+        await axios.delete(`/api/network-cards/${card.nicId}`);
+        import('antd').then(({ message }) => message.success('网卡删除成功'));
+        fetchData();
+        onRefresh?.();
+      } catch (error) {
+        import('antd').then(({ message }) =>
+          message.error(error.response?.data?.error || '网卡删除失败')
+        );
+      }
+    },
+    [fetchData, onRefresh]
+  );
 
-  const handleDeletePort = useCallback(async (port) => {
-    try {
-      await axios.delete(`/api/device-ports/${port.portId}`);
-      import('antd').then(({ message }) => message.success('端口删除成功'));
-      fetchData();
-      onRefresh?.();
-    } catch (error) {
-      import('antd').then(({ message }) => message.error('端口删除失败'));
-    }
-  }, [fetchData, onRefresh]);
+  const handleDeletePort = useCallback(
+    async port => {
+      try {
+        await axios.delete(`/api/device-ports/${port.portId}`);
+        import('antd').then(({ message }) => message.success('端口删除成功'));
+        fetchData();
+        onRefresh?.();
+      } catch (error) {
+        import('antd').then(({ message }) => message.error('端口删除失败'));
+      }
+    },
+    [fetchData, onRefresh]
+  );
 
   const handleCreateCardSuccess = useCallback(() => {
     fetchData();
@@ -90,7 +117,7 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
     onRefresh?.();
   }, [fetchData, onRefresh]);
 
-  const handleExpand = (nicId) => {
+  const handleExpand = nicId => {
     setExpandedCards(prev => {
       if (prev.includes(nicId)) {
         return prev.filter(id => id !== nicId);
@@ -99,27 +126,27 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
     });
   };
 
-  const getStatusTag = (status) => {
+  const getStatusTag = status => {
     const config = {
       free: { color: 'success', text: '空闲' },
       occupied: { color: 'processing', text: '占用' },
       fault: { color: 'error', text: '故障' },
       normal: { color: 'success', text: '正常' },
       warning: { color: 'warning', text: '警告' },
-      offline: { color: 'default', text: '离线' }
+      offline: { color: 'default', text: '离线' },
     };
     const { color, text } = config[status] || { color: 'default', text: status };
     return <Tag color={color}>{text}</Tag>;
   };
 
-  const getTypeTag = (type) => {
+  const getTypeTag = type => {
     const config = {
-      'RJ45': { color: 'blue', text: 'RJ45' },
-      'SFP': { color: 'green', text: 'SFP' },
+      RJ45: { color: 'blue', text: 'RJ45' },
+      SFP: { color: 'green', text: 'SFP' },
       'SFP+': { color: 'cyan', text: 'SFP+' },
-      'SFP28': { color: 'purple', text: 'SFP28' },
-      'QSFP': { color: 'orange', text: 'QSFP' },
-      'QSFP28': { color: 'red', text: 'QSFP28' }
+      SFP28: { color: 'purple', text: 'SFP28' },
+      QSFP: { color: 'orange', text: 'QSFP' },
+      QSFP28: { color: 'red', text: 'QSFP28' },
     };
     const { color, text } = config[type] || { color: 'default', text: type };
     return <Tag color={color}>{text}</Tag>;
@@ -132,34 +159,34 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
         dataIndex: 'portName',
         key: 'portName',
         width: 120,
-        render: (text) => <span style={{ fontWeight: 500 }}>{text}</span>
+        render: text => <span style={{ fontWeight: 500 }}>{text}</span>,
       },
       {
         title: '类型',
         dataIndex: 'portType',
         key: 'portType',
         width: 80,
-        render: (type) => getTypeTag(type)
+        render: type => getTypeTag(type),
       },
       {
         title: '速率',
         dataIndex: 'portSpeed',
         key: 'portSpeed',
-        width: 70
+        width: 70,
       },
       {
         title: '状态',
         dataIndex: 'status',
         key: 'status',
         width: 70,
-        render: (status) => getStatusTag(status)
+        render: status => getStatusTag(status),
       },
       {
         title: 'VLAN',
         dataIndex: 'vlanId',
         key: 'vlanId',
         width: 60,
-        render: (vlanId) => vlanId || '-'
+        render: vlanId => vlanId || '-',
       },
       {
         title: '操作',
@@ -178,8 +205,8 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
               </Button>
             </Popconfirm>
           </Space>
-        )
-      }
+        ),
+      },
     ];
 
     return (
@@ -194,30 +221,41 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
     );
   };
 
-  const renderCardHeader = (card) => {
+  const renderCardHeader = card => {
     const stats = card.stats || { free: 0, occupied: 0, fault: 0, total: 0 };
-    
+
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '8px',
-            background: card.isUngrouped 
-              ? 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)'
-              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff'
-          }}>
+          <div
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              background: card.isUngrouped
+                ? 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)'
+                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+            }}
+          >
             {card.isUngrouped ? <FolderOutlined /> : <CloudServerOutlined />}
           </div>
           <div>
             <div style={{ fontWeight: 600, fontSize: '14px', color: '#1e293b' }}>
               {card.name}
-              {card.slotNumber && <span style={{ color: '#94a3b8', marginLeft: 8 }}>插槽 {card.slotNumber}</span>}
+              {card.slotNumber && (
+                <span style={{ color: '#94a3b8', marginLeft: 8 }}>插槽 {card.slotNumber}</span>
+              )}
             </div>
             <div style={{ fontSize: '12px', color: '#64748b' }}>
               {card.description || (card.isUngrouped ? '未分配到网卡的端口' : '网卡')}
@@ -248,7 +286,7 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
             type="primary"
             size="small"
             icon={<PlusOutlined />}
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation();
               setSelectedCard(card);
               setCreatePortModalVisible(true);
@@ -270,26 +308,35 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
     );
   }
 
-  const totalStats = cards.reduce((acc, card) => {
-    const stats = card.stats || {};
-    acc.total += stats.total || 0;
-    acc.free += stats.free || 0;
-    acc.occupied += stats.occupied || 0;
-    acc.fault += stats.fault || 0;
-    return acc;
-  }, { total: 0, free: 0, occupied: 0, fault: 0 });
+  const totalStats = cards.reduce(
+    (acc, card) => {
+      const stats = card.stats || {};
+      acc.total += stats.total || 0;
+      acc.free += stats.free || 0;
+      acc.occupied += stats.occupied || 0;
+      acc.fault += stats.fault || 0;
+      return acc;
+    },
+    { total: 0, free: 0, occupied: 0, fault: 0 }
+  );
 
   return (
     <div className="network-card-panel">
-      <div className="panel-header" style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px'
-      }}>
+      <div
+        className="panel-header"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px',
+        }}
+      >
         <div className="stats" style={{ display: 'flex', gap: '24px' }}>
           <Space size={16}>
-            <Badge count={networkCards.length} style={{ backgroundColor: designTokens.colors.primary.main }} />
+            <Badge
+              count={networkCards.length}
+              style={{ backgroundColor: designTokens.colors.primary.main }}
+            />
             <span style={{ color: '#64748b', fontSize: '13px' }}>个网卡</span>
             <Badge count={totalStats.total} style={{ backgroundColor: '#667eea' }} />
             <span style={{ color: '#64748b', fontSize: '13px' }}>个端口</span>
@@ -334,11 +381,11 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
       ) : (
         <Collapse
           activeKey={expandedCards}
-          onChange={(keys) => setExpandedCards(keys)}
+          onChange={keys => setExpandedCards(keys)}
           expandIconPosition="end"
           style={{ background: 'transparent' }}
         >
-          {cards.map((card) => (
+          {cards.map(card => (
             <Panel
               key={card.nicId}
               header={renderCardHeader(card)}
@@ -346,7 +393,7 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
                 background: '#fff',
                 borderRadius: '8px',
                 marginBottom: '8px',
-                border: '1px solid #e2e8f0'
+                border: '1px solid #e2e8f0',
               }}
             >
               {card.ports && card.ports.length > 0 ? (

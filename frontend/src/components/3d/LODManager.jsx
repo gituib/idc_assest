@@ -5,12 +5,12 @@ import * as THREE from 'three';
 export const LOD_LEVELS = {
   HIGH: 0,
   MEDIUM: 1,
-  LOW: 2
+  LOW: 2,
 };
 
 export const LOD_DISTANCES = {
   HIGH: 5,
-  MEDIUM: 10
+  MEDIUM: 10,
 };
 
 const createSimplifiedDeviceMesh = (device, uHeight, rackDepth, deviceColor, statusColor) => {
@@ -34,7 +34,7 @@ const createSimplifiedDeviceMesh = (device, uHeight, rackDepth, deviceColor, sta
         <boxGeometry args={[chassisWidth, height - 0.002, chassisDepth]} />
         <meshStandardMaterial color="#333333" roughness={0.9} metalness={0.3} />
       </mesh>
-      <mesh position={[panelWidth/2 - 0.03, halfHeight - 0.02, frontZ + 0.01]}>
+      <mesh position={[panelWidth / 2 - 0.03, halfHeight - 0.02, frontZ + 0.01]}>
         <circleGeometry args={[0.006, 16]} />
         <meshBasicMaterial color={statusColor} toneMapped={false} />
       </mesh>
@@ -65,9 +65,9 @@ const createMediumDeviceMesh = (device, uHeight, rackDepth, deviceColor, statusC
         <meshStandardMaterial color={deviceColor} roughness={0.8} metalness={0.1} />
       </mesh>
       <mesh position={[0, 0, frontZ - panelDepth - chassisDepth / 2]}>
-          <boxGeometry args={[chassisWidth, height - 0.002, chassisDepth]} />
-          <meshStandardMaterial color="#333333" roughness={0.9} metalness={0.3} />
-        </mesh>
+        <boxGeometry args={[chassisWidth, height - 0.002, chassisDepth]} />
+        <meshStandardMaterial color="#333333" roughness={0.9} metalness={0.3} />
+      </mesh>
       <group position={[-0.18, 0, frontZ + 0.006]}>
         <mesh position={[-0.02, 0, 0]}>
           <boxGeometry args={[0.04, height - 0.01, 0.002]} />
@@ -86,7 +86,7 @@ const createMediumDeviceMesh = (device, uHeight, rackDepth, deviceColor, statusC
           </mesh>
         ))}
       </group>
-      <mesh position={[panelWidth/2 - 0.03, halfHeight - 0.02, frontZ + 0.01]}>
+      <mesh position={[panelWidth / 2 - 0.03, halfHeight - 0.02, frontZ + 0.01]}>
         <circleGeometry args={[0.006, 16]} />
         <meshBasicMaterial color={statusColor} toneMapped={false} />
       </mesh>
@@ -94,15 +94,15 @@ const createMediumDeviceMesh = (device, uHeight, rackDepth, deviceColor, statusC
   );
 };
 
-const LODManager = ({ 
-  device, 
-  uHeight, 
-  rackDepth, 
-  position, 
-  deviceColor, 
-  statusColor, 
+const LODManager = ({
+  device,
+  uHeight,
+  rackDepth,
+  position,
+  deviceColor,
+  statusColor,
   children,
-  level = LOD_LEVELS.HIGH
+  level = LOD_LEVELS.HIGH,
 }) => {
   const groupRef = useRef();
   const highDetailRef = useRef();
@@ -119,26 +119,26 @@ const LODManager = ({
 
   useFrame(() => {
     if (!groupRef.current) return;
-    
+
     // 节流：每5帧检查一次
     frameCount.current++;
     if (frameCount.current % 5 !== 0) return;
-    
+
     const distance = camera.position.distanceTo(groupRef.current.position);
     distanceRef.current = distance;
-    
+
     // 添加缓冲避免频繁切换（10% 缓冲）
     const buffer = 0.1;
     const highThreshold = LOD_DISTANCES.HIGH * (1 + buffer);
     const mediumThreshold = LOD_DISTANCES.MEDIUM * (1 + buffer);
-    
+
     let newLevel = LOD_LEVELS.HIGH;
     if (distance > mediumThreshold) {
       newLevel = LOD_LEVELS.LOW;
     } else if (distance > highThreshold) {
       newLevel = LOD_LEVELS.MEDIUM;
     }
-    
+
     // 只有当级别变化时才更新
     if (newLevel !== lodLevelRef.current) {
       lodLevelRef.current = newLevel;
@@ -169,12 +169,12 @@ const LODManager = ({
       <group ref={highDetailRef} visible={true}>
         {children}
       </group>
-      
+
       {/* 中等细节模型 */}
       <group ref={mediumDetailRef} visible={false}>
         {createMediumDeviceMesh(device, uHeight, rackDepth, deviceColor, statusColor)}
       </group>
-      
+
       {/* 低细节模型 */}
       <group ref={lowDetailRef} visible={false}>
         {createSimplifiedDeviceMesh(device, uHeight, rackDepth, deviceColor, statusColor)}

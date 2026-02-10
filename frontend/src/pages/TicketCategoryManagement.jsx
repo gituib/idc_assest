@@ -49,7 +49,7 @@ function TicketCategoryManagement() {
         priority: category.priority,
         defaultPriority: category.defaultPriority,
         expectedDuration: category.expectedDuration,
-        isActive: category.isActive
+        isActive: category.isActive,
       });
     } else {
       form.resetFields();
@@ -62,7 +62,7 @@ function TicketCategoryManagement() {
     setEditingCategory(null);
   };
 
-  const handleSubmit = async (values) => {
+  const handleSubmit = async values => {
     try {
       if (editingCategory) {
         await axios.put(`/api/ticket-categories/${editingCategory.categoryId}`, values);
@@ -81,7 +81,7 @@ function TicketCategoryManagement() {
     }
   };
 
-  const handleDelete = async (categoryId) => {
+  const handleDelete = async categoryId => {
     try {
       await axios.delete(`/api/ticket-categories/${categoryId}`);
       message.success('分类删除成功');
@@ -97,49 +97,47 @@ function TicketCategoryManagement() {
       title: '分类ID',
       dataIndex: 'categoryId',
       key: 'categoryId',
-      width: 150
+      width: 150,
     },
     {
       title: '分类名称',
       dataIndex: 'name',
       key: 'name',
-      width: 180
+      width: 180,
     },
     {
       title: '分类说明',
       dataIndex: 'description',
       key: 'description',
       width: 300,
-      ellipsis: true
+      ellipsis: true,
     },
     {
       title: '优先级',
       dataIndex: 'priority',
       key: 'priority',
-      width: 80
+      width: 80,
     },
     {
       title: '默认优先级',
       dataIndex: 'defaultPriority',
       key: 'defaultPriority',
-      width: 100
+      width: 100,
     },
     {
       title: '预计时长(分钟)',
       dataIndex: 'expectedDuration',
       key: 'expectedDuration',
-      width: 120
+      width: 120,
     },
     {
       title: '启用状态',
       dataIndex: 'isActive',
       key: 'isActive',
       width: 100,
-      render: (text) => (
-        <span style={{ color: text ? 'green' : 'red' }}>
-          {text ? '启用' : '禁用'}
-        </span>
-      )
+      render: text => (
+        <span style={{ color: text ? 'green' : 'red' }}>{text ? '启用' : '禁用'}</span>
+      ),
     },
     {
       title: '操作',
@@ -147,11 +145,7 @@ function TicketCategoryManagement() {
       width: 150,
       render: (_, record) => (
         <Space size="small">
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => showModal(record)}
-          >
+          <Button type="link" icon={<EditOutlined />} onClick={() => showModal(record)}>
             编辑
           </Button>
           <Popconfirm
@@ -166,22 +160,25 @@ function TicketCategoryManagement() {
             </Button>
           </Popconfirm>
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
   return (
     <div style={{ padding: 24 }}>
-      <Card title="故障分类管理" extra={
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={initCategories}>
-            初始化分类
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
-            添加分类
-          </Button>
-        </Space>
-      }>
+      <Card
+        title="故障分类管理"
+        extra={
+          <Space>
+            <Button icon={<ReloadOutlined />} onClick={initCategories}>
+              初始化分类
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
+              添加分类
+            </Button>
+          </Space>
+        }
+      >
         <Table
           columns={columns}
           dataSource={categories}

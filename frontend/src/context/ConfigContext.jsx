@@ -17,7 +17,7 @@ export const ConfigProvider = ({ children }) => {
     date_format: 'YYYY-MM-DD',
     session_timeout: 30,
     max_login_attempts: 5,
-    maintenance_mode: false
+    maintenance_mode: false,
   });
   const [loading, setLoading] = useState(true);
 
@@ -27,15 +27,15 @@ export const ConfigProvider = ({ children }) => {
       const response = await axios.get('/api/system-settings');
       const settings = response.data;
       const configValues = {};
-      
+
       // 将配置转换为扁平结构
       Object.entries(settings).forEach(([key, value]) => {
         configValues[key] = value.value;
       });
-      
+
       setConfig(prev => ({
         ...prev,
-        ...configValues
+        ...configValues,
       }));
     } catch (error) {
       console.error('加载系统配置失败:', error);
@@ -50,10 +50,10 @@ export const ConfigProvider = ({ children }) => {
   }, []);
 
   // 更新配置
-  const updateConfig = (newConfig) => {
+  const updateConfig = newConfig => {
     setConfig(prev => ({
       ...prev,
-      ...newConfig
+      ...newConfig,
     }));
   };
 

@@ -1,0 +1,15 @@
+# 构建输出
+dist/
+build/
+
+# 依赖
+node_modules/
+
+# Vite 缓存
+.vite/
+
+# 日志
+*.log
+
+# 其他
+.DS_Store

@@ -6,7 +6,11 @@
     "start": "vite",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext js,jsx --fix",
+    "format": "prettier --write \"src/**/*.{js,jsx,css,json}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,css,json}\""
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
@@ -27,7 +31,14 @@
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
     "@vitejs/plugin-react": "^4.0.3",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.0",
     "jsdom": "^27.3.0",
+    "prettier": "^3.8.1",
     "terser": "^5.44.1",
     "vite": "^4.4.9",
     "vitest": "^4.0.16"

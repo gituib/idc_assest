@@ -13,13 +13,13 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   console.log('[AuthContext] Initializing...');
-  
+
   const savedToken = localStorage.getItem('token');
   const savedUser = localStorage.getItem('user');
-  
+
   console.log('[AuthContext] Saved token:', savedToken ? 'exists' : 'null');
   console.log('[AuthContext] Saved user:', savedUser ? 'exists' : 'null');
-  
+
   const [user, setUser] = useState(() => {
     try {
       if (savedUser) {
@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
     }
     return null;
   });
-  
+
   const [token, setToken] = useState(() => savedToken);
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(false);
@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const currentToken = localStorage.getItem('token');
     const currentUser = localStorage.getItem('user');
-    
+
     if (currentToken && currentToken === token) {
       if (currentUser) {
         try {
@@ -97,7 +97,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (userData) => {
+  const register = async userData => {
     try {
       const response = await authAPI.register(userData);
       if (response.success) {
@@ -123,13 +123,13 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   }, []);
 
-  const updateUser = (newUserData) => {
+  const updateUser = newUserData => {
     const updatedUser = { ...user, ...newUserData };
     setUser(updatedUser);
     localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
-  const hasPermission = (permission) => {
+  const hasPermission = permission => {
     if (!user) return false;
     return true;
   };
@@ -144,14 +144,10 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateUser,
     hasPermission,
-    checkAdmin: () => authAPI.checkAdmin()
+    checkAdmin: () => authAPI.checkAdmin(),
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export default AuthContext;

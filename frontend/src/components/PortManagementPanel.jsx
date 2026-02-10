@@ -1,18 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Table, Button, Space, Tag, Tooltip, Popconfirm, Empty, Spin, Badge } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, ApiOutlined } from '@ant-design/icons';
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  ReloadOutlined,
+  ApiOutlined,
+} from '@ant-design/icons';
 import axios from 'axios';
 import PortCreateModal from './PortCreateModal';
 
 const designTokens = {
   colors: {
     primary: {
-      main: '#667eea'
+      main: '#667eea',
     },
     success: '#10b981',
     error: '#ef4444',
-    warning: '#f59e0b'
-  }
+    warning: '#f59e0b',
+  },
 };
 
 function PortManagementPanel({ deviceId, deviceName, onRefresh }) {
@@ -38,40 +44,43 @@ function PortManagementPanel({ deviceId, deviceName, onRefresh }) {
     fetchPorts();
   }, [fetchPorts]);
 
-  const handleDelete = useCallback(async (port) => {
-    try {
-      await axios.delete(`/api/device-ports/${port.portId}`);
-      import('antd').then(({ message }) => message.success('端口删除成功'));
-      fetchPorts();
-      onRefresh?.();
-    } catch (error) {
-      import('antd').then(({ message }) => message.error('端口删除失败'));
-    }
-  }, [fetchPorts, onRefresh]);
+  const handleDelete = useCallback(
+    async port => {
+      try {
+        await axios.delete(`/api/device-ports/${port.portId}`);
+        import('antd').then(({ message }) => message.success('端口删除成功'));
+        fetchPorts();
+        onRefresh?.();
+      } catch (error) {
+        import('antd').then(({ message }) => message.error('端口删除失败'));
+      }
+    },
+    [fetchPorts, onRefresh]
+  );
 
   const handleCreateSuccess = useCallback(() => {
     fetchPorts();
     onRefresh?.();
   }, [fetchPorts, onRefresh]);
 
-  const getStatusTag = (status) => {
+  const getStatusTag = status => {
     const config = {
       free: { color: 'success', text: '空闲' },
       occupied: { color: 'processing', text: '占用' },
-      fault: { color: 'error', text: '故障' }
+      fault: { color: 'error', text: '故障' },
     };
     const { color, text } = config[status] || { color: 'default', text: status };
     return <Tag color={color}>{text}</Tag>;
   };
 
-  const getTypeTag = (type) => {
+  const getTypeTag = type => {
     const config = {
-      'RJ45': { color: 'blue', text: 'RJ45' },
-      'SFP': { color: 'green', text: 'SFP' },
+      RJ45: { color: 'blue', text: 'RJ45' },
+      SFP: { color: 'green', text: 'SFP' },
       'SFP+': { color: 'cyan', text: 'SFP+' },
-      'SFP28': { color: 'purple', text: 'SFP28' },
-      'QSFP': { color: 'orange', text: 'QSFP' },
-      'QSFP28': { color: 'red', text: 'QSFP28' }
+      SFP28: { color: 'purple', text: 'SFP28' },
+      QSFP: { color: 'orange', text: 'QSFP' },
+      QSFP28: { color: 'red', text: 'QSFP28' },
     };
     const { color, text } = config[type] || { color: 'default', text: type };
     return <Tag color={color}>{text}</Tag>;
@@ -83,38 +92,38 @@ function PortManagementPanel({ deviceId, deviceName, onRefresh }) {
       dataIndex: 'portName',
       key: 'portName',
       width: 120,
-      render: (text) => (
+      render: text => (
         <Tooltip title={text}>
           <span style={{ fontWeight: 500 }}>{text}</span>
         </Tooltip>
-      )
+      ),
     },
     {
       title: '类型',
       dataIndex: 'portType',
       key: 'portType',
       width: 90,
-      render: (type) => getTypeTag(type)
+      render: type => getTypeTag(type),
     },
     {
       title: '速率',
       dataIndex: 'portSpeed',
       key: 'portSpeed',
-      width: 80
+      width: 80,
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
       width: 80,
-      render: (status) => getStatusTag(status)
+      render: status => getStatusTag(status),
     },
     {
       title: 'VLAN',
       dataIndex: 'vlanId',
       key: 'vlanId',
       width: 70,
-      render: (vlanId) => vlanId || '-'
+      render: vlanId => vlanId || '-',
     },
     {
       title: '操作',
@@ -129,18 +138,13 @@ function PortManagementPanel({ deviceId, deviceName, onRefresh }) {
             okText="确定"
             cancelText="取消"
           >
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-            >
+            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
               删除
             </Button>
           </Popconfirm>
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
   const freeCount = ports.filter(p => p.status === 'free').length;
@@ -169,11 +173,7 @@ function PortManagementPanel({ deviceId, deviceName, onRefresh }) {
           </Space>
         </div>
         <Space>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={fetchPorts}
-            size="small"
-          >
+          <Button icon={<ReloadOutlined />} onClick={fetchPorts} size="small">
             刷新
           </Button>
           <Button
@@ -182,7 +182,7 @@ function PortManagementPanel({ deviceId, deviceName, onRefresh }) {
             onClick={() => setCreateModalVisible(true)}
             style={{
               background: designTokens.colors.primary.gradient,
-              border: 'none'
+              border: 'none',
             }}
           >
             新增端口

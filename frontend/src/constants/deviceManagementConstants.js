@@ -12,7 +12,7 @@ export const PAGINATION_CONFIG = {
   // 显示快速跳转
   showSizeChanger: true,
   // 显示总数
-  showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
+  showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
 };
 
 // 搜索防抖延迟（毫秒）
@@ -21,7 +21,7 @@ export const DEBOUNCE_DELAY = 300;
 // 表格滚动配置
 export const TABLE_SCROLL_CONFIG = {
   x: 'max-content',
-  y: 'calc(100vh - 400px)'
+  y: 'calc(100vh - 400px)',
 };
 
 // 默认设备字段配置
@@ -32,7 +32,7 @@ export const DEFAULT_DEVICE_FIELDS = [
     fieldType: 'text',
     required: true,
     visible: true,
-    editable: false
+    editable: false,
   },
   {
     fieldName: 'name',
@@ -40,7 +40,7 @@ export const DEFAULT_DEVICE_FIELDS = [
     fieldType: 'text',
     required: true,
     visible: true,
-    editable: true
+    editable: true,
   },
   {
     fieldName: 'type',
@@ -54,8 +54,8 @@ export const DEFAULT_DEVICE_FIELDS = [
       { value: 'switch', label: '交换机' },
       { value: 'router', label: '路由器' },
       { value: 'storage', label: '存储设备' },
-      { value: 'other', label: '其他设备' }
-    ]
+      { value: 'other', label: '其他设备' },
+    ],
   },
   {
     fieldName: 'model',
@@ -63,7 +63,7 @@ export const DEFAULT_DEVICE_FIELDS = [
     fieldType: 'text',
     required: false,
     visible: true,
-    editable: true
+    editable: true,
   },
   {
     fieldName: 'serialNumber',
@@ -71,7 +71,7 @@ export const DEFAULT_DEVICE_FIELDS = [
     fieldType: 'text',
     required: true,
     visible: true,
-    editable: true
+    editable: true,
   },
   {
     fieldName: 'rackId',
@@ -79,7 +79,7 @@ export const DEFAULT_DEVICE_FIELDS = [
     fieldType: 'text',
     required: true,
     visible: true,
-    editable: true
+    editable: true,
   },
   {
     fieldName: 'position',
@@ -87,7 +87,7 @@ export const DEFAULT_DEVICE_FIELDS = [
     fieldType: 'number',
     required: true,
     visible: true,
-    editable: true
+    editable: true,
   },
   {
     fieldName: 'height',
@@ -95,7 +95,7 @@ export const DEFAULT_DEVICE_FIELDS = [
     fieldType: 'number',
     required: true,
     visible: true,
-    editable: true
+    editable: true,
   },
   {
     fieldName: 'powerConsumption',
@@ -103,7 +103,7 @@ export const DEFAULT_DEVICE_FIELDS = [
     fieldType: 'number',
     required: false,
     visible: true,
-    editable: true
+    editable: true,
   },
   {
     fieldName: 'ipAddress',
@@ -111,7 +111,7 @@ export const DEFAULT_DEVICE_FIELDS = [
     fieldType: 'text',
     required: false,
     visible: true,
-    editable: true
+    editable: true,
   },
   {
     fieldName: 'status',
@@ -124,8 +124,8 @@ export const DEFAULT_DEVICE_FIELDS = [
       { value: 'running', label: '运行中' },
       { value: 'maintenance', label: '维护中' },
       { value: 'offline', label: '离线' },
-      { value: 'fault', label: '故障' }
-    ]
+      { value: 'fault', label: '故障' },
+    ],
   },
   {
     fieldName: 'purchaseDate',
@@ -133,7 +133,7 @@ export const DEFAULT_DEVICE_FIELDS = [
     fieldType: 'date',
     required: false,
     visible: true,
-    editable: true
+    editable: true,
   },
   {
     fieldName: 'warrantyExpiry',
@@ -141,7 +141,7 @@ export const DEFAULT_DEVICE_FIELDS = [
     fieldType: 'date',
     required: false,
     visible: true,
-    editable: true
+    editable: true,
   },
   {
     fieldName: 'description',
@@ -149,8 +149,8 @@ export const DEFAULT_DEVICE_FIELDS = [
     fieldType: 'textarea',
     required: false,
     visible: true,
-    editable: true
-  }
+    editable: true,
+  },
 ];
 
 // 基础字段名称列表（用于导入导出时排除自定义字段）
@@ -168,7 +168,7 @@ export const BASE_FIELD_NAMES = [
   'status',
   'purchaseDate',
   'warrantyExpiry',
-  'description'
+  'description',
 ];
 
 // 系统字段列表（不可编辑）
@@ -186,7 +186,7 @@ export const IMPORT_CONFIG = {
   // 单次最大导入条数
   maxImportCount: 5000,
   // 编码格式
-  encoding: 'gbk'
+  encoding: 'gbk',
 };
 
 // 导出配置
@@ -196,7 +196,7 @@ export const EXPORT_CONFIG = {
   // 日期格式
   dateFormat: 'YYYY-MM-DD_HH-mm-ss',
   // 支持的导出格式
-  formats: ['xlsx', 'csv']
+  formats: ['xlsx', 'csv'],
 };
 
 // 模态框配置
@@ -210,7 +210,7 @@ export const MODAL_CONFIG = {
   // 导入模态框宽度
   importModalWidth: 600,
   // 导出模态框宽度
-  exportModalWidth: 500
+  exportModalWidth: 500,
 };
 
 // 统计卡片配置
@@ -220,7 +220,7 @@ export const STATS_CONFIG = {
   // 显示的维护中设备数量上限
   maxMaintenanceDisplay: 99,
   // 显示的故障设备数量上限
-  maxFaultDisplay: 99
+  maxFaultDisplay: 99,
 };
 
 // 设备类型选项（用于筛选）
@@ -230,7 +230,7 @@ export const DEVICE_TYPE_OPTIONS = [
   { value: 'switch', label: '交换机' },
   { value: 'router', label: '路由器' },
   { value: 'storage', label: '存储设备' },
-  { value: 'other', label: '其他设备' }
+  { value: 'other', label: '其他设备' },
 ];
 
 // 设备状态选项（用于筛选）
@@ -239,7 +239,7 @@ export const DEVICE_STATUS_OPTIONS = [
   { value: 'running', label: '运行中' },
   { value: 'maintenance', label: '维护中' },
   { value: 'offline', label: '离线' },
-  { value: 'fault', label: '故障' }
+  { value: 'fault', label: '故障' },
 ];
 
 // 表格列宽配置
@@ -258,13 +258,13 @@ export const COLUMN_WIDTH_CONFIG = {
   purchaseDate: 110,
   warrantyExpiry: 110,
   description: 200,
-  action: 150
+  action: 150,
 };
 
 // 空状态配置
 export const EMPTY_STATE_CONFIG = {
   description: '暂无设备数据',
-  image: 'https://gw.alipayobjects.com/zos/antfincdn/ZHrcdLPrvN/empty.svg'
+  image: 'https://gw.alipayobjects.com/zos/antfincdn/ZHrcdLPrvN/empty.svg',
 };
 
 // 操作按钮配置
@@ -272,7 +272,7 @@ export const ACTION_BUTTON_CONFIG = {
   // 批量操作阈值（超过此数量显示确认对话框）
   batchConfirmThreshold: 10,
   // 批量删除确认消息
-  batchDeleteConfirmMessage: (count) => `确定要删除选中的 ${count} 个设备吗？此操作不可恢复。`,
+  batchDeleteConfirmMessage: count => `确定要删除选中的 ${count} 个设备吗？此操作不可恢复。`,
   // 单个删除确认消息
-  singleDeleteConfirmMessage: (name) => `确定要删除设备 "${name}" 吗？此操作不可恢复。`
+  singleDeleteConfirmMessage: name => `确定要删除设备 "${name}" 吗？此操作不可恢复。`,
 };

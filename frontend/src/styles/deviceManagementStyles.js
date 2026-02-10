@@ -11,12 +11,12 @@ const { colors, shadows, borderRadius, transitions, spacing } = designTokens;
 export const pageContainerStyle = {
   minHeight: '100vh',
   background: colors.background.secondary,
-  padding: spacing.lg
+  padding: spacing.lg,
 };
 
 // 头部样式
 export const headerStyle = {
-  marginBottom: spacing.lg
+  marginBottom: spacing.lg,
 };
 
 // 标题行样式
@@ -26,14 +26,14 @@ export const titleRowStyle = {
   justifyContent: 'space-between',
   marginBottom: spacing.lg,
   flexWrap: 'wrap',
-  gap: spacing.md
+  gap: spacing.md,
 };
 
 // 标题区域样式
 export const titleSectionStyle = {
   display: 'flex',
   alignItems: 'center',
-  gap: spacing.md
+  gap: spacing.md,
 };
 
 // 标题图标样式
@@ -45,14 +45,14 @@ export const titleIconStyle = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  boxShadow: shadows.medium
+  boxShadow: shadows.medium,
 };
 
 // 标题文本样式
 export const titleTextStyle = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '2px'
+  gap: '2px',
 };
 
 // 页面标题样式
@@ -61,14 +61,14 @@ export const pageTitleStyle = {
   fontWeight: '700',
   margin: 0,
   color: colors.text.primary,
-  lineHeight: 1.2
+  lineHeight: 1.2,
 };
 
 // 页面副标题样式
 export const pageSubtitleStyle = {
   fontSize: '13px',
   color: colors.text.secondary,
-  margin: 0
+  margin: 0,
 };
 
 // 操作按钮基础样式
@@ -79,7 +79,7 @@ export const actionButtonStyle = {
   fontWeight: '500',
   display: 'inline-flex',
   alignItems: 'center',
-  gap: '6px'
+  gap: '6px',
 };
 
 // 主要操作按钮样式
@@ -88,7 +88,7 @@ export const primaryActionStyle = {
   background: colors.primary.gradient,
   border: 'none',
   color: '#ffffff !important',
-  boxShadow: shadows.small
+  boxShadow: shadows.small,
 };
 
 // 次要操作按钮样式
@@ -96,7 +96,7 @@ export const secondaryActionStyle = {
   ...actionButtonStyle,
   background: colors.background.primary,
   border: `1px solid ${colors.border.light}`,
-  color: colors.text.primary
+  color: colors.text.primary,
 };
 
 // 危险操作按钮样式
@@ -104,7 +104,7 @@ export const dangerActionStyle = {
   ...actionButtonStyle,
   background: colors.error.main,
   border: 'none',
-  color: '#ffffff'
+  color: '#ffffff',
 };
 
 // 主要按钮样式（大）
@@ -118,7 +118,7 @@ export const primaryButtonStyle = {
   fontWeight: '500',
   display: 'inline-flex',
   alignItems: 'center',
-  justifyContent: 'center'
+  justifyContent: 'center',
 };
 
 // 统计卡片行样式
@@ -126,7 +126,7 @@ export const statsRowStyle = {
   display: 'flex',
   gap: spacing.md,
   marginBottom: spacing.lg,
-  flexWrap: 'wrap'
+  flexWrap: 'wrap',
 };
 
 // 统计卡片基础样式
@@ -139,7 +139,7 @@ export const statCardStyle = {
   borderRadius: borderRadius.medium,
   border: `1px solid ${colors.border.light}`,
   boxShadow: shadows.small,
-  transition: `all ${transitions.fast}`
+  transition: `all ${transitions.fast}`,
 };
 
 // 统计数值样式
@@ -147,35 +147,35 @@ export const statValueStyle = {
   fontSize: '24px',
   fontWeight: '700',
   color: colors.text.primary,
-  lineHeight: 1.2
+  lineHeight: 1.2,
 };
 
 // 统计标签样式
 export const statLabelStyle = {
   fontSize: '12px',
   color: colors.text.secondary,
-  marginTop: '4px'
+  marginTop: '4px',
 };
 
 // 运行中状态统计卡片样式
 export const statCardRunningStyle = {
   ...statCardStyle,
   borderLeft: `3px solid ${colors.success.main}`,
-  background: `${colors.success.main}08`
+  background: `${colors.success.main}08`,
 };
 
 // 维护中状态统计卡片样式
 export const statCardMaintenanceStyle = {
   ...statCardStyle,
   borderLeft: `3px solid ${colors.warning.main}`,
-  background: `${colors.warning.main}08`
+  background: `${colors.warning.main}08`,
 };
 
 // 故障状态统计卡片样式
 export const statCardFaultStyle = {
   ...statCardStyle,
   borderLeft: `3px solid ${colors.error.main}`,
-  background: `${colors.error.main}08`
+  background: `${colors.error.main}08`,
 };
 
 // 卡片基础样式
@@ -184,7 +184,7 @@ export const cardStyle = {
   border: 'none',
   boxShadow: shadows.medium,
   overflow: 'hidden',
-  background: colors.background.primary
+  background: colors.background.primary,
 };
 
 // 筛选卡片样式
@@ -193,7 +193,7 @@ export const filterCardStyle = {
   border: 'none',
   boxShadow: shadows.small,
   background: colors.background.primary,
-  marginBottom: spacing.lg
+  marginBottom: spacing.lg,
 };
 
 // 模态框头部样式
@@ -202,7 +202,7 @@ export const modalHeaderStyle = {
   alignItems: 'center',
   gap: spacing.sm,
   fontSize: '18px',
-  fontWeight: '600'
+  fontWeight: '600',
 };
 
 // 表格样式常量
@@ -210,23 +210,23 @@ export const tableStyles = {
   // 表格容器样式
   wrapper: {
     borderRadius: borderRadius.medium,
-    overflow: 'hidden'
+    overflow: 'hidden',
   },
-  
+
   // 空状态样式
   empty: {
     textAlign: 'center',
     padding: '60px 20px',
     color: colors.text.secondary,
-    fontSize: '15px'
+    fontSize: '15px',
   },
-  
+
   // 空状态图标样式
   emptyIcon: {
     fontSize: '48px',
     marginBottom: '16px',
-    color: colors.border.light
-  }
+    color: colors.border.light,
+  },
 };
 
 // 搜索输入框样式
@@ -234,24 +234,24 @@ export const searchInputStyle = {
   width: '280px',
   borderRadius: borderRadius.medium,
   border: `1px solid ${colors.border.light}`,
-  transition: `all ${transitions.fast}`
+  transition: `all ${transitions.fast}`,
 };
 
 // 选择器样式
 export const selectStyle = {
-  borderRadius: borderRadius.medium
+  borderRadius: borderRadius.medium,
 };
 
 // 下拉菜单样式
 export const dropdownStyle = {
-  borderRadius: borderRadius.medium
+  borderRadius: borderRadius.medium,
 };
 
 // 刷新按钮样式
 export const refreshButtonStyle = {
   borderRadius: borderRadius.medium,
   border: `1px solid ${colors.border.light}`,
-  height: '36px'
+  height: '36px',
 };
 
 // 搜索按钮样式
@@ -260,14 +260,14 @@ export const searchButtonStyle = {
   borderRadius: borderRadius.medium,
   background: colors.primary.gradient,
   border: 'none',
-  boxShadow: shadows.small
+  boxShadow: shadows.small,
 };
 
 // 重置按钮样式
 export const resetButtonStyle = {
   height: '36px',
   borderRadius: borderRadius.medium,
-  border: `1px solid ${colors.border.light}`
+  border: `1px solid ${colors.border.light}`,
 };
 
 // 导入模态框样式
@@ -278,32 +278,32 @@ export const importModalStyles = {
     padding: '16px',
     background: 'linear-gradient(180deg, #fafafa 0%, #ffffff 100%)',
     borderRadius: '12px',
-    border: '1px solid #f0f0f0'
+    border: '1px solid #f0f0f0',
   },
-  
+
   // 标题样式
   title: {
     fontWeight: '600',
     marginBottom: '8px',
-    color: '#333'
+    color: '#333',
   },
-  
+
   // 列表样式
   list: {
     paddingLeft: '20px',
     marginBottom: '10px',
     color: '#666',
     fontSize: '13px',
-    marginTop: '12px'
+    marginTop: '12px',
   },
-  
+
   // 进度容器样式
   progressContainer: {
     display: 'flex',
     alignItems: 'center',
-    marginBottom: '16px'
+    marginBottom: '16px',
   },
-  
+
   // 进度图标样式
   progressIcon: {
     width: '48px',
@@ -315,46 +315,49 @@ export const importModalStyles = {
     justifyContent: 'center',
     marginRight: '16px',
     color: '#fff',
-    fontSize: '20px'
+    fontSize: '20px',
   },
-  
+
   // 进度信息样式
   progressInfo: {
     title: {
       margin: '0 0 4px 0',
       fontWeight: '600',
       color: '#333',
-      fontSize: '16px'
+      fontSize: '16px',
     },
     phase: {
       margin: 0,
       color: colors.primary.main,
-      fontSize: '14px'
-    }
+      fontSize: '14px',
+    },
   },
-  
+
   // 结果卡片样式
-  resultCard: (type) => ({
+  resultCard: type => ({
     padding: '12px',
-    background: type === 'total' ? colors.primary.gradient :
-                type === 'success' ? 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)' :
-                'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)',
+    background:
+      type === 'total'
+        ? colors.primary.gradient
+        : type === 'success'
+          ? 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)'
+          : 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)',
     borderRadius: '8px',
     color: '#fff',
-    textAlign: 'center'
+    textAlign: 'center',
   }),
-  
+
   // 结果数值样式
   resultValue: {
     fontSize: '24px',
-    fontWeight: '700'
+    fontWeight: '700',
   },
-  
+
   // 结果标签样式
   resultLabel: {
     fontSize: '12px',
-    opacity: 0.9
-  }
+    opacity: 0.9,
+  },
 };
 
 // 详情模态框样式
@@ -363,27 +366,27 @@ export const detailModalStyles = {
   infoItem: {
     label: {
       fontWeight: '500',
-      color: '#666'
+      color: '#666',
     },
     value: {
       marginLeft: 8,
-      color: '#333'
-    }
+      color: '#333',
+    },
   },
-  
+
   // 描述区域样式
   description: {
-    marginTop: '16px'
+    marginTop: '16px',
   },
-  
+
   // 描述内容样式
   descriptionContent: {
     marginTop: '8px',
     padding: '12px',
     backgroundColor: '#fafafa',
     borderRadius: '8px',
-    color: '#333'
-  }
+    color: '#333',
+  },
 };
 
 // 导出模态框样式
@@ -394,17 +397,17 @@ export const exportModalStyles = {
     overflow: 'auto',
     border: '1px solid #f0f0f0',
     borderRadius: '8px',
-    padding: '12px'
+    padding: '12px',
   },
-  
+
   // 字段项样式
   fieldItem: {
-    marginBottom: '8px'
-  }
+    marginBottom: '8px',
+  },
 };
 
 // CSS-in-JS 样式字符串生成函数
-export const generateGlobalStyles = (tokens) => `
+export const generateGlobalStyles = tokens => `
   .device-modal .ant-modal-close {
     top: 16px;
     right: 24px;

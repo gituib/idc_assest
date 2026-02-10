@@ -3,27 +3,62 @@ import { MATERIAL_CONFIGS, MATERIAL_TYPES } from './constants.js';
 
 export const createDeviceChassisMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.DEVICE_CHASSIS];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      {...options}
+    />
+  );
 };
 
 export const createDevicePanelMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.DEVICE_PANEL];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      {...options}
+    />
+  );
 };
 
 export const createDevicePanelSelectedMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.DEVICE_PANEL_SELECTED];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      {...options}
+    />
+  );
 };
 
 export const createDriveTrayMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.DRIVE_TRAY];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      {...options}
+    />
+  );
 };
 
 export const createDriveTrayHandleMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.DRIVE_TRAY_HANDLE];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      {...options}
+    />
+  );
 };
 
 export const createLedIndicatorMaterial = (color = '#10b981', options = {}) => {
@@ -37,32 +72,78 @@ export const createLedErrorMaterial = (options = {}) => {
 
 export const createSfpPortMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.SFP_PORT];
-  return <meshPhysicalMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} transparent opacity={config.opacity} {...options} />;
+  return (
+    <meshPhysicalMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      transparent
+      opacity={config.opacity}
+      {...options}
+    />
+  );
 };
 
 export const createRj45PortMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.RJ45_PORT];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      {...options}
+    />
+  );
 };
 
 export const createVentHoleMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.VENT_HOLE];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      {...options}
+    />
+  );
 };
 
 export const createBackPanelMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.BACK_PANEL];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} transparent opacity={config.opacity} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      transparent
+      opacity={config.opacity}
+      {...options}
+    />
+  );
 };
 
 export const createPsuModuleMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.PSU_MODULE];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      {...options}
+    />
+  );
 };
 
 export const createFanModuleMaterial = (options = {}) => {
   const config = MATERIAL_CONFIGS[MATERIAL_TYPES.FAN_MODULE];
-  return <meshStandardMaterial color={config.color} metalness={config.metalness} roughness={config.roughness} {...options} />;
+  return (
+    <meshStandardMaterial
+      color={config.color}
+      metalness={config.metalness}
+      roughness={config.roughness}
+      {...options}
+    />
+  );
 };
 
 export const createConsolePortMaterial = (color = '#facc15') => {

@@ -9,7 +9,7 @@ const cacheManager = (() => {
     return `${method}:${url}:${paramsStr}`;
   };
 
-  const isExpired = (key) => {
+  const isExpired = key => {
     const timestamp = cacheTimestamps.get(key);
     if (!timestamp) return true;
     const ttl = config.get(key)?.ttl || defaultTTL;
@@ -34,7 +34,7 @@ const cacheManager = (() => {
     return key;
   };
 
-  const invalidate = (url) => {
+  const invalidate = url => {
     const keysToDelete = [];
     cache.forEach((_, key) => {
       if (key.includes(url)) {
@@ -49,7 +49,7 @@ const cacheManager = (() => {
     return keysToDelete.length;
   };
 
-  const invalidatePattern = (pattern) => {
+  const invalidatePattern = pattern => {
     const regex = new RegExp(pattern);
     const keysToDelete = [];
     cache.forEach((_, key) => {
@@ -78,7 +78,7 @@ const cacheManager = (() => {
   const getStats = () => {
     return {
       size: cache.size,
-      keys: Array.from(cache.keys())
+      keys: Array.from(cache.keys()),
     };
   };
 
@@ -90,37 +90,29 @@ const cacheManager = (() => {
     clear,
     setTTL,
     getStats,
-    defaultTTL
+    defaultTTL,
   };
 })();
 
-const cacheInterceptor = (api) => {
+const cacheInterceptor = api => {
   const requestCache = new Set();
   const pendingRequests = new Map();
 
   api.interceptors.request.use(
-    (config) => {
+    config => {
       if (config.method?.toLowerCase() === 'get') {
-        const cacheKey = cacheManager.generateKey(
-          config.method,
-          config.url,
-          config.params
-        );
+        const cacheKey = cacheManager.generateKey(config.method, config.url, config.params);
 
         if (requestCache.has(cacheKey)) {
           config.adapter = () => {
-            const cachedData = cacheManager.get(
-              config.method,
-              config.url,
-              config.params
-            );
+            const cachedData = cacheManager.get(config.method, config.url, config.params);
             if (cachedData) {
               return Promise.resolve({
                 data: cachedData,
                 status: 200,
                 statusText: 'OK',
                 headers: {},
-                config
+                config,
               });
             }
             requestCache.delete(cacheKey);
@@ -130,11 +122,11 @@ const cacheInterceptor = (api) => {
       }
       return config;
     },
-    (error) => Promise.reject(error)
+    error => Promise.reject(error)
   );
 
   api.interceptors.response.use(
-    (response) => {
+    response => {
       if (response.config.method?.toLowerCase() === 'get') {
         const cacheKey = cacheManager.generateKey(
           response.config.method,
@@ -151,7 +143,7 @@ const cacheInterceptor = (api) => {
       }
       return response;
     },
-    (error) => {
+    error => {
       if (error.config) {
         const cacheKey = cacheManager.generateKey(
           error.config.method,
@@ -178,108 +170,113 @@ export const cachedAPI = {
     });
   },
 
-  post: (url, data) => api.post(url, data).then(data => {
-    cacheManager.invalidate(url);
-    return data;
-  }),
+  post: (url, data) =>
+    api.post(url, data).then(data => {
+      cacheManager.invalidate(url);
+      return data;
+    }),
 
-  put: (url, data) => api.put(url, data).then(data => {
-    cacheManager.invalidate(url);
-    return data;
-  }),
+  put: (url, data) =>
+    api.put(url, data).then(data => {
+      cacheManager.invalidate(url);
+      return data;
+    }),
 
-  delete: (url) => api.delete(url).then(data => {
-    cacheManager.invalidate(url);
-    return data;
-  }),
+  delete: url =>
+    api.delete(url).then(data => {
+      cacheManager.invalidate(url);
+      return data;
+    }),
 
-  invalidate: (url) => cacheManager.invalidate(url),
+  invalidate: url => cacheManager.invalidate(url),
 
-  invalidatePattern: (pattern) => cacheManager.invalidatePattern(pattern),
+  invalidatePattern: pattern => cacheManager.invalidatePattern(pattern),
 
   clearCache: () => cacheManager.clear(),
 
   setCacheTTL: (url, ttl) => cacheManager.setTTL(url, ttl),
 
-  getCacheStats: () => cacheManager.getStats()
+  getCacheStats: () => cacheManager.getStats(),
 };
 
 export const deviceAPI = {
-  list: (params) => cachedAPI.get('/devices', params),
-  get: (deviceId) => cachedAPI.get(`/devices/${deviceId}`),
-  create: (data) => cachedAPI.post('/devices', data),
+  list: params => cachedAPI.get('/devices', params),
+  get: deviceId => cachedAPI.get(`/devices/${deviceId}`),
+  create: data => cachedAPI.post('/devices', data),
   update: (deviceId, data) => cachedAPI.put(`/api/devices/${deviceId}`, data),
-  delete: (deviceId) => cachedAPI.delete(`/api/devices/${deviceId}`),
-  batchOffline: (data) => cachedAPI.post('/devices/batch-offline', data),
-  batchDelete: (data) => cachedAPI.delete('/devices/batch-delete', { data }),
-  export: (params) => api.get('/devices/export', { params, responseType: 'blob' }),
-  import: (formData) => api.post('/devices/import', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  })
+  delete: deviceId => cachedAPI.delete(`/api/devices/${deviceId}`),
+  batchOffline: data => cachedAPI.post('/devices/batch-offline', data),
+  batchDelete: data => cachedAPI.delete('/devices/batch-delete', { data }),
+  export: params => api.get('/devices/export', { params, responseType: 'blob' }),
+  import: formData =>
+    api.post('/devices/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 export const rackAPI = {
-  list: (params) => cachedAPI.get('/racks', params),
-  get: (rackId) => cachedAPI.get(`/racks/${rackId}`),
-  create: (data) => cachedAPI.post('/racks', data),
+  list: params => cachedAPI.get('/racks', params),
+  get: rackId => cachedAPI.get(`/racks/${rackId}`),
+  create: data => cachedAPI.post('/racks', data),
   update: (rackId, data) => cachedAPI.put(`/racks/${rackId}`, data),
-  delete: (rackId) => cachedAPI.delete(`/racks/${rackId}`),
-  import: (formData) => api.post('/racks/import', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  })
+  delete: rackId => cachedAPI.delete(`/racks/${rackId}`),
+  import: formData =>
+    api.post('/racks/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 export const roomAPI = {
-  list: (params) => cachedAPI.get('/rooms', params),
-  get: (roomId) => cachedAPI.get(`/rooms/${roomId}`),
-  create: (data) => cachedAPI.post('/rooms', data),
+  list: params => cachedAPI.get('/rooms', params),
+  get: roomId => cachedAPI.get(`/rooms/${roomId}`),
+  create: data => cachedAPI.post('/rooms', data),
   update: (roomId, data) => cachedAPI.put(`/rooms/${roomId}`, data),
-  delete: (roomId) => cachedAPI.delete(`/rooms/${roomId}`)
+  delete: roomId => cachedAPI.delete(`/rooms/${roomId}`),
 };
 
 export const deviceFieldAPI = {
   list: () => cachedAPI.get('/deviceFields'),
-  get: (fieldId) => cachedAPI.get(`/deviceFields/${fieldId}`),
-  create: (data) => cachedAPI.post('/deviceFields', data),
+  get: fieldId => cachedAPI.get(`/deviceFields/${fieldId}`),
+  create: data => cachedAPI.post('/deviceFields', data),
   update: (fieldId, data) => cachedAPI.put(`/deviceFields/${fieldId}`, data),
-  delete: (fieldId) => cachedAPI.delete(`/deviceFields/${fieldId}`),
-  updateConfig: (data) => cachedAPI.post('/deviceFields/config', data)
+  delete: fieldId => cachedAPI.delete(`/deviceFields/${fieldId}`),
+  updateConfig: data => cachedAPI.post('/deviceFields/config', data),
 };
 
 export const consumableAPI = {
-  list: (params) => cachedAPI.get('/consumables', params),
-  get: (consumableId) => cachedAPI.get(`/consumables/${consumableId}`),
-  create: (data) => cachedAPI.post('/consumables', data),
+  list: params => cachedAPI.get('/consumables', params),
+  get: consumableId => cachedAPI.get(`/consumables/${consumableId}`),
+  create: data => cachedAPI.post('/consumables', data),
   update: (consumableId, data) => cachedAPI.put(`/consumables/${consumableId}`, data),
-  delete: (consumableId) => cachedAPI.delete(`/consumables/${consumableId}`),
-  import: (data) => cachedAPI.post('/consumables/import', data),
-  quickInOut: (data) => cachedAPI.post('/consumables/quick-inout', data),
+  delete: consumableId => cachedAPI.delete(`/consumables/${consumableId}`),
+  import: data => cachedAPI.post('/consumables/import', data),
+  quickInOut: data => cachedAPI.post('/consumables/quick-inout', data),
   getStatistics: () => cachedAPI.get('/consumables/statistics/summary'),
-  getLowStock: () => cachedAPI.get('/consumables/low-stock')
+  getLowStock: () => cachedAPI.get('/consumables/low-stock'),
 };
 
 export const consumableCategoryAPI = {
-  list: (params) => cachedAPI.get('/consumable-categories', params),
-  getList: (params) => cachedAPI.get('/consumable-categories/list', params),
-  create: (data) => cachedAPI.post('/consumable-categories', data),
+  list: params => cachedAPI.get('/consumable-categories', params),
+  getList: params => cachedAPI.get('/consumable-categories/list', params),
+  create: data => cachedAPI.post('/consumable-categories', data),
   update: (id, data) => cachedAPI.put(`/consumable-categories/${id}`, data),
-  delete: (id) => cachedAPI.delete(`/consumable-categories/${id}`)
+  delete: id => cachedAPI.delete(`/consumable-categories/${id}`),
 };
 
 export const consumableLogAPI = {
-  list: (params) => cachedAPI.get('/consumables/logs', params),
-  create: (data) => cachedAPI.post('/consumables/logs', data),
-  export: (params) => api.get('/consumables/logs/export', { params, responseType: 'blob' }),
-  import: (data) => cachedAPI.post('/consumables/logs/import', data)
+  list: params => cachedAPI.get('/consumables/logs', params),
+  create: data => cachedAPI.post('/consumables/logs', data),
+  export: params => api.get('/consumables/logs/export', { params, responseType: 'blob' }),
+  import: data => cachedAPI.post('/consumables/logs/import', data),
 };
 
 export const ticketCategoryAPI = {
-  list: (params) => cachedAPI.get('/ticket-categories', params),
-  create: (data) => cachedAPI.post('/ticket-categories', data),
+  list: params => cachedAPI.get('/ticket-categories', params),
+  create: data => cachedAPI.post('/ticket-categories', data),
   update: (code, data) => cachedAPI.put(`/ticket-categories/${code}`, data),
-  delete: (code) => cachedAPI.delete(`/ticket-categories/${code}`),
+  delete: code => cachedAPI.delete(`/ticket-categories/${code}`),
   getTree: () => cachedAPI.get('/ticket-categories/tree'),
-  init: () => cachedAPI.post('/ticket-categories/init')
+  init: () => cachedAPI.post('/ticket-categories/init'),
 };
 
 export { cacheManager };

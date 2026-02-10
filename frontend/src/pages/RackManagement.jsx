@@ -1,16 +1,51 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  Table, Button, Modal, Form, Input, Select, message, Card, Space,
-  InputNumber, Progress, Drawer, Tag, Tooltip, Row, Col, Typography,
-  Empty, Badge, Checkbox, Dropdown, Statistic, Upload, Spin
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  Select,
+  message,
+  Card,
+  Space,
+  InputNumber,
+  Progress,
+  Drawer,
+  Tag,
+  Tooltip,
+  Row,
+  Col,
+  Typography,
+  Empty,
+  Badge,
+  Checkbox,
+  Dropdown,
+  Statistic,
+  Upload,
+  Spin,
 } from 'antd';
 import {
-  PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined,
-  DownloadOutlined, SearchOutlined, ReloadOutlined, EyeOutlined,
-  DatabaseOutlined, HomeOutlined, ThunderboltOutlined,
-  ExpandOutlined, CompressOutlined, MoreOutlined,
-  CheckCircleOutlined, WarningOutlined, SyncOutlined,
-  LineChartOutlined, FilterOutlined, DeleteFilled
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  UploadOutlined,
+  DownloadOutlined,
+  SearchOutlined,
+  ReloadOutlined,
+  EyeOutlined,
+  DatabaseOutlined,
+  HomeOutlined,
+  ThunderboltOutlined,
+  ExpandOutlined,
+  CompressOutlined,
+  MoreOutlined,
+  CheckCircleOutlined,
+  WarningOutlined,
+  SyncOutlined,
+  LineChartOutlined,
+  FilterOutlined,
+  DeleteFilled,
 } from '@ant-design/icons';
 import axios from 'axios';
 
@@ -22,49 +57,49 @@ const designTokens = {
     primary: {
       main: '#1890ff',
       gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      bgGradient: 'linear-gradient(135deg, #667eea15 0%, #764ba208 100%)'
+      bgGradient: 'linear-gradient(135deg, #667eea15 0%, #764ba208 100%)',
     },
     success: {
       main: '#52c41a',
-      gradient: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)'
+      gradient: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)',
     },
     warning: {
       main: '#faad14',
-      gradient: 'linear-gradient(135deg, #faad14 0%, #d48806 100%)'
+      gradient: 'linear-gradient(135deg, #faad14 0%, #d48806 100%)',
     },
     error: {
       main: '#ff4d4f',
-      gradient: 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)'
+      gradient: 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)',
     },
     purple: {
       main: '#722ed1',
-      gradient: 'linear-gradient(135deg, #722ed1 0%, #531dab 100%)'
+      gradient: 'linear-gradient(135deg, #722ed1 0%, #531dab 100%)',
     },
     text: {
       primary: '#262626',
       secondary: '#8c8c8c',
-      tertiary: '#bfbfbf'
-    }
+      tertiary: '#bfbfbf',
+    },
   },
   shadows: {
     small: '0 2px 8px rgba(0, 0, 0, 0.06)',
     medium: '0 4px 16px rgba(0, 0, 0, 0.08)',
-    large: '0 8px 24px rgba(0, 0, 0, 0.12)'
+    large: '0 8px 24px rgba(0, 0, 0, 0.12)',
   },
   borderRadius: {
     small: '8px',
     medium: '12px',
-    large: '16px'
+    large: '16px',
   },
   transitions: {
-    normal: '0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-  }
+    normal: '0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  },
 };
 
 const containerStyle = {
   minHeight: '100vh',
   background: 'linear-gradient(180deg, #f5f7fa 0%, #e8ecf1 100%)',
-  padding: '24px'
+  padding: '24px',
 };
 
 const headerStyle = {
@@ -73,7 +108,7 @@ const headerStyle = {
   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
   borderRadius: '20px',
   color: '#fff',
-  boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3)'
+  boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3)',
 };
 
 const statCardStyle = {
@@ -81,7 +116,7 @@ const statCardStyle = {
   borderRadius: designTokens.borderRadius.medium,
   padding: '16px',
   border: '1px solid rgba(255, 255, 255, 0.2)',
-  backdropFilter: 'blur(10px)'
+  backdropFilter: 'blur(10px)',
 };
 
 const cardStyle = {
@@ -89,13 +124,13 @@ const cardStyle = {
   border: 'none',
   boxShadow: designTokens.shadows.medium,
   background: '#fff',
-  overflow: 'hidden'
+  overflow: 'hidden',
 };
 
 const cardHeadStyle = {
   borderBottom: '1px solid #f0f0f0',
   padding: '16px 24px',
-  background: 'linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%)'
+  background: 'linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%)',
 };
 
 const primaryButtonStyle = {
@@ -104,25 +139,25 @@ const primaryButtonStyle = {
   background: designTokens.colors.primary.gradient,
   border: 'none',
   boxShadow: '0 4px 16px rgba(102, 126, 234, 0.35)',
-  fontWeight: '500'
+  fontWeight: '500',
 };
 
 const actionButtonStyle = {
   height: '36px',
   borderRadius: '8px',
-  border: '1px solid #e8e8e8'
+  border: '1px solid #e8e8e8',
 };
 
 const searchInputStyle = {
   borderRadius: '10px',
   height: '42px',
-  border: '1px solid #e8e8e8'
+  border: '1px solid #e8e8e8',
 };
 
 const statusConfig = {
   active: { text: '在用', color: 'success', icon: <CheckCircleOutlined /> },
   maintenance: { text: '维护中', color: 'warning', icon: <SyncOutlined spin /> },
-  inactive: { text: '停用', color: 'default', icon: <WarningOutlined /> }
+  inactive: { text: '停用', color: 'default', icon: <WarningOutlined /> },
 };
 
 const PowerGauge = ({ current, max }) => {
@@ -169,21 +204,32 @@ const RackCard = ({ rack, onEdit, onDelete, onView, selected, onSelect }) => {
         border: selected ? `2px solid ${designTokens.colors.primary.main}` : '1px solid #f0f0f0',
         boxShadow: designTokens.shadows.small,
         transition: `all ${designTokens.transitions.normal}`,
-        cursor: 'pointer'
+        cursor: 'pointer',
       }}
       onClick={() => onSelect(rack.rackId)}
       onDoubleClick={() => onView(rack)}
       styles={{ body: { padding: '20px' } }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: '16px',
+        }}
+      >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <DatabaseOutlined style={{ fontSize: '20px', color: designTokens.colors.purple.main }} />
+            <DatabaseOutlined
+              style={{ fontSize: '20px', color: designTokens.colors.purple.main }}
+            />
             <Text strong style={{ fontSize: '16px', color: designTokens.colors.text.primary }}>
               {rack.name}
             </Text>
           </div>
-          <Text type="secondary" style={{ fontSize: '13px' }}>{rack.rackId}</Text>
+          <Text type="secondary" style={{ fontSize: '13px' }}>
+            {rack.rackId}
+          </Text>
         </div>
         <Tag color={statusInfo.color} icon={statusInfo.icon} style={{ borderRadius: '20px' }}>
           {statusInfo.text}
@@ -197,16 +243,38 @@ const RackCard = ({ rack, onEdit, onDelete, onView, selected, onSelect }) => {
         </Text>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '12px',
+          marginBottom: '16px',
+        }}
+      >
         <div style={{ padding: '12px', background: '#fafafa', borderRadius: '8px' }}>
-          <Text type="secondary" style={{ fontSize: '11px' }}>高度/已用U位</Text>
-          <div style={{ fontSize: '14px', fontWeight: '600', color: designTokens.colors.text.primary }}>
+          <Text type="secondary" style={{ fontSize: '11px' }}>
+            高度/已用U位
+          </Text>
+          <div
+            style={{ fontSize: '14px', fontWeight: '600', color: designTokens.colors.text.primary }}
+          >
             {rack.height}U / {deviceCount}
           </div>
         </div>
         <div style={{ padding: '12px', background: '#fafafa', borderRadius: '8px' }}>
-          <Text type="secondary" style={{ fontSize: '11px' }}>功率使用</Text>
-          <div style={{ fontSize: '14px', fontWeight: '600', color: powerUsage >= 80 ? designTokens.colors.error.main : designTokens.colors.text.primary }}>
+          <Text type="secondary" style={{ fontSize: '11px' }}>
+            功率使用
+          </Text>
+          <div
+            style={{
+              fontSize: '14px',
+              fontWeight: '600',
+              color:
+                powerUsage >= 80
+                  ? designTokens.colors.error.main
+                  : designTokens.colors.text.primary,
+            }}
+          >
             {powerUsage.toFixed(1)}%
           </div>
         </div>
@@ -225,7 +293,10 @@ const RackCard = ({ rack, onEdit, onDelete, onView, selected, onSelect }) => {
             <Button
               type="text"
               icon={<EyeOutlined />}
-              onClick={(e) => { e.stopPropagation(); onView(rack); }}
+              onClick={e => {
+                e.stopPropagation();
+                onView(rack);
+              }}
               style={{ color: designTokens.colors.text.secondary }}
             />
           </Tooltip>
@@ -233,7 +304,10 @@ const RackCard = ({ rack, onEdit, onDelete, onView, selected, onSelect }) => {
             <Button
               type="text"
               icon={<EditOutlined />}
-              onClick={(e) => { e.stopPropagation(); onEdit(rack); }}
+              onClick={e => {
+                e.stopPropagation();
+                onEdit(rack);
+              }}
               style={{ color: designTokens.colors.primary.main }}
             />
           </Tooltip>
@@ -242,7 +316,10 @@ const RackCard = ({ rack, onEdit, onDelete, onView, selected, onSelect }) => {
               type="text"
               icon={<DeleteOutlined />}
               danger
-              onClick={(e) => { e.stopPropagation(); onDelete(rack.rackId); }}
+              onClick={e => {
+                e.stopPropagation();
+                onDelete(rack.rackId);
+              }}
             />
           </Tooltip>
         </Space>
@@ -271,7 +348,7 @@ function RackManagement() {
     total: 0,
     pageSizeOptions: ['10', '20', '30', '50', '100'],
     showSizeChanger: true,
-    showTotal: (total) => `共 ${total} 条记录`
+    showTotal: total => `共 ${total} 条记录`,
   });
   const [form] = Form.useForm();
   const [importProgress, setImportProgress] = useState(0);
@@ -279,28 +356,31 @@ function RackManagement() {
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
 
-  const fetchRacks = useCallback(async (page = 1, pageSize = 10) => {
-    try {
-      setLoading(true);
-      const response = await axios.get('/api/racks', {
-        params: {
-          page,
-          pageSize,
-          roomId: roomFilter,
-          status: statusFilter,
-          keyword: searchKeyword || undefined
-        }
-      });
-      const { racks: data, total } = response.data;
-      setRacks(data);
-      setPagination(prev => ({ ...prev, current: page, pageSize, total }));
-    } catch (error) {
-      message.error('获取机柜列表失败');
-      console.error('获取机柜列表失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [roomFilter, statusFilter, searchKeyword]);
+  const fetchRacks = useCallback(
+    async (page = 1, pageSize = 10) => {
+      try {
+        setLoading(true);
+        const response = await axios.get('/api/racks', {
+          params: {
+            page,
+            pageSize,
+            roomId: roomFilter,
+            status: statusFilter,
+            keyword: searchKeyword || undefined,
+          },
+        });
+        const { racks: data, total } = response.data;
+        setRacks(data);
+        setPagination(prev => ({ ...prev, current: page, pageSize, total }));
+      } catch (error) {
+        message.error('获取机柜列表失败');
+        console.error('获取机柜列表失败:', error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [roomFilter, statusFilter, searchKeyword]
+  );
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -323,9 +403,12 @@ function RackManagement() {
     fetchRacks(1, pagination.pageSize);
   }, [roomFilter, statusFilter, searchKeyword]);
 
-  const handleTableChange = useCallback((pagination) => {
-    fetchRacks(pagination.current, pagination.pageSize);
-  }, [fetchRacks]);
+  const handleTableChange = useCallback(
+    pagination => {
+      fetchRacks(pagination.current, pagination.pageSize);
+    },
+    [fetchRacks]
+  );
 
   const showModal = (rack = null) => {
     setEditingRack(rack);
@@ -342,7 +425,7 @@ function RackManagement() {
     setEditingRack(null);
   };
 
-  const handleSubmit = async (values) => {
+  const handleSubmit = async values => {
     try {
       if (editingRack) {
         await axios.put(`/api/racks/${editingRack.rackId}`, values);
@@ -360,7 +443,7 @@ function RackManagement() {
     }
   };
 
-  const handleDelete = async (rackId) => {
+  const handleDelete = async rackId => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个机柜吗？删除后无法恢复。',
@@ -376,7 +459,7 @@ function RackManagement() {
           message.error('机柜删除失败');
           console.error('机柜删除失败:', error);
         }
-      }
+      },
     });
   };
 
@@ -402,11 +485,11 @@ function RackManagement() {
           message.error('批量删除失败');
           console.error('批量删除失败:', error);
         }
-      }
+      },
     });
   };
 
-  const handleView = (rack) => {
+  const handleView = rack => {
     setViewingRack(rack);
     setDrawerVisible(true);
   };
@@ -420,19 +503,19 @@ function RackManagement() {
   const handleExport = useCallback(async () => {
     try {
       message.loading('正在导出租机柜数据...', 0);
-      
+
       const response = await axios.get('/api/racks/export', {
-        responseType: 'blob'
+        responseType: 'blob',
       });
-      
+
       // 创建下载链接
-      const blob = new Blob([response.data], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      
+
       // 从响应头获取文件名，或使用默认文件名
       const contentDisposition = response.headers['content-disposition'];
       let fileName = '机柜导出.xlsx';
@@ -442,13 +525,13 @@ function RackManagement() {
           fileName = decodeURIComponent(match[1].replace(/['"]/g, ''));
         }
       }
-      
+
       link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       message.destroy();
       message.success('机柜导出成功');
     } catch (error) {
@@ -458,52 +541,58 @@ function RackManagement() {
     }
   }, []);
 
-  const handleImport = useCallback(async (file) => {
-    try {
-      setIsImporting(true);
-      setImportProgress(0);
-      setImportPhase('正在上传文件...');
-      setImportResult(null);
+  const handleImport = useCallback(
+    async file => {
+      try {
+        setIsImporting(true);
+        setImportProgress(0);
+        setImportPhase('正在上传文件...');
+        setImportResult(null);
 
-      const formData = new FormData();
-      formData.append('file', file);
+        const formData = new FormData();
+        formData.append('file', file);
 
-      const response = await axios.post('/api/racks/import', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+        const response = await axios.post('/api/racks/import', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
 
-      setImportProgress(100);
-      setImportPhase('导入完成');
-      setImportResult(response.data);
-      setIsImporting(false);
+        setImportProgress(100);
+        setImportPhase('导入完成');
+        setImportResult(response.data);
+        setIsImporting(false);
 
-      if (response.data.success) {
-        message.success('机柜导入成功');
-      } else {
-        message.warning(response.data.message || '部分记录导入失败');
+        if (response.data.success) {
+          message.success('机柜导入成功');
+        } else {
+          message.warning(response.data.message || '部分记录导入失败');
+        }
+
+        fetchRacks();
+        return false;
+      } catch (error) {
+        setIsImporting(false);
+        setImportProgress(0);
+        message.error('机柜导入失败');
+        console.error('机柜导入失败:', error);
+        return false;
       }
-
-      fetchRacks();
-      return false;
-    } catch (error) {
-      setIsImporting(false);
-      setImportProgress(0);
-      message.error('机柜导入失败');
-      console.error('机柜导入失败:', error);
-      return false;
-    }
-  }, [fetchRacks]);
+    },
+    [fetchRacks]
+  );
 
   // 后端已过滤，直接使用 racks 数据
   const filteredRacks = racks;
 
-  const stats = useMemo(() => ({
-    total: racks.length,
-    active: racks.filter(r => r.status === 'active').length,
-    maintenance: racks.filter(r => r.status === 'maintenance').length,
-    totalPower: racks.reduce((sum, r) => sum + (r.currentPower || 0), 0),
-    totalDevices: racks.reduce((sum, r) => sum + (r.Devices?.length || 0), 0)
-  }), [racks]);
+  const stats = useMemo(
+    () => ({
+      total: racks.length,
+      active: racks.filter(r => r.status === 'active').length,
+      maintenance: racks.filter(r => r.status === 'maintenance').length,
+      totalPower: racks.reduce((sum, r) => sum + (r.currentPower || 0), 0),
+      totalDevices: racks.reduce((sum, r) => sum + (r.Devices?.length || 0), 0),
+    }),
+    [racks]
+  );
 
   const tableColumns = [
     {
@@ -511,16 +600,20 @@ function RackManagement() {
       key: 'rackInfo',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '44px',
-            height: '44px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #722ed115 0%, #722ed108 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <DatabaseOutlined style={{ fontSize: '22px', color: designTokens.colors.purple.main }} />
+          <div
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #722ed115 0%, #722ed108 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <DatabaseOutlined
+              style={{ fontSize: '22px', color: designTokens.colors.purple.main }}
+            />
           </div>
           <div>
             <div style={{ fontWeight: '600', color: designTokens.colors.text.primary }}>
@@ -531,7 +624,7 @@ function RackManagement() {
             </div>
           </div>
         </div>
-      )
+      ),
     },
     {
       title: '所属机房',
@@ -542,7 +635,7 @@ function RackManagement() {
           <HomeOutlined style={{ color: designTokens.colors.text.tertiary }} />
           <span>{name || '未分配'}</span>
         </div>
-      )
+      ),
     },
     {
       title: '高度/已用U位',
@@ -556,7 +649,9 @@ function RackManagement() {
             <Progress
               percent={percentage}
               size="small"
-              strokeColor={percentage >= 90 ? designTokens.colors.error.main : designTokens.colors.success.main}
+              strokeColor={
+                percentage >= 90 ? designTokens.colors.error.main : designTokens.colors.success.main
+              }
               trailColor="#f0f0f0"
               style={{ marginTop: '4px', marginBottom: 0 }}
             />
@@ -566,7 +661,7 @@ function RackManagement() {
           </div>
         );
       },
-      sorter: (a, b) => (a.Devices?.length || 0) - (b.Devices?.length || 0)
+      sorter: (a, b) => (a.Devices?.length || 0) - (b.Devices?.length || 0),
     },
     {
       title: '功率使用',
@@ -576,13 +671,13 @@ function RackManagement() {
           <PowerGauge current={record.currentPower} max={record.maxPower} />
         </div>
       ),
-      sorter: (a, b) => (a.currentPower || 0) - (b.currentPower || 0)
+      sorter: (a, b) => (a.currentPower || 0) - (b.currentPower || 0),
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => {
+      render: status => {
         const config = statusConfig[status];
         return (
           <Tag color={config.color} icon={config.icon} style={{ borderRadius: '20px' }}>
@@ -593,9 +688,9 @@ function RackManagement() {
       filters: [
         { text: '在用', value: 'active' },
         { text: '维护中', value: 'maintenance' },
-        { text: '停用', value: 'inactive' }
+        { text: '停用', value: 'inactive' },
       ],
-      onFilter: (value, record) => record.status === value
+      onFilter: (value, record) => record.status === value,
     },
     {
       title: '设备数',
@@ -603,14 +698,14 @@ function RackManagement() {
       render: (_, record) => (
         <Badge count={record.Devices?.length || 0} style={{ backgroundColor: '#52c41a' }} />
       ),
-      sorter: (a, b) => (a.Devices?.length || 0) - (b.Devices?.length || 0)
+      sorter: (a, b) => (a.Devices?.length || 0) - (b.Devices?.length || 0),
     },
     {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (date) => date ? new Date(date).toLocaleString() : '-',
-      sorter: (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
+      render: date => (date ? new Date(date).toLocaleString() : '-'),
+      sorter: (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0),
     },
     {
       title: '操作',
@@ -644,29 +739,44 @@ function RackManagement() {
             />
           </Tooltip>
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
   const rowSelection = {
     selectedRowKeys: selectedRackIds,
-    onChange: (selectedRowKeys) => {
+    onChange: selectedRowKeys => {
       setSelectedRackIds(selectedRowKeys);
-    }
+    },
   };
 
   return (
     <div style={containerStyle}>
       <div style={headerStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}
+        >
           <div>
-            <h1 style={{ fontSize: '24px', fontWeight: '700', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h1
+              style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                margin: '0 0 4px 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
               <DatabaseOutlined />
               机柜管理
             </h1>
-            <p style={{ margin: 0, opacity: 0.9, fontSize: '14px' }}>
-              管理和监控所有机柜设备
-            </p>
+            <p style={{ margin: 0, opacity: 0.9, fontSize: '14px' }}>管理和监控所有机柜设备</p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
             <div style={statCardStyle}>
@@ -675,7 +785,9 @@ function RackManagement() {
             </div>
             <div style={statCardStyle}>
               <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>在用机柜</Text>
-              <div style={{ fontSize: '24px', fontWeight: '700', color: '#52c41a' }}>{stats.active}</div>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: '#52c41a' }}>
+                {stats.active}
+              </div>
             </div>
             <div style={statCardStyle}>
               <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>设备总数</Text>
@@ -683,20 +795,31 @@ function RackManagement() {
             </div>
             <div style={statCardStyle}>
               <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>总功率</Text>
-              <div style={{ fontSize: '24px', fontWeight: '700' }}>{(stats.totalPower / 1000).toFixed(1)}kW</div>
+              <div style={{ fontSize: '24px', fontWeight: '700' }}>
+                {(stats.totalPower / 1000).toFixed(1)}kW
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <Card style={cardStyle} styles={{ header: cardHeadStyle, body: { padding: '20px 24px' } }}>
-        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div
+          style={{
+            marginBottom: '20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}
+        >
           <div style={{ display: 'flex', gap: '12px', flex: 1, maxWidth: '800px' }}>
             <Input
               placeholder="搜索机柜名称、ID..."
               prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
               value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
+              onChange={e => setSearchKeyword(e.target.value)}
               style={searchInputStyle}
               allowClear
             />
@@ -717,7 +840,9 @@ function RackManagement() {
             >
               <Option value="all">全部机房</Option>
               {rooms.map(room => (
-                <Option key={room.roomId} value={room.roomId}>{room.name}</Option>
+                <Option key={room.roomId} value={room.roomId}>
+                  {room.name}
+                </Option>
               ))}
             </Select>
           </div>
@@ -747,11 +872,7 @@ function RackManagement() {
             >
               导入
             </Button>
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={handleExport}
-              style={actionButtonStyle}
-            >
+            <Button icon={<DownloadOutlined />} onClick={handleExport} style={actionButtonStyle}>
               导出
             </Button>
             <Button
@@ -807,7 +928,7 @@ function RackManagement() {
                     onDelete={handleDelete}
                     onView={handleView}
                     selected={selectedRackIds.includes(rack.rackId)}
-                    onSelect={(id) => {
+                    onSelect={id => {
                       if (selectedRackIds.includes(id)) {
                         setSelectedRackIds(selectedRackIds.filter(rid => rid !== id));
                       } else {
@@ -829,12 +950,14 @@ function RackManagement() {
       <Modal
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '4px',
-              height: '20px',
-              background: designTokens.colors.primary.gradient,
-              borderRadius: '2px'
-            }} />
+            <div
+              style={{
+                width: '4px',
+                height: '20px',
+                background: designTokens.colors.primary.gradient,
+                borderRadius: '2px',
+              }}
+            />
             {editingRack ? '编辑机柜' : '添加机柜'}
           </div>
         }
@@ -845,17 +968,14 @@ function RackManagement() {
         destroyOnHidden
         styles={{
           body: { padding: '24px' },
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 50px 16px 24px' }
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 50px 16px 24px' },
         }}
         style={{ borderRadius: '16px' }}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item
-                name="rackId"
-                label="机柜ID（留空自动生成）"
-              >
+              <Form.Item name="rackId" label="机柜ID（留空自动生成）">
                 <Input placeholder="如：RACK001，留空则自动生成" style={{ borderRadius: '8px' }} />
               </Form.Item>
             </Col>
@@ -891,7 +1011,12 @@ function RackManagement() {
                 label="高度(U)"
                 rules={[{ required: true, message: '请输入机柜高度' }]}
               >
-                <InputNumber placeholder="请输入机柜高度" min={1} max={50} style={{ width: '100%', borderRadius: '8px' }} />
+                <InputNumber
+                  placeholder="请输入机柜高度"
+                  min={1}
+                  max={50}
+                  style={{ width: '100%', borderRadius: '8px' }}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -900,16 +1025,16 @@ function RackManagement() {
                 label="最大功率(W)"
                 rules={[{ required: true, message: '请输入最大功率' }]}
               >
-                <InputNumber placeholder="请输入最大功率" min={0} style={{ width: '100%', borderRadius: '8px' }} />
+                <InputNumber
+                  placeholder="请输入最大功率"
+                  min={0}
+                  style={{ width: '100%', borderRadius: '8px' }}
+                />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item
-            name="status"
-            label="状态"
-            rules={[{ required: true, message: '请选择状态' }]}
-          >
+          <Form.Item name="status" label="状态" rules={[{ required: true, message: '请选择状态' }]}>
             <Select placeholder="请选择状态" style={{ borderRadius: '8px' }}>
               <Option value="active">在用</Option>
               <Option value="maintenance">维护中</Option>
@@ -917,7 +1042,9 @@ function RackManagement() {
             </Select>
           </Form.Item>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+          <div
+            style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}
+          >
             <Button onClick={handleCancel} style={{ borderRadius: '8px', height: '42px' }}>
               取消
             </Button>
@@ -931,7 +1058,9 @@ function RackManagement() {
       <Drawer
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <DatabaseOutlined style={{ fontSize: '20px', color: designTokens.colors.purple.main }} />
+            <DatabaseOutlined
+              style={{ fontSize: '20px', color: designTokens.colors.purple.main }}
+            />
             机柜详情 - {viewingRack?.name}
           </div>
         }
@@ -940,21 +1069,33 @@ function RackManagement() {
         width={520}
         styles={{
           header: { borderBottom: '1px solid #f0f0f0' },
-          body: { padding: '24px' }
+          body: { padding: '24px' },
         }}
       >
         {viewingRack && (
           <div>
-            <div style={{
-              padding: '20px',
-              background: 'linear-gradient(135deg, #722ed115 0%, #722ed108 100%)',
-              borderRadius: designTokens.borderRadius.medium,
-              marginBottom: '20px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <DatabaseOutlined style={{ fontSize: '32px', color: designTokens.colors.purple.main }} />
+            <div
+              style={{
+                padding: '20px',
+                background: 'linear-gradient(135deg, #722ed115 0%, #722ed108 100%)',
+                borderRadius: designTokens.borderRadius.medium,
+                marginBottom: '20px',
+              }}
+            >
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}
+              >
+                <DatabaseOutlined
+                  style={{ fontSize: '32px', color: designTokens.colors.purple.main }}
+                />
                 <div>
-                  <div style={{ fontSize: '18px', fontWeight: '600', color: designTokens.colors.text.primary }}>
+                  <div
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: '600',
+                      color: designTokens.colors.text.primary,
+                    }}
+                  >
                     {viewingRack.name}
                   </div>
                   <div style={{ fontSize: '13px', color: designTokens.colors.text.secondary }}>
@@ -970,7 +1111,9 @@ function RackManagement() {
             <Row gutter={16} style={{ marginBottom: '20px' }}>
               <Col span={12}>
                 <div style={{ padding: '16px', background: '#fafafa', borderRadius: '10px' }}>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>所属机房</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    所属机房
+                  </Text>
                   <div style={{ fontSize: '15px', fontWeight: '500', marginTop: '4px' }}>
                     {viewingRack.Room?.name || '未分配'}
                   </div>
@@ -978,8 +1121,16 @@ function RackManagement() {
               </Col>
               <Col span={12}>
                 <div style={{ padding: '16px', background: '#fafafa', borderRadius: '10px' }}>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>设备数量</Text>
-                  <div style={{ fontSize: '20px', fontWeight: '600', color: designTokens.colors.primary.main }}>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    设备数量
+                  </Text>
+                  <div
+                    style={{
+                      fontSize: '20px',
+                      fontWeight: '600',
+                      color: designTokens.colors.primary.main,
+                    }}
+                  >
                     {viewingRack.Devices?.length || 0}
                   </div>
                 </div>
@@ -989,16 +1140,32 @@ function RackManagement() {
             <Row gutter={16} style={{ marginBottom: '20px' }}>
               <Col span={12}>
                 <div style={{ padding: '16px', background: '#fafafa', borderRadius: '10px' }}>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>机柜高度</Text>
-                  <div style={{ fontSize: '20px', fontWeight: '600', color: designTokens.colors.text.primary }}>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    机柜高度
+                  </Text>
+                  <div
+                    style={{
+                      fontSize: '20px',
+                      fontWeight: '600',
+                      color: designTokens.colors.text.primary,
+                    }}
+                  >
                     {viewingRack.height}U
                   </div>
                 </div>
               </Col>
               <Col span={12}>
                 <div style={{ padding: '16px', background: '#fafafa', borderRadius: '10px' }}>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>可用U位</Text>
-                  <div style={{ fontSize: '20px', fontWeight: '600', color: designTokens.colors.success.main }}>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    可用U位
+                  </Text>
+                  <div
+                    style={{
+                      fontSize: '20px',
+                      fontWeight: '600',
+                      color: designTokens.colors.success.main,
+                    }}
+                  >
                     {viewingRack.height - (viewingRack.Devices?.length || 0)}U
                   </div>
                 </div>
@@ -1006,7 +1173,9 @@ function RackManagement() {
             </Row>
 
             <div style={{ marginBottom: '20px' }}>
-              <Text type="secondary" style={{ fontSize: '13px' }}>功率使用情况</Text>
+              <Text type="secondary" style={{ fontSize: '13px' }}>
+                功率使用情况
+              </Text>
               <div style={{ marginTop: '12px' }}>
                 <PowerGauge current={viewingRack.currentPower} max={viewingRack.maxPower} />
               </div>
@@ -1043,12 +1212,14 @@ function RackManagement() {
       <Modal
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '4px',
-              height: '20px',
-              background: designTokens.colors.primary.gradient,
-              borderRadius: '2px'
-            }} />
+            <div
+              style={{
+                width: '4px',
+                height: '20px',
+                background: designTokens.colors.primary.gradient,
+                borderRadius: '2px',
+              }}
+            />
             导入机柜
           </div>
         }
@@ -1065,52 +1236,56 @@ function RackManagement() {
         destroyOnHidden
         styles={{
           body: { padding: '24px' },
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
         }}
         style={{ borderRadius: '16px' }}
       >
         {!isImporting && !importResult ? (
           <div>
-            <div style={{
-              padding: '16px',
-              background: designTokens.colors.primary.bgGradient,
-              borderRadius: '12px',
-              marginBottom: '20px',
-              border: '1px solid #e8e8e8'
-            }}>
+            <div
+              style={{
+                padding: '16px',
+                background: designTokens.colors.primary.bgGradient,
+                borderRadius: '12px',
+                marginBottom: '20px',
+                border: '1px solid #e8e8e8',
+              }}
+            >
               <p style={{ margin: '0 0 12px 0', fontWeight: '600', color: '#262626' }}>
                 请上传XLSX格式的机柜数据文件
               </p>
-              <p style={{ margin: 0, color: '#8c8c8c', fontSize: '12px' }}>
-                支持的编码格式：UTF-8
-              </p>
+              <p style={{ margin: 0, color: '#8c8c8c', fontSize: '12px' }}>支持的编码格式：UTF-8</p>
             </div>
 
             <div style={{ marginBottom: '24px' }}>
               <p style={{ fontWeight: '600', marginBottom: '12px', color: '#262626' }}>
                 Excel文件格式要求：
               </p>
-              <ul style={{
-                paddingLeft: '20px',
-                marginBottom: '10px',
-                color: '#595959',
-                lineHeight: '1.8'
-              }}>
+              <ul
+                style={{
+                  paddingLeft: '20px',
+                  marginBottom: '10px',
+                  color: '#595959',
+                  lineHeight: '1.8',
+                }}
+              >
                 <li>必填字段：机柜ID、机柜名称、所属机房名称、高度(U)、最大功率(W)、状态</li>
                 <li>状态值：active(在用)、maintenance(维护中)、inactive(停用)</li>
                 <li>高度和功率必须是数字格式</li>
               </ul>
             </div>
 
-            <div style={{
-              padding: '16px',
-              background: '#f6f6f6',
-              borderRadius: '8px',
-              marginBottom: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
+            <div
+              style={{
+                padding: '16px',
+                background: '#f6f6f6',
+                borderRadius: '8px',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
               <Button
                 icon={<DownloadOutlined />}
                 onClick={handleDownloadTemplate}
@@ -1118,9 +1293,7 @@ function RackManagement() {
               >
                 下载导入模板
               </Button>
-              <span style={{ color: '#8c8c8c', fontSize: '12px' }}>
-                包含示例数据的XLSX模板文件
-              </span>
+              <span style={{ color: '#8c8c8c', fontSize: '12px' }}>包含示例数据的XLSX模板文件</span>
             </div>
 
             <Upload
@@ -1137,7 +1310,7 @@ function RackManagement() {
                 style={{
                   ...primaryButtonStyle,
                   height: '48px',
-                  fontSize: '16px'
+                  fontSize: '16px',
                 }}
               >
                 选择Excel文件
@@ -1147,23 +1320,36 @@ function RackManagement() {
         ) : isImporting ? (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                background: designTokens.colors.primary.gradient,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: '16px',
-                color: '#fff',
-                fontSize: '20px'
-              }}>
+              <div
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  background: designTokens.colors.primary.gradient,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: '16px',
+                  color: '#fff',
+                  fontSize: '20px',
+                }}
+              >
                 <UploadOutlined spin />
               </div>
               <div>
-                <p style={{ margin: '0 0 4px 0', fontWeight: '600', color: '#333', fontSize: '16px' }}>正在导入机柜数据</p>
-                <p style={{ margin: 0, color: designTokens.colors.primary.main, fontSize: '14px' }}>{importPhase}</p>
+                <p
+                  style={{
+                    margin: '0 0 4px 0',
+                    fontWeight: '600',
+                    color: '#333',
+                    fontSize: '16px',
+                  }}
+                >
+                  正在导入机柜数据
+                </p>
+                <p style={{ margin: 0, color: designTokens.colors.primary.main, fontSize: '14px' }}>
+                  {importPhase}
+                </p>
               </div>
             </div>
             <Progress
@@ -1171,68 +1357,73 @@ function RackManagement() {
               status="active"
               strokeColor={{
                 '0%': '#667eea',
-                '100%': '#764ba2'
+                '100%': '#764ba2',
               }}
               format={() => `${importProgress}%`}
             />
           </div>
-        ) : importResult && (
-          <div>
-            <div style={{
-              padding: '20px',
-              background: '#f6f6f6',
-              borderRadius: '12px',
-              marginBottom: '20px'
-            }}>
-              <p style={{ marginBottom: '12px', fontWeight: '600' }}>
-                导入结果：
-              </p>
-              <p style={{ margin: '8px 0', color: '#52c41a' }}>
-                ✓ 总记录数：{importResult.total || 0}
-              </p>
-              <p style={{ margin: '8px 0', color: '#52c41a' }}>
-                ✓ 成功导入：{importResult.successCount || 0}
-              </p>
-              {importResult.failedCount > 0 && (
-                <p style={{ margin: '8px 0', color: '#ff4d4f' }}>
-                  ✗ 导入失败：{importResult.failedCount}
+        ) : (
+          importResult && (
+            <div>
+              <div
+                style={{
+                  padding: '20px',
+                  background: '#f6f6f6',
+                  borderRadius: '12px',
+                  marginBottom: '20px',
+                }}
+              >
+                <p style={{ marginBottom: '12px', fontWeight: '600' }}>导入结果：</p>
+                <p style={{ margin: '8px 0', color: '#52c41a' }}>
+                  ✓ 总记录数：{importResult.total || 0}
                 </p>
-              )}
-            </div>
-            {importResult.errors && importResult.errors.length > 0 && (
-              <div style={{ marginBottom: '20px' }}>
-                <p style={{ fontWeight: '600', marginBottom: '8px' }}>错误详情：</p>
-                {importResult.errors.slice(0, 5).map((err, idx) => (
-                  <div key={idx} style={{
-                    padding: '8px 12px',
-                    background: '#fff2f0',
-                    borderRadius: '6px',
-                    marginBottom: '8px',
-                    fontSize: '13px',
-                    color: '#cf1322'
-                  }}>
-                    第{err.row || idx + 1}行：{err.error}
-                  </div>
-                ))}
-                {importResult.errors.length > 5 && (
-                  <p style={{ color: '#8c8c8c', fontSize: '12px' }}>
-                    还有 {importResult.errors.length - 5} 处错误...
+                <p style={{ margin: '8px 0', color: '#52c41a' }}>
+                  ✓ 成功导入：{importResult.successCount || 0}
+                </p>
+                {importResult.failedCount > 0 && (
+                  <p style={{ margin: '8px 0', color: '#ff4d4f' }}>
+                    ✗ 导入失败：{importResult.failedCount}
                   </p>
                 )}
               </div>
-            )}
-            <Button
-              type="primary"
-              onClick={() => {
-                setImportModalVisible(false);
-                setImportResult(null);
-                fetchRacks();
-              }}
-              style={primaryButtonStyle}
-            >
-              完成
-            </Button>
-          </div>
+              {importResult.errors && importResult.errors.length > 0 && (
+                <div style={{ marginBottom: '20px' }}>
+                  <p style={{ fontWeight: '600', marginBottom: '8px' }}>错误详情：</p>
+                  {importResult.errors.slice(0, 5).map((err, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: '8px 12px',
+                        background: '#fff2f0',
+                        borderRadius: '6px',
+                        marginBottom: '8px',
+                        fontSize: '13px',
+                        color: '#cf1322',
+                      }}
+                    >
+                      第{err.row || idx + 1}行：{err.error}
+                    </div>
+                  ))}
+                  {importResult.errors.length > 5 && (
+                    <p style={{ color: '#8c8c8c', fontSize: '12px' }}>
+                      还有 {importResult.errors.length - 5} 处错误...
+                    </p>
+                  )}
+                </div>
+              )}
+              <Button
+                type="primary"
+                onClick={() => {
+                  setImportModalVisible(false);
+                  setImportResult(null);
+                  fetchRacks();
+                }}
+                style={primaryButtonStyle}
+              >
+                完成
+              </Button>
+            </div>
+          )
         )}
       </Modal>
     </div>

@@ -1,6 +1,43 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Table, Button, Modal, Form, Input, Select, DatePicker, message, Card, Space, InputNumber, Switch, Upload, Progress, Checkbox, Spin, Dropdown, Tooltip } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, UploadOutlined, DownloadOutlined, SettingOutlined, UndoOutlined, CloudServerOutlined, SafetyOutlined, DatabaseOutlined, AppstoreOutlined, MoreOutlined, ReloadOutlined, ExportOutlined, FileExcelOutlined, SwapOutlined } from '@ant-design/icons';
+import {
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  Select,
+  DatePicker,
+  message,
+  Card,
+  Space,
+  InputNumber,
+  Switch,
+  Upload,
+  Progress,
+  Checkbox,
+  Spin,
+  Dropdown,
+  Tooltip,
+} from 'antd';
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  SearchOutlined,
+  UploadOutlined,
+  DownloadOutlined,
+  SettingOutlined,
+  UndoOutlined,
+  CloudServerOutlined,
+  SafetyOutlined,
+  DatabaseOutlined,
+  AppstoreOutlined,
+  MoreOutlined,
+  ReloadOutlined,
+  ExportOutlined,
+  FileExcelOutlined,
+  SwapOutlined,
+} from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { designTokens } from '../config/theme';
@@ -18,7 +55,7 @@ import {
   DEVICE_TYPE_OPTIONS,
   DEVICE_STATUS_OPTIONS,
   COLUMN_WIDTH_CONFIG,
-  EMPTY_STATE_CONFIG
+  EMPTY_STATE_CONFIG,
 } from '../constants/deviceManagementConstants';
 import {
   pageContainerStyle,
@@ -50,7 +87,7 @@ import {
   importModalStyles,
   detailModalStyles,
   exportModalStyles,
-  generateGlobalStyles
+  generateGlobalStyles,
 } from '../styles/deviceManagementStyles';
 
 const { Option } = Select;
@@ -59,49 +96,49 @@ const { RangePicker } = DatePicker;
 // 防抖 Hook
 function useDebounce(value, delay = DEBOUNCE_DELAY) {
   const [debouncedValue, setDebouncedValue] = useState(value);
-  
+
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);
-    
+
     return () => {
       clearTimeout(handler);
     };
   }, [value, delay]);
-  
+
   return debouncedValue;
 }
 
 // 工具函数提取到组件外部，避免每次渲染重复创建
-const getStatusConfig = (status) => {
+const getStatusConfig = status => {
   const statusMap = {
     running: { text: '运行中', color: 'green' },
     maintenance: { text: '维护中', color: 'orange' },
     offline: { text: '离线', color: 'gray' },
-    fault: { text: '故障', color: 'red' }
+    fault: { text: '故障', color: 'red' },
   };
   return statusMap[status] || { text: status, color: 'black' };
 };
 
-const getTypeLabel = (type) => {
+const getTypeLabel = type => {
   const typeMap = {
     server: '服务器',
     switch: '交换机',
     router: '路由器',
     storage: '存储设备',
-    other: '其他设备'
+    other: '其他设备',
   };
   return typeMap[type] || type;
 };
 
-const getDeviceTypeIcon = (type) => {
+const getDeviceTypeIcon = type => {
   const iconMap = {
     server: <CloudServerOutlined style={{ color: '#1890ff' }} />,
     switch: <SwapOutlined style={{ color: '#52c41a' }} />,
     router: <SafetyOutlined style={{ color: '#faad14' }} />,
     storage: <DatabaseOutlined style={{ color: '#722ed1' }} />,
-    other: <AppstoreOutlined style={{ color: '#8c8c8c' }} />
+    other: <AppstoreOutlined style={{ color: '#8c8c8c' }} />,
   };
   return iconMap[type] || <AppstoreOutlined style={{ color: '#8c8c8c' }} />;
 };
@@ -109,89 +146,95 @@ const getDeviceTypeIcon = (type) => {
 // 格式化日期
 const formatDate = (date, fieldName) => {
   if (!date) return '';
-  
+
   const dateObj = new Date(date);
   const formattedDate = dateObj.toLocaleDateString('zh-CN');
-  
+
   if (fieldName === 'warrantyExpiry') {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     dateObj.setHours(0, 0, 0, 0);
-    
+
     if (dateObj < today) {
       return <span style={{ color: '#d93025', fontWeight: 'bold' }}>{formattedDate}</span>;
     }
   }
-  
+
   return formattedDate;
 };
 
 // 使用从常量文件导入的默认设备字段配置
 const defaultDeviceFields = DEFAULT_DEVICE_FIELDS;
-  
-  // 简单的可调整列宽的表头组件
-  const ResizableTitle = (props) => {
-    const { children, onResize, width, ...restProps } = props;
-    
-    const handleMouseDown = (e) => {
-      if (!onResize) return;
-      
-      e.preventDefault();
-      e.stopPropagation();
-      
-      const th = e.currentTarget.closest('th');
-      if (!th) return;
-      
-      const startWidth = th.offsetWidth;
-      const startX = e.clientX;
-      
-      const handleMouseMove = (moveEvent) => {
-        const diff = moveEvent.clientX - startX;
-        const newWidth = Math.max(50, startWidth + diff);
-        onResize(newWidth);
-      };
-      
-      const handleMouseUp = () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-      
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+
+// 简单的可调整列宽的表头组件
+const ResizableTitle = props => {
+  const { children, onResize, width, ...restProps } = props;
+
+  const handleMouseDown = e => {
+    if (!onResize) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const th = e.currentTarget.closest('th');
+    if (!th) return;
+
+    const startWidth = th.offsetWidth;
+    const startX = e.clientX;
+
+    const handleMouseMove = moveEvent => {
+      const diff = moveEvent.clientX - startX;
+      const newWidth = Math.max(50, startWidth + diff);
+      onResize(newWidth);
     };
-    
-    return (
-      <th {...restProps} style={{ position: 'relative' }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  return (
+    <th {...restProps} style={{ position: 'relative' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          width: '100%'
-        }}>
-          <span style={{ 
+          width: '100%',
+        }}
+      >
+        <span
+          style={{
             flex: 1,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }}>{children}</span>
-          {onResize && (
-            <div
-              onMouseDown={handleMouseDown}
-              style={{
-                width: '8px',
-                height: '20px',
-                backgroundColor: '#e0e0e0',
-                borderRadius: '4px',
-                cursor: 'col-resize',
-                marginLeft: '8px',
-                flexShrink: 0
-              }}
-            />
-          )}
-        </div>
-      </th>
-    );
-  };
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {children}
+        </span>
+        {onResize && (
+          <div
+            onMouseDown={handleMouseDown}
+            style={{
+              width: '8px',
+              height: '20px',
+              backgroundColor: '#e0e0e0',
+              borderRadius: '4px',
+              cursor: 'col-resize',
+              marginLeft: '8px',
+              flexShrink: 0,
+            }}
+          />
+        )}
+      </div>
+    </th>
+  );
+};
 
 function DeviceManagement() {
   const [devices, setDevices] = useState([]);
@@ -208,15 +251,15 @@ function DeviceManagement() {
   const [type, setType] = useState('all');
   const [searchForm] = Form.useForm();
   // 分页状态 - 使用常量配置
-  const [pagination, setPagination] = useState({ 
-    current: 1, 
-    pageSize: PAGINATION_CONFIG.defaultPageSize, 
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: PAGINATION_CONFIG.defaultPageSize,
     total: 0,
     pageSizeOptions: PAGINATION_CONFIG.pageSizeOptions,
     showSizeChanger: PAGINATION_CONFIG.showSizeChanger,
-    showTotal: PAGINATION_CONFIG.showTotal
+    showTotal: PAGINATION_CONFIG.showTotal,
   });
-  
+
   // 设备字段配置
   const [deviceFields, setDeviceFields] = useState([]);
   const [loadingFields, setLoadingFields] = useState(true);
@@ -236,12 +279,12 @@ function DeviceManagement() {
 
   // 字段配置模态框
   const [fieldConfigModalVisible, setFieldConfigModalVisible] = useState(false);
-  
+
   // 批量状态变更模态框
   const [batchStatusModalVisible, setBatchStatusModalVisible] = useState(false);
   const [batchStatusLoading, setBatchStatusLoading] = useState(false);
   const [batchStatusForm] = Form.useForm();
-  
+
   // 导出选项模态框
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exportFormat, setExportFormat] = useState('csv');
@@ -249,10 +292,10 @@ function DeviceManagement() {
   const [exportFields, setExportFields] = useState([]);
   const [exportLoading, setExportLoading] = useState(false);
   const [currentPageDevices, setCurrentPageDevices] = useState([]);
-  
+
   // 全选状态
   const [selectAll, setSelectAll] = useState(false);
-  
+
   // 列宽状态
   const [columnWidths, setColumnWidths] = useState({});
 
@@ -265,42 +308,45 @@ function DeviceManagement() {
   }, [allDevices]);
 
   // 获取所有设备（支持搜索、筛选和分页）
-  const fetchDevices = useCallback(async (page = 1, pageSize = 10, forceRefresh = false) => {
-    try {
-      setLoading(true);
-      
-      // 使用后端分页加载
-      const params = {
-        page,
-        pageSize,
-        keyword: debouncedKeyword || undefined,
-        status: status !== 'all' ? status : undefined,
-        type: type !== 'all' ? type : undefined
-      };
-      
-      const response = await axios.get('/api/devices', { params });
-      const { devices, total } = response.data;
-      
-      // 处理设备数据，展开自定义字段
-      const processedDevices = devices.map(device => {
-        const deviceWithFields = { ...device };
-        if (device.customFields && typeof device.customFields === 'object') {
-          Object.entries(device.customFields).forEach(([fieldName, value]) => {
-            deviceWithFields[fieldName] = value;
-          });
-        }
-        return deviceWithFields;
-      });
-      
-      setAllDevices(processedDevices);
-      setPagination(prev => ({ ...prev, current: page, pageSize, total }));
-    } catch (error) {
-      message.error('获取设备列表失败');
-      console.error('获取设备列表失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [debouncedKeyword, status, type]);
+  const fetchDevices = useCallback(
+    async (page = 1, pageSize = 10, forceRefresh = false) => {
+      try {
+        setLoading(true);
+
+        // 使用后端分页加载
+        const params = {
+          page,
+          pageSize,
+          keyword: debouncedKeyword || undefined,
+          status: status !== 'all' ? status : undefined,
+          type: type !== 'all' ? type : undefined,
+        };
+
+        const response = await axios.get('/api/devices', { params });
+        const { devices, total } = response.data;
+
+        // 处理设备数据，展开自定义字段
+        const processedDevices = devices.map(device => {
+          const deviceWithFields = { ...device };
+          if (device.customFields && typeof device.customFields === 'object') {
+            Object.entries(device.customFields).forEach(([fieldName, value]) => {
+              deviceWithFields[fieldName] = value;
+            });
+          }
+          return deviceWithFields;
+        });
+
+        setAllDevices(processedDevices);
+        setPagination(prev => ({ ...prev, current: page, pageSize, total }));
+      } catch (error) {
+        message.error('获取设备列表失败');
+        console.error('获取设备列表失败:', error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [debouncedKeyword, status, type]
+  );
 
   // 获取设备字段配置
   const fetchDeviceFields = async () => {
@@ -322,24 +368,132 @@ function DeviceManagement() {
 
   // 默认设备字段配置
   const defaultDeviceFields = [
-    { fieldName: 'deviceId', displayName: '设备ID', fieldType: 'string', required: true, order: 1, visible: true },
-    { fieldName: 'name', displayName: '设备名称', fieldType: 'string', required: true, order: 2, visible: true },
-    { fieldName: 'type', displayName: '设备类型', fieldType: 'select', required: true, order: 3, visible: true, 
-      options: [{ value: 'server', label: '服务器' }, { value: 'switch', label: '交换机' }, { value: 'router', label: '路由器' }, { value: 'storage', label: '存储设备' }, { value: 'other', label: '其他设备' }] },
-    { fieldName: 'model', displayName: '型号', fieldType: 'string', required: true, order: 4, visible: true },
-    { fieldName: 'serialNumber', displayName: '序列号', fieldType: 'string', required: true, order: 5, visible: true },
-    { fieldName: 'rackId', displayName: '所在机柜', fieldType: 'select', required: true, order: 6, visible: true },
-    { fieldName: 'position', displayName: '位置(U)', fieldType: 'number', required: true, order: 7, visible: true },
-    { fieldName: 'height', displayName: '高度(U)', fieldType: 'number', required: true, order: 8, visible: true },
-    { fieldName: 'powerConsumption', displayName: '功率(W)', fieldType: 'number', required: true, order: 9, visible: true },
-    { fieldName: 'status', displayName: '状态', fieldType: 'select', required: true, order: 10, visible: true, 
-      options: [{ value: 'running', label: '运行中' }, { value: 'maintenance', label: '维护中' }, { value: 'offline', label: '离线' }, { value: 'fault', label: '故障' }] },
-    { fieldName: 'purchaseDate', displayName: '购买日期', fieldType: 'date', required: true, order: 11, visible: true },
-    { fieldName: 'warrantyExpiry', displayName: '保修到期', fieldType: 'date', required: true, order: 12, visible: true },
-    { fieldName: 'ipAddress', displayName: 'IP地址', fieldType: 'string', required: false, order: 13, visible: true },
-    { fieldName: 'description', displayName: '描述', fieldType: 'textarea', required: false, order: 14, visible: true }
+    {
+      fieldName: 'deviceId',
+      displayName: '设备ID',
+      fieldType: 'string',
+      required: true,
+      order: 1,
+      visible: true,
+    },
+    {
+      fieldName: 'name',
+      displayName: '设备名称',
+      fieldType: 'string',
+      required: true,
+      order: 2,
+      visible: true,
+    },
+    {
+      fieldName: 'type',
+      displayName: '设备类型',
+      fieldType: 'select',
+      required: true,
+      order: 3,
+      visible: true,
+      options: [
+        { value: 'server', label: '服务器' },
+        { value: 'switch', label: '交换机' },
+        { value: 'router', label: '路由器' },
+        { value: 'storage', label: '存储设备' },
+        { value: 'other', label: '其他设备' },
+      ],
+    },
+    {
+      fieldName: 'model',
+      displayName: '型号',
+      fieldType: 'string',
+      required: true,
+      order: 4,
+      visible: true,
+    },
+    {
+      fieldName: 'serialNumber',
+      displayName: '序列号',
+      fieldType: 'string',
+      required: true,
+      order: 5,
+      visible: true,
+    },
+    {
+      fieldName: 'rackId',
+      displayName: '所在机柜',
+      fieldType: 'select',
+      required: true,
+      order: 6,
+      visible: true,
+    },
+    {
+      fieldName: 'position',
+      displayName: '位置(U)',
+      fieldType: 'number',
+      required: true,
+      order: 7,
+      visible: true,
+    },
+    {
+      fieldName: 'height',
+      displayName: '高度(U)',
+      fieldType: 'number',
+      required: true,
+      order: 8,
+      visible: true,
+    },
+    {
+      fieldName: 'powerConsumption',
+      displayName: '功率(W)',
+      fieldType: 'number',
+      required: true,
+      order: 9,
+      visible: true,
+    },
+    {
+      fieldName: 'status',
+      displayName: '状态',
+      fieldType: 'select',
+      required: true,
+      order: 10,
+      visible: true,
+      options: [
+        { value: 'running', label: '运行中' },
+        { value: 'maintenance', label: '维护中' },
+        { value: 'offline', label: '离线' },
+        { value: 'fault', label: '故障' },
+      ],
+    },
+    {
+      fieldName: 'purchaseDate',
+      displayName: '购买日期',
+      fieldType: 'date',
+      required: true,
+      order: 11,
+      visible: true,
+    },
+    {
+      fieldName: 'warrantyExpiry',
+      displayName: '保修到期',
+      fieldType: 'date',
+      required: true,
+      order: 12,
+      visible: true,
+    },
+    {
+      fieldName: 'ipAddress',
+      displayName: 'IP地址',
+      fieldType: 'string',
+      required: false,
+      order: 13,
+      visible: true,
+    },
+    {
+      fieldName: 'description',
+      displayName: '描述',
+      fieldType: 'textarea',
+      required: false,
+      order: 14,
+      visible: true,
+    },
   ];
-
 
   // 获取所有机柜
   const fetchRacks = async () => {
@@ -379,46 +533,59 @@ function DeviceManagement() {
       const deviceData = { ...device };
       if (deviceData.purchaseDate) deviceData.purchaseDate = dayjs(deviceData.purchaseDate);
       if (deviceData.warrantyExpiry) deviceData.warrantyExpiry = dayjs(deviceData.warrantyExpiry);
-      
+
       // 定义设备模型的固定字段
       const fixedFields = [
-        'deviceId', 'name', 'type', 'model', 'serialNumber', 'rackId',
-        'position', 'height', 'powerConsumption', 'status', 'purchaseDate',
-        'warrantyExpiry', 'ipAddress', 'description'
+        'deviceId',
+        'name',
+        'type',
+        'model',
+        'serialNumber',
+        'rackId',
+        'position',
+        'height',
+        'powerConsumption',
+        'status',
+        'purchaseDate',
+        'warrantyExpiry',
+        'ipAddress',
+        'description',
       ];
-      
+
       // 定义需要排除的系统字段
       const systemFields = ['createdAt', 'updatedAt', 'Rack', 'Room', 'customFields'];
-      
+
       // 创建一个干净的设备数据对象
       const cleanDeviceData = {};
-      
+
       // 复制固定字段
       fixedFields.forEach(field => {
         if (deviceData[field] !== undefined) {
           cleanDeviceData[field] = deviceData[field];
         }
       });
-      
+
       // 将自定义字段直接添加到表单数据中（不在customFields对象内）
       Object.entries(deviceData).forEach(([key, value]) => {
         // 排除固定字段、系统字段和非基本类型的值
-        if (!fixedFields.includes(key) && 
-            !systemFields.includes(key) && 
-            key !== 'deviceId' &&
-            typeof value !== 'object' &&
-            value !== null) {
+        if (
+          !fixedFields.includes(key) &&
+          !systemFields.includes(key) &&
+          key !== 'deviceId' &&
+          typeof value !== 'object' &&
+          value !== null
+        ) {
           cleanDeviceData[key] = value;
         }
       });
-      
+
       // 如果有原始customFields对象，将其字段也添加到表单数据中
       if (deviceData.customFields && typeof deviceData.customFields === 'object') {
         Object.entries(deviceData.customFields).forEach(([key, value]) => {
           cleanDeviceData[key] = value;
         });
       }
-      
+
       form.setFieldsValue(cleanDeviceData);
     } else {
       form.resetFields();
@@ -433,23 +600,34 @@ function DeviceManagement() {
   };
 
   // 提交表单
-  const handleSubmit = async (values) => {
+  const handleSubmit = async values => {
     try {
       // 定义设备模型的固定字段
       const fixedFields = [
-        'deviceId', 'name', 'type', 'model', 'serialNumber', 'rackId',
-        'position', 'height', 'powerConsumption', 'status', 'purchaseDate',
-        'warrantyExpiry', 'ipAddress', 'description'
+        'deviceId',
+        'name',
+        'type',
+        'model',
+        'serialNumber',
+        'rackId',
+        'position',
+        'height',
+        'powerConsumption',
+        'status',
+        'purchaseDate',
+        'warrantyExpiry',
+        'ipAddress',
+        'description',
       ];
-      
+
       // 构建最终的设备数据，包含固定字段和自定义字段
       const deviceData = {
         ...values,
         purchaseDate: values.purchaseDate ? values.purchaseDate.format('YYYY-MM-DD') : null,
         warrantyExpiry: values.warrantyExpiry ? values.warrantyExpiry.format('YYYY-MM-DD') : null,
-        customFields: {} // 用于存储自定义字段
+        customFields: {}, // 用于存储自定义字段
       };
-      
+
       // 分离固定字段和自定义字段
       Object.keys(deviceData).forEach(key => {
         if (!fixedFields.includes(key) && key !== 'customFields') {
@@ -479,16 +657,16 @@ function DeviceManagement() {
   };
 
   // 搜索处理函数
-  const handleSearch = (values) => {
+  const handleSearch = values => {
     setSearching(true);
-    
+
     setKeyword(values.keyword || '');
     setStatus(values.status || 'all');
     setType(values.type || 'all');
-    
+
     // 筛选后的数据会通过useMemo自动更新，这里只需更新分页
     setPagination(prev => ({ ...prev, current: 1 }));
-    
+
     // 短暂延迟后移除搜索状态，提供视觉反馈
     setTimeout(() => setSearching(false), 300);
   };
@@ -496,25 +674,25 @@ function DeviceManagement() {
   // 重置筛选条件
   const handleReset = () => {
     setSearching(true);
-    
+
     setKeyword('');
     setStatus('all');
     setType('all');
     searchForm.resetFields();
-    
+
     // 短暂延迟后移除搜索状态
     setTimeout(() => setSearching(false), 300);
   };
 
   // 表格分页变化处理
-  const handleTableChange = (newPagination) => {
+  const handleTableChange = newPagination => {
     setPagination(newPagination);
-    
+
     const start = (newPagination.current - 1) * newPagination.pageSize;
     const end = start + newPagination.pageSize;
     const currentPageData = filteredDevicesMemo.slice(start, end);
     setCurrentPageDevices(currentPageData);
-    
+
     fetchDevices(newPagination.current, newPagination.pageSize);
   };
 
@@ -529,7 +707,7 @@ function DeviceManagement() {
       onOk: async () => {
         try {
           const response = await axios.delete('/api/devices/batch-delete', {
-            data: { deviceIds: selectedDevices }
+            data: { deviceIds: selectedDevices },
           });
           message.success(response.data.message || '批量删除成功');
           setSelectedDevices([]);
@@ -539,7 +717,7 @@ function DeviceManagement() {
           message.error('批量删除失败');
           console.error('批量删除设备失败:', error);
         }
-      }
+      },
     });
   };
 
@@ -547,7 +725,8 @@ function DeviceManagement() {
   const handleDeleteAll = async () => {
     Modal.confirm({
       title: '危险操作确认',
-      content: '确定要删除所有设备吗？此操作将清空所有设备数据，包括相关的接线、网卡、端口等信息，且不可恢复！',
+      content:
+        '确定要删除所有设备吗？此操作将清空所有设备数据，包括相关的接线、网卡、端口等信息，且不可恢复！',
       okText: '确认删除所有',
       okType: 'danger',
       cancelText: '取消',
@@ -562,12 +741,12 @@ function DeviceManagement() {
           message.error('删除所有设备失败');
           console.error('删除所有设备失败:', error);
         }
-      }
+      },
     });
   };
 
   // 删除设备
-  const handleDelete = async (deviceId) => {
+  const handleDelete = async deviceId => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个设备吗？',
@@ -583,12 +762,12 @@ function DeviceManagement() {
           message.error('设备删除失败');
           console.error('设备删除失败:', error);
         }
-      }
+      },
     });
   };
 
   // 显示设备详情
-  const handleShowDetail = (device) => {
+  const handleShowDetail = device => {
     setSelectedDevice(device);
     setDetailModalVisible(true);
   };
@@ -608,12 +787,12 @@ function DeviceManagement() {
     try {
       const values = await batchStatusForm.validateFields();
       setBatchStatusLoading(true);
-      
+
       const response = await axios.put('/api/devices/batch-status', {
         deviceIds: selectedDevices,
-        status: values.status
+        status: values.status,
       });
-      
+
       message.success(response.data.message || '批量状态变更成功');
       setBatchStatusModalVisible(false);
       setSelectedDevices([]);
@@ -637,7 +816,9 @@ function DeviceManagement() {
       return;
     }
     setExportFormat('csv');
-    setExportFields(deviceFields.filter(f => f.visible && f.fieldName !== 'rackId').map(f => f.fieldName));
+    setExportFields(
+      deviceFields.filter(f => f.visible && f.fieldName !== 'rackId').map(f => f.fieldName)
+    );
     setExportModalVisible(true);
   };
 
@@ -645,12 +826,12 @@ function DeviceManagement() {
   const handleEnhancedExport = async () => {
     try {
       setExportLoading(true);
-      
+
       const fieldLabels = {};
       deviceFields.forEach(field => {
         fieldLabels[field.fieldName] = field.displayName;
       });
-      
+
       let deviceIds = [];
       if (exportScope === 'selected') {
         deviceIds = selectedDevices;
@@ -659,21 +840,23 @@ function DeviceManagement() {
       } else if (exportScope === 'all') {
         deviceIds = allDevices.map(device => device.deviceId);
       }
-      
+
       if (deviceIds.length === 0) {
         message.warning('没有可导出的设备');
         setExportLoading(false);
         return;
       }
-      
+
       const params = new URLSearchParams();
       deviceIds.forEach(id => params.append('deviceIds', id));
       params.append('format', exportFormat);
       params.append('fields', JSON.stringify(exportFields));
       params.append('fieldLabels', JSON.stringify(fieldLabels));
-      
-      const response = await axios.get(`/api/devices/enhanced-export?${params.toString()}`, { responseType: 'blob' });
-      
+
+      const response = await axios.get(`/api/devices/enhanced-export?${params.toString()}`, {
+        responseType: 'blob',
+      });
+
       const contentType = exportFormat === 'csv' ? 'text/csv; charset=gbk' : 'application/json';
       const blob = new Blob([response.data], { type: contentType });
       const url = window.URL.createObjectURL(blob);
@@ -684,7 +867,7 @@ function DeviceManagement() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       message.success(`成功导出 ${deviceIds.length} 个设备`);
       setExportModalVisible(false);
     } catch (error) {
@@ -706,15 +889,17 @@ function DeviceManagement() {
       setSelectAll(true);
     }
   };
-  
+
   // 处理选择变化
-  const handleSelectionChange = (selectedRowKeys) => {
+  const handleSelectionChange = selectedRowKeys => {
     setSelectedDevices(selectedRowKeys);
-    setSelectAll(selectedRowKeys.length === filteredDevicesMemo.length && filteredDevicesMemo.length > 0);
+    setSelectAll(
+      selectedRowKeys.length === filteredDevicesMemo.length && filteredDevicesMemo.length > 0
+    );
   };
-  
+
   // 全选复选框的处理函数
-  const handleSelectAllCheckbox = (e) => {
+  const handleSelectAllCheckbox = e => {
     const checked = e.target.checked;
     if (checked) {
       const allIds = filteredDevicesMemo.map(device => device.deviceId);
@@ -725,76 +910,81 @@ function DeviceManagement() {
       setSelectAll(false);
     }
   };
-  const handleImport = async (file) => {
+  const handleImport = async file => {
     try {
       setIsImporting(true);
       setImportProgress(0);
       setImportPhase('正在上传文件...');
       setImportResult(null);
-      
+
       const formData = new FormData();
       formData.append('csvFile', file);
-      
+
       const response = await axios.post('/api/devices/import', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': 'multipart/form-data',
         },
-        onUploadProgress: (progressEvent) => {
+        onUploadProgress: progressEvent => {
           const progress = Math.round((progressEvent.loaded * 50) / progressEvent.total);
           setImportProgress(Math.min(progress, 50));
           setImportPhase('正在上传文件...');
-        }
+        },
       });
-      
+
       setImportProgress(60);
       setImportPhase('正在处理数据...');
-      
+
       setTimeout(() => {
         setImportProgress(80);
         setImportPhase('正在验证数据...');
       }, 200);
-      
+
       setTimeout(() => {
         setImportProgress(90);
         setImportPhase('正在保存数据...');
       }, 400);
-      
+
       setImportResult(response.data);
       setImportProgress(100);
       setImportPhase('导入完成');
       setIsImporting(false);
-      
+
       const { success, failed } = response.data.statistics;
       if (failed > 0) {
         message.warning(`导入完成，但有 ${failed} 条记录导入失败`);
       } else {
         message.success('所有记录导入成功');
       }
-      
+
       setTimeout(() => {
         fetchDevices();
       }, 1000);
-      
     } catch (error) {
       setIsImporting(false);
       setImportProgress(0);
-      
+
       let errorMessage = '导入失败';
       let errorDetails = [];
-      
+
       if (error.response) {
         const { data, status } = error.response;
-        
-        if (status === 500 && data && data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
-          errorDetails = data.errors.map((err) => ({
+
+        if (
+          status === 500 &&
+          data &&
+          data.errors &&
+          Array.isArray(data.errors) &&
+          data.errors.length > 0
+        ) {
+          errorDetails = data.errors.map(err => ({
             row: err.row || 0,
-            error: err.error || err.message || '服务器内部错误'
+            error: err.error || err.message || '服务器内部错误',
           }));
           errorMessage = `导入失败：${errorDetails[0].error}`;
         } else if (data && data.errors && Array.isArray(data.errors)) {
           errorDetails = data.errors.map((err, index) => ({
             row: err.row || index + 1,
-            error: err.error || err.message || '未知错误'
+            error: err.error || err.message || '未知错误',
           }));
           errorMessage = `导入失败，共发现 ${errorDetails.length} 处数据错误`;
         } else if (data && (data.message || data.error)) {
@@ -803,7 +993,7 @@ function DeviceManagement() {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       setImportResult({
         success: false,
         statistics: {
@@ -811,14 +1001,14 @@ function DeviceManagement() {
           success: 0,
           failed: errorDetails.length > 0 ? errorDetails.length : 1,
           errors: errorDetails.length > 0 ? errorDetails : [{ row: 0, error: errorMessage }],
-          message: errorMessage
-        }
+          message: errorMessage,
+        },
       });
-      
+
       message.error(errorMessage);
       console.error('导入设备失败:', error);
     }
-    
+
     return false;
   };
 
@@ -827,7 +1017,7 @@ function DeviceManagement() {
     running: { text: '运行中', color: 'green' },
     maintenance: { text: '维护中', color: 'orange' },
     offline: { text: '离线', color: 'gray' },
-    fault: { text: '故障', color: 'red' }
+    fault: { text: '故障', color: 'red' },
   };
 
   // 设备类型映射
@@ -836,17 +1026,17 @@ function DeviceManagement() {
     switch: '交换机',
     router: '路由器',
     storage: '存储设备',
-    other: '其他设备'
+    other: '其他设备',
   };
 
   // 获取设备类型图标
-  const getDeviceTypeIcon = (type) => {
+  const getDeviceTypeIcon = type => {
     const iconMap = {
       server: <CloudServerOutlined style={{ color: '#1890ff' }} />,
       switch: <SwapOutlined style={{ color: '#52c41a' }} />,
       router: <SafetyOutlined style={{ color: '#faad14' }} />,
       storage: <DatabaseOutlined style={{ color: '#722ed1' }} />,
-      other: <AppstoreOutlined style={{ color: '#8c8c8c' }} />
+      other: <AppstoreOutlined style={{ color: '#8c8c8c' }} />,
     };
     return iconMap[type] || <AppstoreOutlined style={{ color: '#8c8c8c' }} />;
   };
@@ -855,31 +1045,30 @@ function DeviceManagement() {
   const handleColumnResize = (key, width) => {
     setColumnWidths(prev => ({ ...prev, [key]: width }));
   };
-  
+
   // 重置列宽到默认值
   const resetColumnWidths = () => {
     setColumnWidths({});
     message.success('列宽已重置为默认值');
   };
-  
+
   // 处理表头单元格拖拽 - 自定义实现
-  const handleHeaderCellResize = (key) => (column) => ({
+  const handleHeaderCellResize = key => column => ({
     width: column.width,
-    onResize: (width) => {
+    onResize: width => {
       setColumnWidths(prev => ({ ...prev, [key]: width }));
     },
   });
-  
 
   // 动态生成表格列配置
   const columns = React.useMemo(() => {
     const generatedColumns = [];
-    
+
     // 根据字段配置动态生成列，只显示visible为true的字段
     deviceFields.forEach(field => {
       // 只处理可见字段
       if (!field.visible) return;
-      
+
       // 特殊处理机柜字段
       if (field.fieldName === 'rackId') {
         // 添加机房信息列
@@ -898,7 +1087,7 @@ function DeviceManagement() {
           width: columnWidths[field.fieldName] || 120,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
         });
-      } 
+      }
       // 特殊处理设备类型
       else if (field.fieldName === 'type') {
         generatedColumns.push({
@@ -907,7 +1096,7 @@ function DeviceManagement() {
           key: field.fieldName,
           width: columnWidths[field.fieldName] || 100,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
-          render: (type) => {
+          render: type => {
             return (
               <Space>
                 {getDeviceTypeIcon(type)}
@@ -925,7 +1114,7 @@ function DeviceManagement() {
           key: field.fieldName,
           width: columnWidths[field.fieldName] || 100,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
-          render: (status) => {
+          render: status => {
             if (Array.isArray(status)) {
               return (
                 <Space>
@@ -953,25 +1142,27 @@ function DeviceManagement() {
           key: field.fieldName,
           width: columnWidths[field.fieldName] || 120,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
-          render: (date) => {
+          render: date => {
             if (!date) return '';
-            
+
             const dateObj = new Date(date);
             const formattedDate = dateObj.toLocaleDateString('zh-CN');
-            
+
             // 检查是否是保修到期字段
             if (field.fieldName === 'warrantyExpiry') {
               const today = new Date();
               // 设置时间为同一天的00:00:00，确保只比较日期部分
               today.setHours(0, 0, 0, 0);
               dateObj.setHours(0, 0, 0, 0);
-              
+
               // 如果保修日期已过期，显示为红色
               if (dateObj < today) {
-                return <span style={{ color: '#d93025', fontWeight: 'bold' }}>{formattedDate}</span>;
+                return (
+                  <span style={{ color: '#d93025', fontWeight: 'bold' }}>{formattedDate}</span>
+                );
               }
             }
-            
+
             return formattedDate;
           },
         });
@@ -989,7 +1180,7 @@ function DeviceManagement() {
         } else if (field.fieldType === 'textarea') {
           defaultWidth = 180;
         }
-        
+
         // 为设备名称和ID列添加点击查看详情功能
         const columnConfig = {
           title: field.displayName,
@@ -1001,14 +1192,14 @@ function DeviceManagement() {
           onHeaderCell: handleHeaderCellResize(field.fieldName),
           ellipsis: field.fieldType !== 'textarea',
         };
-        
+
         // 设备名称和ID列添加点击效果
         if (field.fieldName === 'deviceId' || field.fieldName === 'name') {
           columnConfig.render = (value, record) => (
-            <a 
+            <a
               onClick={() => handleShowDetail(record)}
-              style={{ 
-                color: '#1890ff', 
+              style={{
+                color: '#1890ff',
                 textDecoration: 'none',
                 cursor: 'pointer',
                 display: 'block',
@@ -1016,18 +1207,18 @@ function DeviceManagement() {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}
-              onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
-              onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+              onMouseEnter={e => (e.target.style.textDecoration = 'underline')}
+              onMouseLeave={e => (e.target.style.textDecoration = 'none')}
             >
               {value || '-'}
             </a>
           );
         }
-        
+
         generatedColumns.push(columnConfig);
       }
     });
-    
+
     // 添加操作列
     generatedColumns.push({
       title: '操作',
@@ -1060,22 +1251,22 @@ function DeviceManagement() {
         </div>
       ),
     });
-    
+
     return generatedColumns;
   }, [deviceFields, columnWidths]);
 
   // 保存字段配置
-  const handleSaveFieldConfig = async (values) => {
+  const handleSaveFieldConfig = async values => {
     try {
       // 更新设备字段配置的可见性
       const updatedFields = deviceFields.map(field => ({
         ...field,
-        visible: values[field.fieldName]
+        visible: values[field.fieldName],
       }));
-      
+
       // 保存到后端
       await axios.post('/api/deviceFields/config', updatedFields);
-      
+
       // 更新本地状态
       setDeviceFields(updatedFields);
       message.success('字段配置保存成功');
@@ -1098,7 +1289,7 @@ function DeviceManagement() {
   return (
     <div style={pageContainerStyle}>
       <style>{generateGlobalStyles(designTokens)}</style>
-      
+
       <div style={headerStyle}>
         <div style={titleRowStyle}>
           <div style={titleSectionStyle}>
@@ -1110,13 +1301,13 @@ function DeviceManagement() {
               <p style={pageSubtitleStyle}>管理您的IT设备资产</p>
             </div>
           </div>
-          
+
           <div style={{ display: 'flex', gap: designTokens.spacing.sm, flexWrap: 'wrap' }}>
             <Button
               style={{
                 ...secondaryActionStyle,
                 color: designTokens.colors.primary.main,
-                borderColor: designTokens.colors.primary.main
+                borderColor: designTokens.colors.primary.main,
               }}
               icon={<PlusOutlined />}
               onClick={() => showModal()}
@@ -1127,7 +1318,7 @@ function DeviceManagement() {
               style={{
                 ...secondaryActionStyle,
                 color: designTokens.colors.primary.main,
-                borderColor: designTokens.colors.primary.main
+                borderColor: designTokens.colors.primary.main,
               }}
               icon={<UploadOutlined />}
               onClick={() => setImportModalVisible(true)}
@@ -1138,7 +1329,7 @@ function DeviceManagement() {
               style={{
                 ...secondaryActionStyle,
                 color: designTokens.colors.primary.main,
-                borderColor: designTokens.colors.primary.main
+                borderColor: designTokens.colors.primary.main,
               }}
               icon={<ExportOutlined />}
               onClick={showExportModal}
@@ -1149,7 +1340,7 @@ function DeviceManagement() {
               style={{
                 ...secondaryActionStyle,
                 color: designTokens.colors.primary.main,
-                borderColor: designTokens.colors.primary.main
+                borderColor: designTokens.colors.primary.main,
               }}
               icon={<SettingOutlined />}
               onClick={() => setFieldConfigModalVisible(true)}
@@ -1160,7 +1351,7 @@ function DeviceManagement() {
               style={{
                 ...secondaryActionStyle,
                 color: designTokens.colors.primary.main,
-                borderColor: designTokens.colors.primary.main
+                borderColor: designTokens.colors.primary.main,
               }}
               icon={<ReloadOutlined />}
               disabled={selectedDevices.length === 0}
@@ -1172,7 +1363,7 @@ function DeviceManagement() {
               style={{
                 ...secondaryActionStyle,
                 color: designTokens.colors.primary.main,
-                borderColor: designTokens.colors.primary.main
+                borderColor: designTokens.colors.primary.main,
               }}
               icon={<DeleteOutlined />}
               disabled={selectedDevices.length === 0}
@@ -1191,7 +1382,7 @@ function DeviceManagement() {
                 gap: '6px',
                 background: designTokens.colors.error.main,
                 border: 'none',
-                color: '#ffffff'
+                color: '#ffffff',
               }}
               icon={<DeleteOutlined />}
               onClick={handleDeleteAll}
@@ -1202,7 +1393,19 @@ function DeviceManagement() {
         </div>
       </div>
 
-      <Card size="small" style={filterCardStyle} styles={{ body: { padding: `${designTokens.spacing.md}px ${designTokens.spacing.lg}px`, display: 'flex', alignItems: 'center', gap: designTokens.spacing.md, flexWrap: 'wrap' } }}>
+      <Card
+        size="small"
+        style={filterCardStyle}
+        styles={{
+          body: {
+            padding: `${designTokens.spacing.md}px ${designTokens.spacing.lg}px`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: designTokens.spacing.md,
+            flexWrap: 'wrap',
+          },
+        }}
+      >
         <Form
           form={searchForm}
           layout="inline"
@@ -1214,17 +1417,17 @@ function DeviceManagement() {
             <Input
               placeholder="搜索设备..."
               prefix={<SearchOutlined style={{ color: designTokens.colors.primary.main }} />}
-              style={{ 
+              style={{
                 width: '280px',
                 borderRadius: designTokens.borderRadius.medium,
                 border: `1px solid ${designTokens.colors.border.light}`,
-                transition: `all ${designTokens.transitions.fast}`
+                transition: `all ${designTokens.transitions.fast}`,
               }}
               value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
+              onChange={e => setKeyword(e.target.value)}
             />
           </Form.Item>
-          
+
           <Form.Item name="status" style={{ margin: 0 }}>
             <Select
               value={status}
@@ -1239,7 +1442,7 @@ function DeviceManagement() {
               <Option value="fault">故障</Option>
             </Select>
           </Form.Item>
-          
+
           <Form.Item name="type" style={{ margin: 0 }}>
             <Select
               value={type}
@@ -1255,7 +1458,7 @@ function DeviceManagement() {
               <Option value="other">其他设备</Option>
             </Select>
           </Form.Item>
-          
+
           <Form.Item style={{ margin: 0 }}>
             <Space>
               <Button
@@ -1265,7 +1468,7 @@ function DeviceManagement() {
                   borderRadius: designTokens.borderRadius.medium,
                   background: designTokens.colors.primary.gradient,
                   border: 'none',
-                  boxShadow: designTokens.shadows.small
+                  boxShadow: designTokens.shadows.small,
                 }}
                 icon={<SearchOutlined />}
                 htmlType="submit"
@@ -1277,7 +1480,7 @@ function DeviceManagement() {
                 style={{
                   height: '36px',
                   borderRadius: designTokens.borderRadius.medium,
-                  border: `1px solid ${designTokens.colors.border.light}`
+                  border: `1px solid ${designTokens.colors.border.light}`,
                 }}
                 onClick={handleReset}
               >
@@ -1286,7 +1489,7 @@ function DeviceManagement() {
             </Space>
           </Form.Item>
         </Form>
-        
+
         <div style={{ display: 'flex', alignItems: 'center', gap: designTokens.spacing.sm }}>
           <Button
             icon={<ReloadOutlined />}
@@ -1294,7 +1497,7 @@ function DeviceManagement() {
             style={{
               borderRadius: designTokens.borderRadius.medium,
               border: `1px solid ${designTokens.colors.border.light}`,
-              height: '36px'
+              height: '36px',
             }}
           >
             刷新
@@ -1303,93 +1506,121 @@ function DeviceManagement() {
       </Card>
 
       <Card style={cardStyle}>
-        {(!loading && filteredDevicesMemo.length === 0 && !searching) && (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: '60px 20px', 
-            color: designTokens.colors.text.secondary,
-            fontSize: '15px'
-          }}>
-            <SearchOutlined style={{ fontSize: '48px', marginBottom: '16px', color: designTokens.colors.border.light }} />
+        {!loading && filteredDevicesMemo.length === 0 && !searching && (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '60px 20px',
+              color: designTokens.colors.text.secondary,
+              fontSize: '15px',
+            }}
+          >
+            <SearchOutlined
+              style={{
+                fontSize: '48px',
+                marginBottom: '16px',
+                color: designTokens.colors.border.light,
+              }}
+            />
             <p>暂无设备数据</p>
           </div>
         )}
         {filteredDevicesMemo.length > 0 && (
-          <div className="device-table-wrapper" style={{ 
-            borderRadius: designTokens.borderRadius.medium,
-            overflow: 'hidden'
-          }}>
+          <div
+            className="device-table-wrapper"
+            style={{
+              borderRadius: designTokens.borderRadius.medium,
+              overflow: 'hidden',
+            }}
+          >
             <Table
-            columns={columns}
-            dataSource={filteredDevicesMemo}
-            rowKey="deviceId"
-            loading={loading || searching}
-            pagination={{
-              ...pagination,
-              showSizeChanger: true,
-              showQuickJumper: true,
-              pageSizeOptions: ['10', '20', '30', '50', '100'],
-              showTotal: (total) => `共 ${total} 条记录`,
-              style: { marginTop: '16px' }
-            }}
-            onChange={handleTableChange}
-            scroll={{ y: 'calc(100vh - 380px)', scrollToFirstRowOnChange: true }}
-            virtual
-            components={{
-              header: {
-                cell: ResizableTitle,
-              },
-            }}
-            style={{ width: '100%', maxWidth: '100%' }}
-            size="middle"
-            showHeader={filteredDevicesMemo.length > 0}
-            rowSelection={{
-              selectedRowKeys: selectedDevices,
-              onChange: handleSelectionChange,
-              columnWidth: 48,
-              fixed: 'left',
-              type: 'checkbox',
-              crossPageSelect: true,
-              selections: [
-                { key: 'all', text: '全选', onSelect: () => {
-                  const allIds = filteredDevicesMemo.map(device => device.deviceId);
-                  setSelectedDevices(allIds);
-                  setSelectAll(true);
-                }},
-                { key: 'invert', text: '反选', onSelect: () => {
-                  const visibleIds = filteredDevicesMemo.map(device => device.deviceId);
-                  const newSelected = visibleIds.filter(id => !selectedDevices.includes(id));
-                  setSelectedDevices(newSelected);
-                  setSelectAll(newSelected.length === filteredDevicesMemo.length);
-                }},
-                { key: 'none', text: '清除选择', onSelect: () => {
-                  setSelectedDevices([]);
-                  setSelectAll(false);
-                }},
-              ],
-            }}
-            onRow={(record) => ({
-              onClick: () => handleSelectionChange(
-                selectedDevices.includes(record.deviceId)
-                  ? selectedDevices.filter(id => id !== record.deviceId)
-                  : [...selectedDevices, record.deviceId]
-              ),
-            })}
-            rowClassName={(record, index) => {
-              if (selectedDevices.includes(record.deviceId)) {
-                return 'ant-table-row-selected';
-              }
-              return index % 2 === 0 ? 'ant-table-row-even' : 'ant-table-row-odd';
-            }}
-          />
-        </div>
+              columns={columns}
+              dataSource={filteredDevicesMemo}
+              rowKey="deviceId"
+              loading={loading || searching}
+              pagination={{
+                ...pagination,
+                showSizeChanger: true,
+                showQuickJumper: true,
+                pageSizeOptions: ['10', '20', '30', '50', '100'],
+                showTotal: total => `共 ${total} 条记录`,
+                style: { marginTop: '16px' },
+              }}
+              onChange={handleTableChange}
+              scroll={{ y: 'calc(100vh - 380px)', scrollToFirstRowOnChange: true }}
+              virtual
+              components={{
+                header: {
+                  cell: ResizableTitle,
+                },
+              }}
+              style={{ width: '100%', maxWidth: '100%' }}
+              size="middle"
+              showHeader={filteredDevicesMemo.length > 0}
+              rowSelection={{
+                selectedRowKeys: selectedDevices,
+                onChange: handleSelectionChange,
+                columnWidth: 48,
+                fixed: 'left',
+                type: 'checkbox',
+                crossPageSelect: true,
+                selections: [
+                  {
+                    key: 'all',
+                    text: '全选',
+                    onSelect: () => {
+                      const allIds = filteredDevicesMemo.map(device => device.deviceId);
+                      setSelectedDevices(allIds);
+                      setSelectAll(true);
+                    },
+                  },
+                  {
+                    key: 'invert',
+                    text: '反选',
+                    onSelect: () => {
+                      const visibleIds = filteredDevicesMemo.map(device => device.deviceId);
+                      const newSelected = visibleIds.filter(id => !selectedDevices.includes(id));
+                      setSelectedDevices(newSelected);
+                      setSelectAll(newSelected.length === filteredDevicesMemo.length);
+                    },
+                  },
+                  {
+                    key: 'none',
+                    text: '清除选择',
+                    onSelect: () => {
+                      setSelectedDevices([]);
+                      setSelectAll(false);
+                    },
+                  },
+                ],
+              }}
+              onRow={record => ({
+                onClick: () =>
+                  handleSelectionChange(
+                    selectedDevices.includes(record.deviceId)
+                      ? selectedDevices.filter(id => id !== record.deviceId)
+                      : [...selectedDevices, record.deviceId]
+                  ),
+              })}
+              rowClassName={(record, index) => {
+                if (selectedDevices.includes(record.deviceId)) {
+                  return 'ant-table-row-selected';
+                }
+                return index % 2 === 0 ? 'ant-table-row-even' : 'ant-table-row-odd';
+              }}
+            />
+          </div>
         )}
       </Card>
 
       <Modal
         title={
           <div style={modalHeaderStyle}>
-            {editingDevice ? <EditOutlined style={{ color: '#667eea' }} /> : <PlusOutlined style={{ color: '#667eea' }} />}
+            {editingDevice ? (
+              <EditOutlined style={{ color: '#667eea' }} />
+            ) : (
+              <PlusOutlined style={{ color: '#667eea' }} />
+            )}
             {editingDevice ? '编辑设备' : '添加设备'}
           </div>
         }
@@ -1398,77 +1629,135 @@ function DeviceManagement() {
         footer={null}
         width={700}
         style={{ borderRadius: '16px' }}
-        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 50px 16px 24px' }, body: { padding: '24px' } }}
+        styles={{
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 50px 16px 24px' },
+          body: { padding: '24px' },
+        }}
         className="device-modal"
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-        >
-          {deviceFields.filter(field => field.fieldName !== 'deviceId').map(field => {
-            let control = null;
-            
-            switch (field.fieldType) {
-              case 'text':
-              case 'string':
-                control = <Input placeholder={`请输入${field.displayName}`} style={{ borderRadius: '8px' }} />;
-                break;
-              case 'number':
-                control = <InputNumber placeholder={`请输入${field.displayName}`} min={0} style={{ width: '100%', borderRadius: '8px' }} />;
-                break;
-              case 'boolean':
-                control = <Switch />;
-                break;
-              case 'date':
-                control = <DatePicker style={{ width: '100%', borderRadius: '8px' }} placeholder={`请选择${field.displayName}`} />;
-                break;
-              case 'textarea':
-                control = <Input.TextArea placeholder={`请输入${field.displayName}`} rows={3} style={{ borderRadius: '8px' }} />;
-                break;
-              case 'select':
-                if (field.fieldName === 'rackId') {
-                  control = (
-                    <Select placeholder={`请选择${field.displayName}`} style={{ borderRadius: '8px' }}>
-                      {racks.map(rack => (
-                        <Option key={rack.rackId} value={rack.rackId}>
-                          {rack.name} ({rack.rackId})
-                        </Option>
-                      ))}
-                    </Select>
-                  );
-                } else {
-                  control = (
-                    <Select placeholder={`请选择${field.displayName}`} style={{ borderRadius: '8px' }}>
-                      {field.options && field.options.map(option => (
-                        <Option key={option.value} value={option.value}>
-                          {option.label}
-                        </Option>
-                      ))}
-                    </Select>
-                  );
-                }
-                break;
-              default:
-                control = <Input placeholder={`请输入${field.displayName}`} style={{ borderRadius: '8px' }} />;
-            }
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          {deviceFields
+            .filter(field => field.fieldName !== 'deviceId')
+            .map(field => {
+              let control = null;
 
-            return (
-              <Form.Item
-                key={field.fieldName}
-                name={field.fieldName}
-                label={field.displayName}
-                rules={field.required && field.fieldName !== 'deviceId' ? [{ required: true, message: `请输入${field.displayName}` }] : []}
-              >
-                {control}
-              </Form.Item>
-            );
-          })}
+              switch (field.fieldType) {
+                case 'text':
+                case 'string':
+                  control = (
+                    <Input
+                      placeholder={`请输入${field.displayName}`}
+                      style={{ borderRadius: '8px' }}
+                    />
+                  );
+                  break;
+                case 'number':
+                  control = (
+                    <InputNumber
+                      placeholder={`请输入${field.displayName}`}
+                      min={0}
+                      style={{ width: '100%', borderRadius: '8px' }}
+                    />
+                  );
+                  break;
+                case 'boolean':
+                  control = <Switch />;
+                  break;
+                case 'date':
+                  control = (
+                    <DatePicker
+                      style={{ width: '100%', borderRadius: '8px' }}
+                      placeholder={`请选择${field.displayName}`}
+                    />
+                  );
+                  break;
+                case 'textarea':
+                  control = (
+                    <Input.TextArea
+                      placeholder={`请输入${field.displayName}`}
+                      rows={3}
+                      style={{ borderRadius: '8px' }}
+                    />
+                  );
+                  break;
+                case 'select':
+                  if (field.fieldName === 'rackId') {
+                    control = (
+                      <Select
+                        placeholder={`请选择${field.displayName}`}
+                        style={{ borderRadius: '8px' }}
+                      >
+                        {racks.map(rack => (
+                          <Option key={rack.rackId} value={rack.rackId}>
+                            {rack.name} ({rack.rackId})
+                          </Option>
+                        ))}
+                      </Select>
+                    );
+                  } else {
+                    control = (
+                      <Select
+                        placeholder={`请选择${field.displayName}`}
+                        style={{ borderRadius: '8px' }}
+                      >
+                        {field.options &&
+                          field.options.map(option => (
+                            <Option key={option.value} value={option.value}>
+                              {option.label}
+                            </Option>
+                          ))}
+                      </Select>
+                    );
+                  }
+                  break;
+                default:
+                  control = (
+                    <Input
+                      placeholder={`请输入${field.displayName}`}
+                      style={{ borderRadius: '8px' }}
+                    />
+                  );
+              }
+
+              return (
+                <Form.Item
+                  key={field.fieldName}
+                  name={field.fieldName}
+                  label={field.displayName}
+                  rules={
+                    field.required && field.fieldName !== 'deviceId'
+                      ? [{ required: true, message: `请输入${field.displayName}` }]
+                      : []
+                  }
+                >
+                  {control}
+                </Form.Item>
+              );
+            })}
 
           <Form.Item style={{ textAlign: 'right', marginTop: '24px' }}>
             <Space>
-              <Button onClick={handleCancel} style={secondaryActionStyle}>取消</Button>
-              <Button type="primary" htmlType="submit" style={{ height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>确定</Button>
+              <Button onClick={handleCancel} style={secondaryActionStyle}>
+                取消
+              </Button>
+              <Button
+                type="primary"
+                htmlType="submit"
+                style={{
+                  height: '40px',
+                  borderRadius: designTokens.borderRadius.small,
+                  background: designTokens.colors.primary.gradient,
+                  border: 'none',
+                  color: '#ffffff',
+                  boxShadow: designTokens.shadows.small,
+                  fontWeight: '500',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                确定
+              </Button>
             </Space>
           </Form.Item>
         </Form>
@@ -1485,38 +1774,68 @@ function DeviceManagement() {
         onCancel={() => setFieldConfigModalVisible(false)}
         footer={null}
         width={600}
-        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
+        styles={{
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
+          body: { padding: '24px' },
+        }}
       >
         <Form
           layout="vertical"
           onFinish={handleSaveFieldConfig}
-          initialValues={deviceFields.reduce((acc, field) => ({
-            ...acc,
-            [field.fieldName]: field.visible
-          }), {})}
+          initialValues={deviceFields.reduce(
+            (acc, field) => ({
+              ...acc,
+              [field.fieldName]: field.visible,
+            }),
+            {}
+          )}
         >
           <div style={{ maxHeight: 400, overflowY: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-              {deviceFields.filter(field => field.fieldName !== 'deviceId').map(field => (
-                <Form.Item
-                  key={field.fieldName}
-                  name={field.fieldName}
-                  valuePropName="checked"
-                  noStyle
-                >
-                  <Checkbox style={{ marginBottom: '8px' }}>
-                    {field.displayName}
-                  </Checkbox>
-                </Form.Item>
-              ))}
+              {deviceFields
+                .filter(field => field.fieldName !== 'deviceId')
+                .map(field => (
+                  <Form.Item
+                    key={field.fieldName}
+                    name={field.fieldName}
+                    valuePropName="checked"
+                    noStyle
+                  >
+                    <Checkbox style={{ marginBottom: '8px' }}>{field.displayName}</Checkbox>
+                  </Form.Item>
+                ))}
             </div>
           </div>
-          
+
           <Form.Item style={{ textAlign: 'right', marginTop: '20px' }}>
             <Space>
-              <Button onClick={() => setFieldConfigModalVisible(false)} style={secondaryActionStyle}>取消</Button>
-              <Button onClick={handleResetFieldConfig} style={secondaryActionStyle}>重置默认</Button>
-              <Button type="primary" htmlType="submit" style={{ height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>保存</Button>
+              <Button
+                onClick={() => setFieldConfigModalVisible(false)}
+                style={secondaryActionStyle}
+              >
+                取消
+              </Button>
+              <Button onClick={handleResetFieldConfig} style={secondaryActionStyle}>
+                重置默认
+              </Button>
+              <Button
+                type="primary"
+                htmlType="submit"
+                style={{
+                  height: '40px',
+                  borderRadius: designTokens.borderRadius.small,
+                  background: designTokens.colors.primary.gradient,
+                  border: 'none',
+                  color: '#ffffff',
+                  boxShadow: designTokens.shadows.small,
+                  fontWeight: '500',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                保存
+              </Button>
             </Space>
           </Form.Item>
         </Form>
@@ -1540,22 +1859,37 @@ function DeviceManagement() {
         footer={null}
         width={650}
         destroyOnHidden
-        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
+        styles={{
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
+          body: { padding: '24px' },
+        }}
       >
         {!isImporting && !importResult ? (
           <div>
             <p style={{ color: '#666', marginBottom: '8px' }}>请上传CSV格式的设备数据文件</p>
-            <p style={{ color: '#999', fontSize: '12px', marginBottom: '20px' }}>支持的编码格式：GBK</p>
-            
-            <div style={{ marginBottom: '20px', padding: '16px', background: 'linear-gradient(180deg, #fafafa 0%, #ffffff 100%)', borderRadius: '12px', border: '1px solid #f0f0f0' }}>
-              <p style={{ fontWeight: '600', marginBottom: '8px', color: '#333' }}>CSV文件格式要求：</p>
+            <p style={{ color: '#999', fontSize: '12px', marginBottom: '20px' }}>
+              支持的编码格式：GBK
+            </p>
+
+            <div
+              style={{
+                marginBottom: '20px',
+                padding: '16px',
+                background: 'linear-gradient(180deg, #fafafa 0%, #ffffff 100%)',
+                borderRadius: '12px',
+                border: '1px solid #f0f0f0',
+              }}
+            >
+              <p style={{ fontWeight: '600', marginBottom: '8px', color: '#333' }}>
+                CSV文件格式要求：
+              </p>
               <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                 {(() => {
                   // 获取必填字段
                   const requiredFields = deviceFields.filter(f => f.visible && f.required);
                   // 获取可选字段
                   const optionalFields = deviceFields.filter(f => f.visible && !f.required);
-                  
+
                   return (
                     <>
                       {requiredFields.length > 0 && (
@@ -1577,23 +1911,35 @@ function DeviceManagement() {
                     </>
                   );
                 })()}
-                <ul style={{ paddingLeft: '20px', marginBottom: '10px', color: '#666', fontSize: '13px', marginTop: '12px' }}>
-                  <li>设备类型：server(服务器)、switch(交换机)、router(路由器)、storage(存储设备)、other(其他)</li>
+                <ul
+                  style={{
+                    paddingLeft: '20px',
+                    marginBottom: '10px',
+                    color: '#666',
+                    fontSize: '13px',
+                    marginTop: '12px',
+                  }}
+                >
+                  <li>
+                    设备类型：server(服务器)、switch(交换机)、router(路由器)、storage(存储设备)、other(其他)
+                  </li>
                   <li>状态值：running(运行中)、maintenance(维护中)、offline(离线)、fault(故障)</li>
                   <li>日期格式：YYYY-MM-DD (例如：2023-01-01)</li>
                 </ul>
               </div>
             </div>
-            
+
             <div style={{ marginBottom: '20px' }}>
               <a href="/api/devices/import-template" download="设备导入模板.csv">
                 <Button icon={<DownloadOutlined />} style={secondaryActionStyle}>
                   下载导入模板
                 </Button>
               </a>
-              <span style={{ color: '#999', fontSize: '12px', marginLeft: '10px' }}>包含示例数据的CSV模板文件（根据当前字段配置生成）</span>
+              <span style={{ color: '#999', fontSize: '12px', marginLeft: '10px' }}>
+                包含示例数据的CSV模板文件（根据当前字段配置生成）
+              </span>
             </div>
-            
+
             <Upload
               name="csvFile"
               accept=".csv"
@@ -1601,7 +1947,23 @@ function DeviceManagement() {
               beforeUpload={handleImport}
               maxCount={1}
             >
-              <Button type="primary" icon={<UploadOutlined />} block style={{ height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Button
+                type="primary"
+                icon={<UploadOutlined />}
+                block
+                style={{
+                  height: '40px',
+                  borderRadius: designTokens.borderRadius.small,
+                  background: designTokens.colors.primary.gradient,
+                  border: 'none',
+                  color: '#ffffff',
+                  boxShadow: designTokens.shadows.small,
+                  fontWeight: '500',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
                 选择CSV文件
               </Button>
             </Upload>
@@ -1609,94 +1971,207 @@ function DeviceManagement() {
         ) : isImporting ? (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ 
-                width: '48px', 
-                height: '48px', 
-                borderRadius: '50%', 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                marginRight: '16px',
-                color: '#fff',
-                fontSize: '20px'
-              }}>
+              <div
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: '16px',
+                  color: '#fff',
+                  fontSize: '20px',
+                }}
+              >
                 <UploadOutlined spin />
               </div>
               <div>
-                <p style={{ margin: '0 0 4px 0', fontWeight: '600', color: '#333', fontSize: '16px' }}>正在导入设备数据</p>
+                <p
+                  style={{
+                    margin: '0 0 4px 0',
+                    fontWeight: '600',
+                    color: '#333',
+                    fontSize: '16px',
+                  }}
+                >
+                  正在导入设备数据
+                </p>
                 <p style={{ margin: 0, color: '#667eea', fontSize: '14px' }}>{importPhase}</p>
               </div>
             </div>
-            <Progress 
-              percent={importProgress} 
-              status="active" 
+            <Progress
+              percent={importProgress}
+              status="active"
               strokeColor={{ '0%': '#667eea', '100%': '#764ba2' }}
               format={() => `${importProgress}%`}
             />
           </div>
         ) : importResult?.statistics ? (
-              <div>
-                <p style={{ marginBottom: '10px', fontWeight: '600' }}>导入完成：</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
-                  <div style={{ padding: '12px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '8px', color: '#fff', textAlign: 'center' }}>
-                    <div style={{ fontSize: '24px', fontWeight: '700' }}>{importResult.statistics.total || 0}</div>
-                    <div style={{ fontSize: '12px', opacity: 0.9 }}>总记录数</div>
-                  </div>
-                  <div style={{ padding: '12px', background: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)', borderRadius: '8px', color: '#fff', textAlign: 'center' }}>
-                    <div style={{ fontSize: '24px', fontWeight: '700' }}>{importResult.statistics.success || 0}</div>
-                    <div style={{ fontSize: '12px', opacity: 0.9 }}>成功</div>
-                  </div>
-                  <div style={{ padding: '12px', background: 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)', borderRadius: '8px', color: '#fff', textAlign: 'center' }}>
-                    <div style={{ fontSize: '24px', fontWeight: '700' }}>{importResult.statistics.failed || 0}</div>
-                    <div style={{ fontSize: '12px', opacity: 0.9 }}>失败</div>
-                  </div>
+          <div>
+            <p style={{ marginBottom: '10px', fontWeight: '600' }}>导入完成：</p>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '12px',
+                marginBottom: '16px',
+              }}
+            >
+              <div
+                style={{
+                  padding: '12px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: '24px', fontWeight: '700' }}>
+                  {importResult.statistics.total || 0}
                 </div>
-                {(() => {
-                  const errors = importResult.statistics?.errors;
-                  const hasErrors = Array.isArray(errors) && errors.length > 0;
-                  const hasFailedRecords = importResult.statistics?.failed > 0;
-                  
-                  return (hasErrors || hasFailedRecords) && (
-                    <div style={{ marginTop: '20px', maxHeight: 400, overflowY: 'auto', border: '1px solid #ffcccc', borderRadius: '8px', padding: '12px', backgroundColor: '#fff7f7' }}>
-                      <h4 style={{ color: '#d93025', marginBottom: '12px', fontWeight: '600' }}>失败记录详情：</h4>
-                      
-                      {hasErrors ? (
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                          <thead>
-                            <tr style={{ backgroundColor: '#ffeeee' }}>
-                              <th style={{ border: '1px solid #ffcccc', padding: '8px', textAlign: 'left', width: '80px' }}>行号</th>
-                              <th style={{ border: '1px solid #ffcccc', padding: '8px', textAlign: 'left' }}>失败原因</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {errors.map((item, index) => (
-                              <tr key={index} style={{ borderBottom: '1px solid #ffcccc' }}>
-                                <td style={{ border: '1px solid #ffcccc', padding: '8px', fontWeight: 'bold' }}>{item.row || index + 1}</td>
-                                <td style={{ border: '1px solid #ffcccc', padding: '8px', color: '#d93025' }}>{item.error || '未知错误'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      ) : (
-                        <div style={{ color: '#d93025', padding: '20px', textAlign: 'center' }}>
-                          检测到 {importResult.statistics.failed} 条导入失败记录，但未提供详细错误信息
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-                <Button type="primary" onClick={() => {
-                  setImportModalVisible(false);
-                  setImportProgress(0);
-                  setImportResult(null);
-                  setIsImporting(false);
-                  fetchDevices();
-                }} style={{ marginTop: '20px', height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                  确定
-                </Button>
+                <div style={{ fontSize: '12px', opacity: 0.9 }}>总记录数</div>
               </div>
-            ) : null}
+              <div
+                style={{
+                  padding: '12px',
+                  background: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: '24px', fontWeight: '700' }}>
+                  {importResult.statistics.success || 0}
+                </div>
+                <div style={{ fontSize: '12px', opacity: 0.9 }}>成功</div>
+              </div>
+              <div
+                style={{
+                  padding: '12px',
+                  background: 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: '24px', fontWeight: '700' }}>
+                  {importResult.statistics.failed || 0}
+                </div>
+                <div style={{ fontSize: '12px', opacity: 0.9 }}>失败</div>
+              </div>
+            </div>
+            {(() => {
+              const errors = importResult.statistics?.errors;
+              const hasErrors = Array.isArray(errors) && errors.length > 0;
+              const hasFailedRecords = importResult.statistics?.failed > 0;
+
+              return (
+                (hasErrors || hasFailedRecords) && (
+                  <div
+                    style={{
+                      marginTop: '20px',
+                      maxHeight: 400,
+                      overflowY: 'auto',
+                      border: '1px solid #ffcccc',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      backgroundColor: '#fff7f7',
+                    }}
+                  >
+                    <h4 style={{ color: '#d93025', marginBottom: '12px', fontWeight: '600' }}>
+                      失败记录详情：
+                    </h4>
+
+                    {hasErrors ? (
+                      <table
+                        style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}
+                      >
+                        <thead>
+                          <tr style={{ backgroundColor: '#ffeeee' }}>
+                            <th
+                              style={{
+                                border: '1px solid #ffcccc',
+                                padding: '8px',
+                                textAlign: 'left',
+                                width: '80px',
+                              }}
+                            >
+                              行号
+                            </th>
+                            <th
+                              style={{
+                                border: '1px solid #ffcccc',
+                                padding: '8px',
+                                textAlign: 'left',
+                              }}
+                            >
+                              失败原因
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {errors.map((item, index) => (
+                            <tr key={index} style={{ borderBottom: '1px solid #ffcccc' }}>
+                              <td
+                                style={{
+                                  border: '1px solid #ffcccc',
+                                  padding: '8px',
+                                  fontWeight: 'bold',
+                                }}
+                              >
+                                {item.row || index + 1}
+                              </td>
+                              <td
+                                style={{
+                                  border: '1px solid #ffcccc',
+                                  padding: '8px',
+                                  color: '#d93025',
+                                }}
+                              >
+                                {item.error || '未知错误'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div style={{ color: '#d93025', padding: '20px', textAlign: 'center' }}>
+                        检测到 {importResult.statistics.failed} 条导入失败记录，但未提供详细错误信息
+                      </div>
+                    )}
+                  </div>
+                )
+              );
+            })()}
+            <Button
+              type="primary"
+              onClick={() => {
+                setImportModalVisible(false);
+                setImportProgress(0);
+                setImportResult(null);
+                setIsImporting(false);
+                fetchDevices();
+              }}
+              style={{
+                marginTop: '20px',
+                height: '40px',
+                borderRadius: designTokens.borderRadius.small,
+                background: designTokens.colors.primary.gradient,
+                border: 'none',
+                color: '#ffffff',
+                boxShadow: designTokens.shadows.small,
+                fontWeight: '500',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              确定
+            </Button>
+          </div>
+        ) : null}
       </Modal>
 
       <Modal
@@ -1712,27 +2187,50 @@ function DeviceManagement() {
           setSelectedDevice(null);
         }}
         footer={[
-          <Button key="close" onClick={() => {
-            setDetailModalVisible(false);
-            setSelectedDevice(null);
-          }} style={secondaryActionStyle}>
+          <Button
+            key="close"
+            onClick={() => {
+              setDetailModalVisible(false);
+              setSelectedDevice(null);
+            }}
+            style={secondaryActionStyle}
+          >
             关闭
           </Button>,
-          <Button key="edit" type="primary" onClick={() => {
-            setDetailModalVisible(false);
-            showModal(selectedDevice);
-          }} style={{ height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Button
+            key="edit"
+            type="primary"
+            onClick={() => {
+              setDetailModalVisible(false);
+              showModal(selectedDevice);
+            }}
+            style={{
+              height: '40px',
+              borderRadius: designTokens.borderRadius.small,
+              background: designTokens.colors.primary.gradient,
+              border: 'none',
+              color: '#ffffff',
+              boxShadow: designTokens.shadows.small,
+              fontWeight: '500',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             编辑
-          </Button>
+          </Button>,
         ]}
         width={800}
         destroyOnHidden
-        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
+        styles={{
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
+          body: { padding: '24px' },
+        }}
       >
         {selectedDevice && (
           <div>
-            <Card 
-              size="small" 
+            <Card
+              size="small"
               title={
                 <span style={{ fontWeight: '600' }}>
                   <CloudServerOutlined style={{ marginRight: '8px', color: '#667eea' }} />
@@ -1744,7 +2242,9 @@ function DeviceManagement() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>设备ID：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.deviceId || '-'}</span>
+                  <span style={{ marginLeft: 8, color: '#333' }}>
+                    {selectedDevice.deviceId || '-'}
+                  </span>
                 </div>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>设备名称：</label>
@@ -1758,72 +2258,118 @@ function DeviceManagement() {
                         {getDeviceTypeIcon(selectedDevice.type)}
                         <span>{typeMap[selectedDevice.type] || selectedDevice.type}</span>
                       </Space>
-                    ) : '-'}
+                    ) : (
+                      '-'
+                    )}
                   </span>
                 </div>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>型号：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.model || '-'}</span>
+                  <span style={{ marginLeft: 8, color: '#333' }}>
+                    {selectedDevice.model || '-'}
+                  </span>
                 </div>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>序列号：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.serialNumber || '-'}</span>
+                  <span style={{ marginLeft: 8, color: '#333' }}>
+                    {selectedDevice.serialNumber || '-'}
+                  </span>
                 </div>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>IP地址：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.ipAddress || '-'}</span>
+                  <span style={{ marginLeft: 8, color: '#333' }}>
+                    {selectedDevice.ipAddress || '-'}
+                  </span>
                 </div>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>所在机房：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.Rack?.Room?.name || '-'}</span>
+                  <span style={{ marginLeft: 8, color: '#333' }}>
+                    {selectedDevice.Rack?.Room?.name || '-'}
+                  </span>
                 </div>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>所在机柜：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.Rack?.name || '-'}</span>
+                  <span style={{ marginLeft: 8, color: '#333' }}>
+                    {selectedDevice.Rack?.name || '-'}
+                  </span>
                 </div>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>位置：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.position || '-'}</span>
+                  <span style={{ marginLeft: 8, color: '#333' }}>
+                    {selectedDevice.position || '-'}
+                  </span>
                 </div>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>高度(U)：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.height || '-'}</span>
+                  <span style={{ marginLeft: 8, color: '#333' }}>
+                    {selectedDevice.height || '-'}
+                  </span>
                 </div>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>功率(W)：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.power || '-'}</span>
+                  <span style={{ marginLeft: 8, color: '#333' }}>
+                    {selectedDevice.power || '-'}
+                  </span>
                 </div>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>状态：</label>
-                  <span style={{ 
-                    marginLeft: 8, 
-                    color: selectedDevice.status ? statusMap[selectedDevice.status]?.color : '#666',
-                    fontWeight: '600'
-                  }}>
-                    {selectedDevice.status ? statusMap[selectedDevice.status]?.text || selectedDevice.status : '-'}
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      color: selectedDevice.status
+                        ? statusMap[selectedDevice.status]?.color
+                        : '#666',
+                      fontWeight: '600',
+                    }}
+                  >
+                    {selectedDevice.status
+                      ? statusMap[selectedDevice.status]?.text || selectedDevice.status
+                      : '-'}
                   </span>
                 </div>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>购买日期：</label>
                   <span style={{ marginLeft: 8, color: '#333' }}>
-                    {selectedDevice.purchaseDate ? new Date(selectedDevice.purchaseDate).toLocaleDateString('zh-CN') : '-'}
+                    {selectedDevice.purchaseDate
+                      ? new Date(selectedDevice.purchaseDate).toLocaleDateString('zh-CN')
+                      : '-'}
                   </span>
                 </div>
                 <div>
                   <label style={{ fontWeight: '500', color: '#666' }}>保修到期：</label>
-                  <span style={{ 
-                    marginLeft: 8, 
-                    color: selectedDevice.warrantyExpiry && new Date(selectedDevice.warrantyExpiry) < new Date() ? '#d93025' : '#333',
-                    fontWeight: selectedDevice.warrantyExpiry && new Date(selectedDevice.warrantyExpiry) < new Date() ? '600' : 'normal'
-                  }}>
-                    {selectedDevice.warrantyExpiry ? new Date(selectedDevice.warrantyExpiry).toLocaleDateString('zh-CN') : '-'}
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      color:
+                        selectedDevice.warrantyExpiry &&
+                        new Date(selectedDevice.warrantyExpiry) < new Date()
+                          ? '#d93025'
+                          : '#333',
+                      fontWeight:
+                        selectedDevice.warrantyExpiry &&
+                        new Date(selectedDevice.warrantyExpiry) < new Date()
+                          ? '600'
+                          : 'normal',
+                    }}
+                  >
+                    {selectedDevice.warrantyExpiry
+                      ? new Date(selectedDevice.warrantyExpiry).toLocaleDateString('zh-CN')
+                      : '-'}
                   </span>
                 </div>
               </div>
               {selectedDevice.description && (
                 <div style={{ marginTop: '16px' }}>
                   <label style={{ fontWeight: '500', color: '#666' }}>描述：</label>
-                  <div style={{ marginTop: '8px', padding: '12px', backgroundColor: '#fafafa', borderRadius: '8px', color: '#333' }}>
+                  <div
+                    style={{
+                      marginTop: '8px',
+                      padding: '12px',
+                      backgroundColor: '#fafafa',
+                      borderRadius: '8px',
+                      color: '#333',
+                    }}
+                  >
                     {selectedDevice.description}
                   </div>
                 </div>
@@ -1843,15 +2389,39 @@ function DeviceManagement() {
         open={batchStatusModalVisible}
         onCancel={() => setBatchStatusModalVisible(false)}
         footer={[
-          <Button key="cancel" onClick={() => setBatchStatusModalVisible(false)} style={secondaryActionStyle}>
+          <Button
+            key="cancel"
+            onClick={() => setBatchStatusModalVisible(false)}
+            style={secondaryActionStyle}
+          >
             取消
           </Button>,
-          <Button key="submit" type="primary" loading={batchStatusLoading} onClick={handleBatchStatusChange} style={{ height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Button
+            key="submit"
+            type="primary"
+            loading={batchStatusLoading}
+            onClick={handleBatchStatusChange}
+            style={{
+              height: '40px',
+              borderRadius: designTokens.borderRadius.small,
+              background: designTokens.colors.primary.gradient,
+              border: 'none',
+              color: '#ffffff',
+              boxShadow: designTokens.shadows.small,
+              fontWeight: '500',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             确定
-          </Button>
+          </Button>,
         ]}
         destroyOnHidden
-        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
+        styles={{
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
+          body: { padding: '24px' },
+        }}
       >
         <Form form={batchStatusForm} layout="vertical">
           <Form.Item
@@ -1867,7 +2437,9 @@ function DeviceManagement() {
             </Select>
           </Form.Item>
           <div style={{ color: '#666', fontSize: '13px' }}>
-            已选择 <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedDevices.length}</span> 个设备
+            已选择{' '}
+            <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedDevices.length}</span>{' '}
+            个设备
           </div>
         </Form>
       </Modal>
@@ -1882,15 +2454,39 @@ function DeviceManagement() {
         open={exportModalVisible}
         onCancel={() => setExportModalVisible(false)}
         footer={[
-          <Button key="cancel" onClick={() => setExportModalVisible(false)} style={secondaryActionStyle}>
+          <Button
+            key="cancel"
+            onClick={() => setExportModalVisible(false)}
+            style={secondaryActionStyle}
+          >
             取消
           </Button>,
-          <Button key="submit" type="primary" loading={exportLoading} onClick={handleEnhancedExport} style={{ height: '40px', borderRadius: designTokens.borderRadius.small, background: designTokens.colors.primary.gradient, border: 'none', color: '#ffffff', boxShadow: designTokens.shadows.small, fontWeight: '500', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Button
+            key="submit"
+            type="primary"
+            loading={exportLoading}
+            onClick={handleEnhancedExport}
+            style={{
+              height: '40px',
+              borderRadius: designTokens.borderRadius.small,
+              background: designTokens.colors.primary.gradient,
+              border: 'none',
+              color: '#ffffff',
+              boxShadow: designTokens.shadows.small,
+              fontWeight: '500',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             导出
-          </Button>
+          </Button>,
         ]}
         destroyOnHidden
-        styles={{ header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }, body: { padding: '24px' } }}
+        styles={{
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
+          body: { padding: '24px' },
+        }}
         width={600}
       >
         <Form layout="vertical">
@@ -1908,28 +2504,40 @@ function DeviceManagement() {
             </Select>
           </Form.Item>
           <Form.Item label="选择导出字段">
-            <div style={{ maxHeight: '300px', overflow: 'auto', border: '1px solid #f0f0f0', borderRadius: '8px', padding: '12px' }}>
-              {deviceFields.filter(f => f.visible && f.fieldName !== 'rackId').map(field => (
-                <div key={field.fieldName} style={{ marginBottom: '8px' }}>
-                  <Checkbox
-                    checked={exportFields.includes(field.fieldName)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setExportFields([...exportFields, field.fieldName]);
-                      } else {
-                        setExportFields(exportFields.filter(f => f !== field.fieldName));
-                      }
-                    }}
-                  >
-                    {field.displayName}
-                  </Checkbox>
-                </div>
-              ))}
+            <div
+              style={{
+                maxHeight: '300px',
+                overflow: 'auto',
+                border: '1px solid #f0f0f0',
+                borderRadius: '8px',
+                padding: '12px',
+              }}
+            >
+              {deviceFields
+                .filter(f => f.visible && f.fieldName !== 'rackId')
+                .map(field => (
+                  <div key={field.fieldName} style={{ marginBottom: '8px' }}>
+                    <Checkbox
+                      checked={exportFields.includes(field.fieldName)}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          setExportFields([...exportFields, field.fieldName]);
+                        } else {
+                          setExportFields(exportFields.filter(f => f !== field.fieldName));
+                        }
+                      }}
+                    >
+                      {field.displayName}
+                    </Checkbox>
+                  </div>
+                ))}
             </div>
           </Form.Item>
           <div style={{ color: '#666', fontSize: '13px' }}>
-            已选择 <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedDevices.length}</span> 个设备，
-            将导出 <span style={{ color: '#52c41a', fontWeight: 600 }}>{exportFields.length}</span> 个字段
+            已选择{' '}
+            <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedDevices.length}</span>{' '}
+            个设备， 将导出{' '}
+            <span style={{ color: '#52c41a', fontWeight: 600 }}>{exportFields.length}</span> 个字段
           </div>
         </Form>
       </Modal>

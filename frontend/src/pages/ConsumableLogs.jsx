@@ -1,6 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Table, Card, Space, Select, DatePicker, Input, Tag, Button, message, Modal, Upload, Radio, Dropdown, Form, Tooltip, Timeline } from 'antd';
-import { HistoryOutlined, SearchOutlined, FileTextOutlined, DownloadOutlined, UploadOutlined, FileExcelOutlined, FileOutlined, DownOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
+import {
+  Table,
+  Card,
+  Space,
+  Select,
+  DatePicker,
+  Input,
+  Tag,
+  Button,
+  message,
+  Modal,
+  Upload,
+  Radio,
+  Dropdown,
+  Form,
+  Tooltip,
+  Timeline,
+} from 'antd';
+import {
+  HistoryOutlined,
+  SearchOutlined,
+  FileTextOutlined,
+  DownloadOutlined,
+  UploadOutlined,
+  FileExcelOutlined,
+  FileOutlined,
+  DownOutlined,
+  EditOutlined,
+  EyeOutlined,
+} from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
@@ -15,7 +43,7 @@ function ConsumableLogs() {
   const [filters, setFilters] = useState({
     operationType: 'all',
     consumableId: '',
-    dateRange: null
+    dateRange: null,
   });
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importType, setImportType] = useState('excel');
@@ -33,7 +61,7 @@ function ConsumableLogs() {
     try {
       setLoading(true);
       const params = { page, pageSize };
-      
+
       if (currentFilters.operationType !== 'all') {
         params.operationType = currentFilters.operationType;
       }
@@ -44,7 +72,7 @@ function ConsumableLogs() {
         params.startDate = currentFilters.dateRange[0].format('YYYY-MM-DD');
         params.endDate = currentFilters.dateRange[1].format('YYYY-MM-DD');
       }
-      
+
       const response = await axios.get('/api/consumables/logs', { params });
       setLogs(response.data.logs);
       setPagination(prev => ({ ...prev, current: page, total: response.data.total }));
@@ -65,7 +93,7 @@ function ConsumableLogs() {
     fetchLogs(1, pagination.pageSize);
   };
 
-  const getOperationTag = (type) => {
+  const getOperationTag = type => {
     const config = {
       in: { color: 'green', text: '入库' },
       out: { color: 'red', text: '出库' },
@@ -73,7 +101,7 @@ function ConsumableLogs() {
       update: { color: 'orange', text: '更新' },
       delete: { color: 'magenta', text: '删除' },
       adjust: { color: 'purple', text: '调整' },
-      import: { color: 'cyan', text: '导入' }
+      import: { color: 'cyan', text: '导入' },
     };
     const { color, text } = config[type] || { color: 'default', text: type };
     return <Tag color={color}>{text}</Tag>;
@@ -86,27 +114,27 @@ function ConsumableLogs() {
       key: 'createdAt',
       width: 180,
       sorter: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
-      render: (date) => dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+      render: date => dayjs(date).format('YYYY-MM-DD HH:mm:ss'),
     },
     {
       title: '耗材ID',
       dataIndex: 'consumableId',
       key: 'consumableId',
       width: 150,
-      render: (value) => <code>{value}</code>
+      render: value => <code>{value}</code>,
     },
     {
       title: '耗材名称',
       dataIndex: 'consumableName',
       key: 'consumableName',
-      width: 150
+      width: 150,
     },
     {
       title: '操作类型',
       dataIndex: 'operationType',
       key: 'operationType',
       width: 100,
-      render: (type) => getOperationTag(type)
+      render: type => getOperationTag(type),
     },
     {
       title: '变动数量',
@@ -114,46 +142,49 @@ function ConsumableLogs() {
       key: 'quantity',
       width: 100,
       render: (value, record) => (
-        <span style={{ 
-          color: value > 0 ? '#52c41a' : value < 0 ? '#ff4d4f' : '#888',
-          fontWeight: 'bold'
-        }}>
-          {value > 0 ? '+' : ''}{value}
+        <span
+          style={{
+            color: value > 0 ? '#52c41a' : value < 0 ? '#ff4d4f' : '#888',
+            fontWeight: 'bold',
+          }}
+        >
+          {value > 0 ? '+' : ''}
+          {value}
         </span>
-      )
+      ),
     },
     {
       title: '操作前库存',
       dataIndex: 'previousStock',
       key: 'previousStock',
-      width: 100
+      width: 100,
     },
     {
       title: '操作后库存',
       dataIndex: 'currentStock',
       key: 'currentStock',
-      width: 100
+      width: 100,
     },
     {
       title: '操作人',
       dataIndex: 'operator',
       key: 'operator',
-      width: 120
+      width: 120,
     },
     {
       title: '原因',
       dataIndex: 'reason',
       key: 'reason',
       width: 150,
-      render: (value) => value || '-'
+      render: value => value || '-',
     },
     {
       title: '备注',
       dataIndex: 'notes',
       key: 'notes',
       width: 200,
-      render: (value) => value || '-',
-      ellipsis: true
+      render: value => value || '-',
+      ellipsis: true,
     },
     {
       title: '操作',
@@ -181,8 +212,8 @@ function ConsumableLogs() {
             />
           </Tooltip>
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
   const handleExport = async (currentFilters = filters) => {
@@ -198,18 +229,18 @@ function ConsumableLogs() {
         params.startDate = currentFilters.dateRange[0].format('YYYY-MM-DD');
         params.endDate = currentFilters.dateRange[1].format('YYYY-MM-DD');
       }
-      
-      const response = await axios.get('/api/consumables/logs/export', { 
+
+      const response = await axios.get('/api/consumables/logs/export', {
         params,
-        responseType: 'blob'
+        responseType: 'blob',
       });
-      
+
       const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = window.URL.createObjectURL(blob);
       link.download = `耗材操作日志_${dayjs().format('YYYYMMDD_HHmmss')}.csv`;
       link.click();
-      
+
       message.success('导出成功');
     } catch (error) {
       message.error('导出失败');
@@ -230,29 +261,29 @@ function ConsumableLogs() {
         params.startDate = currentFilters.dateRange[0].format('YYYY-MM-DD');
         params.endDate = currentFilters.dateRange[1].format('YYYY-MM-DD');
       }
-      
-      const response = await axios.get('/api/consumables/logs', { 
-        params: { ...params, page: 1, pageSize: 10000 }
+
+      const response = await axios.get('/api/consumables/logs', {
+        params: { ...params, page: 1, pageSize: 10000 },
       });
-      
+
       const exportData = response.data.logs.map(log => ({
-        '时间': dayjs(log.createdAt).format('YYYY-MM-DD HH:mm:ss'),
-        '耗材ID': log.consumableId,
-        '耗材名称': log.consumableName,
-        '操作类型': getOperationTypeText(log.operationType),
-        '变动数量': log.quantity,
-        '操作前库存': log.previousStock,
-        '操作后库存': log.currentStock,
-        '操作人': log.operator,
-        '原因': log.reason || '',
-        '备注': log.notes || ''
+        时间: dayjs(log.createdAt).format('YYYY-MM-DD HH:mm:ss'),
+        耗材ID: log.consumableId,
+        耗材名称: log.consumableName,
+        操作类型: getOperationTypeText(log.operationType),
+        变动数量: log.quantity,
+        操作前库存: log.previousStock,
+        操作后库存: log.currentStock,
+        操作人: log.operator,
+        原因: log.reason || '',
+        备注: log.notes || '',
       }));
-      
+
       const ws = XLSX.utils.json_to_sheet(exportData);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '操作日志');
       XLSX.writeFile(wb, `耗材操作日志_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`);
-      
+
       message.success('导出Excel成功');
     } catch (error) {
       message.error('导出Excel失败');
@@ -260,27 +291,27 @@ function ConsumableLogs() {
     }
   };
 
-  const getOperationTypeText = (type) => {
+  const getOperationTypeText = type => {
     const map = {
-      'in': '入库',
-      'out': '出库',
-      'create': '创建',
-      'update': '更新',
-      'delete': '删除',
-      'adjust': '调整',
-      'import': '导入'
+      in: '入库',
+      out: '出库',
+      create: '创建',
+      update: '更新',
+      delete: '删除',
+      adjust: '调整',
+      import: '导入',
     };
     return map[type] || type;
   };
 
-  const handleImport = async (file) => {
+  const handleImport = async file => {
     setImporting(true);
     try {
       const reader = new FileReader();
-      reader.onload = async (e) => {
+      reader.onload = async e => {
         try {
           let logItems = [];
-          
+
           if (importType === 'excel') {
             const workbook = XLSX.read(e.target.result, { type: 'array' });
             const sheetName = workbook.SheetNames[0];
@@ -290,7 +321,7 @@ function ConsumableLogs() {
             const text = e.target.result;
             const lines = text.split('\n').filter(line => line.trim());
             const headers = lines[0].split(',').map(h => h.replace(/"/g, ''));
-            
+
             for (let i = 1; i < lines.length; i++) {
               const values = lines[i].split(',').map(v => v.replace(/"/g, ''));
               const item = {};
@@ -300,12 +331,12 @@ function ConsumableLogs() {
               logItems.push(item);
             }
           }
-          
+
           const response = await axios.post('/api/consumables/logs/import', {
             logs: logItems,
-            operator: '前端导入'
+            operator: '前端导入',
           });
-          
+
           if (response.data.success > 0) {
             message.success(`成功导入 ${response.data.success} 条记录`);
           }
@@ -313,7 +344,7 @@ function ConsumableLogs() {
             message.warning(`导入失败 ${response.data.failed} 条`);
             response.data.errors.forEach(err => console.error(err));
           }
-          
+
           setImportModalVisible(false);
           fetchLogs(1, pagination.pageSize);
         } catch (err) {
@@ -322,7 +353,7 @@ function ConsumableLogs() {
           setImporting(false);
         }
       };
-      
+
       if (importType === 'excel') {
         reader.readAsArrayBuffer(file);
       } else {
@@ -338,16 +369,16 @@ function ConsumableLogs() {
   const downloadTemplate = () => {
     const template = [
       {
-        '耗材ID': 'CON123456',
-        '耗材名称': '示例耗材',
-        '操作类型': '入库',
-        '变动数量': 10,
-        '操作前库存': 100,
-        '操作后库存': 110,
-        '操作人': '管理员',
-        '原因': '示例原因',
-        '备注': '示例备注'
-      }
+        耗材ID: 'CON123456',
+        耗材名称: '示例耗材',
+        操作类型: '入库',
+        变动数量: 10,
+        操作前库存: 100,
+        操作后库存: 110,
+        操作人: '管理员',
+        原因: '示例原因',
+        备注: '示例备注',
+      },
     ];
 
     const ws = XLSX.utils.json_to_sheet(template);
@@ -359,18 +390,18 @@ function ConsumableLogs() {
   };
 
   // 编辑日志
-  const handleEdit = (record) => {
+  const handleEdit = record => {
     setCurrentLog(record);
     form.setFieldsValue({
       reason: record.reason,
       notes: record.notes,
-      modificationReason: ''
+      modificationReason: '',
     });
     setEditModalVisible(true);
   };
 
   // 提交编辑
-  const handleEditSubmit = async (values) => {
+  const handleEditSubmit = async values => {
     if (!currentLog) return;
 
     setEditLoading(true);
@@ -379,7 +410,7 @@ function ConsumableLogs() {
         reason: values.reason,
         notes: values.notes,
         operator: values.operator || '管理员',
-        modificationReason: values.modificationReason
+        modificationReason: values.modificationReason,
       });
 
       message.success('日志修改成功');
@@ -393,7 +424,7 @@ function ConsumableLogs() {
   };
 
   // 查看修改历史
-  const handleViewHistory = async (record) => {
+  const handleViewHistory = async record => {
     setCurrentLog(record);
     setHistoryModalVisible(true);
     setHistoryLoading(true);
@@ -411,7 +442,7 @@ function ConsumableLogs() {
 
   return (
     <div>
-      <Card 
+      <Card
         title={
           <Space>
             <FileTextOutlined />
@@ -425,12 +456,12 @@ function ConsumableLogs() {
               placeholder="搜索耗材ID"
               style={{ width: 200 }}
               allowClear
-              onSearch={(value) => handleFilterChange('consumableId', value)}
+              onSearch={value => handleFilterChange('consumableId', value)}
               prefix={<SearchOutlined />}
             />
             <Select
               value={filters.operationType}
-              onChange={(value) => handleFilterChange('operationType', value)}
+              onChange={value => handleFilterChange('operationType', value)}
               style={{ width: 120 }}
             >
               <Option value="all">全部类型</Option>
@@ -444,11 +475,11 @@ function ConsumableLogs() {
             </Select>
             <RangePicker
               value={filters.dateRange}
-              onChange={(dates) => handleFilterChange('dateRange', dates)}
+              onChange={dates => handleFilterChange('dateRange', dates)}
               placeholder={['开始日期', '结束日期']}
             />
-            <Button 
-              icon={<HistoryOutlined />} 
+            <Button
+              icon={<HistoryOutlined />}
               onClick={() => {
                 setFilters({ operationType: 'all', consumableId: '', dateRange: null });
                 fetchLogs(1, pagination.pageSize);
@@ -463,15 +494,15 @@ function ConsumableLogs() {
                     key: 'csv',
                     icon: <FileOutlined />,
                     label: '导出CSV',
-                    onClick: () => handleExport(filters)
+                    onClick: () => handleExport(filters),
                   },
                   {
                     key: 'excel',
                     icon: <FileExcelOutlined />,
                     label: '导出Excel',
-                    onClick: () => handleExportExcel(filters)
-                  }
-                ]
+                    onClick: () => handleExportExcel(filters),
+                  },
+                ],
               }}
             >
               <Button icon={<DownloadOutlined />}>
@@ -491,11 +522,11 @@ function ConsumableLogs() {
           loading={loading}
           pagination={{
             ...pagination,
-            showTotal: (total) => `共 ${total} 条记录`,
+            showTotal: total => `共 ${total} 条记录`,
             showSizeChanger: true,
-            showQuickJumper: true
+            showQuickJumper: true,
           }}
-          onChange={(pagination) => fetchLogs(pagination.current, pagination.pageSize)}
+          onChange={pagination => fetchLogs(pagination.current, pagination.pageSize)}
           scroll={{ x: 1500 }}
         />
       </Card>
@@ -511,23 +542,23 @@ function ConsumableLogs() {
         width={500}
       >
         <div style={{ marginBottom: 16 }}>
-          <Radio.Group 
-            value={importType} 
-            onChange={(e) => setImportType(e.target.value)}
+          <Radio.Group
+            value={importType}
+            onChange={e => setImportType(e.target.value)}
             style={{ marginBottom: 16 }}
           >
             <Radio.Button value="excel">Excel文件</Radio.Button>
             <Radio.Button value="csv">CSV文件</Radio.Button>
           </Radio.Group>
         </div>
-        
+
         <div style={{ marginBottom: 16 }}>
           <Button type="link" onClick={downloadTemplate}>
             下载导入模板
           </Button>
           <span style={{ color: '#888', marginLeft: 8 }}>（建议先下载模板填写）</span>
         </div>
-        
+
         <Upload
           accept={importType === 'excel' ? '.xlsx,.xls' : '.csv'}
           showUploadList={false}
@@ -537,7 +568,7 @@ function ConsumableLogs() {
             选择{importType === 'excel' ? 'Excel' : 'CSV'}文件并导入
           </Button>
         </Upload>
-        
+
         <div style={{ marginTop: 16, color: '#888', fontSize: 12 }}>
           <p>注意事项：</p>
           <ul>
@@ -561,21 +592,11 @@ function ConsumableLogs() {
         confirmLoading={editLoading}
         width={600}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleEditSubmit}
-        >
-          <Form.Item
-            label="操作原因"
-            name="reason"
-          >
+        <Form form={form} layout="vertical" onFinish={handleEditSubmit}>
+          <Form.Item label="操作原因" name="reason">
             <Input.TextArea rows={2} placeholder="请输入操作原因" />
           </Form.Item>
-          <Form.Item
-            label="备注"
-            name="notes"
-          >
+          <Form.Item label="备注" name="notes">
             <Input.TextArea rows={3} placeholder="请输入备注信息" />
           </Form.Item>
           <Form.Item
@@ -585,10 +606,7 @@ function ConsumableLogs() {
           >
             <Input.TextArea rows={2} placeholder="请输入修改原因（必填）" />
           </Form.Item>
-          <Form.Item
-            label="修改人"
-            name="operator"
-          >
+          <Form.Item label="修改人" name="operator">
             <Input placeholder="请输入修改人姓名" />
           </Form.Item>
         </Form>
@@ -623,21 +641,38 @@ function ConsumableLogs() {
                   <Tag color={getOperationTag(item.operationType).props.color}>
                     {getOperationTag(item.operationType).props.children}
                   </Tag>
-                  {item.modifiedBy && (
-                    <Tag color="orange">已修改</Tag>
-                  )}
+                  {item.modifiedBy && <Tag color="orange">已修改</Tag>}
                 </div>
                 <div style={{ fontSize: 12, color: '#666' }}>
-                  <p><strong>耗材:</strong> {item.consumableName} ({item.consumableId})</p>
-                  <p><strong>操作人:</strong> {item.operator}</p>
-                  {item.reason && <p><strong>原因:</strong> {item.reason}</p>}
-                  {item.notes && <p><strong>备注:</strong> {item.notes}</p>}
+                  <p>
+                    <strong>耗材:</strong> {item.consumableName} ({item.consumableId})
+                  </p>
+                  <p>
+                    <strong>操作人:</strong> {item.operator}
+                  </p>
+                  {item.reason && (
+                    <p>
+                      <strong>原因:</strong> {item.reason}
+                    </p>
+                  )}
+                  {item.notes && (
+                    <p>
+                      <strong>备注:</strong> {item.notes}
+                    </p>
+                  )}
                   {item.modifiedBy && (
                     <>
-                      <p><strong>修改人:</strong> {item.modifiedBy}</p>
-                      <p><strong>修改时间:</strong> {dayjs(item.modifiedAt).format('YYYY-MM-DD HH:mm:ss')}</p>
+                      <p>
+                        <strong>修改人:</strong> {item.modifiedBy}
+                      </p>
+                      <p>
+                        <strong>修改时间:</strong>{' '}
+                        {dayjs(item.modifiedAt).format('YYYY-MM-DD HH:mm:ss')}
+                      </p>
                       {item.modificationReason && (
-                        <p><strong>修改原因:</strong> {item.modificationReason}</p>
+                        <p>
+                          <strong>修改原因:</strong> {item.modificationReason}
+                        </p>
                       )}
                     </>
                   )}

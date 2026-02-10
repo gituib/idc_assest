@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, Select, message, Card, Space, InputNumber, Switch } from 'antd';
+import {
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  Select,
+  message,
+  Card,
+  Space,
+  InputNumber,
+  Switch,
+} from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
@@ -34,7 +46,7 @@ function TicketFieldManagement() {
     if (field) {
       const fieldData = {
         ...field,
-        options: field.options ? JSON.stringify(field.options, null, 2) : ''
+        options: field.options ? JSON.stringify(field.options, null, 2) : '',
       };
       form.setFieldsValue(fieldData);
     } else {
@@ -48,11 +60,11 @@ function TicketFieldManagement() {
     setEditingField(null);
   };
 
-  const handleSubmit = async (values) => {
+  const handleSubmit = async values => {
     try {
       const fieldData = {
         ...values,
-        options: values.options ? JSON.parse(values.options || '[]') : null
+        options: values.options ? JSON.parse(values.options || '[]') : null,
       };
 
       if (editingField) {
@@ -72,7 +84,7 @@ function TicketFieldManagement() {
     }
   };
 
-  const handleDelete = async (fieldId) => {
+  const handleDelete = async fieldId => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个字段吗？',
@@ -88,7 +100,7 @@ function TicketFieldManagement() {
           message.error('字段删除失败');
           console.error('字段删除失败:', error);
         }
-      }
+      },
     });
   };
 
@@ -107,7 +119,7 @@ function TicketFieldManagement() {
       title: '字段类型',
       dataIndex: 'fieldType',
       key: 'fieldType',
-      render: (type) => {
+      render: type => {
         const typeMap = {
           string: '文本',
           number: '数字',
@@ -116,26 +128,22 @@ function TicketFieldManagement() {
           date: '日期',
           datetime: '日期时间',
           textarea: '多行文本',
-          device: '设备选择'
+          device: '设备选择',
         };
         return typeMap[type] || type;
-      }
+      },
     },
     {
       title: '必填',
       dataIndex: 'required',
       key: 'required',
-      render: (required) => (
-        <Switch checked={required} disabled />
-      )
+      render: required => <Switch checked={required} disabled />,
     },
     {
       title: '可见',
       dataIndex: 'visible',
       key: 'visible',
-      render: (visible) => (
-        <Switch checked={visible} disabled />
-      )
+      render: visible => <Switch checked={visible} disabled />,
     },
     {
       title: '顺序',
@@ -147,10 +155,20 @@ function TicketFieldManagement() {
       key: 'action',
       render: (_, record) => (
         <Space size="middle">
-          <Button type="primary" icon={<EditOutlined />} onClick={() => showModal(record)} size="small">
+          <Button
+            type="primary"
+            icon={<EditOutlined />}
+            onClick={() => showModal(record)}
+            size="small"
+          >
             编辑
           </Button>
-          <Button danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.fieldId)} size="small">
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record.fieldId)}
+            size="small"
+          >
             删除
           </Button>
         </Space>
@@ -160,11 +178,14 @@ function TicketFieldManagement() {
 
   return (
     <div>
-      <Card title="工单字段管理" extra={
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
-          添加字段
-        </Button>
-      }>
+      <Card
+        title="工单字段管理"
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
+            添加字段
+          </Button>
+        }
+      >
         <Table
           columns={columns}
           dataSource={fields}
@@ -181,11 +202,7 @@ function TicketFieldManagement() {
         footer={null}
         width={600}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-        >
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item
             name="fieldName"
             label="字段名称"
@@ -219,17 +236,11 @@ function TicketFieldManagement() {
             </Select>
           </Form.Item>
 
-          <Form.Item
-            name="required"
-            label="必填"
-          >
+          <Form.Item name="required" label="必填">
             <Switch />
           </Form.Item>
 
-          <Form.Item
-            name="visible"
-            label="可见"
-          >
+          <Form.Item name="visible" label="可见">
             <Switch defaultChecked />
           </Form.Item>
 
@@ -246,10 +257,7 @@ function TicketFieldManagement() {
             label="选项配置（仅下拉选择类型，JSON格式）"
             tooltip="格式示例：[{value: 'option1', label: '选项1'}]"
           >
-            <Input.TextArea 
-              rows={3} 
-              placeholder='[{"value": "option1", "label": "选项1"}]'
-            />
+            <Input.TextArea rows={3} placeholder='[{"value": "option1", "label": "选项1"}]' />
           </Form.Item>
 
           <Form.Item style={{ textAlign: 'right' }}>

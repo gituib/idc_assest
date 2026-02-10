@@ -1,6 +1,31 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Card, Table, Button, Space, Modal, Form, Input, Select, message, Tag, Popconfirm, Avatar, Tooltip, Badge } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, ReloadOutlined, LockOutlined, CameraOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import {
+  Card,
+  Table,
+  Button,
+  Space,
+  Modal,
+  Form,
+  Input,
+  Select,
+  message,
+  Tag,
+  Popconfirm,
+  Avatar,
+  Tooltip,
+  Badge,
+} from 'antd';
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  UserOutlined,
+  ReloadOutlined,
+  LockOutlined,
+  CameraOutlined,
+  CheckOutlined,
+  CloseOutlined,
+} from '@ant-design/icons';
 import { userAPI, roleAPI } from '../api';
 
 const { Option } = Select;
@@ -32,7 +57,7 @@ const UserManagement = () => {
     try {
       const params = {
         page: pagination.current,
-        pageSize: pagination.pageSize
+        pageSize: pagination.pageSize,
       };
       if (activeTab !== 'all') {
         params.status = activeTab;
@@ -69,7 +94,7 @@ const UserManagement = () => {
     setModalVisible(true);
   }, []);
 
-  const handleEdit = useCallback((user) => {
+  const handleEdit = useCallback(user => {
     setEditingUser(user);
     form.setFieldsValue({
       username: user.username,
@@ -77,55 +102,58 @@ const UserManagement = () => {
       phone: user.phone,
       realName: user.realName,
       status: user.status,
-      roleIds: user.roles?.map(r => r.roleId) || []
+      roleIds: user.roles?.map(r => r.roleId) || [],
     });
     setModalVisible(true);
   }, []);
 
-  const handleResetPassword = useCallback((user) => {
+  const handleResetPassword = useCallback(user => {
     setPasswordUser(user);
     passwordForm.resetFields();
     setPasswordModalVisible(true);
   }, []);
 
-  const handleAvatarClick = useCallback((user) => {
+  const handleAvatarClick = useCallback(user => {
     setAvatarUser(user);
     setAvatarModalVisible(true);
   }, []);
 
-  const handleAvatarUpload = useCallback(async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const handleAvatarUpload = useCallback(
+    async e => {
+      const file = e.target.files[0];
+      if (!file) return;
 
-    if (!file.type.match(/image\/(jpeg|png|gif|webp)/)) {
-      message.error('只支持 JPG、PNG、GIF 和 WebP 格式的图片');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      message.error('图片大小不能超过 5MB');
-      return;
-    }
-
-    setUploadLoading(true);
-    try {
-      const response = await userAPI.uploadAvatar(avatarUser.userId, file);
-      if (response.success) {
-        message.success('头像上传成功');
-        fetchUsers();
-        setAvatarModalVisible(false);
-      } else {
-        message.error(response.message || '上传失败');
+      if (!file.type.match(/image\/(jpeg|png|gif|webp)/)) {
+        message.error('只支持 JPG、PNG、GIF 和 WebP 格式的图片');
+        return;
       }
-    } catch (error) {
-      message.error('上传失败');
-    } finally {
-      setUploadLoading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+
+      if (file.size > 5 * 1024 * 1024) {
+        message.error('图片大小不能超过 5MB');
+        return;
       }
-    }
-  }, [avatarUser, fetchUsers]);
+
+      setUploadLoading(true);
+      try {
+        const response = await userAPI.uploadAvatar(avatarUser.userId, file);
+        if (response.success) {
+          message.success('头像上传成功');
+          fetchUsers();
+          setAvatarModalVisible(false);
+        } else {
+          message.error(response.message || '上传失败');
+        }
+      } catch (error) {
+        message.error('上传失败');
+      } finally {
+        setUploadLoading(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    },
+    [avatarUser, fetchUsers]
+  );
 
   const handleAvatarDelete = useCallback(async () => {
     try {
@@ -142,283 +170,302 @@ const UserManagement = () => {
     }
   }, [avatarUser, fetchUsers]);
 
-  const handleDelete = useCallback(async (userId) => {
-    try {
-      const response = await userAPI.delete(userId);
-      if (response.success) {
-        message.success('删除成功');
-        fetchUsers();
-      } else {
-        message.error(response.message || '删除失败');
+  const handleDelete = useCallback(
+    async userId => {
+      try {
+        const response = await userAPI.delete(userId);
+        if (response.success) {
+          message.success('删除成功');
+          fetchUsers();
+        } else {
+          message.error(response.message || '删除失败');
+        }
+      } catch (error) {
+        message.error('删除失败');
       }
-    } catch (error) {
-      message.error('删除失败');
-    }
-  }, [fetchUsers]);
+    },
+    [fetchUsers]
+  );
 
-  const handleLockUnlock = useCallback(async (record) => {
-    try {
-      const newStatus = record.status === 'locked' ? 'active' : 'locked';
-      const response = await userAPI.update(record.userId, {
-        status: newStatus
-      });
-      if (response.success) {
-        message.success(record.status === 'locked' ? '解锁成功' : '锁定成功');
-        fetchUsers();
-      } else {
-        message.error(response.message || '操作失败');
+  const handleLockUnlock = useCallback(
+    async record => {
+      try {
+        const newStatus = record.status === 'locked' ? 'active' : 'locked';
+        const response = await userAPI.update(record.userId, {
+          status: newStatus,
+        });
+        if (response.success) {
+          message.success(record.status === 'locked' ? '解锁成功' : '锁定成功');
+          fetchUsers();
+        } else {
+          message.error(response.message || '操作失败');
+        }
+      } catch (error) {
+        message.error('操作失败');
       }
-    } catch (error) {
-      message.error('操作失败');
-    }
-  }, [fetchUsers]);
+    },
+    [fetchUsers]
+  );
 
-  const handleSubmit = useCallback(async (values) => {
-    try {
-      let response;
-      if (editingUser) {
-        response = await userAPI.update(editingUser.userId, values);
-      } else {
-        response = await userAPI.create(values);
+  const handleSubmit = useCallback(
+    async values => {
+      try {
+        let response;
+        if (editingUser) {
+          response = await userAPI.update(editingUser.userId, values);
+        } else {
+          response = await userAPI.create(values);
+        }
+
+        if (response.success) {
+          message.success(editingUser ? '更新成功' : '创建成功');
+          setModalVisible(false);
+          fetchUsers();
+        } else {
+          message.error(response.message || '操作失败');
+        }
+      } catch (error) {
+        message.error('操作失败');
       }
+    },
+    [editingUser, fetchUsers]
+  );
 
-      if (response.success) {
-        message.success(editingUser ? '更新成功' : '创建成功');
-        setModalVisible(false);
-        fetchUsers();
-      } else {
-        message.error(response.message || '操作失败');
+  const handleResetPasswordSubmit = useCallback(
+    async values => {
+      try {
+        const response = await userAPI.resetPassword(passwordUser.userId, values);
+        if (response.success) {
+          message.success('密码重置成功');
+          setPasswordModalVisible(false);
+        } else {
+          message.error(response.message || '重置失败');
+        }
+      } catch (error) {
+        message.error('重置失败');
       }
-    } catch (error) {
-      message.error('操作失败');
-    }
-  }, [editingUser, fetchUsers]);
+    },
+    [passwordUser]
+  );
 
-  const handleResetPasswordSubmit = useCallback(async (values) => {
-    try {
-      const response = await userAPI.resetPassword(passwordUser.userId, values);
-      if (response.success) {
-        message.success('密码重置成功');
-        setPasswordModalVisible(false);
-      } else {
-        message.error(response.message || '重置失败');
-      }
-    } catch (error) {
-      message.error('重置失败');
-    }
-  }, [passwordUser]);
-
-  const getStatusColor = (status) => {
+  const getStatusColor = status => {
     const colors = {
       active: 'green',
       inactive: 'red',
       locked: 'orange',
-      pending: 'blue'
+      pending: 'blue',
     };
     return colors[status] || 'default';
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = status => {
     const texts = {
       active: '正常',
       inactive: '禁用',
       locked: '锁定',
-      pending: '待审核'
+      pending: '待审核',
     };
     return texts[status] || status;
   };
 
-  const handleApprove = useCallback(async (userId) => {
-    try {
-      const response = await userAPI.approve(userId);
-      if (response.success) {
-        message.success('审核通过');
-        fetchUsers();
-      } else {
-        message.error(response.message || '审核失败');
+  const handleApprove = useCallback(
+    async userId => {
+      try {
+        const response = await userAPI.approve(userId);
+        if (response.success) {
+          message.success('审核通过');
+          fetchUsers();
+        } else {
+          message.error(response.message || '审核失败');
+        }
+      } catch (error) {
+        message.error('审核失败');
       }
-    } catch (error) {
-      message.error('审核失败');
-    }
-  }, [fetchUsers]);
+    },
+    [fetchUsers]
+  );
 
-  const handleReject = useCallback(async (userId) => {
-    try {
-      const response = await userAPI.reject(userId);
-      if (response.success) {
-        message.success('已拒绝该用户的注册申请');
-        fetchUsers();
-      } else {
-        message.error(response.message || '操作失败');
+  const handleReject = useCallback(
+    async userId => {
+      try {
+        const response = await userAPI.reject(userId);
+        if (response.success) {
+          message.success('已拒绝该用户的注册申请');
+          fetchUsers();
+        } else {
+          message.error(response.message || '操作失败');
+        }
+      } catch (error) {
+        message.error('操作失败');
       }
-    } catch (error) {
-      message.error('操作失败');
-    }
-  }, [fetchUsers]);
+    },
+    [fetchUsers]
+  );
 
-  const getAvatarUrl = (user) => {
+  const getAvatarUrl = user => {
     if (!user?.avatar) return null;
     return user.avatar;
   };
 
-  const tableColumns = useMemo(() => [
-    {
-      title: '头像',
-      key: 'avatar',
-      width: 80,
-      render: (_, record) => (
-        <Badge dot={!!record.avatar} color="green" offset={[-5, 35]}>
-          <Avatar
-            size={48}
-            icon={!record.avatar && <UserOutlined />}
-            src={getAvatarUrl(record)}
-            style={{ 
-              backgroundColor: record.avatar ? 'transparent' : '#1890ff',
-              cursor: 'pointer'
-            }}
-            onClick={() => handleAvatarClick(record)}
-          />
-        </Badge>
-      )
-    },
-    {
-      title: '用户名',
-      key: 'username',
-      width: 150,
-      render: (_, record) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{record.realName || record.username}</div>
-          <div style={{ fontSize: '12px', color: '#999' }}>@{record.username}</div>
-        </div>
-      )
-    },
-    {
-      title: '邮箱',
-      dataIndex: 'email',
-      key: 'email',
-      width: 200,
-      render: (email) => email || '-'
-    },
-    {
-      title: '手机号',
-      dataIndex: 'phone',
-      key: 'phone',
-      width: 130,
-      render: (phone) => phone || '-'
-    },
-    {
-      title: '角色',
-      key: 'roles',
-      render: (_, record) => (
-        <Space wrap>
-          {record.roles?.map(role => (
-            <Tag key={role.roleId} color={role.roleCode === 'admin' ? 'blue' : 'green'}>
-              {role.roleName}
-            </Tag>
-          )) || '-'}
-        </Space>
-      )
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => (
-        <Tag color={getStatusColor(status)}>{getStatusText(status)}</Tag>
-      )
-    },
-    {
-      title: '最后登录',
-      key: 'lastLogin',
-      render: (_, record) => (
-        <div style={{ fontSize: '12px' }}>
-          <div>{record.lastLoginTime ? new Date(record.lastLoginTime).toLocaleString() : '从未登录'}</div>
-          <div style={{ color: '#999' }}>{record.lastLoginIp || '-'}</div>
-        </div>
-      )
-    },
-    {
-      title: '操作',
-      key: 'action',
-      render: (_, record) => (
-        <Space size="small">
-          {record.status === 'pending' ? (
-            <>
-              <Popconfirm
-                title="确定要通过该用户的注册申请吗？"
-                onConfirm={() => handleApprove(record.userId)}
-                okText="通过"
-                cancelText="取消"
-              >
-                <Tooltip title="通过">
+  const tableColumns = useMemo(
+    () => [
+      {
+        title: '头像',
+        key: 'avatar',
+        width: 80,
+        render: (_, record) => (
+          <Badge dot={!!record.avatar} color="green" offset={[-5, 35]}>
+            <Avatar
+              size={48}
+              icon={!record.avatar && <UserOutlined />}
+              src={getAvatarUrl(record)}
+              style={{
+                backgroundColor: record.avatar ? 'transparent' : '#1890ff',
+                cursor: 'pointer',
+              }}
+              onClick={() => handleAvatarClick(record)}
+            />
+          </Badge>
+        ),
+      },
+      {
+        title: '用户名',
+        key: 'username',
+        width: 150,
+        render: (_, record) => (
+          <div>
+            <div style={{ fontWeight: 500 }}>{record.realName || record.username}</div>
+            <div style={{ fontSize: '12px', color: '#999' }}>@{record.username}</div>
+          </div>
+        ),
+      },
+      {
+        title: '邮箱',
+        dataIndex: 'email',
+        key: 'email',
+        width: 200,
+        render: email => email || '-',
+      },
+      {
+        title: '手机号',
+        dataIndex: 'phone',
+        key: 'phone',
+        width: 130,
+        render: phone => phone || '-',
+      },
+      {
+        title: '角色',
+        key: 'roles',
+        render: (_, record) => (
+          <Space wrap>
+            {record.roles?.map(role => (
+              <Tag key={role.roleId} color={role.roleCode === 'admin' ? 'blue' : 'green'}>
+                {role.roleName}
+              </Tag>
+            )) || '-'}
+          </Space>
+        ),
+      },
+      {
+        title: '状态',
+        dataIndex: 'status',
+        key: 'status',
+        render: status => <Tag color={getStatusColor(status)}>{getStatusText(status)}</Tag>,
+      },
+      {
+        title: '最后登录',
+        key: 'lastLogin',
+        render: (_, record) => (
+          <div style={{ fontSize: '12px' }}>
+            <div>
+              {record.lastLoginTime ? new Date(record.lastLoginTime).toLocaleString() : '从未登录'}
+            </div>
+            <div style={{ color: '#999' }}>{record.lastLoginIp || '-'}</div>
+          </div>
+        ),
+      },
+      {
+        title: '操作',
+        key: 'action',
+        render: (_, record) => (
+          <Space size="small">
+            {record.status === 'pending' ? (
+              <>
+                <Popconfirm
+                  title="确定要通过该用户的注册申请吗？"
+                  onConfirm={() => handleApprove(record.userId)}
+                  okText="通过"
+                  cancelText="取消"
+                >
+                  <Tooltip title="通过">
+                    <Button type="text" icon={<CheckOutlined />} style={{ color: '#52c41a' }} />
+                  </Tooltip>
+                </Popconfirm>
+                <Popconfirm
+                  title="确定要拒绝该用户的注册申请吗？"
+                  onConfirm={() => handleReject(record.userId)}
+                  okText="拒绝"
+                  cancelText="取消"
+                >
+                  <Tooltip title="拒绝">
+                    <Button type="text" icon={<CloseOutlined />} style={{ color: '#ff4d4f' }} />
+                  </Tooltip>
+                </Popconfirm>
+              </>
+            ) : (
+              <>
+                <Tooltip title="编辑">
+                  <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+                </Tooltip>
+                <Tooltip title="重置密码">
                   <Button
                     type="text"
-                    icon={<CheckOutlined />}
-                    style={{ color: '#52c41a' }}
+                    icon={<LockOutlined />}
+                    onClick={() => handleResetPassword(record)}
                   />
                 </Tooltip>
-              </Popconfirm>
-              <Popconfirm
-                title="确定要拒绝该用户的注册申请吗？"
-                onConfirm={() => handleReject(record.userId)}
-                okText="拒绝"
-                cancelText="取消"
-              >
-                <Tooltip title="拒绝">
-                  <Button
-                    type="text"
-                    icon={<CloseOutlined />}
-                    style={{ color: '#ff4d4f' }}
-                  />
-                </Tooltip>
-              </Popconfirm>
-            </>
-          ) : (
-            <>
-              <Tooltip title="编辑">
-                <Button
-                  type="text"
-                  icon={<EditOutlined />}
-                  onClick={() => handleEdit(record)}
-                />
-              </Tooltip>
-              <Tooltip title="重置密码">
-                <Button
-                  type="text"
-                  icon={<LockOutlined />}
-                  onClick={() => handleResetPassword(record)}
-                />
-              </Tooltip>
-              <Popconfirm
-                title={record.status === 'locked' ? '确定要解锁此用户吗？' : '确定要锁定此用户吗？'}
-                onConfirm={() => handleLockUnlock(record)}
-                okText="确定"
-                cancelText="取消"
-              >
-                <Tooltip title={record.status === 'locked' ? '解锁' : '锁定'}>
-                  <Button
-                    type="text"
-                    icon={record.status === 'locked' ? <ReloadOutlined /> : <LockOutlined />}
-                    style={{ color: record.status === 'locked' ? '#52c41a' : '#faad14' }}
-                  />
-                </Tooltip>
-              </Popconfirm>
-              <Popconfirm
-                title="确定要删除此用户吗？"
-                onConfirm={() => handleDelete(record.userId)}
-                okText="确定"
-                cancelText="取消"
-              >
-                <Tooltip title="删除">
-                  <Button type="text" danger icon={<DeleteOutlined />} />
-                </Tooltip>
-              </Popconfirm>
-            </>
-          )}
-        </Space>
-      )
-    }
-  ], [handleAvatarClick, handleEdit, handleResetPassword, handleDelete, handleLockUnlock, handleApprove, handleReject]);
+                <Popconfirm
+                  title={
+                    record.status === 'locked' ? '确定要解锁此用户吗？' : '确定要锁定此用户吗？'
+                  }
+                  onConfirm={() => handleLockUnlock(record)}
+                  okText="确定"
+                  cancelText="取消"
+                >
+                  <Tooltip title={record.status === 'locked' ? '解锁' : '锁定'}>
+                    <Button
+                      type="text"
+                      icon={record.status === 'locked' ? <ReloadOutlined /> : <LockOutlined />}
+                      style={{ color: record.status === 'locked' ? '#52c41a' : '#faad14' }}
+                    />
+                  </Tooltip>
+                </Popconfirm>
+                <Popconfirm
+                  title="确定要删除此用户吗？"
+                  onConfirm={() => handleDelete(record.userId)}
+                  okText="确定"
+                  cancelText="取消"
+                >
+                  <Tooltip title="删除">
+                    <Button type="text" danger icon={<DeleteOutlined />} />
+                  </Tooltip>
+                </Popconfirm>
+              </>
+            )}
+          </Space>
+        ),
+      },
+    ],
+    [
+      handleAvatarClick,
+      handleEdit,
+      handleResetPassword,
+      handleDelete,
+      handleLockUnlock,
+      handleApprove,
+      handleReject,
+    ]
+  );
 
   const pageHeaderStyle = {
     marginBottom: '24px',
@@ -426,7 +473,7 @@ const UserManagement = () => {
     justifyContent: 'space-between',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: '16px'
+    gap: '16px',
   };
 
   const titleStyle = {
@@ -436,20 +483,20 @@ const UserManagement = () => {
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
-    backgroundClip: 'text'
+    backgroundClip: 'text',
   };
 
   const cardStyle = {
     borderRadius: '16px',
     border: 'none',
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-    overflow: 'hidden'
+    overflow: 'hidden',
   };
 
   const cardHeadStyle = {
     borderBottom: '1px solid #f0f0f0',
     padding: '16px 24px',
-    background: 'linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%)'
+    background: 'linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%)',
   };
 
   const primaryButtonStyle = {
@@ -459,21 +506,21 @@ const UserManagement = () => {
     border: 'none',
     boxShadow: '0 4px 12px rgba(102, 126, 234, 0.35)',
     fontWeight: '500',
-    transition: 'all 0.3s ease'
+    transition: 'all 0.3s ease',
   };
 
   const secondaryButtonStyle = {
     height: '40px',
     borderRadius: '8px',
     border: '1px solid #e8e8e8',
-    transition: 'all 0.3s ease'
+    transition: 'all 0.3s ease',
   };
 
   const actionButtonStyle = {
     height: '32px',
     borderRadius: '6px',
     border: '1px solid #e8e8e8',
-    transition: 'all 0.3s ease'
+    transition: 'all 0.3s ease',
   };
 
   const modalHeaderStyle = {
@@ -481,25 +528,25 @@ const UserManagement = () => {
     alignItems: 'center',
     gap: '8px',
     fontSize: '18px',
-    fontWeight: '600'
+    fontWeight: '600',
   };
 
   const modalHeaderAccent = {
     width: '4px',
     height: '20px',
     background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '2px'
+    borderRadius: '2px',
   };
 
   const avatarModalStyle = {
     textAlign: 'center',
-    padding: '20px 0'
+    padding: '20px 0',
   };
 
   const avatarWrapperStyle = {
     marginBottom: '24px',
     position: 'relative',
-    display: 'inline-block'
+    display: 'inline-block',
   };
 
   return (
@@ -507,16 +554,12 @@ const UserManagement = () => {
       <div style={pageHeaderStyle}>
         <h1 style={titleStyle}>用户管理</h1>
         <Space size="middle">
-          <Button 
-            icon={<ReloadOutlined />} 
-            onClick={fetchUsers}
-            style={secondaryButtonStyle}
-          >
+          <Button icon={<ReloadOutlined />} onClick={fetchUsers} style={secondaryButtonStyle}>
             刷新
           </Button>
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />} 
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
             onClick={handleAdd}
             style={primaryButtonStyle}
           >
@@ -533,10 +576,10 @@ const UserManagement = () => {
           { key: 'pending', tab: '待审核' },
           { key: 'active', tab: '正常' },
           { key: 'locked', tab: '锁定' },
-          { key: 'inactive', tab: '禁用' }
+          { key: 'inactive', tab: '禁用' },
         ]}
         activeTabKey={activeTab}
-        onTabChange={(key) => {
+        onTabChange={key => {
           setActiveTab(key);
           setPagination(prev => ({ ...prev, current: 1 }));
         }}
@@ -550,9 +593,9 @@ const UserManagement = () => {
             ...pagination,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 条记录`
+            showTotal: total => `共 ${total} 条记录`,
           }}
-          onChange={(newPagination) => {
+          onChange={newPagination => {
             setPagination(prev => ({ ...prev, ...newPagination }));
           }}
           rowClassName={() => 'table-row'}
@@ -573,22 +616,17 @@ const UserManagement = () => {
         destroyOnHidden
         styles={{
           body: { padding: '24px' },
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
         }}
         style={{ borderRadius: '16px', overflow: 'hidden' }}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-          style={{ marginTop: '20px' }}
-        >
+        <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ marginTop: '20px' }}>
           <Form.Item
             name="username"
             label="用户名"
             rules={[
               { required: true, message: '请输入用户名' },
-              { min: 3, max: 20, message: '用户名长度必须在3-20个字符之间' }
+              { min: 3, max: 20, message: '用户名长度必须在3-20个字符之间' },
             ]}
           >
             <Input placeholder="请输入用户名" style={{ borderRadius: '8px' }} />
@@ -607,7 +645,7 @@ const UserManagement = () => {
             label="邮箱"
             rules={[
               { required: true, message: '请输入邮箱' },
-              { type: 'email', message: '请输入有效的邮箱地址' }
+              { type: 'email', message: '请输入有效的邮箱地址' },
             ]}
           >
             <Input placeholder="请输入邮箱" style={{ borderRadius: '8px' }} />
@@ -637,7 +675,7 @@ const UserManagement = () => {
               label="初始密码"
               rules={[
                 { required: true, message: '请输入初始密码' },
-                { min: 6, message: '密码长度不能少于6个字符' }
+                { min: 6, message: '密码长度不能少于6个字符' },
               ]}
             >
               <Input.Password placeholder="请输入初始密码" style={{ borderRadius: '8px' }} />
@@ -656,9 +694,7 @@ const UserManagement = () => {
             <Form.Item
               name="newPassword"
               label="新密码"
-              rules={[
-                { min: 6, message: '密码长度不能少于6个字符' }
-              ]}
+              rules={[{ min: 6, message: '密码长度不能少于6个字符' }]}
             >
               <Input.Password placeholder="留空则不修改密码" style={{ borderRadius: '8px' }} />
             </Form.Item>
@@ -666,21 +702,21 @@ const UserManagement = () => {
 
           <Form.Item style={{ marginBottom: 0, textAlign: 'right', marginTop: '24px' }}>
             <Space>
-              <Button 
+              <Button
                 onClick={() => setModalVisible(false)}
                 style={{ borderRadius: '8px', height: '40px' }}
               >
                 取消
               </Button>
-              <Button 
-                type="primary" 
-                htmlType="submit" 
+              <Button
+                type="primary"
+                htmlType="submit"
                 loading={loading}
                 style={{
                   ...primaryButtonStyle,
                   width: 'auto',
                   paddingLeft: '24px',
-                  paddingRight: '24px'
+                  paddingRight: '24px',
                 }}
               >
                 {editingUser ? '更新' : '创建'}
@@ -704,7 +740,7 @@ const UserManagement = () => {
         destroyOnHidden
         styles={{
           body: { padding: '24px' },
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
         }}
         style={{ borderRadius: '16px', overflow: 'hidden' }}
       >
@@ -719,7 +755,7 @@ const UserManagement = () => {
             label="新密码"
             rules={[
               { required: true, message: '请输入新密码' },
-              { min: 6, message: '密码长度不能少于6个字符' }
+              { min: 6, message: '密码长度不能少于6个字符' },
             ]}
           >
             <Input.Password placeholder="请输入新密码" style={{ borderRadius: '8px' }} />
@@ -727,21 +763,21 @@ const UserManagement = () => {
 
           <Form.Item style={{ marginBottom: 0, textAlign: 'right', marginTop: '24px' }}>
             <Space>
-              <Button 
+              <Button
                 onClick={() => setPasswordModalVisible(false)}
                 style={{ borderRadius: '8px', height: '40px' }}
               >
                 取消
               </Button>
-              <Button 
-                type="primary" 
-                htmlType="submit" 
+              <Button
+                type="primary"
+                htmlType="submit"
                 loading={loading}
                 style={{
                   ...primaryButtonStyle,
                   width: 'auto',
                   paddingLeft: '24px',
-                  paddingRight: '24px'
+                  paddingRight: '24px',
                 }}
               >
                 重置
@@ -765,7 +801,7 @@ const UserManagement = () => {
         destroyOnHidden
         styles={{
           body: { padding: '24px' },
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' }
+          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
         }}
         style={{ borderRadius: '16px', overflow: 'hidden' }}
       >
@@ -776,10 +812,10 @@ const UserManagement = () => {
                 size={120}
                 icon={!avatarUser?.avatar && <UserOutlined />}
                 src={getAvatarUrl(avatarUser)}
-                style={{ 
+                style={{
                   backgroundColor: avatarUser?.avatar ? 'transparent' : '#1890ff',
                   border: '1px solid #f0f0f0',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
                 }}
               />
             </Badge>
@@ -794,23 +830,23 @@ const UserManagement = () => {
               onChange={handleAvatarUpload}
             />
 
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               icon={<CameraOutlined />}
               onClick={() => fileInputRef.current?.click()}
               loading={uploadLoading}
               block
               style={{
                 ...primaryButtonStyle,
-                height: '44px'
+                height: '44px',
               }}
             >
               {avatarUser?.avatar ? '更换头像' : '上传头像'}
             </Button>
 
             {avatarUser?.avatar && (
-              <Button 
-                danger 
+              <Button
+                danger
                 icon={<DeleteOutlined />}
                 onClick={handleAvatarDelete}
                 block

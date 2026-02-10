@@ -1,0 +1,25 @@
+# 依赖
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# 构建输出
+dist/
+frontend/dist/
+backend/dist/
+
+# 日志
+logs/
+*.log
+
+# 数据库
+*.db
+*.sqlite
+
+# 上传文件
+backend/uploads/
+
+# 其他
+.DS_Store
+.vscode/
+.idea/

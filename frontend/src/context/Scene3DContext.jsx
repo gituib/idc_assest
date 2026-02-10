@@ -17,11 +17,11 @@ export const Scene3DProvider = ({ children }) => {
   const [loadingDevices, setLoadingDevices] = useState(false);
 
   // 使用 useCallback 稳定回调函数
-  const selectDevice = useCallback((device) => {
+  const selectDevice = useCallback(device => {
     setSelectedDevice(device);
   }, []);
 
-  const hoverDevice = useCallback((device) => {
+  const hoverDevice = useCallback(device => {
     setHoveredDevice(device);
   }, []);
 
@@ -29,72 +29,84 @@ export const Scene3DProvider = ({ children }) => {
     setDeviceSlideEnabled(prev => !prev);
   }, []);
 
-  const setDeviceSlide = useCallback((enabled) => {
+  const setDeviceSlide = useCallback(enabled => {
     setDeviceSlideEnabled(enabled);
   }, []);
 
-  const updateDevices = useCallback((newDevices) => {
+  const updateDevices = useCallback(newDevices => {
     setDevices(newDevices);
   }, []);
 
-  const updateRacks = useCallback((newRacks) => {
+  const updateRacks = useCallback(newRacks => {
     setRacks(newRacks);
   }, []);
 
-  const selectRack = useCallback((rack) => {
+  const selectRack = useCallback(rack => {
     setSelectedRack(rack);
   }, []);
 
-  const updateDeviceCables = useCallback((cables) => {
+  const updateDeviceCables = useCallback(cables => {
     setDeviceCables(cables);
   }, []);
 
-  const setLoading = useCallback((loading) => {
+  const setLoading = useCallback(loading => {
     setLoadingDevices(loading);
   }, []);
 
   // 使用 useMemo 缓存 context value，避免不必要的重渲染
-  const value = useMemo(() => ({
-    // 状态
-    devices,
-    selectedDevice,
-    hoveredDevice,
-    deviceSlideEnabled,
-    selectedRack,
-    racks,
-    deviceCables,
-    loadingDevices,
-    // 方法
-    selectDevice,
-    hoverDevice,
-    toggleDeviceSlide,
-    setDeviceSlide,
-    updateDevices,
-    updateRacks,
-    selectRack,
-    updateDeviceCables,
-    setLoading,
-    // 直接设置状态的方法（用于兼容现有代码）
-    setDevices,
-    setSelectedDevice,
-    setHoveredDevice,
-    setDeviceSlideEnabled,
-    setSelectedRack,
-    setRacks,
-    setDeviceCables,
-    setLoadingDevices,
-  }), [
-    devices, selectedDevice, hoveredDevice, deviceSlideEnabled, 
-    selectedRack, racks, deviceCables, loadingDevices,
-    selectDevice, hoverDevice, toggleDeviceSlide, setDeviceSlide,
-    updateDevices, updateRacks, selectRack, updateDeviceCables, setLoading
-  ]);
-
-  return (
-    <Scene3DContext.Provider value={value}>
-      {children}
-    </Scene3DContext.Provider>
+  const value = useMemo(
+    () => ({
+      // 状态
+      devices,
+      selectedDevice,
+      hoveredDevice,
+      deviceSlideEnabled,
+      selectedRack,
+      racks,
+      deviceCables,
+      loadingDevices,
+      // 方法
+      selectDevice,
+      hoverDevice,
+      toggleDeviceSlide,
+      setDeviceSlide,
+      updateDevices,
+      updateRacks,
+      selectRack,
+      updateDeviceCables,
+      setLoading,
+      // 直接设置状态的方法（用于兼容现有代码）
+      setDevices,
+      setSelectedDevice,
+      setHoveredDevice,
+      setDeviceSlideEnabled,
+      setSelectedRack,
+      setRacks,
+      setDeviceCables,
+      setLoadingDevices,
+    }),
+    [
+      devices,
+      selectedDevice,
+      hoveredDevice,
+      deviceSlideEnabled,
+      selectedRack,
+      racks,
+      deviceCables,
+      loadingDevices,
+      selectDevice,
+      hoverDevice,
+      toggleDeviceSlide,
+      setDeviceSlide,
+      updateDevices,
+      updateRacks,
+      selectRack,
+      updateDeviceCables,
+      setLoading,
+    ]
   );
+
+  return <Scene3DContext.Provider value={value}>{children}</Scene3DContext.Provider>;
 };
 
 // 自定义 Hook
