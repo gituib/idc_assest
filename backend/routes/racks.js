@@ -39,15 +39,16 @@ router.get('/', async (req, res) => {
     // 获取总记录数（带筛选条件）
     const total = await Rack.count({ where });
 
-    // 获取分页数据
+    // 获取分页数据 - 优化：使用 JOIN 避免 N+1 查询问题
     const racks = await Rack.findAll({
       where,
       include: [
-        { model: Room },
-        { model: Device }
+        { model: Room, separate: false },
+        { model: Device, separate: false }
       ],
       limit: pageSize,
-      offset: offset
+      offset: offset,
+      subQuery: false  // 避免子查询导致的性能问题
     });
 
     // 返回带分页信息的响应
@@ -220,9 +221,10 @@ router.get('/:rackId', async (req, res) => {
   try {
     const rack = await Rack.findByPk(req.params.rackId, {
       include: [
-        { model: Room },
-        { model: Device }
-      ]
+        { model: Room, separate: false },
+        { model: Device, separate: false }
+      ],
+      subQuery: false  // 避免子查询导致的性能问题
     });
     if (!rack) {
       return res.status(404).json({ error: '机柜不存在' });
@@ -286,9 +288,10 @@ router.put('/:rackId', validateBody(updateRackSchema), async (req, res) => {
     if (updated) {
       const updatedRack = await Rack.findByPk(req.params.rackId, {
         include: [
-          { model: Room },
-          { model: Device }
-        ]
+          { model: Room, separate: false },
+          { model: Device, separate: false }
+        ],
+        subQuery: false  // 避免子查询导致的性能问题
       });
       res.json(updatedRack);
     } else {

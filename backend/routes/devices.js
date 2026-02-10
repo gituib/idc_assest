@@ -98,7 +98,7 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
       where.rackId = rackId;
     }
 
-    // 执行查询
+    // 执行查询 - 优化：使用 JOIN 避免 N+1 查询问题
     const { count, rows } = await Device.findAndCountAll({
       where,
       include: [
@@ -106,11 +106,14 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
           model: Rack,
           include: [
             { model: Room }
-          ]
+          ],
+          separate: false  // 强制使用 JOIN 而不是单独查询
         }
       ],
       offset,
-      limit: parseInt(pageSize)
+      limit: parseInt(pageSize),
+      distinct: true,      // 避免 count 不准确
+      subQuery: false      // 避免子查询导致的性能问题
     });
 
     res.json({

@@ -17,7 +17,14 @@ if (DB_TYPE === 'mysql') {
       host: process.env.MYSQL_HOST || 'localhost',
       port: parseInt(process.env.MYSQL_PORT) || 3306,
       dialect: 'mysql',
-      logging: process.env.NODE_ENV === 'development' ? console.log : false
+      logging: process.env.NODE_ENV === 'development' ? console.log : false,
+      // 连接池配置 - 提升并发处理能力
+      pool: {
+        max: 10,        // 最大连接数
+        min: 2,         // 最小连接数
+        acquire: 30000, // 获取连接超时时间(ms)
+        idle: 10000     // 连接空闲时间(ms)
+      }
     }
   );
   dbDialect = 'mysql';
@@ -25,7 +32,14 @@ if (DB_TYPE === 'mysql') {
   sequelize = new Sequelize({
     dialect: 'sqlite',
     storage: process.env.DB_PATH || './idc_management.db',
-    logging: process.env.NODE_ENV === 'development' ? console.log : false
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    // SQLite 连接池配置
+    pool: {
+      max: 5,
+      min: 1,
+      acquire: 30000,
+      idle: 10000
+    }
   });
   dbDialect = 'sqlite';
 }
