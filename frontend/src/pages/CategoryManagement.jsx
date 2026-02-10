@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useDebounce } from '../hooks/useDebounce';
 import {
   Table,
   Button,
@@ -31,13 +32,14 @@ function CategoryManagement() {
     showTotal: total => `共 ${total} 条记录`,
   });
   const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebounce(keyword, 300);
   const [status, setStatus] = useState('all');
 
   const fetchCategories = async (page = 1, pageSize = 10) => {
     try {
       setLoading(true);
       const response = await axios.get('/api/consumable-categories', {
-        params: { page, pageSize, keyword, status },
+        params: { page, pageSize, keyword: debouncedKeyword, status },
       });
       setCategories(response.data.categories);
       setPagination(prev => ({ ...prev, current: page, pageSize, total: response.data.total }));
@@ -51,7 +53,7 @@ function CategoryManagement() {
 
   useEffect(() => {
     fetchCategories();
-  }, [keyword, status]);
+  }, [debouncedKeyword, status]);
 
   const showModal = (category = null) => {
     setEditingCategory(category);

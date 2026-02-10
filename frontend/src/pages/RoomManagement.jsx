@@ -660,7 +660,7 @@ function RoomManagement() {
               value={statusFilter}
               onChange={setStatusFilter}
               style={{ width: '140px', height: '42px' }}
-              dropdownStyle={{ borderRadius: '10px' }}
+              styles={{ popup: { root: { borderRadius: '10px' } } }}
             >
               <Option value="all">全部状态</Option>
               <Option value="active">在用</Option>

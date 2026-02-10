@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useDebounce } from '../hooks/useDebounce';
 import {
   Table,
   Button,
@@ -340,6 +341,7 @@ function RackManagement() {
   const [selectedRackIds, setSelectedRackIds] = useState([]);
   const [viewMode, setViewMode] = useState('table');
   const [searchKeyword, setSearchKeyword] = useState('');
+  const debouncedSearchKeyword = useDebounce(searchKeyword, 300);
   const [statusFilter, setStatusFilter] = useState('all');
   const [roomFilter, setRoomFilter] = useState('all');
   const [pagination, setPagination] = useState({
@@ -366,7 +368,7 @@ function RackManagement() {
             pageSize,
             roomId: roomFilter,
             status: statusFilter,
-            keyword: searchKeyword || undefined,
+            keyword: debouncedSearchKeyword || undefined,
           },
         });
         const { racks: data, total } = response.data;
@@ -379,7 +381,7 @@ function RackManagement() {
         setLoading(false);
       }
     },
-    [roomFilter, statusFilter, searchKeyword]
+    [roomFilter, statusFilter, debouncedSearchKeyword]
   );
 
   const fetchRooms = useCallback(async () => {
@@ -401,7 +403,7 @@ function RackManagement() {
   useEffect(() => {
     setPagination(prev => ({ ...prev, current: 1 }));
     fetchRacks(1, pagination.pageSize);
-  }, [roomFilter, statusFilter, searchKeyword]);
+  }, [roomFilter, statusFilter, debouncedSearchKeyword]);
 
   const handleTableChange = useCallback(
     pagination => {

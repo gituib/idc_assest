@@ -1433,7 +1433,7 @@ function DeviceManagement() {
               value={status}
               onChange={setStatus}
               style={{ width: '140px', borderRadius: designTokens.borderRadius.medium }}
-              dropdownStyle={{ borderRadius: designTokens.borderRadius.medium }}
+              styles={{ popup: { root: { borderRadius: designTokens.borderRadius.medium } } }}
             >
               <Option value="all">所有状态</Option>
               <Option value="running">运行中</Option>
@@ -1448,7 +1448,7 @@ function DeviceManagement() {
               value={type}
               onChange={setType}
               style={{ width: '140px', borderRadius: designTokens.borderRadius.medium }}
-              dropdownStyle={{ borderRadius: designTokens.borderRadius.medium }}
+              styles={{ popup: { root: { borderRadius: designTokens.borderRadius.medium } } }}
             >
               <Option value="all">所有类型</Option>
               <Option value="server">服务器</Option>
@@ -1547,7 +1547,7 @@ function DeviceManagement() {
                 style: { marginTop: '16px' },
               }}
               onChange={handleTableChange}
-              scroll={{ y: 'calc(100vh - 380px)', scrollToFirstRowOnChange: true }}
+              scroll={{ y: 500, scrollToFirstRowOnChange: true }}
               virtual
               components={{
                 header: {

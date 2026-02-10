@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useDebounce } from '../hooks/useDebounce';
 import {
   Table,
   Button,
@@ -45,6 +46,7 @@ function ConsumableManagement() {
     showTotal: total => `共 ${total} 条记录`,
   });
   const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebounce(keyword, 300);
   const [category, setCategory] = useState('all');
   const [status, setStatus] = useState('all');
   const [importModalVisible, setImportModalVisible] = useState(false);
@@ -65,7 +67,7 @@ function ConsumableManagement() {
       try {
         setLoading(true);
         const response = await axios.get('/api/consumables', {
-          params: { page, pageSize, keyword, category, status },
+          params: { page, pageSize, keyword: debouncedKeyword, category, status },
         });
         setConsumables(response.data.consumables);
         setPagination(prev => ({ ...prev, current: page, pageSize, total: response.data.total }));
@@ -76,7 +78,7 @@ function ConsumableManagement() {
         setLoading(false);
       }
     },
-    [keyword, category, status]
+    [debouncedKeyword, category, status]
   );
 
   const fetchCategories = useCallback(async () => {
