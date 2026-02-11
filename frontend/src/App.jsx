@@ -1,4 +1,4 @@
-import React, { useState, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import {
   Layout,
   Menu,
@@ -48,6 +48,8 @@ import { useAuth } from './context/AuthContext';
 import { ConfigProvider, useConfig } from './context/ConfigContext';
 import { Scene3DProvider } from './context/Scene3DContext';
 import { useDesignTokens } from './hooks/useDesignTokens';
+import useIdleTimeout from './hooks/useIdleTimeout';
+import axios from 'axios';
 import { Spin } from 'antd';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -127,14 +129,46 @@ const ProtectedRoute = ({ component: Component }) => (
   </PrivateRoute>
 );
 
+// 默认空闲超时配置
+const DEFAULT_IDLE_CONFIG = {
+  timeout: 10 * 60 * 1000, // 10分钟
+  warningTime: 30 * 1000, // 30秒
+};
+
 const AppLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [activeKey, setActiveKey] = useState('dashboard');
+  const [idleConfig, setIdleConfig] = useState(DEFAULT_IDLE_CONFIG);
   const { user, logout } = useAuth();
   const { config } = useConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const designTokens = useDesignTokens();
+
+  // 获取空闲超时配置
+  useEffect(() => {
+    const fetchIdleConfig = async () => {
+      try {
+        const response = await axios.get('/api/system-settings/idle-timeout');
+        setIdleConfig({
+          timeout: response.data.timeout,
+          warningTime: response.data.warningTime,
+        });
+      } catch (error) {
+        console.warn('获取空闲超时配置失败，使用默认配置:', error);
+      }
+    };
+
+    fetchIdleConfig();
+  }, []);
+
+  // 启用空闲超时检测
+  useIdleTimeout({
+    timeout: idleConfig.timeout,
+    warningTime: idleConfig.warningTime,
+    onLogout: logout,
+    enabled: true,
+  });
 
   const handleLogout = () => {
     logout();

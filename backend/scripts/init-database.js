@@ -17,7 +17,9 @@ const defaultSettings = [
   { settingKey: 'site_logo', settingValue: JSON.stringify(''), settingType: 'string', category: 'general', description: '网站Logo URL', isEditable: true },
   { settingKey: 'timezone', settingValue: JSON.stringify('Asia/Shanghai'), settingType: 'string', category: 'general', description: '时区设置', isEditable: true },
   { settingKey: 'date_format', settingValue: JSON.stringify('YYYY-MM-DD'), settingType: 'string', category: 'general', description: '日期格式', isEditable: true },
-  { settingKey: 'session_timeout', settingValue: JSON.stringify(30), settingType: 'number', category: 'general', description: '会话超时时间(分钟)', isEditable: true },
+  { settingKey: 'session_timeout', settingValue: JSON.stringify(30), settingType: 'number', category: 'general', description: '登录有效期(分钟)', isEditable: true },
+  { settingKey: 'idle_timeout', settingValue: JSON.stringify(10), settingType: 'number', category: 'general', description: '用户空闲超时时间(分钟)', isEditable: true },
+  { settingKey: 'idle_warning_time', settingValue: JSON.stringify(10), settingType: 'number', category: 'general', description: '空闲超时前警告时间(秒)', isEditable: false },
   { settingKey: 'max_login_attempts', settingValue: JSON.stringify(5), settingType: 'number', category: 'general', description: '最大登录尝试次数', isEditable: true },
   { settingKey: 'maintenance_mode', settingValue: JSON.stringify(false), settingType: 'boolean', category: 'general', description: '维护模式', isEditable: true },
 
