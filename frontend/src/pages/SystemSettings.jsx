@@ -368,7 +368,7 @@ const SystemSettings = () => {
       'site_logo',
       'timezone',
       'date_format',
-      'session_timeout',
+      'idle_timeout',
       'max_login_attempts',
       'maintenance_mode',
     ];

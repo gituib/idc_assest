@@ -13,7 +13,9 @@ const initDefaultSettings = async () => {
     { settingKey: 'site_logo', settingValue: JSON.stringify(''), settingType: 'string', category: 'general', description: '网站Logo URL', isEditable: true },
     { settingKey: 'timezone', settingValue: JSON.stringify('Asia/Shanghai'), settingType: 'string', category: 'general', description: '时区设置', isEditable: true },
     { settingKey: 'date_format', settingValue: JSON.stringify('YYYY-MM-DD'), settingType: 'string', category: 'general', description: '日期格式', isEditable: true },
-    { settingKey: 'session_timeout', settingValue: JSON.stringify(30), settingType: 'number', category: 'general', description: '会话超时时间(分钟)', isEditable: true },
+    { settingKey: 'session_timeout', settingValue: JSON.stringify(30), settingType: 'number', category: 'general', description: '登录有效期(分钟)', isEditable: true },
+    { settingKey: 'idle_timeout', settingValue: JSON.stringify(10), settingType: 'number', category: 'general', description: '用户空闲超时时间(分钟)', isEditable: true },
+    { settingKey: 'idle_warning_time', settingValue: JSON.stringify(10), settingType: 'number', category: 'general', description: '空闲超时前警告时间(秒)', isEditable: false },
     { settingKey: 'max_login_attempts', settingValue: JSON.stringify(5), settingType: 'number', category: 'general', description: '最大登录尝试次数', isEditable: true },
     { settingKey: 'maintenance_mode', settingValue: JSON.stringify(false), settingType: 'boolean', category: 'general', description: '维护模式', isEditable: true },
 
@@ -92,6 +94,29 @@ router.get('/', async (req, res) => {
     });
     
     res.json(formattedSettings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 获取用户空闲超时配置（公开接口，供前端使用）
+// 注意：此路由必须在 /:key 之前定义，否则会被当作 key 参数处理
+router.get('/idle-timeout', async (req, res) => {
+  try {
+    const timeoutSetting = await SystemSetting.findByPk('idle_timeout');
+
+    // 默认配置
+    const defaultTimeout = 10; // 10分钟
+    const fixedWarningTime = 10; // 固定10秒警告时间
+
+    const timeout = timeoutSetting ? JSON.parse(timeoutSetting.settingValue) : defaultTimeout;
+
+    res.json({
+      timeout: timeout * 60 * 1000, // 转换为毫秒
+      warningTime: fixedWarningTime * 1000, // 固定10秒（转换为毫秒）
+      timeoutMinutes: timeout,
+      warningTimeSeconds: fixedWarningTime
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -238,6 +263,8 @@ router.post('/reset/:key', async (req, res) => {
       timezone: 'Asia/Shanghai',
       date_format: 'YYYY-MM-DD',
       session_timeout: 30,
+      idle_timeout: 10,
+      idle_warning_time: 10,
       max_login_attempts: 5,
       maintenance_mode: false,
       frontend_port: 3000,

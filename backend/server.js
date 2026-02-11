@@ -53,6 +53,44 @@ sequelize.authenticate()
   .then(() => {
     console.log('系统设置初始化完成');
   })
+  .then(() => {
+    // 初始化故障分类数据
+    console.log('开始初始化故障分类...');
+    const FaultCategory = require('./models/FaultCategory');
+    const defaultCategories = [
+      { name: '系统故障', description: '操作系统、应用程序等系统软件的故障问题', priority: 1, defaultPriority: 'high' },
+      { name: '硬件故障', description: '物理设备、服务器、存储等硬件设备的故障问题', priority: 2, defaultPriority: 'high' },
+      { name: '网络故障', description: '网络连接、交换机、路由器等网络相关故障', priority: 3, defaultPriority: 'high' },
+      { name: '软件故障', description: '应用程序错误、软件兼容性等问题', priority: 4, defaultPriority: 'medium' },
+      { name: '安全事件', description: '安全漏洞、入侵检测、权限异常等安全问题', priority: 5, defaultPriority: 'urgent' },
+      { name: '性能问题', description: '系统响应慢、资源利用率高等性能问题', priority: 6, defaultPriority: 'medium' },
+      { name: '配置变更', description: '系统配置、软件配置等变更需求', priority: 7, defaultPriority: 'low' },
+      { name: '例行维护', description: '定期维护、巡检、更新等计划性工作', priority: 8, defaultPriority: 'low' },
+      { name: '数据问题', description: '数据错误、数据丢失、数据同步等数据相关问题', priority: 9, defaultPriority: 'high' },
+      { name: '其他问题', description: '无法归类的其他问题', priority: 99, defaultPriority: 'medium' }
+    ];
+
+    return Promise.all(
+      defaultCategories.map(async (cat) => {
+        const existing = await FaultCategory.findOne({ where: { name: cat.name } });
+        if (!existing) {
+          const categoryId = `CAT${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+          await FaultCategory.create({
+            categoryId,
+            ...cat,
+            expectedDuration: 120,
+            solutions: [],
+            isSystem: true,
+            isActive: true
+          });
+          console.log(`创建故障分类: ${cat.name}`);
+        }
+      })
+    );
+  })
+  .then(() => {
+    console.log('故障分类初始化完成');
+  })
   .catch(err => console.error('数据库操作失败:', err));
 
 // 导入路由

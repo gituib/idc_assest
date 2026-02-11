@@ -2222,7 +2222,7 @@ function DeviceManagement() {
                     {selectedDevice.type ? (
                       <Space>
                         {getDeviceTypeIcon(selectedDevice.type)}
-                        <span>{typeMap[selectedDevice.type] || selectedDevice.type}</span>
+                        <span>{getTypeLabel(selectedDevice.type)}</span>
                       </Space>
                     ) : (
                       '-'
@@ -2283,13 +2283,13 @@ function DeviceManagement() {
                     style={{
                       marginLeft: 8,
                       color: selectedDevice.status
-                        ? statusMap[selectedDevice.status]?.color
+                        ? getStatusConfig(selectedDevice.status).color
                         : '#666',
                       fontWeight: '600',
                     }}
                   >
                     {selectedDevice.status
-                      ? statusMap[selectedDevice.status]?.text || selectedDevice.status
+                      ? getStatusConfig(selectedDevice.status).text || selectedDevice.status
                       : '-'}
                   </span>
                 </div>
