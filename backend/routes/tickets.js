@@ -5,6 +5,8 @@ const { v4: uuidv4 } = require('uuid');
 const { Ticket, TicketOperationRecord } = require('../models/ticketIndex');
 const Device = require('../models/Device');
 const User = require('../models/User');
+const Rack = require('../models/Rack');
+const Room = require('../models/Room');
 const { dbDialect } = require('../db');
 
 // 获取工单统计 (必须定义在 /:ticketId 之前)
@@ -238,7 +240,21 @@ router.get('/:ticketId', async (req, res) => {
     const ticket = await Ticket.findByPk(req.params.ticketId, {
       include: [
         { model: User, as: 'reporter', attributes: ['userId', 'username', 'email'] },
-        { model: Device },
+        {
+          model: Device,
+          include: [
+            {
+              model: Rack,
+              attributes: ['rackId', 'name', 'roomId'],
+              include: [
+                {
+                  model: Room,
+                  attributes: ['roomId', 'name']
+                }
+              ]
+            }
+          ]
+        },
         { model: TicketOperationRecord, as: 'operationRecords', order: [['createdAt', 'DESC']] }
       ]
     });
@@ -247,7 +263,14 @@ router.get('/:ticketId', async (req, res) => {
       return res.status(404).json({ error: '工单不存在' });
     }
 
-    res.json(ticket);
+    // 格式化响应数据，添加机房和机柜名称
+    const ticketData = ticket.toJSON();
+    if (ticketData.Device && ticketData.Device.Rack) {
+      ticketData.Device.roomName = ticketData.Device.Rack.Room?.name || '-';
+      ticketData.Device.rackName = ticketData.Device.Rack.name || '-';
+    }
+
+    res.json(ticketData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

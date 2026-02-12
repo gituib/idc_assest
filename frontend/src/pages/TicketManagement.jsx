@@ -20,6 +20,8 @@ import {
   Popover,
   InputNumber,
   Switch,
+  Row,
+  Col,
 } from 'antd';
 import {
   PlusOutlined,
@@ -265,6 +267,7 @@ function TicketManagement() {
   const [deviceSource, setDeviceSource] = useState('select');
   const [ticketFields, setTicketFields] = useState(DEFAULT_TICKET_FIELDS);
   const [loadingFields, setLoadingFields] = useState(true);
+  const [deviceFields, setDeviceFields] = useState([]);
 
   const fetchTickets = useCallback(
     async (page = 1, pageSize = 10, filters = {}) => {
@@ -343,6 +346,17 @@ function TicketManagement() {
     }
   }, []);
 
+  // 获取设备字段配置
+  const fetchDeviceFields = useCallback(async () => {
+    try {
+      const response = await axios.get('/api/deviceFields');
+      setDeviceFields(response.data || []);
+    } catch (error) {
+      console.error('获取设备字段配置失败:', error);
+      setDeviceFields([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchTickets();
     fetchDevices();
@@ -350,7 +364,8 @@ function TicketManagement() {
       // 在 ticketFields 加载完成后再加载分类数据
       fetchCategories();
     });
-  }, [fetchTickets, fetchDevices, fetchTicketFields, fetchCategories]);
+    fetchDeviceFields();
+  }, [fetchTickets, fetchDevices, fetchTicketFields, fetchCategories, fetchDeviceFields]);
 
   // 处理从设备详情页跳转过来创建工单的情况
   useEffect(() => {
@@ -1154,74 +1169,131 @@ function TicketManagement() {
                 }
                 key="device"
               >
-                <Descriptions bordered column={2}>
-                  <Descriptions.Item label="设备ID">
-                    {selectedTicket.Device.deviceId}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="设备名称">
-                    {selectedTicket.Device.name}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="设备类型">
-                    {selectedTicket.Device.type}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="型号">
-                    {selectedTicket.Device.model || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="序列号">
-                    {selectedTicket.Device.serialNumber || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="品牌">
-                    {selectedTicket.Device.brand || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="所在机房">
-                    {selectedTicket.Device.roomName || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="所在机柜">
-                    {selectedTicket.Device.rackName || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="位置(U)">
-                    {selectedTicket.Device.position || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="高度(U)">
-                    {selectedTicket.Device.height || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="IP地址">
-                    {selectedTicket.Device.ipAddress || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="状态">
-                    <Tag
-                      color={
-                        selectedTicket.Device.status === 'running'
-                          ? 'green'
-                          : selectedTicket.Device.status === 'maintenance'
-                            ? 'orange'
-                            : selectedTicket.Device.status === 'fault'
-                              ? 'red'
-                              : 'default'
-                      }
-                    >
-                      {selectedTicket.Device.status === 'running'
-                        ? '运行中'
-                        : selectedTicket.Device.status === 'maintenance'
-                          ? '维护中'
-                          : selectedTicket.Device.status === 'fault'
-                            ? '故障'
-                            : selectedTicket.Device.status === 'offline'
-                              ? '离线'
-                              : selectedTicket.Device.status || '-'}
-                    </Tag>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="购买日期">
-                    {selectedTicket.Device.purchaseDate
-                      ? dayjs(selectedTicket.Device.purchaseDate).format('YYYY-MM-DD')
-                      : '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="保修到期">
-                    {selectedTicket.Device.warrantyDate
-                      ? dayjs(selectedTicket.Device.warrantyDate).format('YYYY-MM-DD')
-                      : '-'}
-                  </Descriptions.Item>
-                </Descriptions>
+                <div style={{ padding: '16px 0' }}>
+                  {/* 设备基本信息卡片 */}
+                  <Card title="基本信息" style={{ marginBottom: 16 }} size="small">
+                    <Row gutter={[24, 16]}>
+                      <Col span={8}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>设备ID</div>
+                        <div style={{ fontWeight: 500 }}>{selectedTicket.Device.deviceId}</div>
+                      </Col>
+                      <Col span={8}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>设备名称</div>
+                        <div style={{ fontWeight: 500 }}>{selectedTicket.Device.name}</div>
+                      </Col>
+                      <Col span={8}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>状态</div>
+                        <Tag
+                          color={
+                            selectedTicket.Device.status === 'running'
+                              ? 'green'
+                              : selectedTicket.Device.status === 'maintenance'
+                                ? 'orange'
+                                : selectedTicket.Device.status === 'fault'
+                                  ? 'red'
+                                  : 'default'
+                          }
+                        >
+                          {selectedTicket.Device.status === 'running'
+                            ? '运行中'
+                            : selectedTicket.Device.status === 'maintenance'
+                              ? '维护中'
+                              : selectedTicket.Device.status === 'fault'
+                                ? '故障'
+                                : selectedTicket.Device.status === 'offline'
+                                  ? '离线'
+                                  : selectedTicket.Device.status || '-'}
+                        </Tag>
+                      </Col>
+                      <Col span={8}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>设备类型</div>
+                        <div>{selectedTicket.Device.type}</div>
+                      </Col>
+                      <Col span={8}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>型号</div>
+                        <div>{selectedTicket.Device.model || '-'}</div>
+                      </Col>
+                      <Col span={8}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>序列号</div>
+                        <div>{selectedTicket.Device.serialNumber || '-'}</div>
+                      </Col>
+                    </Row>
+                  </Card>
+
+                  {/* 位置信息卡片 */}
+                  <Card title="位置信息" style={{ marginBottom: 16 }} size="small">
+                    <Row gutter={[24, 16]}>
+                      <Col span={8}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>所在机房</div>
+                        <div>{selectedTicket.Device.roomName || '-'}</div>
+                      </Col>
+                      <Col span={8}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>所在机柜</div>
+                        <div>{selectedTicket.Device.rackName || '-'}</div>
+                      </Col>
+                      <Col span={8}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>IP地址</div>
+                        <div>{selectedTicket.Device.ipAddress || '-'}</div>
+                      </Col>
+                      <Col span={8}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>位置(U)</div>
+                        <div>{selectedTicket.Device.position || '-'}</div>
+                      </Col>
+                      <Col span={8}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>高度(U)</div>
+                        <div>{selectedTicket.Device.height || '-'}</div>
+                      </Col>
+                      <Col span={8}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>功耗(W)</div>
+                        <div>{selectedTicket.Device.powerConsumption || '-'}</div>
+                      </Col>
+                    </Row>
+                  </Card>
+
+                  {/* 维保信息卡片 */}
+                  <Card title="维保信息" style={{ marginBottom: 16 }} size="small">
+                    <Row gutter={[24, 16]}>
+                      <Col span={12}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>购买日期</div>
+                        <div>{selectedTicket.Device.purchaseDate
+                          ? dayjs(selectedTicket.Device.purchaseDate).format('YYYY-MM-DD')
+                          : '-'}</div>
+                      </Col>
+                      <Col span={12}>
+                        <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>保修到期</div>
+                        <div>{selectedTicket.Device.warrantyExpiry
+                          ? dayjs(selectedTicket.Device.warrantyExpiry).format('YYYY-MM-DD')
+                          : '-'}</div>
+                      </Col>
+                    </Row>
+                  </Card>
+
+                  {/* 描述信息 */}
+                  {selectedTicket.Device.description && (
+                    <Card title="描述" style={{ marginBottom: 16 }} size="small">
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{selectedTicket.Device.description}</div>
+                    </Card>
+                  )}
+
+                  {/* 自定义字段卡片 */}
+                  {selectedTicket.Device.customFields && Object.keys(selectedTicket.Device.customFields).length > 0 && (
+                    <Card title="自定义字段" size="small">
+                      <Row gutter={[24, 16]}>
+                        {Object.entries(selectedTicket.Device.customFields).map(([key, value]) => {
+                          // 从 deviceFields 中查找对应的中文显示名称
+                          const fieldConfig = deviceFields.find(f => f.fieldName === key);
+                          const displayName = fieldConfig?.displayName || key;
+                          return (
+                            <Col span={8} key={key}>
+                              <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>{displayName}</div>
+                              <div style={{ fontWeight: 500 }}>{String(value)}</div>
+                            </Col>
+                          );
+                        })}
+                      </Row>
+                    </Card>
+                  )}
+                </div>
               </TabPane>
             )}
 
@@ -1233,30 +1305,127 @@ function TicketManagement() {
               }
               key="operations"
             >
-              <Timeline mode="left">
-                {operationRecords.map((record, index) => (
-                  <Timeline.Item
-                    key={index}
-                    label={dayjs(record.createdAt).format('YYYY-MM-DD HH:mm:ss')}
-                    color={
-                      record.operationType === 'create'
-                        ? 'green'
-                        : record.operationType === 'complete'
-                          ? 'blue'
-                          : record.operationType === 'close'
-                            ? 'gray'
-                            : 'orange'
-                    }
-                  >
-                    <div>
-                      <strong>{record.operationType}</strong>
-                    </div>
-                    <div>操作人: {record.operatorName || '-'}</div>
-                    <div>内容: {record.operationDescription || '-'}</div>
-                  </Timeline.Item>
-                ))}
-                {operationRecords.length === 0 && <p style={{ color: '#888' }}>暂无操作记录</p>}
-              </Timeline>
+              <div style={{ padding: '16px 0' }}>
+                {operationRecords.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#888' }}>
+                    <ClockCircleOutlined style={{ fontSize: 48, marginBottom: 16 }} />
+                    <p>暂无操作记录</p>
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative' }}>
+                    {/* 时间线轴线 */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: '20px',
+                        top: '0',
+                        bottom: '0',
+                        width: '2px',
+                        backgroundColor: '#e8e8e8',
+                      }}
+                    />
+                    {operationRecords.map((record, index) => {
+                      const getOperationInfo = type => {
+                        switch (type) {
+                          case 'create':
+                            return { color: '#52c41a', bgColor: '#f6ffed', label: '创建工单' };
+                          case 'complete':
+                            return { color: '#1890ff', bgColor: '#e6f7ff', label: '完成工单' };
+                          case 'close':
+                            return { color: '#8c8c8c', bgColor: '#f5f5f5', label: '关闭工单' };
+                          case 'assign':
+                            return { color: '#722ed1', bgColor: '#f9f0ff', label: '分配工单' };
+                          case 'update':
+                            return { color: '#fa8c16', bgColor: '#fff7e6', label: '更新工单' };
+                          default:
+                            return { color: '#fa8c16', bgColor: '#fff7e6', label: type };
+                        }
+                      };
+                      const info = getOperationInfo(record.operationType);
+                      return (
+                        <div
+                          key={index}
+                          style={{
+                            position: 'relative',
+                            paddingLeft: '48px',
+                            marginBottom: '24px',
+                          }}
+                        >
+                          {/* 时间点圆点 */}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: '12px',
+                              top: '4px',
+                              width: '16px',
+                              height: '16px',
+                              borderRadius: '50%',
+                              backgroundColor: info.color,
+                              border: '3px solid #fff',
+                              boxShadow: '0 0 0 2px ' + info.color + '40',
+                            }}
+                          />
+                          {/* 操作卡片 */}
+                          <Card
+                            size="small"
+                            style={{
+                              backgroundColor: info.bgColor,
+                              border: 'none',
+                              borderRadius: '8px',
+                            }}
+                            bodyStyle={{ padding: '12px 16px' }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'flex-start',
+                                marginBottom: '8px',
+                              }}
+                            >
+                              <Tag
+                                color={info.color}
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: 500,
+                                  border: 'none',
+                                  margin: 0,
+                                }}
+                              >
+                                {info.label}
+                              </Tag>
+                              <span style={{ color: '#666', fontSize: '12px' }}>
+                                {dayjs(record.createdAt).format('YYYY-MM-DD HH:mm:ss')}
+                              </span>
+                            </div>
+                            <div style={{ marginBottom: '4px' }}>
+                              <span style={{ color: '#666' }}>操作人：</span>
+                              <span style={{ fontWeight: 500 }}>
+                                {record.operatorName || '-'}
+                              </span>
+                            </div>
+                            {record.operationDescription && (
+                              <div
+                                style={{
+                                  marginTop: '8px',
+                                  padding: '8px 12px',
+                                  backgroundColor: '#fff',
+                                  borderRadius: '4px',
+                                  fontSize: '13px',
+                                  color: '#333',
+                                  lineHeight: '1.5',
+                                }}
+                              >
+                                {record.operationDescription}
+                              </div>
+                            )}
+                          </Card>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </TabPane>
           </Tabs>
         )}

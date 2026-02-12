@@ -14,6 +14,11 @@ import {
   Divider,
   Descriptions,
   Alert,
+  Row,
+  Col,
+  Typography,
+  Badge,
+  Tooltip,
 } from 'antd';
 import {
   SettingOutlined,
@@ -22,12 +27,24 @@ import {
   InfoCircleOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
+  LockOutlined,
+  DatabaseOutlined,
+  DesktopOutlined,
+  ClockCircleOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  EnvironmentOutlined,
+  FileTextOutlined,
+  SafetyCertificateOutlined,
+  ReloadOutlined,
+  SaveOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { useConfig } from '../context/ConfigContext';
 
 const { Option } = Select;
 const { TabPane } = Tabs;
+const { Title, Text } = Typography;
 
 const SystemSettings = () => {
   const [loading, setLoading] = useState(false);
@@ -362,81 +379,134 @@ const SystemSettings = () => {
     return optionsMap[key] || [];
   };
 
-  const renderGeneralSettings = () => {
-    const generalKeys = [
-      'site_name',
-      'site_logo',
-      'timezone',
-      'date_format',
-      'idle_timeout',
-      'max_login_attempts',
-      'maintenance_mode',
-    ];
+  // 设置项分组配置
+  const settingGroups = {
+    general: [
+      {
+        title: '站点信息',
+        icon: <GlobalOutlined />,
+        keys: ['site_name', 'site_logo'],
+      },
+      {
+        title: '时间设置',
+        icon: <ClockCircleOutlined />,
+        keys: ['timezone', 'date_format'],
+      },
+      {
+        title: '安全设置',
+        icon: <SafetyCertificateOutlined />,
+        keys: ['idle_timeout', 'max_login_attempts', 'maintenance_mode'],
+      },
+    ],
+    appearance: [
+      {
+        title: '主题颜色',
+        icon: <BgColorsOutlined />,
+        keys: ['primary_color', 'secondary_color'],
+      },
+      {
+        title: '界面布局',
+        icon: <DesktopOutlined />,
+        keys: ['compact_mode', 'sidebar_collapsed', 'table_row_height'],
+      },
+      {
+        title: '动画效果',
+        icon: <CheckCircleOutlined />,
+        keys: ['animation_enabled'],
+      },
+    ],
+  };
+
+  const renderSettingGroup = (group) => {
     return (
-      <Card title="全局配置" bordered={false}>
-        <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
-          {generalKeys.map(key => {
-            // 确保时区和日期格式使用select类型
-            const settingData = { ...settings[key] };
-            if (key === 'timezone' || key === 'date_format') {
-              settingData.type = 'select';
-            }
-            return renderFormItem(key, settingData);
-          })}
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit" loading={saving}>
-                保存设置
-              </Button>
-              <Button onClick={() => fetchSettings()}>重置表单</Button>
-            </Space>
-          </Form.Item>
-        </Form>
+      <Card
+        key={group.title}
+        title={
+          <Space>
+            {group.icon}
+            <span style={{ fontWeight: 600 }}>{group.title}</span>
+          </Space>
+        }
+        style={{ marginBottom: 16, borderRadius: 8 }}
+        size="small"
+      >
+        {group.keys.map(key => {
+          const settingData = { ...settings[key] };
+          // 确保特定字段使用正确的类型
+          if (key === 'timezone' || key === 'date_format') {
+            settingData.type = 'select';
+          }
+          if (key === 'primary_color' || key === 'secondary_color') {
+            settingData.type = 'select';
+          }
+          return renderFormItem(key, settingData);
+        })}
       </Card>
+    );
+  };
+
+  const renderGeneralSettings = () => {
+    return (
+      <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
+        {settingGroups.general.map(renderSettingGroup)}
+        <Card style={{ borderRadius: 8 }} size="small">
+          <Space>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={saving}
+              icon={<SaveOutlined />}
+              size="large"
+            >
+              保存设置
+            </Button>
+            <Button
+              onClick={() => fetchSettings()}
+              icon={<ReloadOutlined />}
+              size="large"
+            >
+              重置表单
+            </Button>
+          </Space>
+        </Card>
+      </Form>
     );
   };
 
   const renderAppearanceSettings = () => {
-    const appearanceKeys = [
-      'primary_color',
-      'secondary_color',
-      'compact_mode',
-      'sidebar_collapsed',
-      'table_row_height',
-      'animation_enabled',
-    ];
     return (
-      <Card title="外观设置" bordered={false}>
-        <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
-          <Alert
-            message="主题颜色"
-            description="修改主题颜色后需要刷新页面才能生效。"
-            type="info"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
-          {appearanceKeys.map(key => {
-            // 确保主题颜色使用select类型
-            const settingData = { ...settings[key] };
-            if (key === 'primary_color' || key === 'secondary_color') {
-              settingData.type = 'select';
-            }
-            return renderFormItem(key, settingData);
-          })}
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit" loading={saving}>
-                保存设置
-              </Button>
-              <Button onClick={() => fetchSettings()}>重置表单</Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Card>
+      <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
+        <Alert
+          message="主题颜色设置"
+          description="修改主题颜色后需要刷新页面才能生效。建议选择对比度适中的颜色组合。"
+          type="info"
+          showIcon
+          style={{ marginBottom: 16, borderRadius: 8 }}
+        />
+        {settingGroups.appearance.map(renderSettingGroup)}
+        <Card style={{ borderRadius: 8 }} size="small">
+          <Space>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={saving}
+              icon={<SaveOutlined />}
+              size="large"
+            >
+              保存设置
+            </Button>
+            <Button
+              onClick={() => fetchSettings()}
+              icon={<ReloadOutlined />}
+              size="large"
+            >
+              重置表单
+            </Button>
+          </Space>
+        </Card>
+      </Form>
     );
   };
-
-  // 数据备份功能已移除
 
   const renderAboutPage = () => {
     const aboutKeys = [
@@ -452,62 +522,104 @@ const SystemSettings = () => {
 
     return (
       <div>
-        <Card title="关于系统" bordered={false} style={{ marginBottom: 16 }}>
-          <Descriptions column={{ xs: 1, sm: 2, md: 3 }} bordered>
-            <Descriptions.Item label="系统名称">机柜管理系统</Descriptions.Item>
-            <Descriptions.Item label="版本号">
-              {settings.app_version?.value || '1.0.0'}
-            </Descriptions.Item>
-            <Descriptions.Item label="系统状态">
-              <Tag color="success">运行正常</Tag>
-            </Descriptions.Item>
-          </Descriptions>
-        </Card>
-
-        <Card title="公司信息" bordered={false} style={{ marginBottom: 16 }}>
-          <Form layout="vertical">
-            {aboutKeys.slice(1).map(key => settings[key] && renderFormItem(key, settings[key]))}
-            <Form.Item>
-              <Space>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={saving}
-                  onClick={() => form.submit()}
-                >
-                  保存信息
-                </Button>
-                <Button onClick={() => fetchSettings()}>重置</Button>
+        {/* 系统概览卡片 */}
+        <Card
+          style={{
+            marginBottom: 16,
+            borderRadius: 8,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: '#fff',
+          }}
+          bodyStyle={{ padding: 24 }}
+        >
+          <Row gutter={[24, 24]} align="middle">
+            <Col>
+              <div
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 16,
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <DatabaseOutlined style={{ fontSize: 40, color: '#fff' }} />
+              </div>
+            </Col>
+            <Col flex="auto">
+              <Title level={3} style={{ color: '#fff', margin: 0, marginBottom: 8 }}>
+                机柜管理系统
+              </Title>
+              <Space size={16} style={{ color: 'rgba(255,255,255,0.9)' }}>
+                <span>版本 {settings.app_version?.value || '1.0.0'}</span>
+                <span>|</span>
+                <Badge status="success" text="运行正常" style={{ color: '#fff' }} />
               </Space>
-            </Form.Item>
-          </Form>
+            </Col>
+          </Row>
         </Card>
 
+        {/* 统计信息卡片 */}
         {systemInfo && (
-          <Card title="系统统计信息" bordered={false}>
-            <Descriptions column={{ xs: 1, sm: 2, md: 4 }} bordered size="small">
-              <Descriptions.Item label="设备总数">
-                {systemInfo.statistics?.devices || 0}
-              </Descriptions.Item>
-              <Descriptions.Item label="机柜总数">
-                {systemInfo.statistics?.racks || 0}
-              </Descriptions.Item>
-              <Descriptions.Item label="机房总数">
-                {systemInfo.statistics?.rooms || 0}
-              </Descriptions.Item>
-              <Descriptions.Item label="用户总数">
-                {systemInfo.statistics?.users || 0}
-              </Descriptions.Item>
-            </Descriptions>
-            <Divider />
-            <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
+          <Card
+            title={
+              <Space>
+                <InfoCircleOutlined />
+                <span style={{ fontWeight: 600 }}>系统统计</span>
+              </Space>
+            }
+            style={{ marginBottom: 16, borderRadius: 8 }}
+            size="small"
+          >
+            <Row gutter={[16, 16]}>
+              <Col span={6}>
+                <Card size="small" style={{ textAlign: 'center', backgroundColor: '#f6ffed', border: 'none' }}>
+                  <div style={{ fontSize: 24, fontWeight: 600, color: '#52c41a' }}>
+                    {systemInfo.statistics?.devices || 0}
+                  </div>
+                  <div style={{ color: '#666', fontSize: 12 }}>设备总数</div>
+                </Card>
+              </Col>
+              <Col span={6}>
+                <Card size="small" style={{ textAlign: 'center', backgroundColor: '#e6f7ff', border: 'none' }}>
+                  <div style={{ fontSize: 24, fontWeight: 600, color: '#1890ff' }}>
+                    {systemInfo.statistics?.racks || 0}
+                  </div>
+                  <div style={{ color: '#666', fontSize: 12 }}>机柜总数</div>
+                </Card>
+              </Col>
+              <Col span={6}>
+                <Card size="small" style={{ textAlign: 'center', backgroundColor: '#f9f0ff', border: 'none' }}>
+                  <div style={{ fontSize: 24, fontWeight: 600, color: '#722ed1' }}>
+                    {systemInfo.statistics?.rooms || 0}
+                  </div>
+                  <div style={{ color: '#666', fontSize: 12 }}>机房总数</div>
+                </Card>
+              </Col>
+              <Col span={6}>
+                <Card size="small" style={{ textAlign: 'center', backgroundColor: '#fff7e6', border: 'none' }}>
+                  <div style={{ fontSize: 24, fontWeight: 600, color: '#fa8c16' }}>
+                    {systemInfo.statistics?.users || 0}
+                  </div>
+                  <div style={{ color: '#666', fontSize: 12 }}>用户总数</div>
+                </Card>
+              </Col>
+            </Row>
+
+            <Divider style={{ margin: '16px 0' }} />
+
+            <Descriptions column={{ xs: 1, sm: 2 }} size="small">
               <Descriptions.Item label="Node.js 版本">
-                {systemInfo.system?.nodeVersion}
+                <Tag color="blue">{systemInfo.system?.nodeVersion}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label="运行平台">
                 {systemInfo.system?.platform} ({systemInfo.system?.arch})
               </Descriptions.Item>
-              <Descriptions.Item label="进程 ID">{systemInfo.system?.pid}</Descriptions.Item>
+              <Descriptions.Item label="进程 ID">
+                <Tag>{systemInfo.system?.pid}</Tag>
+              </Descriptions.Item>
               <Descriptions.Item label="运行时间">
                 {systemInfo.system?.uptime
                   ? `${Math.floor(systemInfo.system.uptime / 3600)}小时${Math.floor((systemInfo.system.uptime % 3600) / 60)}分钟`
@@ -526,48 +638,120 @@ const SystemSettings = () => {
             </Descriptions>
           </Card>
         )}
+
+        {/* 公司信息卡片 */}
+        <Card
+          title={
+            <Space>
+              <FileTextOutlined />
+              <span style={{ fontWeight: 600 }}>公司信息</span>
+            </Space>
+          }
+          style={{ marginBottom: 16, borderRadius: 8 }}
+          size="small"
+        >
+          <Form layout="vertical">
+            <Row gutter={[24, 0]}>
+              <Col span={12}>
+                <Form.Item label="公司名称" name="company_name">
+                  <Input prefix={<GlobalOutlined />} placeholder="请输入公司名称" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="联系邮箱" name="contact_email">
+                  <Input prefix={<MailOutlined />} placeholder="请输入联系邮箱" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="联系电话" name="contact_phone">
+                  <Input prefix={<PhoneOutlined />} placeholder="请输入联系电话" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="公司地址" name="company_address">
+                  <Input prefix={<EnvironmentOutlined />} placeholder="请输入公司地址" />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item label="系统描述" name="system_description">
+                  <Input.TextArea rows={3} placeholder="请输入系统描述" />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Form.Item>
+              <Space>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={saving}
+                  onClick={() => form.submit()}
+                  icon={<SaveOutlined />}
+                >
+                  保存信息
+                </Button>
+                <Button onClick={() => fetchSettings()} icon={<ReloadOutlined />}>
+                  重置
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Card>
       </div>
     );
   };
 
+  const tabItems = [
+    {
+      key: 'general',
+      label: (
+        <span>
+          <GlobalOutlined /> 全局配置
+        </span>
+      ),
+      children: renderGeneralSettings(),
+    },
+    {
+      key: 'appearance',
+      label: (
+        <span>
+          <BgColorsOutlined /> 外观设置
+        </span>
+      ),
+      children: renderAppearanceSettings(),
+    },
+    {
+      key: 'about',
+      label: (
+        <span>
+          <InfoCircleOutlined /> 关于系统
+        </span>
+      ),
+      children: renderAboutPage(),
+    },
+  ];
+
   return (
-    <div style={{ padding: 24 }}>
-      <Tabs activeKey={activeTab} onChange={setActiveTab}>
-        <TabPane
-          tab={
-            <span>
-              <GlobalOutlined /> 全局配置
-            </span>
-          }
-          key="general"
-        >
-          {renderGeneralSettings()}
-        </TabPane>
-        <TabPane
-          tab={
-            <span>
-              <BgColorsOutlined /> 外观设置
-            </span>
-          }
-          key="appearance"
-        >
-          {renderAppearanceSettings()}
-        </TabPane>
-        <TabPane
-          tab={
-            <span>
-              <InfoCircleOutlined /> 关于
-            </span>
-          }
-          key="about"
-        >
-          {renderAboutPage()}
-        </TabPane>
-      </Tabs>
+    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+      <Card
+        title={
+          <Space>
+            <SettingOutlined style={{ fontSize: 20, color: '#667eea' }} />
+            <Title level={4} style={{ margin: 0 }}>系统设置</Title>
+          </Space>
+        }
+        style={{ borderRadius: 12 }}
+        bodyStyle={{ padding: 0 }}
+      >
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={tabItems}
+          style={{ padding: '0 24px 24px' }}
+          tabBarStyle={{ marginBottom: 24 }}
+        />
+      </Card>
     </div>
   );
 };
-
-import { LockOutlined } from '@ant-design/icons';
 
 export default SystemSettings;

@@ -18,6 +18,9 @@ import {
   Spin,
   Dropdown,
   Tooltip,
+  Tag,
+  Row,
+  Col,
 } from 'antd';
 import {
   PlusOutlined,
@@ -2154,7 +2157,7 @@ function DeviceManagement() {
 
       <Modal
         title={
-          <div style={modalHeaderStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '18px', fontWeight: 600 }}>
             <AppstoreOutlined style={{ color: '#667eea' }} />
             设备详情
           </div>
@@ -2216,161 +2219,168 @@ function DeviceManagement() {
             编辑
           </Button>,
         ]}
-        width={800}
+        width={700}
         destroyOnHidden
         styles={{
           header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
-          body: { padding: '24px' },
+          body: { padding: '0', overflow: 'auto' },
         }}
       >
         {selectedDevice && (
           <div>
-            <Card
-              size="small"
-              title={
-                <span style={{ fontWeight: '600' }}>
-                  <CloudServerOutlined style={{ marginRight: '8px', color: '#667eea' }} />
-                  基本信息
-                </span>
-              }
-              style={{ borderRadius: '12px', border: '1px solid #f0f0f0' }}
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>设备ID：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>
-                    {selectedDevice.deviceId || '-'}
-                  </span>
+            {/* 头部信息区域 */}
+            <div style={{
+              padding: '24px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: '#fff'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '12px',
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {getDeviceTypeIcon(selectedDevice.type)}
                 </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>设备名称：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>{selectedDevice.name || '-'}</span>
-                </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>设备类型：</label>
-                  <span style={{ marginLeft: 8 }}>
-                    {selectedDevice.type ? (
-                      <Space>
-                        {getDeviceTypeIcon(selectedDevice.type)}
-                        <span>{getTypeLabel(selectedDevice.type)}</span>
-                      </Space>
-                    ) : (
-                      '-'
-                    )}
-                  </span>
-                </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>型号：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>
-                    {selectedDevice.model || '-'}
-                  </span>
-                </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>序列号：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>
-                    {selectedDevice.serialNumber || '-'}
-                  </span>
-                </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>IP地址：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>
-                    {selectedDevice.ipAddress || '-'}
-                  </span>
-                </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>所在机房：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>
-                    {selectedDevice.Rack?.Room?.name || '-'}
-                  </span>
-                </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>所在机柜：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>
-                    {selectedDevice.Rack?.name || '-'}
-                  </span>
-                </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>位置：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>
-                    {selectedDevice.position || '-'}
-                  </span>
-                </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>高度(U)：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>
-                    {selectedDevice.height || '-'}
-                  </span>
-                </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>功率(W)：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>
-                    {selectedDevice.power || '-'}
-                  </span>
-                </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>状态：</label>
-                  <span
-                    style={{
-                      marginLeft: 8,
-                      color: selectedDevice.status
-                        ? getStatusConfig(selectedDevice.status).color
-                        : '#666',
-                      fontWeight: '600',
-                    }}
-                  >
-                    {selectedDevice.status
-                      ? getStatusConfig(selectedDevice.status).text || selectedDevice.status
-                      : '-'}
-                  </span>
-                </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>购买日期：</label>
-                  <span style={{ marginLeft: 8, color: '#333' }}>
-                    {selectedDevice.purchaseDate
-                      ? new Date(selectedDevice.purchaseDate).toLocaleDateString('zh-CN')
-                      : '-'}
-                  </span>
-                </div>
-                <div>
-                  <label style={{ fontWeight: '500', color: '#666' }}>保修到期：</label>
-                  <span
-                    style={{
-                      marginLeft: 8,
-                      color:
-                        selectedDevice.warrantyExpiry &&
-                        new Date(selectedDevice.warrantyExpiry) < new Date()
-                          ? '#d93025'
-                          : '#333',
-                      fontWeight:
-                        selectedDevice.warrantyExpiry &&
-                        new Date(selectedDevice.warrantyExpiry) < new Date()
-                          ? '600'
-                          : 'normal',
-                    }}
-                  >
-                    {selectedDevice.warrantyExpiry
-                      ? new Date(selectedDevice.warrantyExpiry).toLocaleDateString('zh-CN')
-                      : '-'}
-                  </span>
-                </div>
-              </div>
-              {selectedDevice.description && (
-                <div style={{ marginTop: '16px' }}>
-                  <label style={{ fontWeight: '500', color: '#666' }}>描述：</label>
-                  <div
-                    style={{
-                      marginTop: '8px',
-                      padding: '12px',
-                      backgroundColor: '#fafafa',
-                      borderRadius: '8px',
-                      color: '#333',
-                    }}
-                  >
-                    {selectedDevice.description}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px' }}>
+                    {selectedDevice.name}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', opacity: 0.9 }}>
+                    <span>{getTypeLabel(selectedDevice.type)}</span>
+                    <span>|</span>
+                    <span>{selectedDevice.deviceId}</span>
+                    <span>|</span>
+                    <Tag color={selectedDevice.status ? getStatusConfig(selectedDevice.status).badgeColor : 'default'} style={{ margin: 0 }}>
+                      {selectedDevice.status ? getStatusConfig(selectedDevice.status).text : '-'}
+                    </Tag>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* 内容区域 */}
+            <div style={{ padding: '20px 24px' }}>
+              {/* 基本信息卡片 */}
+              <Card
+                size="small"
+                title={<span style={{ fontWeight: 600 }}>基本信息</span>}
+                style={{ marginBottom: '16px', borderRadius: '8px' }}
+              >
+                <Row gutter={[24, 16]}>
+                  <Col span={8}>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>设备型号</div>
+                    <div style={{ fontWeight: 500 }}>{selectedDevice.model || '-'}</div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>序列号</div>
+                    <div style={{ fontWeight: 500 }}>{selectedDevice.serialNumber || '-'}</div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>IP地址</div>
+                    <div style={{ fontWeight: 500 }}>{selectedDevice.ipAddress || '-'}</div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>所在机房</div>
+                    <div style={{ fontWeight: 500 }}>{selectedDevice.Rack?.Room?.name || '-'}</div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>所在机柜</div>
+                    <div style={{ fontWeight: 500 }}>{selectedDevice.Rack?.name || '-'}</div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>位置(U)</div>
+                    <div style={{ fontWeight: 500 }}>U{selectedDevice.position || '-'}</div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>高度</div>
+                    <div style={{ fontWeight: 500 }}>{selectedDevice.height ? `${selectedDevice.height}U` : '-'}</div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>功率</div>
+                    <div style={{ fontWeight: 500 }}>{selectedDevice.power ? `${selectedDevice.power}W` : '-'}</div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>状态</div>
+                    <div style={{
+                      fontWeight: 500,
+                      color: selectedDevice.status ? getStatusConfig(selectedDevice.status).color : '#666'
+                    }}>
+                      {selectedDevice.status ? getStatusConfig(selectedDevice.status).text : '-'}
+                    </div>
+                  </Col>
+                </Row>
+              </Card>
+
+              {/* 维保信息卡片 */}
+              <Card
+                size="small"
+                title={<span style={{ fontWeight: 600 }}>维保信息</span>}
+                style={{ marginBottom: '16px', borderRadius: '8px' }}
+              >
+                <Row gutter={[24, 16]}>
+                  <Col span={12}>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>购买日期</div>
+                    <div style={{ fontWeight: 500 }}>
+                      {selectedDevice.purchaseDate
+                        ? new Date(selectedDevice.purchaseDate).toLocaleDateString('zh-CN')
+                        : '-'}
+                    </div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>保修到期</div>
+                    <div style={{
+                      fontWeight: selectedDevice.warrantyExpiry && new Date(selectedDevice.warrantyExpiry) < new Date() ? 600 : 500,
+                      color: selectedDevice.warrantyExpiry && new Date(selectedDevice.warrantyExpiry) < new Date() ? '#d93025' : '#333'
+                    }}>
+                      {selectedDevice.warrantyExpiry
+                        ? new Date(selectedDevice.warrantyExpiry).toLocaleDateString('zh-CN')
+                        : '-'}
+                    </div>
+                  </Col>
+                </Row>
+              </Card>
+
+              {/* 描述信息 */}
+              {selectedDevice.description && (
+                <Card
+                  size="small"
+                  title={<span style={{ fontWeight: 600 }}>描述</span>}
+                  style={{ marginBottom: '16px', borderRadius: '8px' }}
+                >
+                  <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                    {selectedDevice.description}
+                  </div>
+                </Card>
               )}
-            </Card>
+
+              {/* 自定义字段卡片 */}
+              {selectedDevice.customFields && Object.keys(selectedDevice.customFields).length > 0 && (
+                <Card
+                  size="small"
+                  title={<span style={{ fontWeight: 600 }}>自定义字段</span>}
+                  style={{ borderRadius: '8px' }}
+                >
+                  <Row gutter={[24, 16]}>
+                    {Object.entries(selectedDevice.customFields).map(([key, value]) => {
+                      // 从 deviceFields 中查找对应的中文显示名称
+                      const fieldConfig = deviceFields.find(f => f.fieldName === key);
+                      const displayName = fieldConfig?.displayName || key;
+                      return (
+                        <Col span={8} key={key}>
+                          <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>{displayName}</div>
+                          <div style={{ fontWeight: 500 }}>{String(value)}</div>
+                        </Col>
+                      );
+                    })}
+                  </Row>
+                </Card>
+              )}
+            </div>
           </div>
         )}
       </Modal>
