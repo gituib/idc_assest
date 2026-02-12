@@ -1356,6 +1356,8 @@ function DeviceManagement() {
               批量删除 ({selectedDevices.length})
             </Button>
             <Button
+              type="primary"
+              danger
               style={{
                 height: '36px',
                 borderRadius: designTokens.borderRadius.small,
@@ -1364,9 +1366,6 @@ function DeviceManagement() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                background: designTokens.colors.error.main,
-                border: 'none',
-                color: '#ffffff',
               }}
               icon={<DeleteOutlined />}
               onClick={handleDeleteAll}
