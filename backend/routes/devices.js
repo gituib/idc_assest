@@ -950,6 +950,44 @@ router.get('/:deviceId', async (req, res) => {
   }
 });
 
+// 获取设备的工单列表
+router.get('/:deviceId/tickets', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { status, page = 1, pageSize = 10 } = req.query;
+    const offset = (page - 1) * pageSize;
+
+    // 检查设备是否存在
+    const device = await Device.findByPk(deviceId);
+    if (!device) {
+      return res.status(404).json({ error: '设备不存在' });
+    }
+
+    // 构建查询条件
+    const where = { deviceId };
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+
+    // 查询工单列表
+    const { count, rows: tickets } = await Ticket.findAndCountAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      offset: parseInt(offset),
+      limit: parseInt(pageSize)
+    });
+
+    res.json({
+      data: tickets,
+      total: count,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 更新设备
 router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
   try {

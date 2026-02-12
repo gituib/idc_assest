@@ -40,6 +40,7 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
+import { useNavigate } from 'react-router-dom';
 import { designTokens } from '../config/theme';
 import {
   PAGINATION_CONFIG,
@@ -221,6 +222,7 @@ const ResizableTitle = props => {
 };
 
 function DeviceManagement() {
+  const navigate = useNavigate();
   const [devices, setDevices] = useState([]);
   const [allDevices, setAllDevices] = useState([]);
   const [racks, setRacks] = useState([]);
@@ -754,6 +756,16 @@ function DeviceManagement() {
   const handleShowDetail = device => {
     setSelectedDevice(device);
     setDetailModalVisible(true);
+  };
+
+  // 查看设备关联的工单
+  const handleViewDeviceTickets = device => {
+    navigate(`/tickets?deviceId=${device.deviceId}&deviceName=${encodeURIComponent(device.name)}&serialNumber=${encodeURIComponent(device.serialNumber || '')}&view=true`);
+  };
+
+  // 为设备创建工单
+  const handleCreateTicketForDevice = device => {
+    navigate(`/tickets?deviceId=${device.deviceId}&deviceName=${encodeURIComponent(device.name)}&serialNumber=${encodeURIComponent(device.serialNumber || '')}&create=true`);
   };
 
   // 打开批量状态变更模态框
@@ -2162,6 +2174,24 @@ function DeviceManagement() {
             style={secondaryActionStyle}
           >
             关闭
+          </Button>,
+          <Button
+            key="viewTickets"
+            onClick={() => {
+              handleViewDeviceTickets(selectedDevice);
+            }}
+            style={secondaryActionStyle}
+          >
+            查看工单
+          </Button>,
+          <Button
+            key="createTicket"
+            onClick={() => {
+              handleCreateTicketForDevice(selectedDevice);
+            }}
+            style={secondaryActionStyle}
+          >
+            创建工单
           </Button>,
           <Button
             key="edit"

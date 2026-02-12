@@ -125,6 +125,15 @@ export const operationLogAPI = {
   clear: data => api.delete('/operation-logs', { data }),
 };
 
+export const deviceAPI = {
+  list: params => api.get('/devices', { params }),
+  get: deviceId => api.get(`/devices/${deviceId}`),
+  create: data => api.post('/devices', data),
+  update: (deviceId, data) => api.put(`/devices/${deviceId}`, data),
+  delete: deviceId => api.delete(`/devices/${deviceId}`),
+  getTickets: (deviceId, params) => api.get(`/devices/${deviceId}/tickets`, { params }),
+};
+
 export const ticketAPI = {
   list: params => api.get('/tickets', { params }),
   get: ticketId => api.get(`/tickets/${ticketId}`),

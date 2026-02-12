@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Drawer,
   Tabs,
@@ -10,6 +10,8 @@ import {
   Tooltip,
   Button,
   Popconfirm,
+  Table,
+  Badge,
 } from 'antd';
 import {
   ApiOutlined,
@@ -18,8 +20,12 @@ import {
   EditOutlined,
   PlusCircleOutlined,
   DeleteOutlined,
+  FileTextOutlined,
+  ToolOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import NetworkCardPanel from './NetworkCardPanel';
+import { deviceAPI } from '../api';
 
 const { Text, Title } = Typography;
 
@@ -49,8 +55,121 @@ function DeviceDetailDrawer({
   onDeleteCable,
   tooltipFields,
   refreshTrigger,
+  onViewTicket,
+  onCreateTicket,
 }) {
   const [activeTab, setActiveTab] = useState('ports');
+  const [tickets, setTickets] = useState([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [ticketsPagination, setTicketsPagination] = useState({
+    current: 1,
+    pageSize: 5,
+    total: 0,
+  });
+
+  // 获取设备关联的工单列表
+  const fetchDeviceTickets = useCallback(async (page = 1, pageSize = 5) => {
+    if (!device?.deviceId) return;
+    setTicketsLoading(true);
+    try {
+      const response = await deviceAPI.getTickets(device.deviceId, {
+        page,
+        pageSize,
+      });
+      setTickets(response.data || []);
+      setTicketsPagination({
+        current: response.page || 1,
+        pageSize: response.pageSize || 5,
+        total: response.total || 0,
+      });
+    } catch (error) {
+      console.error('获取设备工单失败:', error);
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, [device?.deviceId]);
+
+  // 当设备变化或标签页切换到工单时，加载工单数据
+  useEffect(() => {
+    if (visible && device?.deviceId && activeTab === 'tickets') {
+      fetchDeviceTickets(1, 5);
+    }
+  }, [visible, device?.deviceId, activeTab, fetchDeviceTickets]);
+
+  // 工单表格列定义
+  const ticketColumns = useMemo(() => [
+    {
+      title: '工单编号',
+      dataIndex: 'ticketId',
+      key: 'ticketId',
+      width: 120,
+      render: (text) => <Text code>{text}</Text>,
+    },
+    {
+      title: '标题',
+      dataIndex: 'title',
+      key: 'title',
+      ellipsis: true,
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 90,
+      render: (status) => {
+        const statusConfig = {
+          pending: { color: 'warning', text: '待处理' },
+          processing: { color: 'processing', text: '处理中' },
+          completed: { color: 'success', text: '已完成' },
+          closed: { color: 'default', text: '已关闭' },
+        };
+        const config = statusConfig[status] || { color: 'default', text: status };
+        return <Badge status={config.color} text={config.text} />;
+      },
+    },
+    {
+      title: '优先级',
+      dataIndex: 'priority',
+      key: 'priority',
+      width: 80,
+      render: (priority) => {
+        const priorityConfig = {
+          low: { color: 'success', text: '低' },
+          medium: { color: 'warning', text: '中' },
+          high: { color: 'error', text: '高' },
+          critical: { color: 'purple', text: '紧急' },
+        };
+        const config = priorityConfig[priority] || { color: 'default', text: priority };
+        return <Tag color={config.color}>{config.text}</Tag>;
+      },
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 150,
+      render: (date) => {
+        if (!date) return '-';
+        const d = new Date(date);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      },
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 80,
+      render: (_, record) => (
+        <Button
+          type="link"
+          size="small"
+          icon={<EyeOutlined />}
+          onClick={() => onViewTicket?.(record)}
+        >
+          查看
+        </Button>
+      ),
+    },
+  ], [onViewTicket]);
 
   const deviceCables = useMemo(() => {
     if (!device || !cables) return [];
@@ -246,6 +365,39 @@ function DeviceDetailDrawer({
               ))}
             </Space>
           )}
+        </div>
+      ),
+    },
+    {
+      key: 'tickets',
+      label: (
+        <span>
+          <FileTextOutlined />
+          工单记录 ({ticketsPagination.total})
+        </span>
+      ),
+      children: (
+        <div className="tickets-panel">
+          <div style={{ marginBottom: designTokens.spacing.md }}>
+            <Button
+              type="primary"
+              icon={<ToolOutlined />}
+              onClick={() => onCreateTicket?.(device)}
+            >
+              创建工单
+            </Button>
+          </div>
+          <Table
+            columns={ticketColumns}
+            dataSource={tickets}
+            rowKey="ticketId"
+            loading={ticketsLoading}
+            pagination={{
+              ...ticketsPagination,
+              onChange: (page, pageSize) => fetchDeviceTickets(page, pageSize),
+            }}
+            size="small"
+          />
         </div>
       ),
     },

@@ -35,9 +35,14 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   SettingOutlined,
+  CloudServerOutlined,
+  DatabaseOutlined,
+  EnvironmentOutlined,
+  TagOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
+import { useSearchParams } from 'react-router-dom';
 
 // 安全地从 localStorage 获取用户信息
 const getUserFromStorage = () => {
@@ -225,6 +230,7 @@ const generateTicketId = () => {
 };
 
 function TicketManagement() {
+  const [searchParams] = useSearchParams();
   const [tickets, setTickets] = useState([]);
   const [devices, setDevices] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -238,6 +244,13 @@ function TicketManagement() {
   const [form] = Form.useForm();
   const [processForm] = Form.useForm();
   const [searchForm] = Form.useForm();
+
+  // 从URL参数获取设备信息（从设备详情页跳转过来）
+  const urlDeviceId = searchParams.get('deviceId');
+  const urlDeviceName = searchParams.get('deviceName');
+  const urlSerialNumber = searchParams.get('serialNumber');
+  const urlCreate = searchParams.get('create');
+  const urlView = searchParams.get('view');
 
   const [pagination, setPagination] = useState({
     current: 1,
@@ -291,7 +304,7 @@ function TicketManagement() {
 
   const fetchDevices = useCallback(async () => {
     try {
-      const response = await axios.get('/api/devices', { params: { pageSize: 1000 } });
+      const response = await axios.get('/api/devices', { params: { pageSize: 100 } });
       setDevices(response.data.devices || []);
     } catch (error) {
       console.error('获取设备列表失败:', error);
@@ -333,9 +346,46 @@ function TicketManagement() {
   useEffect(() => {
     fetchTickets();
     fetchDevices();
-    fetchCategories();
-    fetchTicketFields();
-  }, [fetchTickets, fetchDevices, fetchCategories, fetchTicketFields]);
+    fetchTicketFields().then(() => {
+      // 在 ticketFields 加载完成后再加载分类数据
+      fetchCategories();
+    });
+  }, [fetchTickets, fetchDevices, fetchTicketFields, fetchCategories]);
+
+  // 处理从设备详情页跳转过来创建工单的情况
+  useEffect(() => {
+    if (urlDeviceId && devices.length > 0 && urlCreate === 'true') {
+      // 自动打开创建工单弹窗
+      setEditingTicket(null);
+      setDeviceSource('select');
+      setModalVisible(true);
+
+      // 填充设备信息 - 使用 setTimeout 确保弹窗打开后再设置表单值
+      setTimeout(() => {
+        form.setFieldsValue({
+          deviceId: urlDeviceId,
+        });
+      }, 100);
+    }
+  }, [urlDeviceId, urlCreate, devices, form]);
+
+  // 处理从设备详情页跳转过来查看工单的情况
+  useEffect(() => {
+    if (urlDeviceId && urlView === 'true') {
+      // 设置搜索筛选条件，只显示该设备的工单
+      const filters = { deviceId: urlDeviceId };
+      setSearchFilters(filters);
+      // 在搜索框中显示设备名称提示
+      searchForm.setFieldsValue({ keyword: urlDeviceName || '' });
+    }
+  }, [urlDeviceId, urlView, urlDeviceName, searchForm]);
+
+  // 当 searchFilters 变化时，重新获取工单列表
+  useEffect(() => {
+    if (urlDeviceId && urlView === 'true' && searchFilters.deviceId === urlDeviceId) {
+      fetchTickets(1, pagination.pageSize);
+    }
+  }, [searchFilters, urlDeviceId, urlView]);
 
   const renderFormItem = useCallback(
     field => {
@@ -740,9 +790,35 @@ function TicketManagement() {
         </Form.Item>
       );
     }
+    
+    // 检查 ticketFields 是否包含 deviceId
+    const hasDeviceIdField = ticketFields.some(f => f.fieldName === 'deviceId');
+    const hasDeviceNameField = ticketFields.some(f => f.fieldName === 'deviceName');
+    
     ticketFields.forEach(field => {
-      if (field.fieldName === 'ticketId' || field.fieldName === 'deviceId') {
-        if (field.fieldName === 'deviceId') {
+      if (field.fieldName === 'ticketId') {
+        // 已处理
+      } else if (field.fieldName === 'deviceId') {
+        // 渲染设备选择器
+        items.push(
+          <React.Fragment key="deviceSource">
+            <Form.Item label="设备来源" required>
+              <Select
+                value={deviceSource}
+                onChange={handleDeviceSourceChange}
+                style={{ width: 200 }}
+              >
+                <Option value="select">从设备管理选择</Option>
+                <Option value="manual">手动输入</Option>
+              </Select>
+            </Form.Item>
+            {renderDeviceFormItems()}
+          </React.Fragment>
+        );
+      } else if (field.fieldName === 'deviceName' || field.fieldName === 'serialNumber') {
+        // 如果存在 deviceId 字段，这些字段会在 renderDeviceFormItems 中处理
+        // 如果不存在 deviceId 字段但存在 deviceName，则显示手动输入模式
+        if (!hasDeviceIdField && field.fieldName === 'deviceName') {
           items.push(
             <React.Fragment key="deviceSource">
               <Form.Item label="设备来源" required>
@@ -763,6 +839,26 @@ function TicketManagement() {
         items.push(renderFormItem(field));
       }
     });
+    
+    // 如果 ticketFields 中既没有 deviceId 也没有 deviceName，则手动添加设备选择器
+    if (!hasDeviceIdField && !hasDeviceNameField) {
+      items.push(
+        <React.Fragment key="deviceSource">
+          <Form.Item label="设备来源" required>
+            <Select
+              value={deviceSource}
+              onChange={handleDeviceSourceChange}
+              style={{ width: 200 }}
+            >
+              <Option value="select">从设备管理选择</Option>
+              <Option value="manual">手动输入</Option>
+            </Select>
+          </Form.Item>
+          {renderDeviceFormItems()}
+        </React.Fragment>
+      );
+    }
+    
     return items;
   }, [
     ticketFields,
@@ -993,7 +1089,14 @@ function TicketManagement() {
       >
         {selectedTicket && (
           <Tabs defaultActiveKey="info">
-            <TabPane tab="基本信息" key="info">
+            <TabPane
+              tab={
+                <span>
+                  <TagOutlined /> 基本信息
+                </span>
+              }
+              key="info"
+            >
               <Descriptions bordered column={2}>
                 <Descriptions.Item label="工单编号">{selectedTicket.ticketId}</Descriptions.Item>
                 <Descriptions.Item label="标题">{selectedTicket.title}</Descriptions.Item>
@@ -1042,7 +1145,94 @@ function TicketManagement() {
               </Descriptions>
             </TabPane>
 
-            <TabPane tab={`操作记录 (${operationRecords.length})`} key="operations">
+            {selectedTicket?.Device && (
+              <TabPane
+                tab={
+                  <span>
+                    <CloudServerOutlined /> 设备信息
+                  </span>
+                }
+                key="device"
+              >
+                <Descriptions bordered column={2}>
+                  <Descriptions.Item label="设备ID">
+                    {selectedTicket.Device.deviceId}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="设备名称">
+                    {selectedTicket.Device.name}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="设备类型">
+                    {selectedTicket.Device.type}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="型号">
+                    {selectedTicket.Device.model || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="序列号">
+                    {selectedTicket.Device.serialNumber || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="品牌">
+                    {selectedTicket.Device.brand || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="所在机房">
+                    {selectedTicket.Device.roomName || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="所在机柜">
+                    {selectedTicket.Device.rackName || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="位置(U)">
+                    {selectedTicket.Device.position || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="高度(U)">
+                    {selectedTicket.Device.height || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="IP地址">
+                    {selectedTicket.Device.ipAddress || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="状态">
+                    <Tag
+                      color={
+                        selectedTicket.Device.status === 'running'
+                          ? 'green'
+                          : selectedTicket.Device.status === 'maintenance'
+                            ? 'orange'
+                            : selectedTicket.Device.status === 'fault'
+                              ? 'red'
+                              : 'default'
+                      }
+                    >
+                      {selectedTicket.Device.status === 'running'
+                        ? '运行中'
+                        : selectedTicket.Device.status === 'maintenance'
+                          ? '维护中'
+                          : selectedTicket.Device.status === 'fault'
+                            ? '故障'
+                            : selectedTicket.Device.status === 'offline'
+                              ? '离线'
+                              : selectedTicket.Device.status || '-'}
+                    </Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="购买日期">
+                    {selectedTicket.Device.purchaseDate
+                      ? dayjs(selectedTicket.Device.purchaseDate).format('YYYY-MM-DD')
+                      : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="保修到期">
+                    {selectedTicket.Device.warrantyDate
+                      ? dayjs(selectedTicket.Device.warrantyDate).format('YYYY-MM-DD')
+                      : '-'}
+                  </Descriptions.Item>
+                </Descriptions>
+              </TabPane>
+            )}
+
+            <TabPane
+              tab={
+                <span>
+                  <ClockCircleOutlined /> 操作记录 ({operationRecords.length})
+                </span>
+              }
+              key="operations"
+            >
               <Timeline mode="left">
                 {operationRecords.map((record, index) => (
                   <Timeline.Item
