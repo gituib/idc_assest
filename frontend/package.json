@@ -19,10 +19,12 @@
     "antd": "^5.8.6",
     "axios": "^1.5.0",
     "dayjs": "^1.11.19",
+    "framer-motion": "^12.34.0",
     "papaparse": "^5.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.15.0",
+    "styled-components": "^6.3.9",
     "three": "^0.160.1",
     "xlsx": "^0.18.5"
   },
