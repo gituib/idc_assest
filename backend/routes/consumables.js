@@ -6,6 +6,7 @@ const dayjs = require('dayjs');
 const Consumable = require('../models/Consumable');
 const ConsumableRecord = require('../models/ConsumableRecord');
 const ConsumableLog = require('../models/ConsumableLog');
+const ConsumableLogArchive = require('../models/ConsumableLogArchive');
 
 router.get('/', async (req, res) => {
   try {
@@ -841,6 +842,41 @@ router.delete('/:id', async (req, res) => {
       status: consumable.status
     };
 
+    // 查询该耗材的所有操作日志
+    const logs = await ConsumableLog.findAll({
+      where: { consumableId },
+      order: [['createdAt', 'ASC']],
+      transaction
+    });
+
+    // 计算统计数据
+    const totalOperations = logs.length;
+    const totalInQuantity = logs
+      .filter(l => l.operationType === 'in')
+      .reduce((sum, l) => sum + (l.quantity || 0), 0);
+    const totalOutQuantity = logs
+      .filter(l => l.operationType === 'out')
+      .reduce((sum, l) => sum + Math.abs(l.quantity || 0), 0);
+
+    // 创建归档记录
+    const archiveId = `ARC${Date.now()}`;
+    await ConsumableLogArchive.create({
+      archiveId,
+      consumableId,
+      consumableName,
+      consumableSnapshot,
+      totalOperations,
+      firstOperationAt: logs.length > 0 ? logs[0].createdAt : null,
+      lastOperationAt: logs.length > 0 ? logs[logs.length - 1].createdAt : null,
+      totalInQuantity,
+      totalOutQuantity,
+      finalStock: currentStock,
+      deletedBy: operator,
+      deletedAt: new Date(),
+      deleteReason: req.body.reason || '删除耗材'
+    }, { transaction });
+
+    // 创建一条汇总日志（用于在日志列表中显示）
     await ConsumableLog.create({
       consumableId,
       consumableName,
@@ -850,22 +886,18 @@ router.delete('/:id', async (req, res) => {
       currentStock: 0,
       operator,
       reason: '删除耗材',
-      notes: `删除耗材：${consumableName}，删除时库存为 ${currentStock}`,
+      notes: `删除耗材：${consumableName}，共${totalOperations}条操作记录已归档（归档ID: ${archiveId}）`,
       isEditable: false,
       isConsumableDeleted: true,
-      consumableSnapshot
+      consumableSnapshot,
+      relatedId: archiveId // 关联归档ID
     }, { transaction });
 
-    await ConsumableLog.update(
-      {
-        isConsumableDeleted: true,
-        consumableSnapshot
-      },
-      {
-        where: { consumableId },
-        transaction
-      }
-    );
+    // 删除原日志记录（已归档）
+    await ConsumableLog.destroy({
+      where: { consumableId },
+      transaction
+    });
 
     await ConsumableRecord.destroy({
       where: { consumableId },
@@ -875,9 +907,66 @@ router.delete('/:id', async (req, res) => {
     await consumable.destroy({ transaction });
 
     await transaction.commit();
-    res.json({ message: '删除成功' });
+    res.json({
+      message: '删除成功',
+      archiveId,
+      archivedLogs: totalOperations
+    });
   } catch (error) {
     await transaction.rollback();
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 查询归档记录列表
+router.get('/archives', async (req, res) => {
+  try {
+    const { keyword, page = 1, pageSize = 10 } = req.query;
+    const offset = (page - 1) * pageSize;
+
+    const where = {};
+
+    if (keyword) {
+      where[Op.or] = [
+        { consumableId: { [Op.like]: `%${keyword}%` } },
+        { consumableName: { [Op.like]: `%${keyword}%` } },
+        { archiveId: { [Op.like]: `%${keyword}%` } }
+      ];
+    }
+
+    const { count, rows } = await ConsumableLogArchive.findAndCountAll({
+      where,
+      offset,
+      limit: parseInt(pageSize),
+      order: [['deletedAt', 'DESC']]
+    });
+
+    res.json({
+      total: count,
+      archives: rows,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 查询单个归档记录详情
+router.get('/archives/:archiveId', async (req, res) => {
+  try {
+    const { archiveId } = req.params;
+
+    const archive = await ConsumableLogArchive.findOne({
+      where: { archiveId }
+    });
+
+    if (!archive) {
+      return res.status(404).json({ error: '归档记录不存在' });
+    }
+
+    res.json(archive);
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });

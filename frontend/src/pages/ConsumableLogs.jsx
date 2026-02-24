@@ -16,6 +16,10 @@ import {
   Form,
   Tooltip,
   Timeline,
+  Row,
+  Col,
+  Statistic,
+  Divider,
 } from 'antd';
 import {
   HistoryOutlined,
@@ -56,6 +60,11 @@ function ConsumableLogs() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [form] = Form.useForm();
   const fileInputRef = useRef(null);
+
+  // 归档详情弹窗状态
+  const [archiveModalVisible, setArchiveModalVisible] = useState(false);
+  const [currentArchive, setCurrentArchive] = useState(null);
+  const [archiveLoading, setArchiveLoading] = useState(false);
 
   const fetchLogs = async (page = 1, pageSize = 10, currentFilters = filters) => {
     try {
@@ -121,22 +130,13 @@ function ConsumableLogs() {
       dataIndex: 'consumableId',
       key: 'consumableId',
       width: 150,
-      render: (value, record) => (
-        <Space>
-          <code>{value}</code>
-          {record.isConsumableDeleted && (
-            <Tooltip title="该耗材已被删除">
-              <Tag color="red">已删除</Tag>
-            </Tooltip>
-          )}
-        </Space>
-      ),
+      render: value => <code>{value}</code>,
     },
     {
       title: '耗材名称',
       dataIndex: 'consumableName',
       key: 'consumableName',
-      width: 150,
+      width: 180,
       render: (value, record) => (
         <Tooltip
           title={
@@ -151,7 +151,12 @@ function ConsumableLogs() {
             ) : null
           }
         >
-          <span>{value}</span>
+          <Space direction="vertical" size={0}>
+            <span>{value}</span>
+            {record.isConsumableDeleted && (
+              <Tag color="red" size="small">已删除</Tag>
+            )}
+          </Space>
         </Tooltip>
       ),
     },
@@ -159,8 +164,23 @@ function ConsumableLogs() {
       title: '操作类型',
       dataIndex: 'operationType',
       key: 'operationType',
-      width: 100,
-      render: type => getOperationTag(type),
+      width: 120,
+      render: (type, record) => (
+        <Space direction="vertical" size={0}>
+          {getOperationTag(type)}
+          {type === 'delete' && record.relatedId && (
+            <Tooltip title="点击查看归档详情">
+              <Tag
+                color="blue"
+                style={{ cursor: 'pointer', fontSize: '11px' }}
+                onClick={() => handleViewArchive(record.relatedId)}
+              >
+                已归档
+              </Tag>
+            </Tooltip>
+          )}
+        </Space>
+      ),
     },
     {
       title: '变动数量',
@@ -209,8 +229,19 @@ function ConsumableLogs() {
       dataIndex: 'notes',
       key: 'notes',
       width: 200,
-      render: value => value || '-',
-      ellipsis: true,
+      render: value => (
+        <Tooltip title={value || '-'}>
+          <span style={{ 
+            display: 'inline-block', 
+            maxWidth: '180px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
+            {value || '-'}
+          </span>
+        </Tooltip>
+      ),
     },
     {
       title: '操作',
@@ -428,6 +459,21 @@ function ConsumableLogs() {
       modificationReason: '',
     });
     setEditModalVisible(true);
+  };
+
+  // 查看归档详情
+  const handleViewArchive = async archiveId => {
+    setArchiveModalVisible(true);
+    setArchiveLoading(true);
+    try {
+      const response = await axios.get(`/api/consumables/archives/${archiveId}`);
+      setCurrentArchive(response.data);
+    } catch (error) {
+      message.error('获取归档详情失败');
+      console.error('获取归档详情失败:', error);
+    } finally {
+      setArchiveLoading(false);
+    }
   };
 
   // 提交编辑
@@ -693,8 +739,8 @@ function ConsumableLogs() {
                   )}
                   {item.consumableSnapshot && (
                     <p>
-                      <strong>快照信息:</strong> 分类:{item.consumableSnapshot.category || '-'} | 
-                      单位:{item.consumableSnapshot.unit || '-'} | 
+                      <strong>快照信息:</strong> 分类:{item.consumableSnapshot.category || '-'} |
+                      单位:{item.consumableSnapshot.unit || '-'} |
                       单价:{item.consumableSnapshot.unitPrice || '-'}
                     </p>
                   )}
@@ -718,6 +764,67 @@ function ConsumableLogs() {
               </Timeline.Item>
             ))}
           </Timeline>
+        )}
+      </Modal>
+
+      {/* 归档详情弹窗 */}
+      <Modal
+        title="归档记录详情"
+        open={archiveModalVisible}
+        onCancel={() => {
+          setArchiveModalVisible(false);
+          setCurrentArchive(null);
+        }}
+        footer={null}
+        width={600}
+      >
+        {archiveLoading ? (
+          <div style={{ textAlign: 'center', padding: '40px' }}>加载中...</div>
+        ) : !currentArchive ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
+            无法获取归档信息
+          </div>
+        ) : (
+          <div>
+            <Card size="small" title="基本信息" style={{ marginBottom: 16 }}>
+              <p><strong>归档ID:</strong> <code>{currentArchive.archiveId}</code></p>
+              <p><strong>耗材ID:</strong> <code>{currentArchive.consumableId}</code></p>
+              <p><strong>耗材名称:</strong> {currentArchive.consumableName}</p>
+              <p><strong>删除人:</strong> {currentArchive.deletedBy}</p>
+              <p><strong>删除时间:</strong> {dayjs(currentArchive.deletedAt).format('YYYY-MM-DD HH:mm:ss')}</p>
+              <p><strong>删除原因:</strong> {currentArchive.deleteReason || '-'}</p>
+            </Card>
+
+            <Card size="small" title="操作统计" style={{ marginBottom: 16 }}>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Statistic title="总操作数" value={currentArchive.totalOperations} />
+                </Col>
+                <Col span={8}>
+                  <Statistic title="总入库" value={currentArchive.totalInQuantity} />
+                </Col>
+                <Col span={8}>
+                  <Statistic title="总出库" value={currentArchive.totalOutQuantity} />
+                </Col>
+              </Row>
+              <Divider style={{ margin: '12px 0' }} />
+              <p><strong>首次操作:</strong> {currentArchive.firstOperationAt ? dayjs(currentArchive.firstOperationAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</p>
+              <p><strong>最后操作:</strong> {currentArchive.lastOperationAt ? dayjs(currentArchive.lastOperationAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</p>
+              <p><strong>删除时库存:</strong> {currentArchive.finalStock}</p>
+            </Card>
+
+            {currentArchive.consumableSnapshot && (
+              <Card size="small" title="耗材快照">
+                <p><strong>分类:</strong> {currentArchive.consumableSnapshot.category || '-'}</p>
+                <p><strong>单位:</strong> {currentArchive.consumableSnapshot.unit || '-'}</p>
+                <p><strong>单价:</strong> {currentArchive.consumableSnapshot.unitPrice || '-'}</p>
+                <p><strong>供应商:</strong> {currentArchive.consumableSnapshot.supplier || '-'}</p>
+                <p><strong>位置:</strong> {currentArchive.consumableSnapshot.location || '-'}</p>
+                <p><strong>最小库存:</strong> {currentArchive.consumableSnapshot.minStock || '-'}</p>
+                <p><strong>最大库存:</strong> {currentArchive.consumableSnapshot.maxStock || '-'}</p>
+              </Card>
+            )}
+          </div>
         )}
       </Modal>
     </div>
