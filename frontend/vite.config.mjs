@@ -2,6 +2,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import Components from 'unplugin-vue-components/vite';
+import { AntDesignVueResolver } from 'unplugin-vue-components/resolvers';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // 从配置文件或环境变量获取端口
 const getFrontendPort = () => {
@@ -29,7 +35,17 @@ const getFrontendPort = () => {
 const port = getFrontendPort();
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    Components({
+      resolvers: [
+        AntDesignVueResolver({
+          importStyle: false,
+        }),
+      ],
+      dts: false,
+    }),
+  ],
   assetsInclude: ['**/*.hdr', '**/*.woff2'],
   server: {
     host: '0.0.0.0',
@@ -51,10 +67,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'antd': ['antd', '@ant-design/icons'],
           'vendor': ['react', 'react-dom', 'react-router-dom'],
           'charts': ['axios', 'dayjs'],
-          'utils': ['three', 'xlsx']
+          'three': ['three', '@react-three/fiber', '@react-three/drei']
         },
         chunkFileNames: 'js/[name]-[hash].js',
         entryFileNames: 'js/[name]-[hash].js',
@@ -71,6 +86,6 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['antd', '@ant-design/icons', 'axios', 'react-router-dom']
+    include: ['axios', 'react-router-dom']
   }
 });
