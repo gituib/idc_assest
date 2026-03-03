@@ -59,6 +59,18 @@ const { Panel } = Collapse;
 const { Text, Title } = Typography;
 const { TextArea } = Input;
 
+const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
 // 设计令牌 - 与接线管理页面保持一致
 const designTokens = {
   colors: {
@@ -149,6 +161,7 @@ const animations = {
 function PortManagement() {
   const [ports, setPorts] = useState([]);
   const [devices, setDevices] = useState([]);
+  const [deviceSearching, setDeviceSearching] = useState(false);
   const [cables, setCables] = useState([]);
   const [groupedPorts, setGroupedPorts] = useState({});
   const [loading, setLoading] = useState(false);
@@ -217,15 +230,29 @@ function PortManagement() {
     }
   }, [filters]);
 
-  const fetchDevices = useCallback(async () => {
+  const fetchDevices = useCallback(async (keyword = '') => {
     try {
-      const response = await axios.get('/api/devices', { params: { pageSize: 100 } });
+      setDeviceSearching(true);
+      const params = { pageSize: 50 };
+      if (keyword && keyword.trim()) {
+        params.keyword = keyword.trim();
+      }
+      const response = await axios.get('/api/devices', { params });
       setDevices(response.data.devices || response.data || []);
     } catch (error) {
       message.error('获取设备列表失败');
       console.error('获取设备列表失败:', error);
+    } finally {
+      setDeviceSearching(false);
     }
   }, []);
+
+  const handleDeviceSearch = useCallback(
+    debounce(value => {
+      fetchDevices(value);
+    }, 300),
+    [fetchDevices]
+  );
 
   const fetchCables = useCallback(async () => {
     try {
@@ -772,17 +799,19 @@ function PortManagement() {
                     设备
                   </div>
                   <Select
-                    placeholder="选择设备"
+                    placeholder="输入关键词搜索设备"
                     style={{ width: '100%' }}
                     value={filters.deviceId || undefined}
                     onChange={value => setFilters(prev => ({ ...prev, deviceId: value }))}
                     allowClear
                     showSearch
-                    filterOption={(input, option) => {
-                      const device = devices.find(d => d.deviceId === option.value);
-                      if (!device) return false;
-                      const searchText = `${device.name} ${device.deviceId}`.toLowerCase();
-                      return searchText.indexOf(input.toLowerCase()) >= 0;
+                    loading={deviceSearching}
+                    filterOption={false}
+                    onSearch={handleDeviceSearch}
+                    onDropdownVisibleChange={open => {
+                      if (open && devices.length === 0) {
+                        fetchDevices();
+                      }
                     }}
                   >
                     {devices.map(device => (
@@ -1222,13 +1251,15 @@ function PortManagement() {
             rules={[{ required: true, message: '请选择设备' }]}
           >
             <Select
-              placeholder="请选择设备"
+              placeholder="输入关键词搜索设备"
               showSearch
-              filterOption={(input, option) => {
-                const device = devices.find(d => d.deviceId === option.value);
-                if (!device) return false;
-                const searchText = `${device.name} ${device.deviceId}`.toLowerCase();
-                return searchText.indexOf(input.toLowerCase()) >= 0;
+              loading={deviceSearching}
+              filterOption={false}
+              onSearch={handleDeviceSearch}
+              onDropdownVisibleChange={open => {
+                if (open && devices.length === 0) {
+                  fetchDevices();
+                }
               }}
             >
               {devices.map(device => (

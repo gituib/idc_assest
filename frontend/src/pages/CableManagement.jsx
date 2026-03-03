@@ -57,6 +57,18 @@ const { Panel } = Collapse;
 const { Text, Title } = Typography;
 const { TextArea } = Input;
 
+const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
 // 设计令牌 - 现代化配色方案
 const designTokens = {
   colors: {
@@ -171,6 +183,7 @@ const animations = {
 function CableManagement() {
   const [cables, setCables] = useState([]);
   const [devices, setDevices] = useState([]);
+  const [deviceSearching, setDeviceSearching] = useState(false);
   const [switchDevices, setSwitchDevices] = useState([]);
   const [groupedCables, setGroupedCables] = useState({});
   const [devicePorts, setDevicePorts] = useState({});
@@ -262,9 +275,14 @@ function CableManagement() {
     }
   }, [filters, devicePorts]);
 
-  const fetchDevices = useCallback(async () => {
+  const fetchDevices = useCallback(async (keyword = '') => {
     try {
-      const response = await axios.get('/api/devices', { params: { pageSize: 100 } });
+      setDeviceSearching(true);
+      const params = { pageSize: 50 };
+      if (keyword && keyword.trim()) {
+        params.keyword = keyword.trim();
+      }
+      const response = await axios.get('/api/devices', { params });
       const allDevices = response.data.devices || [];
       const switches = allDevices.filter(device => device.type === 'switch');
       setDevices(allDevices);
@@ -272,8 +290,17 @@ function CableManagement() {
     } catch (error) {
       message.error('获取设备列表失败');
       console.error('获取设备列表失败:', error);
+    } finally {
+      setDeviceSearching(false);
     }
   }, []);
+
+  const handleDeviceSearch = useCallback(
+    debounce(value => {
+      fetchDevices(value);
+    }, 300),
+    [fetchDevices]
+  );
 
   const fetchDevicePorts = useCallback(async deviceId => {
     if (!deviceId) {
@@ -886,17 +913,19 @@ function CableManagement() {
                     交换机
                   </div>
                   <Select
-                    placeholder="选择交换机"
+                    placeholder="输入关键词搜索交换机"
                     style={{ width: '100%' }}
                     value={filters.switchDeviceId || undefined}
                     onChange={value => setFilters(prev => ({ ...prev, switchDeviceId: value }))}
                     allowClear
                     showSearch
-                    filterOption={(input, option) => {
-                      const device = switchDevices.find(d => d.deviceId === option.value);
-                      if (!device) return false;
-                      const searchText = `${device.name} ${device.deviceId}`.toLowerCase();
-                      return searchText.indexOf(input.toLowerCase()) >= 0;
+                    loading={deviceSearching}
+                    filterOption={false}
+                    onSearch={handleDeviceSearch}
+                    onDropdownVisibleChange={open => {
+                      if (open && switchDevices.length === 0) {
+                        fetchDevices();
+                      }
                     }}
                     suffixIcon={<AppstoreOutlined />}
                   >
@@ -1288,13 +1317,15 @@ function CableManagement() {
                   rules={[{ required: true, message: '请选择源设备' }]}
                 >
                   <Select
-                    placeholder="请选择源设备"
+                    placeholder="输入关键词搜索源设备"
                     showSearch
-                    filterOption={(input, option) => {
-                      const device = switchDevices.find(d => d.deviceId === option.value);
-                      if (!device) return false;
-                      const searchText = `${device.name} ${device.deviceId}`.toLowerCase();
-                      return searchText.indexOf(input.toLowerCase()) >= 0;
+                    loading={deviceSearching}
+                    filterOption={false}
+                    onSearch={handleDeviceSearch}
+                    onDropdownVisibleChange={open => {
+                      if (open && switchDevices.length === 0) {
+                        fetchDevices();
+                      }
                     }}
                     onChange={value => {
                       fetchDevicePorts(value);
@@ -1353,13 +1384,15 @@ function CableManagement() {
                   rules={[{ required: true, message: '请选择目标设备' }]}
                 >
                   <Select
-                    placeholder="请选择目标设备"
+                    placeholder="输入关键词搜索目标设备"
                     showSearch
-                    filterOption={(input, option) => {
-                      const device = devices.find(d => d.deviceId === option.value);
-                      if (!device) return false;
-                      const searchText = `${device.name} ${device.deviceId}`.toLowerCase();
-                      return searchText.indexOf(input.toLowerCase()) >= 0;
+                    loading={deviceSearching}
+                    filterOption={false}
+                    onSearch={handleDeviceSearch}
+                    onDropdownVisibleChange={open => {
+                      if (open && devices.length === 0) {
+                        fetchDevices();
+                      }
                     }}
                     onChange={value => {
                       fetchDevicePorts(value);

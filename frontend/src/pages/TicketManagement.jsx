@@ -46,6 +46,18 @@ import axios from 'axios';
 import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router-dom';
 
+const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
 // 安全地从 localStorage 获取用户信息
 const getUserFromStorage = () => {
   try {
@@ -305,14 +317,31 @@ function TicketManagement() {
     [searchFilters]
   );
 
-  const fetchDevices = useCallback(async () => {
+  const [deviceSearching, setDeviceSearching] = useState(false);
+  const [deviceSearchValue, setDeviceSearchValue] = useState('');
+
+  const fetchDevices = useCallback(async (keyword = '') => {
     try {
-      const response = await axios.get('/api/devices', { params: { pageSize: 100 } });
+      setDeviceSearching(true);
+      const params = { pageSize: 50 };
+      if (keyword && keyword.trim()) {
+        params.keyword = keyword.trim();
+      }
+      const response = await axios.get('/api/devices', { params });
       setDevices(response.data.devices || []);
     } catch (error) {
       console.error('获取设备列表失败:', error);
+    } finally {
+      setDeviceSearching(false);
     }
   }, []);
+
+  const handleDeviceSearch = useCallback(
+    debounce(value => {
+      fetchDevices(value);
+    }, 300),
+    [fetchDevices]
+  );
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -448,10 +477,23 @@ function TicketManagement() {
           break;
         case 'device':
           formItem = (
-            <Select placeholder="选择设备" showSearch optionFilterProp="children">
+            <Select
+              placeholder="输入关键词搜索设备（序列号/名称/IP等）"
+              showSearch
+              allowClear
+              loading={deviceSearching}
+              filterOption={false}
+              onSearch={handleDeviceSearch}
+              notFoundContent={deviceSearching ? '搜索中...' : '请输入关键词搜索'}
+              onDropdownVisibleChange={open => {
+                if (open && devices.length === 0) {
+                  fetchDevices();
+                }
+              }}
+            >
               {devices.map(device => (
                 <Option key={device.deviceId} value={device.deviceId}>
-                  {device.name} - {device.serialNumber}
+                  {device.name} {device.serialNumber ? `- ${device.serialNumber}` : ''}
                 </Option>
               ))}
             </Select>
@@ -467,7 +509,7 @@ function TicketManagement() {
         </Form.Item>
       );
     },
-    [devices]
+    [devices, deviceSearching, handleDeviceSearch, fetchDevices]
   );
 
   const tableColumns = useMemo(() => {
@@ -766,10 +808,23 @@ function TicketManagement() {
     if (deviceSource === 'select') {
       return (
         <Form.Item name="deviceId" label="关联设备" rules={[{ required: false }]}>
-          <Select placeholder="选择设备" showSearch optionFilterProp="children" allowClear>
+          <Select
+            placeholder="输入关键词搜索设备（序列号/名称/IP等）"
+            showSearch
+            allowClear
+            loading={deviceSearching}
+            filterOption={false}
+            onSearch={handleDeviceSearch}
+            notFoundContent={deviceSearching ? '搜索中...' : '请输入关键词搜索'}
+            onDropdownVisibleChange={open => {
+              if (open && devices.length === 0) {
+                fetchDevices();
+              }
+            }}
+          >
             {devices.map(device => (
               <Option key={device.deviceId} value={device.deviceId}>
-                {device.name} - {device.serialNumber}
+                {device.name} {device.serialNumber ? `- ${device.serialNumber}` : ''}
               </Option>
             ))}
           </Select>
@@ -794,7 +849,7 @@ function TicketManagement() {
         </Form.Item>
       </>
     );
-  }, [deviceSource, devices]);
+  }, [deviceSource, devices, deviceSearching, handleDeviceSearch, fetchDevices]);
 
   const renderFormItems = useCallback(() => {
     const items = [];

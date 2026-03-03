@@ -5,6 +5,18 @@ import axios from 'axios';
 
 const { Option } = Select;
 
+const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
 const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -13,6 +25,30 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
   const [targetPorts, setTargetPorts] = useState([]);
   const [fetchingDevices, setFetchingDevices] = useState(false);
   const prevVisibleRef = useRef(false);
+
+  const fetchDevices = useCallback(async (keyword = '') => {
+    try {
+      setFetchingDevices(true);
+      const params = { pageSize: 50 };
+      if (keyword && keyword.trim()) {
+        params.keyword = keyword.trim();
+      }
+      const response = await axios.get('/api/devices', { params });
+      setDevices(response.data.devices || []);
+    } catch (error) {
+      console.error('Failed to fetch devices:', error);
+      message.error('获取设备列表失败');
+    } finally {
+      setFetchingDevices(false);
+    }
+  }, []);
+
+  const handleDeviceSearch = useCallback(
+    debounce(value => {
+      fetchDevices(value);
+    }, 300),
+    [fetchDevices]
+  );
 
   // Initialize when visible changes from false to true
   useEffect(() => {
@@ -27,20 +63,7 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
       fetchDevices();
     }
     prevVisibleRef.current = visible;
-  }, [visible, sourceDevice, form]);
-
-  const fetchDevices = async () => {
-    try {
-      setFetchingDevices(true);
-      const response = await axios.get('/api/devices', { params: { pageSize: 1000 } });
-      setDevices(response.data.devices || []);
-    } catch (error) {
-      console.error('Failed to fetch devices:', error);
-      message.error('获取设备列表失败');
-    } finally {
-      setFetchingDevices(false);
-    }
-  };
+  }, [visible, sourceDevice, form, fetchDevices]);
 
   const fetchDevicePorts = async (deviceId, type) => {
     if (!deviceId) {
@@ -136,14 +159,18 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
               rules={[{ required: true, message: '请选择源设备' }]}
             >
               <Select
-                placeholder="选择源设备"
+                placeholder="输入关键词搜索源设备"
                 showSearch
-                filterOption={(input, option) =>
-                  (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-                }
+                filterOption={false}
+                onSearch={handleDeviceSearch}
+                onDropdownVisibleChange={open => {
+                  if (open && devices.length === 0) {
+                    fetchDevices();
+                  }
+                }}
                 onChange={handleSourceDeviceChange}
                 loading={fetchingDevices}
-                disabled={!!sourceDevice} // Lock source device if provided
+                disabled={!!sourceDevice}
               >
                 {devices.map(d => (
                   <Option key={d.deviceId} value={d.deviceId}>
@@ -176,11 +203,15 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
               rules={[{ required: true, message: '请选择目标设备' }]}
             >
               <Select
-                placeholder="选择目标设备"
+                placeholder="输入关键词搜索目标设备"
                 showSearch
-                filterOption={(input, option) =>
-                  (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-                }
+                filterOption={false}
+                onSearch={handleDeviceSearch}
+                onDropdownVisibleChange={open => {
+                  if (open && devices.length === 0) {
+                    fetchDevices();
+                  }
+                }}
                 onChange={handleTargetDeviceChange}
                 loading={fetchingDevices}
               >
