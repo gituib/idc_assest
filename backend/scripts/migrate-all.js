@@ -5,7 +5,24 @@
  * 支持 SQLite 和 MySQL
  */
 
-const { sequelize, DB_TYPE } = require('../db');
+// 必须在最前面加载环境变量
+const path = require('path');
+const envPath = path.join(__dirname, '../.env');
+console.log(`加载环境变量文件: ${envPath}`);
+require('dotenv').config({ path: envPath });
+
+console.log('环境变量检查:');
+console.log(`  DB_TYPE: ${process.env.DB_TYPE}`);
+console.log(`  MYSQL_HOST: ${process.env.MYSQL_HOST}`);
+console.log(`  MYSQL_DATABASE: ${process.env.MYSQL_DATABASE}`);
+console.log(`  MYSQL_USERNAME: ${process.env.MYSQL_USERNAME}`);
+
+const { sequelize, DB_TYPE, dbDialect } = require('../db');
+
+console.log(`\n数据库连接信息:`);
+console.log(`  DB_TYPE (from env): ${DB_TYPE}`);
+console.log(`  dbDialect (actual): ${dbDialect}`);
+console.log(`  sequelize.getDialect(): ${sequelize.getDialect()}`);
 
 const migrations = [
   {
@@ -355,8 +372,7 @@ async function migrateConsumableLogArchive() {
     }
   });
 
-  const dialect = sequelize.getDialect();
-  if (dialect === 'sqlite') {
+  if (dbDialect === 'sqlite') {
     await sequelize.query(`CREATE INDEX idx_archive_consumable_id ON consumable_log_archives(consumableId)`);
     await sequelize.query(`CREATE INDEX idx_archive_archive_id ON consumable_log_archives(archiveId)`);
     await sequelize.query(`CREATE INDEX idx_archive_deleted_at ON consumable_log_archives(deletedAt)`);
@@ -364,12 +380,11 @@ async function migrateConsumableLogArchive() {
 }
 
 async function migrateSnList() {
-  const dialect = sequelize.getDialect();
   const tables = ['consumables', 'consumable_records', 'consumable_logs'];
   
   for (const table of tables) {
     if (await tableExists(table)) {
-      const columnDef = dialect === 'sqlite' ? "TEXT DEFAULT '[]'" : "JSON DEFAULT '[]'";
+      const columnDef = dbDialect === 'sqlite' ? "TEXT DEFAULT '[]'" : "JSON DEFAULT '[]'";
       await addColumnIfNotExists(table, 'snList', columnDef);
     } else {
       console.log(`    ${table} 表不存在，跳过`);
