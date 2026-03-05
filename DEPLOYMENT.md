@@ -676,6 +676,134 @@ sudo certbot renew --dry-run
 
 ---
 
+## Zeabur 云平台部署（推荐免费方案）⭐
+
+Zeabur 是国内团队开发的云平台，国内访问速度快，提供免费额度。
+
+### 1. 准备工作
+
+- GitHub 账号
+- 项目代码已推送到 GitHub 仓库
+
+### 2. 注册 Zeabur
+
+1. 访问 [Zeabur 官网](https://zeabur.com)
+2. 点击「Sign in with GitHub」使用 GitHub 登录
+3. 授权 Zeabur 访问你的仓库
+
+### 3. 创建项目
+
+1. 进入 Zeabur Dashboard
+2. 点击「New Project」创建新项目
+3. 选择区域（推荐：Hong Kong 或 Singapore）
+
+### 4. 部署 MySQL 数据库
+
+1. 在项目中点击「Add Service」→「Prebuilt」
+2. 搜索并选择「MySQL」
+3. 点击部署
+4. 记录数据库连接信息（稍后配置后端使用）
+
+### 5. 部署后端服务
+
+1. 点击「Add Service」→「Git」
+2. 选择你的 GitHub 仓库
+3. 选择 `backend` 目录
+4. 配置环境变量：
+
+```env
+NODE_ENV=production
+PORT=8000
+DB_TYPE=mysql
+JWT_SECRET=your-strong-jwt-secret-at-least-32-characters
+TOKEN_EXPIRY=24h
+```
+
+5. 配置数据库连接（从 MySQL 服务获取）：
+
+```env
+MYSQL_HOST=${mysql:MYSQL_HOST}
+MYSQL_PORT=${mysql:MYSQL_PORT}
+MYSQL_USERNAME=${mysql:MYSQL_USERNAME}
+MYSQL_PASSWORD=${mysql:MYSQL_PASSWORD}
+MYSQL_DATABASE=${mysql:MYSQL_DATABASE}
+```
+
+6. 点击部署
+
+### 6. 部署前端服务
+
+1. 点击「Add Service」→「Git」
+2. 选择同一个仓库
+3. 选择 `frontend` 目录
+4. 配置环境变量：
+
+```env
+VITE_API_URL=${idc-backend:ZEABUR_WEB_URL}
+```
+
+5. 点击部署
+
+### 7. 配置域名
+
+1. 进入前端服务 →「Domains」
+2. 点击「Generate Domain」生成免费域名
+3. 或绑定自定义域名
+
+### 8. 部署完成
+
+访问生成的域名即可使用系统。
+
+### Zeabur 配置文件说明
+
+项目根目录的 `zeabur.yaml` 文件定义了服务配置：
+
+```yaml
+services:
+  - name: idc-backend
+    type: prebuilt
+    source:
+      type: static
+      path: backend
+    env:
+      NODE_ENV: production
+      PORT: 8000
+      DB_TYPE: mysql
+
+  - name: idc-frontend
+    type: prebuilt
+    source:
+      type: static
+      path: frontend
+    env:
+      NODE_ENV: production
+
+  - name: mysql
+    type: prebuilt
+    source:
+      type: image
+      url: mysql:8.0
+    env:
+      MYSQL_DATABASE: idc_management
+```
+
+### 常见问题
+
+**Q: 部署失败怎么办？**
+- 检查构建日志，确认依赖安装成功
+- 确认环境变量配置正确
+- 检查 Dockerfile 是否存在
+
+**Q: 数据库连接失败？**
+- 确认 MySQL 服务已启动
+- 检查环境变量引用格式：`${mysql:MYSQL_HOST}`
+
+**Q: 前端无法访问后端 API？**
+- 检查 `VITE_API_URL` 环境变量
+- 确认后端服务已启动并分配域名
+
+---
+
 ## 数据库配置
 
 ### SQLite（开发环境/小规模）

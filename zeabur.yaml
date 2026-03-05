@@ -1,0 +1,70 @@
+services:
+  - name: idc-backend
+    type: prebuilt
+    source:
+      type: static
+      path: backend
+    env:
+      NODE_ENV: production
+      PORT: 8000
+      DB_TYPE: mysql
+      JWT_SECRET: ${JWT_SECRET}
+      TOKEN_EXPIRY: 24h
+    configs:
+      - type: env
+        name: MYSQL_HOST
+        valueFrom:
+          type: service
+          serviceName: mysql
+          serviceConfigKey: host
+      - type: env
+        name: MYSQL_PORT
+        valueFrom:
+          type: service
+          serviceName: mysql
+          serviceConfigKey: port
+      - type: env
+        name: MYSQL_USERNAME
+        valueFrom:
+          type: service
+          serviceName: mysql
+          serviceConfigKey: username
+      - type: env
+        name: MYSQL_PASSWORD
+        valueFrom:
+          type: service
+          serviceName: mysql
+          serviceConfigKey: password
+      - type: env
+        name: MYSQL_DATABASE
+        valueFrom:
+          type: service
+          serviceName: mysql
+          serviceConfigKey: database
+
+  - name: idc-frontend
+    type: prebuilt
+    source:
+      type: static
+      path: frontend
+    env:
+      NODE_ENV: production
+    configs:
+      - type: env
+        name: BACKEND_URL
+        valueFrom:
+          type: service
+          serviceName: idc-backend
+          serviceConfigKey: url
+
+  - name: mysql
+    type: prebuilt
+    source:
+      type: image
+      url: mysql:8.0
+    env:
+      MYSQL_DATABASE: idc_management
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - name: mysql-data
+        mountPath: /var/lib/mysql
