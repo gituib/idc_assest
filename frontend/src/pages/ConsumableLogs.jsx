@@ -21,6 +21,7 @@ import {
   Col,
   Statistic,
   Divider,
+  Popover,
 } from 'antd';
 import {
   HistoryOutlined,
@@ -227,6 +228,47 @@ function ConsumableLogs() {
       key: 'reason',
       width: 150,
       render: value => value || '-',
+    },
+    {
+      title: 'SN序列号',
+      dataIndex: 'snList',
+      key: 'snList',
+      width: 150,
+      render: (snList, record) => {
+        if (!snList || snList.length === 0) {
+          return '-';
+        }
+        if (record.operationType !== 'in' && record.operationType !== 'out') {
+          return '-';
+        }
+        if (snList.length <= 3) {
+          return (
+            <Space size={2} wrap>
+              {snList.map((sn, index) => (
+                <Tag key={index} color="purple" style={{ fontSize: '11px' }}>
+                  {sn}
+                </Tag>
+              ))}
+            </Space>
+          );
+        }
+        const content = (
+          <div style={{ maxHeight: '200px', overflowY: 'auto', maxWidth: '300px' }}>
+            {snList.map((sn, index) => (
+              <Tag key={index} color="purple" style={{ marginBottom: '4px', fontSize: '11px' }}>
+                {sn}
+              </Tag>
+            ))}
+          </div>
+        );
+        return (
+          <Popover content={content} title={`SN列表 (${snList.length}个)`} trigger="click">
+            <Tag color="purple" style={{ cursor: 'pointer' }}>
+              {snList.length} 个SN 🔍
+            </Tag>
+          </Popover>
+        );
+      },
     },
     {
       title: '备注',
