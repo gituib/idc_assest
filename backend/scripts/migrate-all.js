@@ -384,7 +384,7 @@ async function migrateSnList() {
   
   for (const table of tables) {
     if (await tableExists(table)) {
-      const columnDef = dbDialect === 'sqlite' ? "TEXT DEFAULT '[]'" : "JSON DEFAULT '[]'";
+      const columnDef = dbDialect === 'sqlite' ? "TEXT DEFAULT '[]'" : "JSON";
       await addColumnIfNotExists(table, 'snList', columnDef);
     } else {
       console.log(`    ${table} 表不存在，跳过`);
