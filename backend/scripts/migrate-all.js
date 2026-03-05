@@ -42,6 +42,11 @@ const migrations = [
     name: '耗材日志归档表',
     description: '创建 consumable_log_archives 归档表',
     migrate: migrateConsumableLogArchive
+  },
+  {
+    name: '耗材SN序列号字段',
+    description: '为 consumables、consumable_records、consumable_logs 添加 snList 字段',
+    migrate: migrateSnList
   }
 ];
 
@@ -364,6 +369,36 @@ async function migrateConsumableLogArchive() {
   await sequelize.query(`CREATE INDEX idx_archive_consumable_id ON consumable_log_archives(consumableId)`);
   await sequelize.query(`CREATE INDEX idx_archive_archive_id ON consumable_log_archives(archiveId)`);
   await sequelize.query(`CREATE INDEX idx_archive_deleted_at ON consumable_log_archives(deletedAt)`);
+}
+
+async function migrateSnList() {
+  const dialect = sequelize.getDialect();
+  
+  const tables = ['consumables', 'consumable_records', 'consumable_logs'];
+  
+  for (const table of tables) {
+    const tableInfo = await sequelize.query(
+      dialect === 'sqlite' 
+        ? `PRAGMA table_info(${table})`
+        : `SHOW COLUMNS FROM ${table}`,
+      { type: sequelize.QueryTypes.SELECT }
+    );
+    
+    const columns = dialect === 'sqlite' 
+      ? tableInfo.map(col => col.name)
+      : tableInfo.map(col => col.Field);
+    
+    if (!columns.includes('snList')) {
+      if (dialect === 'sqlite') {
+        await sequelize.query(`ALTER TABLE ${table} ADD COLUMN snList TEXT DEFAULT '[]'`);
+      } else {
+        await sequelize.query(`ALTER TABLE ${table} ADD COLUMN snList JSON DEFAULT '[]'`);
+      }
+      console.log(`    ${table} 表添加 snList 字段成功`);
+    } else {
+      console.log(`    ${table} 表 snList 字段已存在，跳过`);
+    }
+  }
 }
 
 // 执行迁移

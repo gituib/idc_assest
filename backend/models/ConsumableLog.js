@@ -87,6 +87,12 @@ const ConsumableLog = sequelize.define('ConsumableLog', {
     type: DataTypes.JSON,
     allowNull: true,
     comment: '耗材快照信息（分类、单位、供应商等），用于耗材删除后追溯'
+  },
+  snList: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: [],
+    comment: '本次操作的SN序列号列表'
   }
 }, {
   tableName: 'consumable_logs',

@@ -46,6 +46,12 @@ const ConsumableRecord = sequelize.define('ConsumableRecord', {
   },
   notes: {
     type: DataTypes.TEXT
+  },
+  snList: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: [],
+    comment: '本次操作的SN序列号列表'
   }
 }, {
   tableName: 'consumable_records',

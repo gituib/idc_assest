@@ -46,7 +46,7 @@ function ConsumableLogs() {
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
   const [filters, setFilters] = useState({
-    operationType: 'all',
+    operationType: ['in', 'out'],
     consumableId: '',
     dateRange: null,
   });
@@ -73,8 +73,8 @@ function ConsumableLogs() {
       setLoading(true);
       const params = { page, pageSize };
 
-      if (currentFilters.operationType !== 'all') {
-        params.operationType = currentFilters.operationType;
+      if (currentFilters.operationType && currentFilters.operationType !== 'all' && currentFilters.operationType.length > 0) {
+        params.operationType = currentFilters.operationType.join(',');
       }
       if (currentFilters.consumableId) {
         params.consumableId = currentFilters.consumableId;
@@ -541,11 +541,14 @@ function ConsumableLogs() {
               prefix={<SearchOutlined />}
             />
             <Select
+              mode="multiple"
               value={filters.operationType}
               onChange={value => handleFilterChange('operationType', value)}
-              style={{ width: 120 }}
+              style={{ width: 200 }}
+              placeholder="选择操作类型"
+              allowClear
+              maxTagCount="responsive"
             >
-              <Option value="all">全部类型</Option>
               <Option value="in">入库</Option>
               <Option value="out">出库</Option>
               <Option value="create">创建</Option>
@@ -562,7 +565,7 @@ function ConsumableLogs() {
             <Button
               icon={<HistoryOutlined />}
               onClick={() => {
-                setFilters({ operationType: 'all', consumableId: '', dateRange: null });
+                setFilters({ operationType: ['in', 'out'], consumableId: '', dateRange: null });
                 fetchLogs(1, pagination.pageSize);
               }}
             >

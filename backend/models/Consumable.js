@@ -52,6 +52,12 @@ const Consumable = sequelize.define('Consumable', {
   description: {
     type: DataTypes.TEXT
   },
+  snList: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: [],
+    comment: 'SN序列号列表，JSON数组格式'
+  },
   status: {
     type: DataTypes.STRING,
     defaultValue: 'active'

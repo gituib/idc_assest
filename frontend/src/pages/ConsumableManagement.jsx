@@ -12,6 +12,7 @@ import {
   Card,
   Space,
   Popconfirm,
+  Popover,
   Upload,
   Progress,
   Checkbox,
@@ -166,6 +167,11 @@ function ConsumableManagement() {
   const [stockType, setStockType] = useState('in');
   const [stockForm] = Form.useForm();
   const [maxStockUnlimited, setMaxStockUnlimited] = useState(false);
+  const [snList, setSnList] = useState([]);
+  const [snInputVisible, setSnInputVisible] = useState(false);
+  const [snInputValue, setSnInputValue] = useState('');
+  const [selectedSnList, setSelectedSnList] = useState([]);
+  const [snSearchKeyword, setSnSearchKeyword] = useState('');
 
   const fetchConsumables = useCallback(
     async (page = 1, pageSize = 10) => {
@@ -210,12 +216,14 @@ function ConsumableManagement() {
           consumable.maxStock === null ||
           consumable.maxStock === undefined;
         setMaxStockUnlimited(isUnlimited);
+        setSnList(consumable.snList || []);
         form.setFieldsValue({
           ...consumable,
           maxStock: isUnlimited ? undefined : consumable.maxStock,
         });
       } else {
         setMaxStockUnlimited(true);
+        setSnList([]);
         form.resetFields();
         form.setFieldsValue({
           unit: '个',
@@ -233,6 +241,9 @@ function ConsumableManagement() {
   const handleCancel = useCallback(() => {
     setModalVisible(false);
     setEditingConsumable(null);
+    setSnList([]);
+    setSnInputVisible(false);
+    setSnInputValue('');
   }, []);
 
   const handleSubmit = useCallback(
@@ -242,6 +253,7 @@ function ConsumableManagement() {
           ...values,
           maxStock: maxStockUnlimited ? 0 : values.maxStock,
           unitPrice: values.unitPrice || 0,
+          snList: snList,
         };
         if (editingConsumable) {
           await axios.put(`/api/consumables/${editingConsumable.consumableId}`, submitData);
@@ -262,12 +274,13 @@ function ConsumableManagement() {
         setModalVisible(false);
         fetchConsumables();
         setEditingConsumable(null);
+        setSnList([]);
       } catch (error) {
         message.error(editingConsumable ? '耗材更新失败' : '耗材创建失败');
         console.error('提交失败:', error);
       }
     },
-    [editingConsumable, fetchConsumables, maxStockUnlimited]
+    [editingConsumable, fetchConsumables, maxStockUnlimited, snList]
   );
 
   const handleDelete = useCallback(
@@ -539,6 +552,8 @@ function ConsumableManagement() {
     (record, type) => {
       setStockRecord(record);
       setStockType(type);
+      setSelectedSnList([]);
+      setSnSearchKeyword('');
       stockForm.setFieldsValue({
         consumableId: record.consumableId,
         consumableName: record.name,
@@ -554,6 +569,8 @@ function ConsumableManagement() {
   const handleStockCancel = useCallback(() => {
     setStockModalVisible(false);
     setStockRecord(null);
+    setSelectedSnList([]);
+    setSnSearchKeyword('');
   }, []);
 
   const handleStockSubmit = useCallback(
@@ -566,12 +583,14 @@ function ConsumableManagement() {
           operator: values.operator || '系统管理员',
           reason: values.reason,
           notes: values.notes,
+          snList: stockType === 'out' ? selectedSnList : values.snList || [],
         });
         message.success({
           content: `${stockType === 'in' ? '入库' : '出库'}操作成功`,
           icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
         });
         setStockModalVisible(false);
+        setSelectedSnList([]);
         fetchConsumables();
       } catch (error) {
         message.error(
@@ -580,7 +599,7 @@ function ConsumableManagement() {
         console.error('操作失败:', error);
       }
     },
-    [stockRecord, stockType, fetchConsumables]
+    [stockRecord, stockType, fetchConsumables, selectedSnList]
   );
 
   const columns = useMemo(
@@ -605,6 +624,50 @@ function ConsumableManagement() {
         key: 'unit',
         width: 80,
         render: text => <Text type="secondary">{text}</Text>,
+      },
+      {
+        title: 'SN数量',
+        key: 'snCount',
+        width: 120,
+        render: (_, record) => {
+          const snList = record.snList || [];
+          const snCount = snList.length;
+          const stock = record.currentStock || 0;
+          
+          if (snCount === 0) {
+            return (
+              <Tag color="default" style={{ borderRadius: '4px' }}>
+                0/{stock}
+              </Tag>
+            );
+          }
+          
+          const snContent = (
+            <div style={{ maxHeight: '200px', overflowY: 'auto', maxWidth: '300px' }}>
+              {snList.map((sn, index) => (
+                <Tag key={index} style={{ marginBottom: '4px', marginRight: '4px' }}>
+                  {sn}
+                </Tag>
+              ))}
+            </div>
+          );
+          
+          return (
+            <Popover 
+              content={snContent} 
+              title={`SN列表 (${snCount}个)`}
+              trigger="click"
+              placement="right"
+            >
+              <Tag 
+                color="purple" 
+                style={{ borderRadius: '4px', cursor: 'pointer' }}
+              >
+                {snCount}/{stock} 🔍
+              </Tag>
+            </Popover>
+          );
+        },
       },
       {
         title: '当前库存',
@@ -1139,6 +1202,93 @@ function ConsumableManagement() {
             <TextArea rows={3} placeholder="请输入描述信息" />
           </Form.Item>
 
+          <Form.Item label={
+            <span>
+              SN序列号 
+              <Text type="secondary" style={{ fontSize: '12px', marginLeft: '8px' }}>
+                (非必填，已录入 {snList.length} 个)
+              </Text>
+            </span>
+          }>
+            <div style={{ marginBottom: '8px' }}>
+              <Space>
+                <Button 
+                  size="small" 
+                  icon={<PlusOutlined />}
+                  onClick={() => setSnInputVisible(!snInputVisible)}
+                >
+                  批量添加
+                </Button>
+                <Button 
+                  size="small" 
+                  danger
+                  onClick={() => {
+                    setSnList([]);
+                  }}
+                  disabled={snList.length === 0}
+                >
+                  清空全部
+                </Button>
+              </Space>
+            </div>
+            
+            {snInputVisible && (
+              <div style={{ marginBottom: '12px' }}>
+                <TextArea
+                  rows={3}
+                  placeholder="输入SN序列号，每行一个"
+                  value={snInputValue}
+                  onChange={e => setSnInputValue(e.target.value)}
+                  style={{ marginBottom: '8px' }}
+                />
+                <Button 
+                  type="primary" 
+                  size="small"
+                  onClick={() => {
+                    const newSns = snInputValue
+                      .split('\n')
+                      .map(s => s.trim())
+                      .filter(s => s && !snList.includes(s));
+                    if (newSns.length > 0) {
+                      setSnList([...snList, ...newSns]);
+                      setSnInputValue('');
+                      message.success(`成功添加 ${newSns.length} 个SN`);
+                    } else {
+                      message.warning('没有新的SN可添加（可能已存在或为空）');
+                    }
+                  }}
+                >
+                  确认添加
+                </Button>
+              </div>
+            )}
+
+            {snList.length > 0 && (
+              <div 
+                style={{ 
+                  maxHeight: '150px', 
+                  overflowY: 'auto', 
+                  border: `1px solid ${designTokens.colors.neutral[200]}`,
+                  borderRadius: designTokens.borderRadius.sm,
+                  padding: '8px'
+                }}
+              >
+                {snList.map((sn, index) => (
+                  <Tag
+                    key={index}
+                    closable
+                    onClose={() => {
+                      setSnList(snList.filter((_, i) => i !== index));
+                    }}
+                    style={{ marginBottom: '4px' }}
+                  >
+                    {sn}
+                  </Tag>
+                ))}
+              </div>
+            )}
+          </Form.Item>
+
           <Form.Item name="status" label="状态" rules={[{ required: true, message: '请选择状态' }]}>
             <Select placeholder="请选择状态">
               <Option value="active">启用</Option>
@@ -1333,12 +1483,117 @@ function ConsumableManagement() {
           <Form.Item name="consumableName" label="耗材名称">
             <Input disabled />
           </Form.Item>
+          
+          {stockType === 'out' && stockRecord?.snList && stockRecord.snList.length > 0 && (
+            <Form.Item label={
+              <span>
+                选择SN序列号 
+                <Text type="secondary" style={{ fontSize: '12px', marginLeft: '8px' }}>
+                  (已选 {selectedSnList.length} 个)
+                </Text>
+              </span>
+            }>
+              <Space direction="vertical" style={{ width: '100%' }} size="small">
+                <Input
+                  placeholder="搜索SN序列号..."
+                  prefix={<SearchOutlined />}
+                  allowClear
+                  value={snSearchKeyword}
+                  onChange={e => setSnSearchKeyword(e.target.value)}
+                  style={{ marginBottom: '8px' }}
+                />
+                <Space size="small" style={{ marginBottom: '8px' }}>
+                  <Button 
+                    size="small" 
+                    type="link"
+                    onClick={() => {
+                      const filtered = stockRecord.snList.filter(sn => 
+                        sn.toLowerCase().includes(snSearchKeyword.toLowerCase())
+                      );
+                      setSelectedSnList([...new Set([...selectedSnList, ...filtered])]);
+                      stockForm.setFieldsValue({ quantity: [...new Set([...selectedSnList, ...filtered])].length });
+                    }}
+                  >
+                    全选过滤结果
+                  </Button>
+                  <Button 
+                    size="small" 
+                    type="link"
+                    onClick={() => {
+                      setSelectedSnList([]);
+                      stockForm.setFieldsValue({ quantity: 1 });
+                    }}
+                  >
+                    清空选择
+                  </Button>
+                </Space>
+                <div 
+                  style={{ 
+                    maxHeight: '150px', 
+                    overflowY: 'auto', 
+                    border: `1px solid ${designTokens.colors.neutral[200]}`,
+                    borderRadius: designTokens.borderRadius.sm,
+                    padding: '8px'
+                  }}
+                >
+                  {(() => {
+                    const filteredSnList = stockRecord.snList.filter(sn => 
+                      sn.toLowerCase().includes(snSearchKeyword.toLowerCase())
+                    );
+                    if (filteredSnList.length === 0) {
+                      return <Text type="secondary" style={{ display: 'block', textAlign: 'center', padding: '16px 0' }}>无匹配的SN</Text>;
+                    }
+                    return filteredSnList.map((sn, index) => (
+                      <Tag.CheckableTag
+                        key={index}
+                        checked={selectedSnList.includes(sn)}
+                        onChange={checked => {
+                          let newSelected;
+                          if (checked) {
+                            newSelected = [...selectedSnList, sn];
+                          } else {
+                            newSelected = selectedSnList.filter(s => s !== sn);
+                          }
+                          setSelectedSnList(newSelected);
+                          stockForm.setFieldsValue({ quantity: newSelected.length });
+                        }}
+                        style={{ marginBottom: '4px' }}
+                      >
+                        {sn}
+                      </Tag.CheckableTag>
+                    ));
+                  })()}
+                </div>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  {snSearchKeyword ? `过滤结果: ${stockRecord.snList.filter(sn => sn.toLowerCase().includes(snSearchKeyword.toLowerCase())).length} 个SN` : `共 ${stockRecord.snList.length} 个SN`}
+                  ，点击SN进行选择
+                </Text>
+              </Space>
+            </Form.Item>
+          )}
+
+          {stockType === 'in' && (
+            <Form.Item name="snList" label="入库SN序列号（可选）">
+              <Select
+                mode="tags"
+                style={{ width: '100%' }}
+                placeholder="输入SN后按回车添加"
+                tokenSeparators={[',', '\n']}
+              />
+            </Form.Item>
+          )}
+
           <Form.Item
             name="quantity"
             label="数量"
             rules={[{ required: true, message: '请输入数量' }]}
           >
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="请输入数量" />
+            <InputNumber 
+              min={1} 
+              max={stockType === 'out' && stockRecord?.snList?.length > 0 ? stockRecord.snList.length : undefined}
+              style={{ width: '100%' }} 
+              placeholder="请输入数量" 
+            />
           </Form.Item>
           <Form.Item name="operator" label="操作人">
             <Input placeholder="请输入操作人姓名" />

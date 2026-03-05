@@ -287,7 +287,7 @@ router.post('/quick-inout', async (req, res) => {
   while (attempt < MAX_RETRIES) {
     const transaction = await sequelize.transaction();
     try {
-      const { consumableId, type, quantity, operator, reason, notes } = req.body;
+      const { consumableId, type, quantity, operator, reason, notes, snList } = req.body;
 
       const consumable = await Consumable.findByPk(consumableId, { transaction });
       if (!consumable) {
@@ -297,14 +297,33 @@ router.post('/quick-inout', async (req, res) => {
 
       const previousStock = parseFloat(consumable.currentStock);
       let newStock;
+      let currentSnList = consumable.snList || [];
+      let updatedSnList = [...currentSnList];
+      let operationSnList = snList || [];
 
       if (type === 'in') {
         newStock = previousStock + parseFloat(quantity);
+        if (operationSnList.length > 0) {
+          operationSnList.forEach(sn => {
+            if (!updatedSnList.includes(sn)) {
+              updatedSnList.push(sn);
+            }
+          });
+        }
       } else if (type === 'out') {
         newStock = previousStock - parseFloat(quantity);
         if (newStock < 0) {
           await transaction.rollback();
           return res.status(400).json({ error: '库存不足' });
+        }
+        if (operationSnList.length > 0) {
+          for (const sn of operationSnList) {
+            if (!updatedSnList.includes(sn)) {
+              await transaction.rollback();
+              return res.status(400).json({ error: `SN "${sn}" 不存在于当前耗材中` });
+            }
+          }
+          updatedSnList = updatedSnList.filter(sn => !operationSnList.includes(sn));
         }
       } else {
         await transaction.rollback();
@@ -314,6 +333,7 @@ router.post('/quick-inout', async (req, res) => {
       const [affectedRows] = await Consumable.update(
         {
           currentStock: newStock,
+          snList: updatedSnList,
           version: sequelize.literal('version + 1')
         },
         {
@@ -342,10 +362,10 @@ router.post('/quick-inout', async (req, res) => {
         currentStock: newStock,
         operator,
         reason,
-        notes
+        notes,
+        snList: operationSnList
       }, { transaction });
 
-      // 系统生成的出入库记录不可编辑
       await ConsumableLog.create({
         consumableId,
         consumableName: consumable.name,
@@ -357,6 +377,7 @@ router.post('/quick-inout', async (req, res) => {
         reason,
         notes,
         isEditable: false,
+        snList: operationSnList,
         consumableSnapshot: {
           category: consumable.category,
           unit: consumable.unit,
@@ -391,7 +412,7 @@ router.post('/inout', async (req, res) => {
   while (attempt < MAX_RETRIES) {
     const transaction = await sequelize.transaction();
     try {
-      const { consumableId, type, quantity, operator, reason, recipient, notes } = req.body;
+      const { consumableId, type, quantity, operator, reason, recipient, notes, snList } = req.body;
       
       const consumable = await Consumable.findByPk(consumableId, { transaction });
       if (!consumable) {
@@ -401,20 +422,40 @@ router.post('/inout', async (req, res) => {
       
       const previousStock = parseFloat(consumable.currentStock);
       let newStock;
+      let currentSnList = consumable.snList || [];
+      let updatedSnList = [...currentSnList];
+      let operationSnList = snList || [];
       
       if (type === 'in') {
         newStock = previousStock + parseFloat(quantity);
+        if (operationSnList.length > 0) {
+          operationSnList.forEach(sn => {
+            if (!updatedSnList.includes(sn)) {
+              updatedSnList.push(sn);
+            }
+          });
+        }
       } else {
         newStock = previousStock - parseFloat(quantity);
         if (newStock < 0) {
           await transaction.rollback();
           return res.status(400).json({ error: '库存不足' });
         }
+        if (operationSnList.length > 0) {
+          for (const sn of operationSnList) {
+            if (!updatedSnList.includes(sn)) {
+              await transaction.rollback();
+              return res.status(400).json({ error: `SN "${sn}" 不存在于当前耗材中` });
+            }
+          }
+          updatedSnList = updatedSnList.filter(sn => !operationSnList.includes(sn));
+        }
       }
       
       const [affectedRows] = await Consumable.update(
         { 
           currentStock: newStock,
+          snList: updatedSnList,
           version: sequelize.literal('version + 1')
         },
         { 
@@ -444,10 +485,10 @@ router.post('/inout', async (req, res) => {
         operator,
         reason,
         recipient,
-        notes
+        notes,
+        snList: operationSnList
       }, { transaction });
       
-      // 系统生成的出入库记录不可编辑
       await ConsumableLog.create({
         consumableId,
         consumableName: consumable.name,
@@ -459,6 +500,7 @@ router.post('/inout', async (req, res) => {
         reason,
         notes,
         isEditable: false,
+        snList: operationSnList,
         consumableSnapshot: {
           category: consumable.category,
           unit: consumable.unit,
@@ -596,8 +638,13 @@ router.get('/logs', async (req, res) => {
       where.consumableId = consumableId;
     }
     
-    if (operationType && operationType !== 'all') {
-      where.operationType = operationType;
+    if (operationType) {
+      const types = operationType.split(',').map(t => t.trim()).filter(t => t);
+      if (types.length === 1) {
+        where.operationType = types[0];
+      } else if (types.length > 1) {
+        where.operationType = { [Op.in]: types };
+      }
     }
     
     if (startDate && endDate) {
