@@ -2,11 +2,11 @@
  * IDC管理系统 - 数据库迁移汇总脚本
  * 按顺序执行所有数据库迁移
  * 支持幂等执行（重复执行不会出错）
+ * 支持 SQLite 和 MySQL
  */
 
 const { sequelize, DB_TYPE } = require('../db');
 
-// 迁移配置列表
 const migrations = [
   {
     name: 'v2.0 - 网卡和端口表',
@@ -72,7 +72,6 @@ async function runMigrations() {
     } catch (error) {
       results.push({ name: migration.name, status: '失败', error: error.message });
       console.error(`    ✗ 失败: ${error.message}`);
-      // 继续执行下一个迁移，不中断
     }
   }
 
@@ -99,6 +98,59 @@ async function runMigrations() {
   process.exit(failCount > 0 ? 1 : 0);
 }
 
+// ==================== 工具函数 ====================
+
+async function getTableColumns(tableName) {
+  const dialect = sequelize.getDialect();
+  
+  if (dialect === 'sqlite') {
+    const tableInfo = await sequelize.query(
+      `PRAGMA table_info(${tableName})`,
+      { type: sequelize.QueryTypes.SELECT }
+    );
+    return tableInfo.map(col => col.name);
+  } else {
+    const tableInfo = await sequelize.query(
+      `SHOW COLUMNS FROM ${tableName}`,
+      { type: sequelize.QueryTypes.SELECT }
+    );
+    return tableInfo.map(col => col.Field);
+  }
+}
+
+async function tableExists(tableName) {
+  const dialect = sequelize.getDialect();
+  
+  if (dialect === 'sqlite') {
+    const tables = await sequelize.query(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+      { replacements: [tableName], type: sequelize.QueryTypes.SELECT }
+    );
+    return tables.length > 0;
+  } else {
+    const tables = await sequelize.query(
+      "SHOW TABLES LIKE ?",
+      { replacements: [tableName], type: sequelize.QueryTypes.SELECT }
+    );
+    return tables.length > 0;
+  }
+}
+
+async function addColumnIfNotExists(tableName, columnName, columnDef) {
+  const columns = await getTableColumns(tableName);
+  
+  if (!columns.includes(columnName)) {
+    const dialect = sequelize.getDialect();
+    const sql = dialect === 'sqlite' 
+      ? `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`
+      : `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`;
+    await sequelize.query(sql);
+    console.log(`    ${tableName} 表添加 ${columnName} 字段成功`);
+  } else {
+    console.log(`    ${tableName} 表 ${columnName} 字段已存在，跳过`);
+  }
+}
+
 // ==================== 迁移函数 ====================
 
 async function migrateV2() {
@@ -106,8 +158,7 @@ async function migrateV2() {
   const dialect = sequelize.getDialect();
 
   // 1. 创建 network_cards 表
-  const tables = await queryInterface.showAllTables();
-  if (!tables.includes('network_cards')) {
+  if (!(await tableExists('network_cards'))) {
     await queryInterface.createTable('network_cards', {
       id: {
         type: sequelize.Sequelize.INTEGER,
@@ -142,261 +193,186 @@ async function migrateV2() {
   }
 
   // 2. 为 device_ports 添加 nic_id 字段
-  if (dialect === 'sqlite') {
-    const tableInfo = await sequelize.query(
-      "PRAGMA table_info(device_ports)",
-      { type: sequelize.QueryTypes.SELECT }
-    );
-    if (!tableInfo.some(col => col.name === 'nic_id')) {
-      await sequelize.query("ALTER TABLE device_ports ADD COLUMN nic_id INTEGER");
-    }
-  } else {
-    try {
-      await queryInterface.addColumn('device_ports', 'nic_id', {
-        type: sequelize.Sequelize.INTEGER
-      });
-    } catch (err) {
-      if (!err.message.includes('Duplicate column')) throw err;
-    }
+  if (await tableExists('device_ports')) {
+    await addColumnIfNotExists('device_ports', 'nic_id', 'INTEGER');
   }
 }
 
 async function migratePendingStatus() {
-  const queryInterface = sequelize.getQueryInterface();
-  const dialect = sequelize.getDialect();
-
-  if (dialect === 'sqlite') {
-    // 检查是否已有 status 字段
-    const tableInfo = await sequelize.query(
-      "PRAGMA table_info(users)",
-      { type: sequelize.QueryTypes.SELECT }
-    );
-
-    if (!tableInfo.some(col => col.name === 'status')) {
-      // SQLite 需要重建表
-      await sequelize.query(`
-        CREATE TABLE users_new (
-          userId VARCHAR(255) PRIMARY KEY,
-          username VARCHAR(255) NOT NULL UNIQUE,
-          password VARCHAR(255) NOT NULL,
-          email VARCHAR(255),
-          role VARCHAR(255) DEFAULT 'user',
-          status VARCHAR(255) DEFAULT 'active',
-          createdAt DATETIME,
-          updatedAt DATETIME
-        )
-      `);
-
-      await sequelize.query(`
-        INSERT INTO users_new SELECT *, 'active' as status FROM users
-      `);
-
-      await sequelize.query(`DROP TABLE users`);
-      await sequelize.query(`ALTER TABLE users_new RENAME TO users`);
-    }
-  } else {
-    try {
-      await queryInterface.addColumn('users', 'status', {
-        type: sequelize.Sequelize.STRING,
-        defaultValue: 'active'
-      });
-    } catch (err) {
-      if (!err.message.includes('Duplicate column')) throw err;
-    }
+  if (await tableExists('users')) {
+    await addColumnIfNotExists('users', 'status', "VARCHAR(255) DEFAULT 'active'");
   }
 }
 
 async function migrateConsumableVersion() {
-  const tableInfo = await sequelize.query(
-    "PRAGMA table_info(consumables)",
-    { type: sequelize.QueryTypes.SELECT }
-  );
-
-  if (!tableInfo.some(col => col.name === 'version')) {
-    await sequelize.query(
-      "ALTER TABLE consumables ADD COLUMN version INTEGER DEFAULT 0"
-    );
+  if (await tableExists('consumables')) {
+    await addColumnIfNotExists('consumables', 'version', 'INTEGER DEFAULT 0');
   }
 }
 
 async function migrateConsumableLogs() {
-  const tableInfo = await sequelize.query(
-    "PRAGMA table_info(consumable_logs)",
-    { type: sequelize.QueryTypes.SELECT }
-  );
-
-  const columns = tableInfo.map(col => col.name);
-
-  if (!columns.includes('isEditable')) {
-    await sequelize.query(`
-      ALTER TABLE consumable_logs ADD COLUMN isEditable BOOLEAN DEFAULT 1
-    `);
-  }
-
-  if (!columns.includes('originalLogId')) {
-    await sequelize.query(`
-      ALTER TABLE consumable_logs ADD COLUMN originalLogId INTEGER
-    `);
-  }
-
-  if (!columns.includes('modifiedBy')) {
-    await sequelize.query(`
-      ALTER TABLE consumable_logs ADD COLUMN modifiedBy VARCHAR(255)
-    `);
-  }
-
-  if (!columns.includes('modifiedAt')) {
-    await sequelize.query(`
-      ALTER TABLE consumable_logs ADD COLUMN modifiedAt DATETIME
-    `);
-  }
-
-  if (!columns.includes('modificationReason')) {
-    await sequelize.query(`
-      ALTER TABLE consumable_logs ADD COLUMN modificationReason TEXT
-    `);
+  if (await tableExists('consumable_logs')) {
+    await addColumnIfNotExists('consumable_logs', 'isEditable', 'BOOLEAN DEFAULT 1');
+    await addColumnIfNotExists('consumable_logs', 'originalLogId', 'INTEGER');
+    await addColumnIfNotExists('consumable_logs', 'modifiedBy', 'VARCHAR(255)');
+    await addColumnIfNotExists('consumable_logs', 'modifiedAt', 'DATETIME');
+    await addColumnIfNotExists('consumable_logs', 'modificationReason', 'TEXT');
   }
 }
 
 async function migrateConsumableLogDecouple() {
-  const tableInfo = await sequelize.query(
-    "PRAGMA table_info(consumable_logs)",
-    { type: sequelize.QueryTypes.SELECT }
-  );
-
-  const columns = tableInfo.map(col => col.name);
-
-  if (!columns.includes('isConsumableDeleted')) {
-    await sequelize.query(`
-      ALTER TABLE consumable_logs ADD COLUMN isConsumableDeleted BOOLEAN DEFAULT 0
-    `);
-  }
-
-  if (!columns.includes('consumableSnapshot')) {
-    await sequelize.query(`
-      ALTER TABLE consumable_logs ADD COLUMN consumableSnapshot TEXT
-    `);
+  if (await tableExists('consumable_logs')) {
+    await addColumnIfNotExists('consumable_logs', 'isConsumableDeleted', 'BOOLEAN DEFAULT 0');
+    await addColumnIfNotExists('consumable_logs', 'consumableSnapshot', 'TEXT');
   }
 }
 
 async function removeConsumableLogFK() {
-  // SQLite 不支持直接删除外键，需要重建表
-  const fks = await sequelize.query(
-    `PRAGMA foreign_key_list(consumable_logs);`,
-    { type: sequelize.QueryTypes.SELECT }
-  );
+  const dialect = sequelize.getDialect();
+  
+  if (dialect === 'sqlite') {
+    const fks = await sequelize.query(
+      `PRAGMA foreign_key_list(consumable_logs);`,
+      { type: sequelize.QueryTypes.SELECT }
+    );
 
-  if (!fks || fks.length === 0) {
-    return; // 没有外键约束
+    if (!fks || fks.length === 0) {
+      return;
+    }
+
+    await sequelize.query(`
+      CREATE TABLE consumable_logs_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        consumableId VARCHAR(255),
+        consumableName VARCHAR(255),
+        operationType VARCHAR(50),
+        quantity INTEGER,
+        previousStock INTEGER,
+        currentStock INTEGER,
+        operator VARCHAR(255),
+        reason TEXT,
+        notes TEXT,
+        isEditable BOOLEAN DEFAULT 1,
+        originalLogId INTEGER,
+        modifiedBy VARCHAR(255),
+        modifiedAt DATETIME,
+        modificationReason TEXT,
+        isConsumableDeleted BOOLEAN DEFAULT 0,
+        consumableSnapshot TEXT,
+        relatedId VARCHAR(255),
+        createdAt DATETIME,
+        updatedAt DATETIME
+      )
+    `);
+
+    await sequelize.query(`
+      INSERT INTO consumable_logs_new
+      SELECT id, consumableId, consumableName, operationType, quantity,
+             previousStock, currentStock, operator, reason, notes,
+             isEditable, originalLogId, modifiedBy, modifiedAt, modificationReason,
+             isConsumableDeleted, consumableSnapshot, relatedId, createdAt, updatedAt
+      FROM consumable_logs
+    `);
+
+    await sequelize.query(`DROP TABLE consumable_logs`);
+    await sequelize.query(`ALTER TABLE consumable_logs_new RENAME TO consumable_logs`);
+
+    await sequelize.query(`CREATE INDEX idx_logs_consumable_id ON consumable_logs(consumableId)`);
+    await sequelize.query(`CREATE INDEX idx_logs_operation_type ON consumable_logs(operationType)`);
+    await sequelize.query(`CREATE INDEX idx_logs_created_at ON consumable_logs(createdAt)`);
+    await sequelize.query(`CREATE INDEX idx_logs_is_consumable_deleted ON consumable_logs(isConsumableDeleted)`);
   }
-
-  // 重建表（去掉外键约束）
-  await sequelize.query(`
-    CREATE TABLE consumable_logs_new (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      consumableId VARCHAR(255),
-      consumableName VARCHAR(255),
-      operationType VARCHAR(50),
-      quantity INTEGER,
-      previousStock INTEGER,
-      currentStock INTEGER,
-      operator VARCHAR(255),
-      reason TEXT,
-      notes TEXT,
-      isEditable BOOLEAN DEFAULT 1,
-      originalLogId INTEGER,
-      modifiedBy VARCHAR(255),
-      modifiedAt DATETIME,
-      modificationReason TEXT,
-      isConsumableDeleted BOOLEAN DEFAULT 0,
-      consumableSnapshot TEXT,
-      relatedId VARCHAR(255),
-      createdAt DATETIME,
-      updatedAt DATETIME
-    )
-  `);
-
-  // 复制数据
-  await sequelize.query(`
-    INSERT INTO consumable_logs_new
-    SELECT id, consumableId, consumableName, operationType, quantity,
-           previousStock, currentStock, operator, reason, notes,
-           isEditable, originalLogId, modifiedBy, modifiedAt, modificationReason,
-           isConsumableDeleted, consumableSnapshot, relatedId, createdAt, updatedAt
-    FROM consumable_logs
-  `);
-
-  // 删除旧表，重命名新表
-  await sequelize.query(`DROP TABLE consumable_logs`);
-  await sequelize.query(`ALTER TABLE consumable_logs_new RENAME TO consumable_logs`);
-
-  // 创建索引
-  await sequelize.query(`CREATE INDEX idx_logs_consumable_id ON consumable_logs(consumableId)`);
-  await sequelize.query(`CREATE INDEX idx_logs_operation_type ON consumable_logs(operationType)`);
-  await sequelize.query(`CREATE INDEX idx_logs_created_at ON consumable_logs(createdAt)`);
-  await sequelize.query(`CREATE INDEX idx_logs_is_consumable_deleted ON consumable_logs(isConsumableDeleted)`);
 }
 
 async function migrateConsumableLogArchive() {
-  const tables = await sequelize.getQueryInterface().showAllTables();
-
-  if (tables.includes('consumable_log_archives')) {
-    return; // 表已存在
+  if (await tableExists('consumable_log_archives')) {
+    return;
   }
 
-  await sequelize.query(`
-    CREATE TABLE consumable_log_archives (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      archiveId VARCHAR(255) NOT NULL UNIQUE,
-      consumableId VARCHAR(255) NOT NULL,
-      consumableName VARCHAR(255) NOT NULL,
-      consumableSnapshot TEXT,
-      totalOperations INTEGER DEFAULT 0,
-      firstOperationAt DATETIME,
-      lastOperationAt DATETIME,
-      totalInQuantity INTEGER DEFAULT 0,
-      totalOutQuantity INTEGER DEFAULT 0,
-      finalStock INTEGER DEFAULT 0,
-      deletedBy VARCHAR(255),
-      deletedAt DATETIME,
-      deleteReason VARCHAR(255),
-      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+  const queryInterface = sequelize.getQueryInterface();
+  await queryInterface.createTable('consumable_log_archives', {
+    id: {
+      type: sequelize.Sequelize.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    archiveId: {
+      type: sequelize.Sequelize.STRING,
+      allowNull: false,
+      unique: true
+    },
+    consumableId: {
+      type: sequelize.Sequelize.STRING,
+      allowNull: false
+    },
+    consumableName: {
+      type: sequelize.Sequelize.STRING,
+      allowNull: false
+    },
+    consumableSnapshot: {
+      type: sequelize.Sequelize.TEXT
+    },
+    totalOperations: {
+      type: sequelize.Sequelize.INTEGER,
+      defaultValue: 0
+    },
+    firstOperationAt: {
+      type: sequelize.Sequelize.DATE
+    },
+    lastOperationAt: {
+      type: sequelize.Sequelize.DATE
+    },
+    totalInQuantity: {
+      type: sequelize.Sequelize.INTEGER,
+      defaultValue: 0
+    },
+    totalOutQuantity: {
+      type: sequelize.Sequelize.INTEGER,
+      defaultValue: 0
+    },
+    finalStock: {
+      type: sequelize.Sequelize.INTEGER,
+      defaultValue: 0
+    },
+    deletedBy: {
+      type: sequelize.Sequelize.STRING
+    },
+    deletedAt: {
+      type: sequelize.Sequelize.DATE
+    },
+    deleteReason: {
+      type: sequelize.Sequelize.STRING
+    },
+    createdAt: {
+      type: sequelize.Sequelize.DATE,
+      allowNull: false,
+      defaultValue: sequelize.Sequelize.literal('CURRENT_TIMESTAMP')
+    },
+    updatedAt: {
+      type: sequelize.Sequelize.DATE,
+      allowNull: false,
+      defaultValue: sequelize.Sequelize.literal('CURRENT_TIMESTAMP')
+    }
+  });
 
-  // 创建索引
-  await sequelize.query(`CREATE INDEX idx_archive_consumable_id ON consumable_log_archives(consumableId)`);
-  await sequelize.query(`CREATE INDEX idx_archive_archive_id ON consumable_log_archives(archiveId)`);
-  await sequelize.query(`CREATE INDEX idx_archive_deleted_at ON consumable_log_archives(deletedAt)`);
+  const dialect = sequelize.getDialect();
+  if (dialect === 'sqlite') {
+    await sequelize.query(`CREATE INDEX idx_archive_consumable_id ON consumable_log_archives(consumableId)`);
+    await sequelize.query(`CREATE INDEX idx_archive_archive_id ON consumable_log_archives(archiveId)`);
+    await sequelize.query(`CREATE INDEX idx_archive_deleted_at ON consumable_log_archives(deletedAt)`);
+  }
 }
 
 async function migrateSnList() {
   const dialect = sequelize.getDialect();
-  
   const tables = ['consumables', 'consumable_records', 'consumable_logs'];
   
   for (const table of tables) {
-    const tableInfo = await sequelize.query(
-      dialect === 'sqlite' 
-        ? `PRAGMA table_info(${table})`
-        : `SHOW COLUMNS FROM ${table}`,
-      { type: sequelize.QueryTypes.SELECT }
-    );
-    
-    const columns = dialect === 'sqlite' 
-      ? tableInfo.map(col => col.name)
-      : tableInfo.map(col => col.Field);
-    
-    if (!columns.includes('snList')) {
-      if (dialect === 'sqlite') {
-        await sequelize.query(`ALTER TABLE ${table} ADD COLUMN snList TEXT DEFAULT '[]'`);
-      } else {
-        await sequelize.query(`ALTER TABLE ${table} ADD COLUMN snList JSON DEFAULT '[]'`);
-      }
-      console.log(`    ${table} 表添加 snList 字段成功`);
+    if (await tableExists(table)) {
+      const columnDef = dialect === 'sqlite' ? "TEXT DEFAULT '[]'" : "JSON DEFAULT '[]'";
+      await addColumnIfNotExists(table, 'snList', columnDef);
     } else {
-      console.log(`    ${table} 表 snList 字段已存在，跳过`);
+      console.log(`    ${table} 表不存在，跳过`);
     }
   }
 }
