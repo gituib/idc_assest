@@ -1620,7 +1620,7 @@ function DeviceManagement() {
 
       <Modal
         title={
-          <div style={modalHeaderStyle}>
+          <div style={{ ...modalHeaderStyle, paddingRight: '32px' }}>
             {editingDevice ? (
               <EditOutlined style={{ color: '#667eea' }} />
             ) : (
@@ -1635,7 +1635,11 @@ function DeviceManagement() {
         width={700}
         style={{ borderRadius: '16px' }}
         styles={{
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 50px 16px 24px' },
+          header: {
+            borderBottom: '1px solid #f0f0f0',
+            padding: '16px 24px',
+            position: 'relative',
+          },
           body: { padding: '24px' },
         }}
         className="device-modal"
@@ -1941,7 +1945,7 @@ function DeviceManagement() {
 
       <Modal
         title={
-          <div style={modalHeaderStyle}>
+          <div style={{ ...modalHeaderStyle, paddingRight: '32px' }}>
             <SettingOutlined style={{ color: '#667eea' }} />
             字段配置
           </div>
@@ -1951,7 +1955,11 @@ function DeviceManagement() {
         footer={null}
         width={600}
         styles={{
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
+          header: {
+            borderBottom: '1px solid #f0f0f0',
+            padding: '16px 24px',
+            position: 'relative',
+          },
           body: { padding: '24px' },
         }}
       >
@@ -2036,7 +2044,7 @@ function DeviceManagement() {
 
       <Modal
         title={
-          <div style={modalHeaderStyle}>
+          <div style={{ ...modalHeaderStyle, paddingRight: '32px' }}>
             <UploadOutlined style={{ color: '#667eea' }} />
             导入设备
           </div>
@@ -2053,7 +2061,11 @@ function DeviceManagement() {
         width={650}
         destroyOnHidden
         styles={{
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
+          header: {
+            borderBottom: '1px solid #f0f0f0',
+            padding: '16px 24px',
+            position: 'relative',
+          },
           body: { padding: '24px' },
         }}
       >
@@ -2369,7 +2381,7 @@ function DeviceManagement() {
 
       <Modal
         title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '18px', fontWeight: 600 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '18px', fontWeight: 600, paddingRight: '32px' }}>
             <AppstoreOutlined style={{ color: '#667eea' }} />
             设备详情
           </div>
@@ -2434,7 +2446,11 @@ function DeviceManagement() {
         width={700}
         destroyOnHidden
         styles={{
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
+          header: {
+            borderBottom: '1px solid #f0f0f0',
+            padding: '16px 24px',
+            position: 'relative',
+          },
           body: { padding: '0', overflow: 'auto' },
         }}
       >
@@ -2599,7 +2615,7 @@ function DeviceManagement() {
 
       <Modal
         title={
-          <div style={modalHeaderStyle}>
+          <div style={{ ...modalHeaderStyle, paddingRight: '32px' }}>
             <ReloadOutlined style={{ color: '#52c41a' }} />
             批量状态变更
           </div>
@@ -2637,7 +2653,11 @@ function DeviceManagement() {
         ]}
         destroyOnHidden
         styles={{
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
+          header: {
+            borderBottom: '1px solid #f0f0f0',
+            padding: '16px 24px',
+            position: 'relative',
+          },
           body: { padding: '24px' },
         }}
       >
@@ -2664,7 +2684,7 @@ function DeviceManagement() {
 
       <Modal
         title={
-          <div style={modalHeaderStyle}>
+          <div style={{ ...modalHeaderStyle, paddingRight: '32px' }}>
             <ExportOutlined style={{ color: '#fa8c16' }} />
             导出设备数据
           </div>
@@ -2702,7 +2722,11 @@ function DeviceManagement() {
         ]}
         destroyOnHidden
         styles={{
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
+          header: {
+            borderBottom: '1px solid #f0f0f0',
+            padding: '16px 24px',
+            position: 'relative',
+          },
           body: { padding: '24px' },
         }}
         width={600}

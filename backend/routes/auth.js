@@ -4,10 +4,9 @@ const User = require('../models/User');
 const Role = require('../models/Role');
 const UserRole = require('../models/UserRole');
 const { generateToken, authMiddleware } = require('../middleware/auth');
+const { SALT_ROUNDS, MAX_LOGIN_ATTEMPTS, PASSWORD_MIN_LENGTH, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH } = require('../config');
 
 const router = express.Router();
-
-const SALT_ROUNDS = 10;
 
 const generateId = () => {
   return 'user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -24,17 +23,17 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    if (username.length < 3 || username.length > 20) {
+    if (username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH) {
       return res.status(400).json({
         success: false,
-        message: '用户名长度必须在3-20个字符之间'
+        message: `用户名长度必须在${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH}个字符之间`
       });
     }
 
-    if (password.length < 6) {
+    if (password.length < PASSWORD_MIN_LENGTH) {
       return res.status(400).json({
         success: false,
-        message: '密码长度不能少于6个字符'
+        message: `密码长度不能少于${PASSWORD_MIN_LENGTH}个字符`
       });
     }
 
@@ -175,7 +174,7 @@ router.post('/login', async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       user.loginCount = (user.loginCount || 0) + 1;
-      if (user.loginCount >= 5) {
+      if (user.loginCount >= MAX_LOGIN_ATTEMPTS) {
         user.status = 'locked';
       }
       await user.save();
@@ -309,10 +308,10 @@ router.put('/password', authMiddleware, async (req, res) => {
       });
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < PASSWORD_MIN_LENGTH) {
       return res.status(400).json({
         success: false,
-        message: '新密码长度不能少于6个字符'
+        message: `新密码长度不能少于${PASSWORD_MIN_LENGTH}个字符`
       });
     }
 

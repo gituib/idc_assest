@@ -815,6 +815,24 @@ export const inputPlaceholders = {
 
 // CSS-in-JS 样式字符串生成函数
 export const generateGlobalStyles = tokens => `
+  /* Modal 关闭按钮通用修复 */
+  .ant-modal-close {
+    top: 16px !important;
+    right: 16px !important;
+    width: 32px !important;
+    height: 32px !important;
+    line-height: 32px !important;
+  }
+  
+  .ant-modal-close-x {
+    width: 32px !important;
+    height: 32px !important;
+    line-height: 32px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  
   .device-modal .ant-modal-close {
     top: 16px;
     right: 24px;

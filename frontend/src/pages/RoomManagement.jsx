@@ -591,6 +591,23 @@ function RoomManagement() {
 
   return (
     <div style={containerStyle}>
+      <style>{`
+        .ant-modal-close {
+          top: 16px !important;
+          right: 16px !important;
+          width: 32px !important;
+          height: 32px !important;
+          line-height: 32px !important;
+        }
+        .ant-modal-close-x {
+          width: 32px !important;
+          height: 32px !important;
+          line-height: 32px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+      `}</style>
       <div style={headerStyle}>
         <div
           style={{
@@ -765,7 +782,7 @@ function RoomManagement() {
 
       <Modal
         title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingRight: '32px' }}>
             <div
               style={{
                 width: '4px',
@@ -784,7 +801,11 @@ function RoomManagement() {
         destroyOnHidden
         styles={{
           body: { padding: '24px' },
-          header: { borderBottom: '1px solid #f0f0f0', padding: '16px 24px' },
+          header: {
+            borderBottom: '1px solid #f0f0f0',
+            padding: '16px 24px',
+            position: 'relative',
+          },
         }}
         style={{ borderRadius: '16px' }}
       >

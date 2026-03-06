@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_CONFIG } from '../config/api';
 
 /**
  * 防抖 Hook
@@ -15,7 +16,7 @@ import { useState, useEffect } from 'react';
  *   fetchData(debouncedKeyword);
  * }, [debouncedKeyword]);
  */
-export function useDebounce(value, delay = 300) {
+export function useDebounce(value, delay = API_CONFIG.debounceDelay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export function useDebounce(value, delay = 300) {
  *
  * <Input onChange={e => debouncedSearch(e.target.value)} />
  */
-export function useDebouncedCallback(callback, delay = 300) {
+export function useDebouncedCallback(callback, delay = API_CONFIG.debounceDelay) {
   const [timeoutId, setTimeoutId] = useState(null);
 
   const debouncedFn = (...args) => {

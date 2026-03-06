@@ -89,6 +89,26 @@ export const designTokens = {
     lg: '24px',
     xl: '32px',
   },
+  typography: {
+    xs: '12px',
+    sm: '13px',
+    base: '14px',
+    md: '16px',
+    lg: '18px',
+    xl: '20px',
+    '2xl': '24px',
+    '3xl': '32px',
+    '4xl': '40px',
+  },
+  zIndex: {
+    dropdown: 1000,
+    sticky: 1020,
+    fixed: 1030,
+    modalBackdrop: 1040,
+    modal: 1050,
+    popover: 1060,
+    tooltip: 1070,
+  },
 };
 
 export default designTokens;

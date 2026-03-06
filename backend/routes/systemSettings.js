@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { Op } = require('sequelize');
 const SystemSetting = require('../models/SystemSetting');
+const { FRONTEND } = require('../config');
 
 // 初始化默认系统设置
 const initDefaultSettings = async () => {
@@ -267,7 +268,7 @@ router.post('/reset/:key', async (req, res) => {
       idle_warning_time: 60,
       max_login_attempts: 5,
       maintenance_mode: false,
-      frontend_port: 3000,
+      frontend_port: FRONTEND.DEFAULT_PORT,
       primary_color: '#667eea',
       secondary_color: '#764ba2',
       compact_mode: false,
@@ -563,7 +564,7 @@ router.get('/system/info', async (req, res) => {
 router.get('/frontend/port', async (req, res) => {
   try {
     const portSetting = await SystemSetting.findByPk('frontend_port');
-    const port = portSetting ? JSON.parse(portSetting.settingValue) : 3000;
+    const port = portSetting ? JSON.parse(portSetting.settingValue) : FRONTEND.DEFAULT_PORT;
     res.json({ port });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -577,7 +578,7 @@ router.post('/frontend/port/sync', async (req, res) => {
     const path = require('path');
 
     const portSetting = await SystemSetting.findByPk('frontend_port');
-    const port = portSetting ? JSON.parse(portSetting.settingValue) : 3000;
+    const port = portSetting ? JSON.parse(portSetting.settingValue) : FRONTEND.DEFAULT_PORT;
 
     // 写入前端配置文件
     const frontendDir = path.join(__dirname, '../../frontend');

@@ -3,15 +3,14 @@ const express = require('express');
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
 const { sequelize } = require('./db');
+const { FILE_UPLOAD } = require('./config');
 
-// 创建Express应用
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// 中间件
 app.use(cors());
 app.use(express.json());
-app.use(fileUpload({ limits: { fileSize: 50 * 1024 * 1024 } }));
+app.use(fileUpload({ limits: { fileSize: FILE_UPLOAD.MAX_FILE_SIZE } }));
 app.use('/temp', express.static('temp'));
 
 // 数据库连接已从db.js导入

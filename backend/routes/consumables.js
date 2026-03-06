@@ -7,10 +7,11 @@ const Consumable = require('../models/Consumable');
 const ConsumableRecord = require('../models/ConsumableRecord');
 const ConsumableLog = require('../models/ConsumableLog');
 const ConsumableLogArchive = require('../models/ConsumableLogArchive');
+const { PAGINATION, RETRY } = require('../config');
 
 router.get('/', async (req, res) => {
   try {
-    const { keyword, category, status, page = 1, pageSize = 10 } = req.query;
+    const { keyword, category, status, page = 1, pageSize = PAGINATION.DEFAULT_PAGE_SIZE } = req.query;
     const offset = (page - 1) * pageSize;
     
     const where = {};
@@ -281,10 +282,9 @@ router.get('/inout/records', async (req, res) => {
 });
 
 router.post('/quick-inout', async (req, res) => {
-  const MAX_RETRIES = 3;
   let attempt = 0;
 
-  while (attempt < MAX_RETRIES) {
+  while (attempt < RETRY.MAX_RETRIES) {
     const transaction = await sequelize.transaction();
     try {
       const { consumableId, type, quantity, operator, reason, notes, snList } = req.body;
@@ -348,7 +348,7 @@ router.post('/quick-inout', async (req, res) => {
       if (affectedRows === 0) {
         await transaction.rollback();
         attempt++;
-        if (attempt >= MAX_RETRIES) {
+        if (attempt >= RETRY.MAX_RETRIES) {
           return res.status(409).json({ error: '并发冲突，请稍后重试' });
         }
         continue;
@@ -397,7 +397,7 @@ router.post('/quick-inout', async (req, res) => {
       return;
     } catch (error) {
       await transaction.rollback();
-      if (attempt >= MAX_RETRIES - 1) {
+      if (attempt >= RETRY.MAX_RETRIES - 1) {
         return res.status(500).json({ error: error.message });
       }
       attempt++;
@@ -406,10 +406,9 @@ router.post('/quick-inout', async (req, res) => {
 });
 
 router.post('/inout', async (req, res) => {
-  const MAX_RETRIES = 3;
   let attempt = 0;
   
-  while (attempt < MAX_RETRIES) {
+  while (attempt < RETRY.MAX_RETRIES) {
     const transaction = await sequelize.transaction();
     try {
       const { consumableId, type, quantity, operator, reason, recipient, notes, snList } = req.body;
@@ -470,7 +469,7 @@ router.post('/inout', async (req, res) => {
       if (affectedRows === 0) {
         await transaction.rollback();
         attempt++;
-        if (attempt >= MAX_RETRIES) {
+        if (attempt >= RETRY.MAX_RETRIES) {
           return res.status(409).json({ error: '并发冲突，请稍后重试' });
         }
         continue;
@@ -520,7 +519,7 @@ router.post('/inout', async (req, res) => {
       return;
     } catch (error) {
       await transaction.rollback();
-      if (attempt >= MAX_RETRIES - 1) {
+      if (attempt >= RETRY.MAX_RETRIES - 1) {
         return res.status(500).json({ error: error.message });
       }
       attempt++;
@@ -529,10 +528,9 @@ router.post('/inout', async (req, res) => {
 });
 
 router.post('/adjust', async (req, res) => {
-  const MAX_RETRIES = 3;
   let attempt = 0;
   
-  while (attempt < MAX_RETRIES) {
+  while (attempt < RETRY.MAX_RETRIES) {
     const transaction = await sequelize.transaction();
     try {
       const { consumableId, adjustType, quantity, operator, reason, notes } = req.body;
@@ -582,7 +580,7 @@ router.post('/adjust', async (req, res) => {
       if (affectedRows === 0) {
         await transaction.rollback();
         attempt++;
-        if (attempt >= MAX_RETRIES) {
+        if (attempt >= RETRY.MAX_RETRIES) {
           return res.status(409).json({ error: '并发冲突，请稍后重试' });
         }
         continue;
@@ -619,7 +617,7 @@ router.post('/adjust', async (req, res) => {
       return;
     } catch (error) {
       await transaction.rollback();
-      if (attempt >= MAX_RETRIES - 1) {
+      if (attempt >= RETRY.MAX_RETRIES - 1) {
         return res.status(500).json({ error: error.message });
       }
       attempt++;

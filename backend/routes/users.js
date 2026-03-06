@@ -6,10 +6,9 @@ const User = require('../models/User');
 const Role = require('../models/Role');
 const UserRole = require('../models/UserRole');
 const { authMiddleware } = require('../middleware/auth');
+const { SALT_ROUNDS, PASSWORD_MIN_LENGTH, FILE_UPLOAD, PAGINATION } = require('../config');
 
 const router = express.Router();
-
-const SALT_ROUNDS = 10;
 
 const generateId = () => {
   return 'user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -37,9 +36,9 @@ const { Op } = require('sequelize');
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { page = 1, pageSize = 10, username, status, realName } = req.query;
+    const { page = 1, pageSize = PAGINATION.DEFAULT_PAGE_SIZE, username, status, realName } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(pageSize);
-    const limit = parseInt(pageSize);
+    const limit = Math.min(parseInt(pageSize), PAGINATION.MAX_PAGE_SIZE);
 
     const where = getWhereClause({ username, status, realName });
 
@@ -256,7 +255,7 @@ router.put('/:userId', authMiddleware, async (req, res) => {
     if (status !== undefined) user.status = status;
     if (remark !== undefined) user.remark = remark;
 
-    if (newPassword && newPassword.length >= 6) {
+    if (newPassword && newPassword.length >= PASSWORD_MIN_LENGTH) {
       user.password = await bcrypt.hash(newPassword, SALT_ROUNDS);
     }
 
@@ -303,10 +302,10 @@ router.put('/:userId/password', authMiddleware, async (req, res) => {
       });
     }
 
-    if (!newPassword || newPassword.length < 6) {
+    if (!newPassword || newPassword.length < PASSWORD_MIN_LENGTH) {
       return res.status(400).json({
         success: false,
-        message: '密码长度不能少于6个字符'
+        message: `密码长度不能少于${PASSWORD_MIN_LENGTH}个字符`
       });
     }
 
@@ -388,10 +387,10 @@ router.post('/:userId/avatar', authMiddleware, async (req, res) => {
       });
     }
 
-    if (avatarFile.size > 5 * 1024 * 1024) {
+    if (avatarFile.size > FILE_UPLOAD.MAX_AVATAR_SIZE) {
       return res.status(400).json({
         success: false,
-        message: '图片大小不能超过 5MB'
+        message: `图片大小不能超过 ${FILE_UPLOAD.MAX_AVATAR_SIZE / 1024 / 1024}MB`
       });
     }
 

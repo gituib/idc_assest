@@ -10,6 +10,7 @@ const Rack = require('../models/Rack');
 const Room = require('../models/Room');
 const User = require('../models/User');
 const { authMiddleware, authorize } = require('../middleware/auth');
+const { PAGINATION } = require('../config');
 
 InventoryTask.belongsTo(InventoryPlan, { foreignKey: 'planId', as: 'Plan' });
 InventoryPlan.hasMany(InventoryTask, { foreignKey: 'planId', as: 'Tasks' });
@@ -41,7 +42,7 @@ router.use(authMiddleware);
 
 router.get('/plans', async (req, res) => {
   try {
-    const { status, page = 1, pageSize = 10, keyword } = req.query;
+    const { status, page = 1, pageSize = PAGINATION.DEFAULT_PAGE_SIZE, keyword } = req.query;
     const offset = (page - 1) * pageSize;
     const where = {};
 
