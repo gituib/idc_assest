@@ -35,7 +35,16 @@ export const designTokens = {
     },
     info: {
       main: '#3b82f6',
+      light: '#60a5fa',
+      dark: '#2563eb',
       bg: '#eff6ff',
+      gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+    },
+    secondary: {
+      main: '#ec4899',
+      light: '#f472b6',
+      dark: '#db2777',
+      gradient: 'linear-gradient(135deg, #ec4899 0%, #f97316 100%)',
     },
     text: {
       primary: '#1e293b',
@@ -73,6 +82,12 @@ export const designTokens = {
       storage: '#8b5cf6',
       other: '#64748b',
     },
+    purple: {
+      main: '#8b5cf6',
+      light: '#a78bfa',
+      dark: '#7c3aed',
+      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+    },
     status: {
       normal: '#10b981',
       running: '#10b981',
@@ -86,6 +101,14 @@ export const designTokens = {
       bg: '#1e293b',
       text: '#94a3b8',
       border: '#334155',
+    },
+    fieldType: {
+      string: '#3b82f6',
+      number: '#10b981',
+      boolean: '#f59e0b',
+      select: '#8b5cf6',
+      date: '#06b6d4',
+      textarea: '#64748b',
     },
   },
   shadows: {
