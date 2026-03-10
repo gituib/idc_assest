@@ -34,6 +34,7 @@ import {
   ApiOutlined,
   PartitionOutlined,
   CodepenOutlined,
+  CloudUploadOutlined,
 } from '@ant-design/icons';
 import {
   BrowserRouter as Router,
@@ -73,6 +74,7 @@ const CableManagement = lazy(() => import('./pages/CableManagement'));
 const PortManagement = lazy(() => import('./pages/PortManagement'));
 const InventoryManagement = lazy(() => import('./pages/InventoryManagement'));
 const InventoryTaskExecution = lazy(() => import('./pages/InventoryTaskExecution'));
+const PendingDeviceManagement = lazy(() => import('./pages/PendingDeviceManagement'));
 
 const { Header, Content, Sider } = Layout;
 
@@ -199,6 +201,7 @@ const AppLayout = ({ children }) => {
     )
       return 'system-management';
     if (path.startsWith('/tickets')) return 'ticket-management';
+    if (path.startsWith('/inventory') || path.startsWith('/pending-devices')) return 'inventory-management';
     return 'dashboard';
   };
 
@@ -320,6 +323,11 @@ const AppLayout = ({ children }) => {
           key: 'inventory',
           icon: <InboxOutlined style={{ fontSize: '16px' }} />,
           label: <Link to="/inventory">盘点计划</Link>,
+        },
+        {
+          key: 'pending-devices',
+          icon: <CloudUploadOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/pending-devices">暂存设备</Link>,
         },
       ],
     },
@@ -718,6 +726,14 @@ const ThemeConfig = () => {
               element={
                 <PrivateRoute>
                   <InventoryTaskExecution />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/pending-devices"
+              element={
+                <PrivateRoute>
+                  <PendingDeviceManagement />
                 </PrivateRoute>
               }
             />

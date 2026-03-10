@@ -9,6 +9,7 @@ const Device = require('../models/Device');
 const Rack = require('../models/Rack');
 const Room = require('../models/Room');
 const User = require('../models/User');
+const PendingDevice = require('../models/PendingDevice');
 const { authMiddleware, authorize } = require('../middleware/auth');
 const { PAGINATION } = require('../config');
 
@@ -522,15 +523,37 @@ router.get('/stats/dashboard', async (req, res) => {
 
 router.post('/quick-add-device', async (req, res) => {
   try {
-    const { taskId, planId, serialNumber, deviceName, deviceType, rackId, position, remark } = req.body;
+    const { 
+      taskId, 
+      planId, 
+      serialNumber,
+      SN,
+      deviceName,
+      name,
+      deviceType,
+      type,
+      roomId, 
+      rackId, 
+      position, 
+      model,
+      brand,
+      height,
+      powerConsumption,
+      ipAddress,
+      purchaseDate,
+      warrantyExpiry,
+      description,
+      remark,
+      ...restFields
+    } = req.body;
 
-    if (!taskId || !planId || !serialNumber) {
-      return res.status(400).json({ error: '缺少必要参数：taskId, planId, serialNumber' });
-    }
+    // 字段名映射：优先使用数据库字段名，其次使用默认字段名
+    const finalSerialNumber = serialNumber || SN;
+    const finalDeviceName = name || deviceName;
+    const finalDeviceType = type || deviceType;
 
-    const task = await InventoryTask.findByPk(taskId);
-    if (!task) {
-      return res.status(404).json({ error: '盘点任务不存在' });
+    if (!planId || !finalSerialNumber) {
+      return res.status(400).json({ error: '缺少必要参数：planId, serialNumber' });
     }
 
     const plan = await InventoryPlan.findByPk(planId);
@@ -538,15 +561,215 @@ router.post('/quick-add-device', async (req, res) => {
       return res.status(404).json({ error: '盘点计划不存在' });
     }
 
-    const existingDevice = await Device.findOne({ where: { serialNumber } });
+    const existingDevice = await Device.findOne({ where: { serialNumber: finalSerialNumber } });
     if (existingDevice) {
-      return res.status(400).json({ error: '该序列号的设备已存在', deviceId: existingDevice.deviceId });
+      return res.status(400).json({ error: '该序列号的设备已存在于设备管理中', deviceId: existingDevice.deviceId });
     }
 
-    let deviceId;
-    const devices = await Device.findAll({
-      where: { deviceId: { [Op.like]: 'DEV%' } }
+    const existingPending = await PendingDevice.findOne({ 
+      where: { serialNumber: finalSerialNumber, status: 'pending' } 
     });
+    if (existingPending) {
+      return res.status(400).json({ error: '该序列号的设备已在暂存列表中', pendingId: existingPending.pendingId });
+    }
+
+    const pendingId = `PEND${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+
+    // 只有当用户没有填写设备名称时，才使用默认名称
+    const finalName = finalDeviceName && finalDeviceName.trim() !== '' 
+      ? finalDeviceName.trim() 
+      : `新设备-${finalSerialNumber.slice(-6)}`;
+
+    const pendingDevice = await PendingDevice.create({
+      pendingId,
+      serialNumber: finalSerialNumber,
+      deviceName: finalName,
+      deviceType: finalDeviceType || 'other',
+      roomId: roomId || null,
+      rackId: rackId || null,
+      position: position || null,
+      model: model || null,
+      brand: brand || null,
+      height: height || 1,
+      powerConsumption: powerConsumption || 0,
+      ipAddress: ipAddress || null,
+      purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
+      warrantyExpiry: warrantyExpiry ? new Date(warrantyExpiry) : null,
+      description: description || null,
+      customFields: Object.keys(restFields).length > 0 ? restFields : null,
+      planId,
+      taskId: taskId || null,
+      createdBy: req.user?.userId,
+      status: 'pending',
+      remark: remark || '盘点时快速添加'
+    });
+
+    res.status(201).json({
+      message: '设备已暂存，请前往暂存设备页面完善信息后同步',
+      pendingDevice
+    });
+  } catch (error) {
+    console.error('快速添加设备错误:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/pending-devices', async (req, res) => {
+  try {
+    const { status, planId, roomId, keyword, page = 1, pageSize = PAGINATION.DEFAULT_PAGE_SIZE } = req.query;
+    const offset = (page - 1) * pageSize;
+    const where = {};
+
+    if (status) {
+      where.status = status;
+    }
+    if (planId) {
+      where.planId = planId;
+    }
+    if (roomId) {
+      where.roomId = roomId;
+    }
+    if (keyword) {
+      where[Op.or] = [
+        { serialNumber: { [Op.like]: `%${keyword}%` } },
+        { deviceName: { [Op.like]: `%${keyword}%` } }
+      ];
+    }
+
+    const { count, rows } = await PendingDevice.findAndCountAll({
+      where,
+      include: [
+        { model: User, as: 'Creator', attributes: ['userId', 'username', 'realName'] },
+        { model: User, as: 'Syncer', attributes: ['userId', 'username', 'realName'] },
+        { model: InventoryPlan, as: 'Plan', attributes: ['planId', 'name'] },
+        { model: Room, as: 'Room', attributes: ['roomId', 'name'] },
+        { model: Rack, as: 'Rack', attributes: ['rackId', 'name'] }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(pageSize),
+      offset: parseInt(offset)
+    });
+
+    res.json({
+      pendingDevices: rows,
+      total: count,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize)
+    });
+  } catch (error) {
+    console.error('获取暂存设备列表错误:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/pending-devices/stats', async (req, res) => {
+  try {
+    const total = await PendingDevice.count();
+    const pending = await PendingDevice.count({ where: { status: 'pending' } });
+    const synced = await PendingDevice.count({ where: { status: 'synced' } });
+
+    res.json({ total, pending, synced });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/pending-devices/:pendingId', async (req, res) => {
+  try {
+    const pendingDevice = await PendingDevice.findByPk(req.params.pendingId, {
+      include: [
+        { model: User, as: 'Creator', attributes: ['userId', 'username', 'realName'] },
+        { model: User, as: 'Syncer', attributes: ['userId', 'username', 'realName'] },
+        { model: InventoryPlan, as: 'Plan', attributes: ['planId', 'name'] },
+        { model: Room, as: 'Room', attributes: ['roomId', 'name'] },
+        { model: Rack, as: 'Rack', attributes: ['rackId', 'name'] }
+      ]
+    });
+
+    if (!pendingDevice) {
+      return res.status(404).json({ error: '暂存设备不存在' });
+    }
+
+    res.json(pendingDevice);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put('/pending-devices/:pendingId', async (req, res) => {
+  try {
+    const pendingDevice = await PendingDevice.findByPk(req.params.pendingId);
+    if (!pendingDevice) {
+      return res.status(404).json({ error: '暂存设备不存在' });
+    }
+
+    if (pendingDevice.status === 'synced') {
+      return res.status(400).json({ error: '已同步的设备无法修改' });
+    }
+
+    const { deviceName, deviceType, roomId, rackId, position, model, brand, height, powerConsumption, ipAddress, purchaseDate, warrantyExpiry, description, remark, ...restFields } = req.body;
+
+    const updateData = {
+      deviceName: deviceName !== undefined ? deviceName : pendingDevice.deviceName,
+      deviceType: deviceType !== undefined ? deviceType : pendingDevice.deviceType,
+      roomId: roomId !== undefined ? roomId : pendingDevice.roomId,
+      rackId: rackId !== undefined ? rackId : pendingDevice.rackId,
+      position: position !== undefined ? position : pendingDevice.position,
+      model: model !== undefined ? model : pendingDevice.model,
+      brand: brand !== undefined ? brand : pendingDevice.brand,
+      height: height !== undefined ? height : pendingDevice.height,
+      powerConsumption: powerConsumption !== undefined ? powerConsumption : pendingDevice.powerConsumption,
+      ipAddress: ipAddress !== undefined ? ipAddress : pendingDevice.ipAddress,
+      purchaseDate: purchaseDate !== undefined ? (purchaseDate ? new Date(purchaseDate) : null) : pendingDevice.purchaseDate,
+      warrantyExpiry: warrantyExpiry !== undefined ? (warrantyExpiry ? new Date(warrantyExpiry) : null) : pendingDevice.warrantyExpiry,
+      description: description !== undefined ? description : pendingDevice.description,
+      remark: remark !== undefined ? remark : pendingDevice.remark
+    };
+
+    if (Object.keys(restFields).length > 0) {
+      const existingCustomFields = pendingDevice.customFields || {};
+      updateData.customFields = { ...existingCustomFields, ...restFields };
+    }
+
+    await pendingDevice.update(updateData);
+
+    res.json(pendingDevice);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/pending-devices/:pendingId', async (req, res) => {
+  try {
+    const pendingDevice = await PendingDevice.findByPk(req.params.pendingId);
+    if (!pendingDevice) {
+      return res.status(404).json({ error: '暂存设备不存在' });
+    }
+
+    await pendingDevice.destroy();
+    res.json({ message: '删除成功' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/pending-devices/:pendingId/sync', async (req, res) => {
+  try {
+    const pendingDevice = await PendingDevice.findByPk(req.params.pendingId);
+    if (!pendingDevice) {
+      return res.status(404).json({ error: '暂存设备不存在' });
+    }
+
+    if (pendingDevice.status === 'synced') {
+      return res.status(400).json({ error: '该设备已同步' });
+    }
+
+    const existingDevice = await Device.findOne({ where: { serialNumber: pendingDevice.serialNumber } });
+    if (existingDevice) {
+      return res.status(400).json({ error: '该序列号的设备已存在于设备管理中' });
+    }
+
+    const devices = await Device.findAll({ where: { deviceId: { [Op.like]: 'DEV%' } } });
     let maxNumber = 0;
     devices.forEach(device => {
       const match = device.deviceId.match(/^DEV(\d+)$/);
@@ -555,61 +778,126 @@ router.post('/quick-add-device', async (req, res) => {
         if (num > maxNumber) maxNumber = num;
       }
     });
-    deviceId = `DEV${String(maxNumber + 1).padStart(3, '0')}`;
+    const deviceId = `DEV${String(maxNumber + 1).padStart(3, '0')}`;
 
     const newDevice = await Device.create({
       deviceId,
-      name: deviceName || `新设备-${serialNumber.slice(-6)}`,
-      type: deviceType || 'other',
-      serialNumber,
-      rackId: rackId || null,
-      position: position || null,
+      name: pendingDevice.deviceName,
+      type: pendingDevice.deviceType,
+      serialNumber: pendingDevice.serialNumber,
+      rackId: pendingDevice.rackId,
+      position: pendingDevice.position,
+      height: pendingDevice.height || 1,
+      powerConsumption: pendingDevice.powerConsumption || 0,
+      model: pendingDevice.model,
+      ipAddress: pendingDevice.ipAddress,
+      description: pendingDevice.description,
+      purchaseDate: pendingDevice.purchaseDate,
+      warrantyExpiry: pendingDevice.warrantyExpiry,
+      customFields: pendingDevice.customFields,
       status: 'running'
     });
 
-    const record = await InventoryRecord.create({
-      recordId: generateRecordId(),
-      taskId,
-      planId,
-      deviceId: newDevice.deviceId,
-      deviceName: newDevice.name,
-      deviceType: newDevice.type,
-      serialNumber: newDevice.serialNumber,
-      rackId: newDevice.rackId,
-      position: newDevice.position,
-      status: 'normal',
-      abnormalType: 'extra_device',
-      checkedBy: req.user?.userId,
-      checkedAt: new Date(),
-      remark: remark || '盘点时新增设备'
+    await pendingDevice.update({
+      status: 'synced',
+      syncedAt: new Date(),
+      syncedBy: req.user?.userId,
+      syncedDeviceId: newDevice.deviceId
     });
 
-    const taskRecords = await InventoryRecord.findAll({ where: { taskId: task.taskId } });
-    const taskStats = {
-      totalDevices: taskRecords.length,
-      checkedDevices: taskRecords.filter(r => r.status !== 'pending').length,
-      normalDevices: taskRecords.filter(r => r.status === 'normal').length,
-      abnormalDevices: taskRecords.filter(r => r.status === 'abnormal').length
-    };
-    await task.update(taskStats);
-
-    const planRecords = await InventoryRecord.findAll({ where: { planId: plan.planId } });
-    const planStats = {
-      totalDevices: planRecords.length,
-      checkedDevices: planRecords.filter(r => r.status !== 'pending').length,
-      normalDevices: planRecords.filter(r => r.status === 'normal').length,
-      abnormalDevices: planRecords.filter(r => r.status === 'abnormal').length,
-      missedDevices: planRecords.filter(r => r.status === 'pending').length
-    };
-    await plan.update(planStats);
-
-    res.status(201).json({
-      message: '设备添加成功',
+    res.json({
+      message: '同步成功',
       device: newDevice,
-      record
+      pendingDevice
     });
   } catch (error) {
-    console.error('快速添加设备错误:', error);
+    console.error('同步设备错误:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/pending-devices/batch-sync', async (req, res) => {
+  try {
+    const { pendingIds } = req.body;
+    if (!pendingIds || pendingIds.length === 0) {
+      return res.status(400).json({ error: '请选择要同步的设备' });
+    }
+
+    const pendingDevices = await PendingDevice.findAll({
+      where: {
+        pendingId: { [Op.in]: pendingIds },
+        status: 'pending'
+      }
+    });
+
+    if (pendingDevices.length === 0) {
+      return res.status(400).json({ error: '没有可同步的设备' });
+    }
+
+    const devices = await Device.findAll({ where: { deviceId: { [Op.like]: 'DEV%' } } });
+    let maxNumber = 0;
+    devices.forEach(device => {
+      const match = device.deviceId.match(/^DEV(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNumber) maxNumber = num;
+      }
+    });
+
+    const results = [];
+    const errors = [];
+
+    for (const pending of pendingDevices) {
+      try {
+        const existingDevice = await Device.findOne({ where: { serialNumber: pending.serialNumber } });
+        if (existingDevice) {
+          errors.push({ pendingId: pending.pendingId, serialNumber: pending.serialNumber, error: '序列号已存在' });
+          continue;
+        }
+
+        maxNumber++;
+        const deviceId = `DEV${String(maxNumber).padStart(3, '0')}`;
+
+        const newDevice = await Device.create({
+          deviceId,
+          name: pending.deviceName,
+          type: pending.deviceType,
+          serialNumber: pending.serialNumber,
+          rackId: pending.rackId,
+          position: pending.position,
+          height: pending.height || 1,
+          powerConsumption: pending.powerConsumption || 0,
+          model: pending.model,
+          ipAddress: pending.ipAddress,
+          description: pending.description,
+          purchaseDate: pending.purchaseDate,
+          warrantyExpiry: pending.warrantyExpiry,
+          customFields: pending.customFields,
+          status: 'running'
+        });
+
+        await pending.update({
+          status: 'synced',
+          syncedAt: new Date(),
+          syncedBy: req.user?.userId,
+          syncedDeviceId: newDevice.deviceId
+        });
+
+        results.push({ pendingId: pending.pendingId, deviceId: newDevice.deviceId });
+      } catch (err) {
+        errors.push({ pendingId: pending.pendingId, error: err.message });
+      }
+    }
+
+    res.json({
+      message: `成功同步 ${results.length} 台设备`,
+      successCount: results.length,
+      errorCount: errors.length,
+      results,
+      errors
+    });
+  } catch (error) {
+    console.error('批量同步设备错误:', error);
     res.status(500).json({ error: error.message });
   }
 });

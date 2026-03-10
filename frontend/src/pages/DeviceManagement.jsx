@@ -43,7 +43,7 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { designTokens } from '../config/theme';
 import {
   PAGINATION_CONFIG,
@@ -226,6 +226,7 @@ const ResizableTitle = props => {
 
 function DeviceManagement() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [devices, setDevices] = useState([]);
   const [allDevices, setAllDevices] = useState([]);
   const [racks, setRacks] = useState([]);
@@ -516,6 +517,35 @@ function DeviceManagement() {
     fetchRooms();
     fetchDeviceFields();
   }, [fetchDevices]);
+
+  // 处理URL参数中的设备ID，自动打开设备详情
+  useEffect(() => {
+    const deviceIdFromUrl = searchParams.get('deviceId');
+    if (deviceIdFromUrl) {
+      const fetchDeviceDetail = async () => {
+        try {
+          const response = await axios.get(`/api/devices/${deviceIdFromUrl}`);
+          if (response.data) {
+            setSelectedDevice(response.data);
+            setDetailModalVisible(true);
+            setSearchParams({});
+          }
+        } catch (error) {
+          console.error('获取设备详情失败:', error);
+          const errorStatus = error.response?.status;
+          const errorMessage = error.response?.data?.error;
+          
+          if (errorStatus === 404 || errorMessage === '设备不存在') {
+            message.warning('该设备已被删除，无法查看详情');
+          } else {
+            message.error(errorMessage || '获取设备详情失败');
+          }
+          setSearchParams({});
+        }
+      };
+      fetchDeviceDetail();
+    }
+  }, [searchParams, setSearchParams]);
 
   // 同步当前页设备数据
   useEffect(() => {

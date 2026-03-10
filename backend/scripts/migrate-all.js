@@ -79,6 +79,11 @@ const migrations = [
     name: '设备表字段可空',
     description: '将设备表所有字段改为可空，由应用层验证控制',
     migrate: migrateDeviceFieldsNullable
+  },
+  {
+    name: '暂存设备自定义字段',
+    description: '为 pending_devices 表添加 customFields 字段，支持自定义字段存储',
+    migrate: migratePendingDeviceCustomFields
   }
 ];
 
@@ -548,6 +553,16 @@ async function migrateDeviceFieldsNullable() {
       await sequelize.query('PRAGMA foreign_keys = ON');
     }
   }
+}
+
+async function migratePendingDeviceCustomFields() {
+  if (!(await tableExists('pending_devices'))) {
+    console.log('    pending_devices 表不存在，跳过');
+    return;
+  }
+
+  const columnDef = dbDialect === 'sqlite' ? "JSON DEFAULT '{}'" : "JSON";
+  await addColumnIfNotExists('pending_devices', 'customFields', columnDef);
 }
 
 // 执行迁移

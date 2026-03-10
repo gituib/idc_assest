@@ -6,6 +6,8 @@ import {
   Form,
   Input,
   Select,
+  InputNumber,
+  DatePicker,
   message,
   Card,
   Space,
@@ -34,7 +36,7 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { designTokens } from '../config/theme';
 
 const api = axios.create({
@@ -51,6 +53,7 @@ api.interceptors.request.use((config) => {
 
 const InventoryTaskExecution = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [plan, setPlan] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [currentTask, setCurrentTask] = useState(null);
@@ -73,6 +76,7 @@ const InventoryTaskExecution = () => {
   const [quickAddLoading, setQuickAddLoading] = useState(false);
   const [rooms, setRooms] = useState([]);
   const [racks, setRacks] = useState([]);
+  const [deviceFields, setDeviceFields] = useState(null); // 初始值改为 null，表示未加载
   const [selectedRoomId, setSelectedRoomId] = useState(null);
 
   const planId = searchParams.get('planId');
@@ -252,6 +256,41 @@ const InventoryTaskExecution = () => {
     fetchPlan();
   }, [fetchPlan]);
 
+  const defaultDeviceFields = [
+    { fieldName: 'deviceName', displayName: '设备名称', fieldType: 'string', required: true, visible: true, order: 1 },
+    { fieldName: 'deviceType', displayName: '设备类型', fieldType: 'select', required: true, visible: true, order: 2, options: [
+      { value: 'server', label: '服务器' },
+      { value: 'switch', label: '交换机' },
+      { value: 'router', label: '路由器' },
+      { value: 'storage', label: '存储设备' },
+      { value: 'other', label: '其他' },
+    ]},
+    { fieldName: 'model', displayName: '型号', fieldType: 'string', required: false, visible: true, order: 3 },
+    { fieldName: 'serialNumber', displayName: '序列号', fieldType: 'string', required: true, visible: true, order: 4 },
+    { fieldName: 'roomId', displayName: '所属机房', fieldType: 'select', required: false, visible: true, order: 5 },
+    { fieldName: 'rackId', displayName: '所属机柜', fieldType: 'select', required: false, visible: true, order: 6 },
+    { fieldName: 'position', displayName: '位置(U)', fieldType: 'number', required: false, visible: true, order: 7 },
+    { fieldName: 'height', displayName: '高度(U)', fieldType: 'number', required: false, visible: true, order: 8 },
+    { fieldName: 'powerConsumption', displayName: '功率(W)', fieldType: 'number', required: false, visible: true, order: 9 },
+    { fieldName: 'purchaseDate', displayName: '购买日期', fieldType: 'date', required: false, visible: true, order: 10 },
+    { fieldName: 'warrantyExpiry', displayName: '保修到期', fieldType: 'date', required: false, visible: true, order: 11 },
+    { fieldName: 'ipAddress', displayName: 'IP地址', fieldType: 'string', required: false, visible: true, order: 12 },
+    { fieldName: 'brand', displayName: '品牌', fieldType: 'string', required: false, visible: true, order: 13 },
+    { fieldName: 'description', displayName: '描述', fieldType: 'textarea', required: false, visible: true, order: 14 },
+    { fieldName: 'remark', displayName: '备注', fieldType: 'textarea', required: false, visible: true, order: 15 },
+  ];
+
+  const fetchDeviceFields = async () => {
+    try {
+      const res = await api.get('/deviceFields');
+      const sortedFields = res.data.sort((a, b) => a.order - b.order);
+      setDeviceFields(sortedFields);
+    } catch (error) {
+      console.error('获取字段配置失败:', error);
+      setDeviceFields(defaultDeviceFields);
+    }
+  };
+
   const fetchRooms = async () => {
     try {
       const res = await api.get('/rooms');
@@ -263,7 +302,7 @@ const InventoryTaskExecution = () => {
 
   const fetchRacks = async () => {
     try {
-      const res = await api.get('/racks');
+      const res = await api.get('/racks', { params: { pageSize: 1000 } });
       setRacks(res.data.racks || res.data || []);
     } catch (error) {
       console.error('获取机柜列表失败', error);
@@ -273,44 +312,260 @@ const InventoryTaskExecution = () => {
   useEffect(() => {
     fetchRooms();
     fetchRacks();
+    fetchDeviceFields();
   }, []);
 
   const filteredRacks = selectedRoomId 
     ? racks.filter(rack => rack.roomId === selectedRoomId)
     : racks;
 
+  const renderQuickAddFormField = (field) => {
+    const { fieldName, displayName, fieldType, required, options } = field;
+
+    // 统一的表单项样式
+    const formItemStyle = {
+      marginBottom: 16,
+    };
+
+    // 统一的输入框样式
+    const inputStyle = {
+      borderRadius: designTokens.borderRadius.medium,
+    };
+
+    if (fieldName === 'roomId' || fieldName === 'rackId') {
+      // 机房和机柜字段已在Modal中单独处理
+      return null;
+    }
+
+    if (fieldName === 'deviceType') {
+      return (
+        <Form.Item
+          key={fieldName}
+          name={fieldName}
+          label={displayName}
+          initialValue="other"
+          rules={required ? [{ required: true, message: `请选择${displayName}` }] : []}
+          style={formItemStyle}
+        >
+          <Select 
+            placeholder={`请选择${displayName}`}
+            size="large"
+            style={inputStyle}
+          >
+            {(options || [
+              { value: 'server', label: '服务器' },
+              { value: 'switch', label: '交换机' },
+              { value: 'router', label: '路由器' },
+              { value: 'storage', label: '存储设备' },
+              { value: 'other', label: '其他' },
+            ]).map(opt => (
+              <Select.Option key={opt.value} value={opt.value}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ 
+                    fontSize: 16,
+                    filter: 'grayscale(0.3)',
+                  }}>
+                    {opt.value === 'server' && '🖥️'}
+                    {opt.value === 'switch' && '🔀'}
+                    {opt.value === 'router' && '📡'}
+                    {opt.value === 'storage' && '💾'}
+                    {opt.value === 'other' && '📦'}
+                  </span>
+                  <span>{opt.label}</span>
+                </div>
+              </Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
+      );
+    }
+
+    if (fieldType === 'select') {
+      return (
+        <Form.Item
+          key={fieldName}
+          name={fieldName}
+          label={displayName}
+          rules={required ? [{ required: true, message: `请选择${displayName}` }] : []}
+          style={formItemStyle}
+        >
+          <Select 
+            placeholder={`请选择${displayName}`} 
+            allowClear
+            size="large"
+            style={inputStyle}
+          >
+            {(options || []).map(opt => (
+              <Select.Option key={opt.value} value={opt.value}>
+                {opt.label}
+              </Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
+      );
+    }
+
+    if (fieldType === 'number') {
+      return (
+        <Form.Item
+          key={fieldName}
+          name={fieldName}
+          label={displayName}
+          rules={required ? [{ required: true, message: `请输入${displayName}` }] : []}
+          style={formItemStyle}
+        >
+          <Input 
+            type="number" 
+            placeholder={`请输入${displayName}`} 
+            min={1}
+            size="large"
+            style={inputStyle}
+          />
+        </Form.Item>
+      );
+    }
+
+    if (fieldType === 'date') {
+      return (
+        <Form.Item
+          key={fieldName}
+          name={fieldName}
+          label={displayName}
+          rules={required ? [{ required: true, message: `请选择${displayName}` }] : []}
+          style={formItemStyle}
+        >
+          <DatePicker 
+            style={{ ...inputStyle, width: '100%' }}
+            placeholder={`请选择${displayName}`}
+            size="large"
+          />
+        </Form.Item>
+      );
+    }
+
+    if (fieldType === 'text' || fieldType === 'textarea') {
+      return (
+        <Form.Item
+          key={fieldName}
+          name={fieldName}
+          label={displayName}
+          rules={required ? [{ required: true, message: `请输入${displayName}` }] : []}
+          style={formItemStyle}
+        >
+          <Input.TextArea 
+            rows={3} 
+            placeholder={`请输入${displayName}`}
+            style={{
+              ...inputStyle,
+              resize: 'none',
+            }}
+          />
+        </Form.Item>
+      );
+    }
+
+    return (
+      <Form.Item
+        key={fieldName}
+        name={fieldName}
+        label={displayName}
+        rules={required ? [{ required: true, message: `请输入${displayName}` }] : []}
+        style={formItemStyle}
+      >
+        <Input 
+          placeholder={`请输入${displayName}`}
+          size="large"
+          style={inputStyle}
+        />
+      </Form.Item>
+    );
+  };
+
+  const renderQuickAddFormFields = () => {
+    // 如果字段配置未加载，使用默认配置
+    const fields = deviceFields || defaultDeviceFields;
+    
+    // 排除机房和机柜字段（已在Modal中单独渲染）
+    const visibleFields = fields.filter(f => 
+      f.visible !== false && 
+      f.fieldName !== 'serialNumber' &&
+      f.fieldName !== 'roomId' &&
+      f.fieldName !== 'rackId'
+    );
+    const sortedFields = visibleFields.sort((a, b) => a.order - b.order);
+    
+    // 将字段分成两列
+    const leftFields = [];
+    const rightFields = [];
+    const fullFields = [];
+    
+    sortedFields.forEach((field, index) => {
+      // 文本域类型独占一行
+      if (field.fieldType === 'text') {
+        fullFields.push(field);
+      } else {
+        // 其他字段交替排列
+        if (index % 2 === 0) {
+          leftFields.push(field);
+        } else {
+          rightFields.push(field);
+        }
+      }
+    });
+
+    return (
+      <>
+        {/* 两列布局的字段 */}
+        <Row gutter={16}>
+          <Col xs={24} sm={12}>
+            {leftFields.map(renderQuickAddFormField)}
+          </Col>
+          <Col xs={24} sm={12}>
+            {rightFields.map(renderQuickAddFormField)}
+          </Col>
+        </Row>
+        
+        {/* 独占一行的字段（如备注） */}
+        {fullFields.map(renderQuickAddFormField)}
+      </>
+    );
+  };
+
   const handleQuickAddDevice = async (values) => {
-    if (!currentTask || !plan) {
-      message.error('请先选择盘点任务');
+    if (!plan) {
+      message.error('盘点计划不存在');
       return;
     }
     setQuickAddLoading(true);
     try {
-      const res = await api.post('/inventory/quick-add-device', {
-        taskId: currentTask.taskId,
+      const { 
+        purchaseDate, 
+        warrantyExpiry, 
+        ...otherValues 
+      } = values;
+      
+      const payload = {
+        taskId: currentTask?.taskId || null,
         planId: plan.planId,
         serialNumber: scanResult?.sn || values.serialNumber,
-        deviceName: values.deviceName,
-        deviceType: values.deviceType,
-        rackId: values.rackId,
-        position: values.position,
-        remark: values.remark
-      });
-      message.success('设备添加成功！');
+        ...otherValues,
+        purchaseDate: purchaseDate ? dayjs(purchaseDate).toISOString() : null,
+        warrantyExpiry: warrantyExpiry ? dayjs(warrantyExpiry).toISOString() : null
+      };
+      
+      const res = await api.post('/inventory/quick-add-device', payload);
+      message.success('设备已暂存！');
       setQuickAddModalVisible(false);
+      setSelectedRoomId(null);
       quickAddForm.resetFields();
       setScanResult({
         success: true,
-        message: `新设备 "${res.data.device.name}" 已添加并完成盘点！`,
-        record: res.data.record,
-        sn: res.data.device.serialNumber
+        message: `设备 "${res.data.pendingDevice.deviceName}" 已暂存，请前往「暂存设备」页面完善信息后同步到设备管理`,
+        pendingDevice: res.data.pendingDevice,
+        sn: res.data.pendingDevice.serialNumber
       });
-      if (currentTask) {
-        fetchTaskRecords(currentTask.taskId);
-      }
-      fetchPlan();
     } catch (error) {
-      message.error(error.response?.data?.error || '添加设备失败');
+      message.error(error.response?.data?.error || '暂存设备失败');
     } finally {
       setQuickAddLoading(false);
     }
@@ -887,129 +1142,308 @@ const InventoryTaskExecution = () => {
             <div style={{ textAlign: 'center', marginBottom: 16 }}>
               <ScanOutlined style={{ fontSize: 48, color: '#1890ff' }} />
             </div>
-            <Input
-              placeholder="请用扫码枪扫描或输入设备序列号..."
-              value={scanInput}
-              onChange={(e) => setScanInput(e.target.value)}
-              onKeyDown={handleScanKeyPress}
-              variant="outlined"
-              style={{ 
-                fontSize: 16, 
-                textAlign: 'center', 
-                height: 40,
-                borderRadius: 8,
-                boxShadow: '0 2px 8px rgba(24, 144, 255, 0.1)'
-              }}
-              suffix={
-                <Button 
-                  type="primary" 
-                  size="small"
-                  onClick={handleScanClick}
-                  style={{ height: 32, borderRadius: 6 }}
-                  icon={<CheckOutlined />}
-                >
-                  盘点
-                </Button>
-              }
-              autoFocus
-            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Input
+                placeholder="请用扫码枪扫描或输入设备序列号..."
+                value={scanInput}
+                onChange={(e) => setScanInput(e.target.value)}
+                onKeyDown={handleScanKeyPress}
+                variant="outlined"
+                style={{ 
+                  fontSize: 16, 
+                  textAlign: 'center', 
+                  height: 40,
+                  borderRadius: 8,
+                  boxShadow: '0 2px 8px rgba(24, 144, 255, 0.1)',
+                  width: 400
+                }}
+                suffix={
+                  <Button 
+                    type="primary" 
+                    size="small"
+                    onClick={handleScanClick}
+                    style={{ height: 32, borderRadius: 6 }}
+                    icon={<CheckOutlined />}
+                  >
+                    盘点
+                  </Button>
+                }
+                autoFocus
+              />
+            </div>
             <div style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12, textAlign: 'center' }}>
               扫码枪扫描或手动输入序列号后按回车 / 点击盘点
             </div>
           </div>
 
           {scanResult && (
-            <div style={{ 
-              padding: 24, 
-              borderRadius: 12,
-              background: scanResult.success ? 'linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%)' : 'linear-gradient(135deg, #fff2f0 0%, #ffccc7 100%)',
-              border: `1px solid ${scanResult.success ? '#b7eb8f' : '#ffccc7'}`,
-              marginBottom: 16,
-              animation: 'fadeIn 0.3s ease'
-            }}>
-              <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                {scanResult.success ? (
-                  <div style={{ 
-                    width: 64, 
-                    height: 64, 
-                    borderRadius: '50%', 
-                    background: '#52c41a',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto'
-                  }}>
-                    <CheckOutlined style={{ fontSize: 36, color: '#fff' }} />
-                  </div>
-                ) : (
-                  <div style={{ 
-                    width: 64, 
-                    height: 64, 
-                    borderRadius: '50%', 
-                    background: '#ff4d4f',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto'
-                  }}>
-                    <CloseOutlined style={{ fontSize: 36, color: '#fff' }} />
-                  </div>
-                )}
-              </div>
-              <div style={{ 
-                fontSize: 18, 
-                fontWeight: 'bold', 
-                textAlign: 'center', 
+            <Card
+              style={{
                 marginBottom: 16,
-                color: scanResult.success ? '#52c41a' : '#ff4d4f'
+                borderRadius: designTokens.borderRadius.large,
+                border: `2px solid ${scanResult.success ? designTokens.colors.success.main : designTokens.colors.error.main}`,
+                boxShadow: designTokens.shadows.large,
+                overflow: 'hidden',
+              }}
+              bodyStyle={{ padding: 0 }}
+            >
+              {/* 顶部状态条 */}
+              <div style={{
+                background: scanResult.success ? designTokens.colors.success.gradient : designTokens.colors.error.gradient,
+                padding: '20px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
               }}>
-                {scanResult.message}
-              </div>
-              {scanResult.record && (
-                <div style={{ 
-                  background: 'rgba(255,255,255,0.7)', 
-                  borderRadius: 8, 
-                  padding: 16,
-                  fontSize: 13,
-                  color: '#595959'
+                <div style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backdropFilter: 'blur(10px)',
                 }}>
-                  <Row gutter={16}>
-                    <Col span={12}>
-                      <div style={{ marginBottom: 8 }}>
-                        <Tag color="blue">设备ID</Tag>
-                        <span>{scanResult.record.deviceId}</span>
-                      </div>
-                      <div style={{ marginBottom: 8 }}>
-                        <Tag color="cyan">设备名称</Tag>
-                        <span>{scanResult.record.deviceName}</span>
+                  {scanResult.success ? (
+                    <CheckOutlined style={{ fontSize: 28, color: '#fff' }} />
+                  ) : (
+                    <CloseOutlined style={{ fontSize: 28, color: '#fff' }} />
+                  )}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ 
+                    fontSize: designTokens.typography.xl, 
+                    fontWeight: 600, 
+                    color: '#fff',
+                    marginBottom: 4,
+                  }}>
+                    {scanResult.success ? '盘点成功' : '未找到设备'}
+                  </div>
+                  <div style={{ 
+                    fontSize: designTokens.typography.base, 
+                    color: 'rgba(255, 255, 255, 0.9)',
+                  }}>
+                    {scanResult.message}
+                  </div>
+                </div>
+              </div>
+
+              {/* 设备信息卡片 */}
+              {scanResult.record && (
+                <div style={{ padding: '20px 24px', background: designTokens.colors.background.secondary }}>
+                  <div style={{ 
+                    fontSize: designTokens.typography.sm, 
+                    fontWeight: 600,
+                    color: designTokens.colors.text.secondary,
+                    marginBottom: 12,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}>
+                    设备信息
+                  </div>
+                  <Row gutter={[16, 12]}>
+                    <Col xs={24} sm={12} md={8}>
+                      <div style={{
+                        background: '#fff',
+                        padding: 12,
+                        borderRadius: designTokens.borderRadius.medium,
+                        border: `1px solid ${designTokens.colors.border.light}`,
+                      }}>
+                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                          设备ID
+                        </div>
+                        <div style={{ fontSize: designTokens.typography.base, fontWeight: 500, color: designTokens.colors.text.primary }}>
+                          {scanResult.record.deviceId}
+                        </div>
                       </div>
                     </Col>
-                    <Col span={12}>
-                      <div style={{ marginBottom: 8 }}>
-                        <Tag color="purple">序列号</Tag>
-                        <span style={{ fontFamily: 'monospace' }}>{scanResult.record.serialNumber}</span>
+                    <Col xs={24} sm={12} md={8}>
+                      <div style={{
+                        background: '#fff',
+                        padding: 12,
+                        borderRadius: designTokens.borderRadius.medium,
+                        border: `1px solid ${designTokens.colors.border.light}`,
+                      }}>
+                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                          设备名称
+                        </div>
+                        <div style={{ fontSize: designTokens.typography.base, fontWeight: 500, color: designTokens.colors.text.primary }}>
+                          {scanResult.record.deviceName}
+                        </div>
                       </div>
-                      <div>
-                        <Tag color="orange">当前位置</Tag>
-                        <span>{scanResult.record.displayLocation || `${scanResult.record.rackId} - U${scanResult.record.position}`}</span>
+                    </Col>
+                    <Col xs={24} sm={12} md={8}>
+                      <div style={{
+                        background: '#fff',
+                        padding: 12,
+                        borderRadius: designTokens.borderRadius.medium,
+                        border: `1px solid ${designTokens.colors.border.light}`,
+                      }}>
+                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                          序列号
+                        </div>
+                        <div style={{ 
+                          fontSize: designTokens.typography.sm, 
+                          fontWeight: 600, 
+                          fontFamily: 'Consolas, Monaco, monospace',
+                          color: designTokens.colors.primary.main,
+                        }}>
+                          {scanResult.record.serialNumber}
+                        </div>
+                      </div>
+                    </Col>
+                    <Col xs={24} sm={24} md={24}>
+                      <div style={{
+                        background: '#fff',
+                        padding: 12,
+                        borderRadius: designTokens.borderRadius.medium,
+                        border: `1px solid ${designTokens.colors.border.light}`,
+                      }}>
+                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                          当前位置
+                        </div>
+                        <div style={{ fontSize: designTokens.typography.base, fontWeight: 500, color: designTokens.colors.text.primary }}>
+                          <Tag color="blue" style={{ marginRight: 8 }}>
+                            {scanResult.record.displayLocation || `${scanResult.record.rackId}`}
+                          </Tag>
+                          <Tag color="geekblue">U{scanResult.record.position}</Tag>
+                        </div>
                       </div>
                     </Col>
                   </Row>
                 </div>
               )}
+
+              {/* 暂存设备信息 */}
+              {scanResult.pendingDevice && (
+                <div style={{ padding: '20px 24px', background: designTokens.colors.background.secondary }}>
+                  <div style={{ 
+                    fontSize: designTokens.typography.sm, 
+                    fontWeight: 600,
+                    color: designTokens.colors.text.secondary,
+                    marginBottom: 12,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}>
+                    暂存设备信息
+                  </div>
+                  <Row gutter={[16, 12]}>
+                    <Col xs={24} sm={12} md={8}>
+                      <div style={{
+                        background: '#fff',
+                        padding: 12,
+                        borderRadius: designTokens.borderRadius.medium,
+                        border: `1px solid ${designTokens.colors.border.light}`,
+                      }}>
+                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                          暂存ID
+                        </div>
+                        <div style={{ fontSize: designTokens.typography.base, fontWeight: 500, color: designTokens.colors.text.primary }}>
+                          {scanResult.pendingDevice.pendingId}
+                        </div>
+                      </div>
+                    </Col>
+                    <Col xs={24} sm={12} md={8}>
+                      <div style={{
+                        background: '#fff',
+                        padding: 12,
+                        borderRadius: designTokens.borderRadius.medium,
+                        border: `1px solid ${designTokens.colors.border.light}`,
+                      }}>
+                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                          设备名称
+                        </div>
+                        <div style={{ fontSize: designTokens.typography.base, fontWeight: 500, color: designTokens.colors.text.primary }}>
+                          {scanResult.pendingDevice.deviceName}
+                        </div>
+                      </div>
+                    </Col>
+                    <Col xs={24} sm={12} md={8}>
+                      <div style={{
+                        background: '#fff',
+                        padding: 12,
+                        borderRadius: designTokens.borderRadius.medium,
+                        border: `1px solid ${designTokens.colors.border.light}`,
+                      }}>
+                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                          序列号
+                        </div>
+                        <div style={{ 
+                          fontSize: designTokens.typography.sm, 
+                          fontWeight: 600, 
+                          fontFamily: 'Consolas, Monaco, monospace',
+                          color: designTokens.colors.primary.main,
+                        }}>
+                          {scanResult.pendingDevice.serialNumber}
+                        </div>
+                      </div>
+                    </Col>
+                    <Col xs={24} sm={12} md={12}>
+                      <div style={{
+                        background: '#fff',
+                        padding: 12,
+                        borderRadius: designTokens.borderRadius.medium,
+                        border: `1px solid ${designTokens.colors.border.light}`,
+                      }}>
+                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                          设备类型
+                        </div>
+                        <div style={{ fontSize: designTokens.typography.base, fontWeight: 500, color: designTokens.colors.text.primary }}>
+                          <Tag color={designTokens.colors.device[scanResult.pendingDevice.deviceType] || 'default'}>
+                            {scanResult.pendingDevice.deviceType}
+                          </Tag>
+                        </div>
+                      </div>
+                    </Col>
+                  </Row>
+                  <div style={{ marginTop: 16, textAlign: 'center' }}>
+                    <Button 
+                      type="primary"
+                      onClick={() => navigate('/pending-devices')}
+                      icon={<InboxOutlined />}
+                      style={{
+                        borderRadius: designTokens.borderRadius.medium,
+                        background: designTokens.colors.primary.gradient,
+                        border: 'none',
+                        height: 40,
+                        paddingLeft: 24,
+                        paddingRight: 24,
+                      }}
+                    >
+                      前往暂存设备页面完善信息
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* 快速添加按钮 */}
               {!scanResult.success && scanResult.sn && (
-                <div style={{ textAlign: 'center', marginTop: 16 }}>
+                <div style={{ 
+                  padding: '20px 24px', 
+                  background: designTokens.colors.background.tertiary,
+                  borderTop: `1px solid ${designTokens.colors.border.light}`,
+                }}>
                   <Button
                     type="primary"
+                    size="large"
                     icon={<PlusOutlined />}
                     onClick={openQuickAddModal}
-                    style={{ borderRadius: 8 }}
+                    block
+                    style={{
+                      borderRadius: designTokens.borderRadius.medium,
+                      background: designTokens.colors.primary.gradient,
+                      border: 'none',
+                      height: 48,
+                      fontSize: designTokens.typography.md,
+                      fontWeight: 500,
+                    }}
                   >
-                    快速添加此设备
+                    快速添加此设备到系统
                   </Button>
                 </div>
               )}
-            </div>
+            </Card>
           )}
 
           {scanResult && (
@@ -1136,127 +1570,253 @@ const InventoryTaskExecution = () => {
       </Modal>
 
       <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <PlusOutlined style={{ fontSize: 18, color: '#1890ff' }} />
-            <span>快速添加设备</span>
-          </div>
-        }
+        title={null}
         open={quickAddModalVisible}
         onCancel={() => {
           setQuickAddModalVisible(false);
           setSelectedRoomId(null);
         }}
         footer={null}
-        width={500}
+        width={640}
         centered
+        styles={{
+          body: { padding: 0 },
+        }}
       >
-        <Form
-          form={quickAddForm}
-          layout="vertical"
-          onFinish={handleQuickAddDevice}
-        >
-          <Form.Item
-            name="serialNumber"
-            label="序列号"
-            rules={[{ required: true, message: '请输入序列号' }]}
-          >
-            <Input placeholder="请输入设备序列号" disabled />
-          </Form.Item>
+        <div style={{
+          background: designTokens.colors.primary.gradient,
+          padding: '24px 32px',
+          borderRadius: `${designTokens.borderRadius.large} ${designTokens.borderRadius.large} 0 0`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <PlusOutlined style={{ fontSize: 24, color: '#fff' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: designTokens.typography['2xl'], fontWeight: 600, color: '#fff' }}>
+                快速添加设备
+              </div>
+              <div style={{ fontSize: designTokens.typography.sm, color: 'rgba(255, 255, 255, 0.85)', marginTop: 4 }}>
+                将扫描到的设备添加到系统
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <Form.Item
-            name="deviceName"
-            label="设备名称"
+        <div style={{ padding: '24px 32px' }}>
+          <Form
+            form={quickAddForm}
+            layout="vertical"
+            onFinish={handleQuickAddDevice}
+            requiredMark="optional"
           >
-            <Input placeholder="请输入设备名称（可选）" />
-          </Form.Item>
+            {/* 序列号显示 - 突出显示 */}
+            <Form.Item
+              name="serialNumber"
+              label={
+                <span style={{ fontSize: designTokens.typography.sm, fontWeight: 600, color: designTokens.colors.text.primary }}>
+                  设备序列号
+                </span>
+              }
+              rules={[{ required: true, message: '请输入序列号' }]}
+            >
+              <Input 
+                placeholder="请输入设备序列号" 
+                disabled 
+                style={{
+                  height: 44,
+                  fontSize: designTokens.typography.md,
+                  fontFamily: 'Consolas, Monaco, monospace',
+                  fontWeight: 600,
+                  background: designTokens.colors.background.tertiary,
+                  border: `2px solid ${designTokens.colors.border.medium}`,
+                  borderRadius: designTokens.borderRadius.medium,
+                }}
+              />
+            </Form.Item>
 
-          <Form.Item
-            name="deviceType"
-            label="设备类型"
-            initialValue="other"
-          >
-            <Select placeholder="请选择设备类型">
-              <Select.Option value="server">服务器</Select.Option>
-              <Select.Option value="switch">交换机</Select.Option>
-              <Select.Option value="router">路由器</Select.Option>
-              <Select.Option value="storage">存储设备</Select.Option>
-              <Select.Option value="other">其他</Select.Option>
-            </Select>
-          </Form.Item>
+            {/* 位置信息区域 */}
+            <div style={{
+              background: designTokens.colors.background.secondary,
+              padding: 20,
+              borderRadius: designTokens.borderRadius.medium,
+              marginBottom: 16,
+              border: `1px solid ${designTokens.colors.border.light}`,
+            }}>
+              <div style={{
+                fontSize: designTokens.typography.sm,
+                fontWeight: 600,
+                color: designTokens.colors.text.secondary,
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                <span style={{
+                  width: 4,
+                  height: 16,
+                  background: designTokens.colors.primary.main,
+                  borderRadius: 2,
+                }}></span>
+                位置信息（可选）
+              </div>
+              
+              <Row gutter={16}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="roomId"
+                    label="所属机房"
+                    style={{ marginBottom: 16 }}
+                  >
+                    <Select 
+                      placeholder="请选择机房" 
+                      allowClear 
+                      showSearch 
+                      optionFilterProp="children"
+                      size="large"
+                      style={{ borderRadius: designTokens.borderRadius.medium }}
+                      onChange={(value) => {
+                        setSelectedRoomId(value);
+                        quickAddForm.setFieldsValue({ rackId: undefined });
+                      }}
+                      suffixIcon={
+                        selectedRoomId ? (
+                          <Tag color="blue" style={{ margin: 0 }}>
+                            {rooms.find(r => r.roomId === selectedRoomId)?.name}
+                          </Tag>
+                        ) : null
+                      }
+                    >
+                      {rooms.length > 0 ? (
+                        rooms.map(room => (
+                          <Select.Option key={room.roomId} value={room.roomId}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 16 }}>🏢</span>
+                              {room.name}
+                            </div>
+                          </Select.Option>
+                        ))
+                      ) : (
+                        <Select.Option value="" disabled>暂无机房数据</Select.Option>
+                      )}
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="rackId"
+                    label="所属机柜"
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Select 
+                      placeholder={selectedRoomId ? "请选择机柜" : "请先选择机房"} 
+                      allowClear 
+                      showSearch 
+                      optionFilterProp="children"
+                      disabled={!selectedRoomId}
+                      size="large"
+                      style={{ borderRadius: designTokens.borderRadius.medium }}
+                    >
+                      {selectedRoomId ? (
+                        filteredRacks.length > 0 ? (
+                          filteredRacks.map(rack => (
+                            <Select.Option key={rack.rackId} value={rack.rackId}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 16 }}>🗄️</span>
+                                {rack.name}
+                              </div>
+                            </Select.Option>
+                          ))
+                        ) : (
+                          <Select.Option value="" disabled>该机房下无机柜</Select.Option>
+                        )
+                      ) : (
+                        <Select.Option value="" disabled>请先选择机房</Select.Option>
+                      )}
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="roomId"
-                label="所属机房"
+            {/* 设备详细信息 */}
+            <div style={{
+              background: designTokens.colors.background.secondary,
+              padding: 20,
+              borderRadius: designTokens.borderRadius.medium,
+              marginBottom: 24,
+              border: `1px solid ${designTokens.colors.border.light}`,
+            }}>
+              <div style={{
+                fontSize: designTokens.typography.sm,
+                fontWeight: 600,
+                color: designTokens.colors.text.secondary,
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                <span style={{
+                  width: 4,
+                  height: 16,
+                  background: designTokens.colors.primary.main,
+                  borderRadius: 2,
+                }}></span>
+                设备详细信息
+              </div>
+              
+              {renderQuickAddFormFields()}
+            </div>
+
+            {/* 操作按钮 */}
+            <div style={{ 
+              display: 'flex', 
+              gap: 12, 
+              justifyContent: 'flex-end',
+              paddingTop: 8,
+              borderTop: `1px solid ${designTokens.colors.border.light}`,
+            }}>
+              <Button 
+                size="large"
+                onClick={() => {
+                  setQuickAddModalVisible(false);
+                  setSelectedRoomId(null);
+                }}
+                style={{
+                  borderRadius: designTokens.borderRadius.medium,
+                  height: 44,
+                  minWidth: 100,
+                }}
               >
-                <Select 
-                  placeholder="请选择机房" 
-                  allowClear 
-                  showSearch 
-                  optionFilterProp="children"
-                  onChange={(value) => {
-                    setSelectedRoomId(value);
-                    quickAddForm.setFieldsValue({ rackId: undefined });
-                  }}
-                >
-                  {rooms.map(room => (
-                    <Select.Option key={room.roomId} value={room.roomId}>
-                      {room.name}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="rackId"
-                label="所属机柜"
-              >
-                <Select 
-                  placeholder={selectedRoomId ? "请选择机柜" : "请先选择机房"} 
-                  allowClear 
-                  showSearch 
-                  optionFilterProp="children"
-                  disabled={!selectedRoomId}
-                >
-                  {filteredRacks.map(rack => (
-                    <Select.Option key={rack.rackId} value={rack.rackId}>
-                      {rack.name}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item
-            name="position"
-            label="U位"
-          >
-            <Input type="number" placeholder="请输入U位（可选）" min={1} />
-          </Form.Item>
-
-          <Form.Item
-            name="remark"
-            label="备注"
-          >
-            <Input.TextArea rows={2} placeholder="请输入备注（可选）" />
-          </Form.Item>
-
-          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-            <Space>
-              <Button onClick={() => {
-                setQuickAddModalVisible(false);
-                setSelectedRoomId(null);
-              }}>取消</Button>
-              <Button type="primary" htmlType="submit" loading={quickAddLoading}>
-                添加设备
+                取消
               </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+              <Button 
+                type="primary" 
+                size="large"
+                htmlType="submit" 
+                loading={quickAddLoading}
+                style={{
+                  borderRadius: designTokens.borderRadius.medium,
+                  background: designTokens.colors.primary.gradient,
+                  border: 'none',
+                  height: 44,
+                  minWidth: 140,
+                  fontWeight: 500,
+                }}
+              >
+                确认添加
+              </Button>
+            </div>
+          </Form>
+        </div>
       </Modal>
     </div>
   );
