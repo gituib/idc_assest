@@ -9,6 +9,19 @@
 
 const { sequelize } = require('../db');
 const SystemSetting = require('../models/SystemSetting');
+const Consumable = require('../models/Consumable');
+const ConsumableLog = require('../models/ConsumableLog');
+const ConsumableCategory = require('../models/ConsumableCategory');
+const ConsumableRecord = require('../models/ConsumableRecord');
+const ConsumableLogArchive = require('../models/ConsumableLogArchive');
+const Device = require('../models/Device');
+const Rack = require('../models/Rack');
+const Room = require('../models/Room');
+const User = require('../models/User');
+const FaultCategory = require('../models/FaultCategory');
+const InventoryPlan = require('../models/InventoryPlan');
+const InventoryTask = require('../models/InventoryTask');
+const InventoryRecord = require('../models/InventoryRecord');
 
 // 默认系统设置（包含中文描述）
 const defaultSettings = [
@@ -50,8 +63,31 @@ async function initDatabase() {
     await sequelize.authenticate();
     console.log('数据库连接成功');
 
-    // 同步所有模型
-    await sequelize.sync({ force: false, alter: true });
+    // 同步所有模型（按依赖顺序）
+    console.log('开始同步模型...');
+    
+    // 基础模型
+    await User.sync({ alter: true });
+    await Room.sync({ alter: true });
+    await Rack.sync({ alter: true });
+    await Device.sync({ alter: true });
+    await FaultCategory.sync({ alter: true });
+    
+    // 耗材相关模型
+    await ConsumableCategory.sync({ alter: true });
+    await Consumable.sync({ alter: true });
+    await ConsumableLog.sync({ alter: true });
+    await ConsumableRecord.sync({ alter: true });
+    await ConsumableLogArchive.sync({ alter: true });
+    
+    // 盘点相关模型
+    await InventoryPlan.sync({ alter: true });
+    await InventoryTask.sync({ alter: true });
+    await InventoryRecord.sync({ alter: true });
+    
+    // 系统设置
+    await SystemSetting.sync({ alter: true });
+    
     console.log('数据库表结构同步完成');
 
     // 初始化或更新系统设置

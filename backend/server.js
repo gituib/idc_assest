@@ -44,6 +44,24 @@ sequelize.authenticate()
     return SystemSetting.sync();
   })
   .then(() => {
+    // 同步耗材模型
+    const Consumable = require('./models/Consumable');
+    const ConsumableLog = require('./models/ConsumableLog');
+    const ConsumableCategory = require('./models/ConsumableCategory');
+    const ConsumableRecord = require('./models/ConsumableRecord');
+    const ConsumableLogArchive = require('./models/ConsumableLogArchive');
+    return Promise.all([
+      Consumable.sync({ alter: true }),
+      ConsumableLog.sync(),
+      ConsumableCategory.sync(),
+      ConsumableRecord.sync(),
+      ConsumableLogArchive.sync()
+    ]);
+  })
+  .then(() => {
+    console.log('耗材模型同步完成');
+  })
+  .then(() => {
     // 同步盘点模型
     const InventoryPlan = require('./models/InventoryPlan');
     const InventoryTask = require('./models/InventoryTask');
@@ -56,6 +74,24 @@ sequelize.authenticate()
   })
   .then(() => {
     console.log('盘点模型同步完成');
+  })
+  .then(() => {
+    // 同步耗材相关模型
+    const Consumable = require('./models/Consumable');
+    const ConsumableLog = require('./models/ConsumableLog');
+    const ConsumableCategory = require('./models/ConsumableCategory');
+    const ConsumableRecord = require('./models/ConsumableRecord');
+    const ConsumableLogArchive = require('./models/ConsumableLogArchive');
+    return Promise.all([
+      Consumable.sync({ alter: true }),
+      ConsumableLog.sync(),
+      ConsumableCategory.sync(),
+      ConsumableRecord.sync(),
+      ConsumableLogArchive.sync()
+    ]);
+  })
+  .then(() => {
+    console.log('耗材模型同步完成');
   })
   .then(() => {
     // 初始化系统设置默认值（关键：确保部署时数据正确初始化）

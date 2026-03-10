@@ -253,6 +253,7 @@ export const consumableAPI = {
   quickInOut: data => cachedAPI.post('/consumables/quick-inout', data),
   getStatistics: () => cachedAPI.get('/consumables/statistics/summary'),
   getLowStock: () => cachedAPI.get('/consumables/low-stock'),
+  getBySn: sn => cachedAPI.get(`/consumables/by-sn/${encodeURIComponent(sn)}`),
 };
 
 export const consumableCategoryAPI = {

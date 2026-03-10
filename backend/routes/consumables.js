@@ -179,6 +179,23 @@ router.post('/import', async (req, res) => {
   }
 });
 
+router.get('/by-sn/:sn', async (req, res) => {
+  try {
+    const sn = req.params.sn;
+    const consumables = await Consumable.findAll();
+    const consumable = consumables.find(c => {
+      const snList = c.snList || [];
+      return snList.includes(sn);
+    });
+    res.json({
+      found: !!consumable,
+      consumable
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/categories/list', async (req, res) => {
   try {
     const categories = await Consumable.findAll({

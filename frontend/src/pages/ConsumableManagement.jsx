@@ -43,6 +43,8 @@ import {
   ExclamationCircleOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
+  ScanOutlined,
+  BarcodeOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -181,6 +183,13 @@ function ConsumableManagement() {
   const [snInputValue, setSnInputValue] = useState('');
   const [selectedSnList, setSelectedSnList] = useState([]);
   const [snSearchKeyword, setSnSearchKeyword] = useState('');
+  const [scanModalVisible, setScanModalVisible] = useState(false);
+  const [scanMode, setScanMode] = useState('add');
+  const [scanValue, setScanValue] = useState('');
+  const [scanChecking, setScanChecking] = useState(false);
+  const [scannedSnList, setScannedSnList] = useState([]);
+  const [selectedScanInConsumable, setSelectedScanInConsumable] = useState(null);
+  const scanInputRef = React.useRef(null);
 
   const fetchConsumables = useCallback(
     async (page = 1, pageSize = 10) => {
@@ -611,6 +620,137 @@ function ConsumableManagement() {
     [stockRecord, stockType, fetchConsumables, selectedSnList]
   );
 
+  const showScanModal = useCallback((mode) => {
+    setScanMode(mode);
+    setScanValue('');
+    setScannedSnList([]);
+    setSelectedScanInConsumable(null);
+    setScanModalVisible(true);
+    setTimeout(() => {
+      scanInputRef.current?.focus();
+    }, 100);
+  }, []);
+
+  const handleScanCancel = useCallback(() => {
+    setScanModalVisible(false);
+    setScanValue('');
+    setScannedSnList([]);
+    setSelectedScanInConsumable(null);
+    setScanChecking(false);
+  }, []);
+
+  const handleScanKeyDown = useCallback(async (e) => {
+    if (e.key === 'Enter' && scanValue.trim()) {
+      e.preventDefault();
+      const code = scanValue.trim();
+      
+      if (scanMode === 'add') {
+        setScanChecking(true);
+        try {
+          const res = await axios.get(`/api/consumables/by-sn/${encodeURIComponent(code)}`);
+          if (res.data.found) {
+            const existingConsumable = res.data.consumable;
+            Modal.confirm({
+              title: 'SN已存在',
+              content: (
+                <div>
+                  <p>该SN已关联耗材：<strong>{existingConsumable.name}</strong></p>
+                  <p>分类：{existingConsumable.category}</p>
+                  <p>当前库存：{existingConsumable.currentStock} {existingConsumable.unit}</p>
+                  <p style={{ marginTop: 12, color: '#1890ff' }}>是否为该耗材入库？</p>
+                </div>
+              ),
+              okText: '入库',
+              cancelText: '关闭',
+              onOk: () => {
+                handleScanCancel();
+                setModalVisible(false);
+                showStockModal(existingConsumable, 'in');
+                setSelectedSnList([code]);
+                stockForm.setFieldsValue({ quantity: 1 });
+              },
+              onCancel: () => {
+                setScanValue('');
+                scanInputRef.current?.focus();
+              }
+            });
+          } else {
+            if (!snList.includes(code)) {
+              setSnList(prev => [...prev, code]);
+              const currentStock = form.getFieldValue('currentStock') || 0;
+              form.setFieldsValue({ currentStock: currentStock + 1 });
+              message.success(`已添加SN: ${code}`);
+            } else {
+              message.warning(`SN已在列表中: ${code}`);
+            }
+            setScanValue('');
+            scanInputRef.current?.focus();
+          }
+        } catch (error) {
+          message.error('查询SN失败');
+          console.error('查询SN失败:', error);
+        } finally {
+          setScanChecking(false);
+        }
+      } else if (scanMode === 'in') {
+        if (!scannedSnList.includes(code)) {
+          setScannedSnList(prev => [...prev, code]);
+          message.success(`已添加SN: ${code}`);
+        } else {
+          message.warning(`SN已存在: ${code}`);
+        }
+        setScanValue('');
+        scanInputRef.current?.focus();
+      } else if (scanMode === 'out') {
+        setScanChecking(true);
+        try {
+          const res = await axios.get(`/api/consumables/by-sn/${encodeURIComponent(code)}`);
+          if (res.data.found) {
+            handleScanCancel();
+            showStockModal(res.data.consumable, 'out');
+            setSelectedSnList([code]);
+            stockForm.setFieldsValue({ quantity: 1 });
+          } else {
+            message.warning('未找到该SN对应的耗材');
+            setScanValue('');
+            scanInputRef.current?.focus();
+          }
+        } catch (error) {
+          message.error('查询SN失败');
+          console.error('查询SN失败:', error);
+        } finally {
+          setScanChecking(false);
+        }
+      }
+    }
+  }, [scanMode, scanValue, scannedSnList, handleScanCancel, showModal, form, showStockModal, stockForm]);
+
+  const handleScanInSubmit = useCallback(async (consumableId) => {
+    if (scannedSnList.length === 0) {
+      message.warning('请先扫描SN序列号');
+      return;
+    }
+    try {
+      await axios.post('/api/consumables/quick-inout', {
+        consumableId,
+        type: 'in',
+        quantity: scannedSnList.length,
+        operator: '系统管理员',
+        reason: '扫码入库',
+        snList: scannedSnList,
+      });
+      message.success({
+        content: `成功入库 ${scannedSnList.length} 个SN`,
+        icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+      });
+      handleScanCancel();
+      fetchConsumables();
+    } catch (error) {
+      message.error(error.response?.data?.error || '入库操作失败');
+      console.error('入库失败:', error);
+    }
+  }, [scannedSnList, handleScanCancel, fetchConsumables]);
+
   const columns = useMemo(
     () => [
       {
@@ -977,6 +1117,22 @@ function ConsumableManagement() {
                 添加耗材
               </Button>
               <Button
+                icon={<ArrowDownOutlined />}
+                onClick={() => showScanModal('in')}
+                size="large"
+                style={{ borderRadius: designTokens.borderRadius.sm, color: designTokens.colors.success.main, borderColor: designTokens.colors.success.main }}
+              >
+                扫码入库
+              </Button>
+              <Button
+                icon={<ArrowUpOutlined />}
+                onClick={() => showScanModal('out')}
+                size="large"
+                style={{ borderRadius: designTokens.borderRadius.sm, color: designTokens.colors.error.main, borderColor: designTokens.colors.error.main }}
+              >
+                扫码出库
+              </Button>
+              <Button
                 icon={<ImportOutlined />}
                 onClick={showImportModal}
                 size="large"
@@ -1098,231 +1254,529 @@ function ConsumableManagement() {
         open={modalVisible}
         onCancel={handleCancel}
         footer={null}
-        width={700}
+        width={900}
+        style={{ top: 20 }}
+        bodyStyle={{ padding: '24px', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ marginTop: '16px' }}>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="name" label="名称" rules={[inputValidationRules.required('请输入名称')]}>
-                <Input placeholder={inputPlaceholders.consumableName} style={inputStyles.form} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="category"
-                label="分类"
-                rules={[inputValidationRules.required('请选择分类')]}
-              >
-                <Select placeholder={inputPlaceholders.category} allowClear style={selectStyles.base}>
-                  {categories.map(cat => (
-                    <Option key={cat.id} value={cat.name}>
-                      {cat.name}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                name="unit"
-                label="单位"
-                rules={[inputValidationRules.required('请输入单位')]}
-                initialValue="个"
-              >
-                <Input placeholder={inputPlaceholders.unit} style={inputStyles.form} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="currentStock"
-                label="当前库存"
-                rules={[inputValidationRules.required('请输入当前库存')]}
-              >
-                <InputNumber min={0} style={inputNumberStyles.base} placeholder={inputPlaceholders.stock} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="minStock"
-                label="最小库存"
-                rules={[inputValidationRules.required('请输入最小库存')]}
-              >
-                <InputNumber min={0} style={inputNumberStyles.base} placeholder={inputPlaceholders.minStock} />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label="最大库存">
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <Checkbox
-                    checked={maxStockUnlimited}
-                    onChange={e => {
-                      setMaxStockUnlimited(e.target.checked);
-                      if (e.target.checked) {
-                        form.setFieldsValue({ maxStock: undefined });
-                      }
-                    }}
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          {/* 基本信息 */}
+          <div style={{
+            background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+            borderRadius: designTokens.borderRadius.lg,
+            padding: '20px',
+            marginBottom: '20px',
+            border: '1px solid #bae6fd',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '16px',
+              fontSize: '15px',
+              fontWeight: '600',
+              color: designTokens.colors.neutral[700],
+            }}>
+              <div style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                background: designTokens.colors.primary.gradient,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontSize: '12px',
+              }}>1</div>
+              基本信息
+            </div>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="name" label="名称" rules={[inputValidationRules.required('请输入名称')]}>
+                  <Input 
+                    placeholder={inputPlaceholders.consumableName} 
+                    style={inputStyles.form}
+                    prefix={<ShoppingOutlined style={{ color: designTokens.colors.neutral[400] }} />}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="category"
+                  label="分类"
+                  rules={[inputValidationRules.required('请选择分类')]}
+                >
+                  <Select 
+                    placeholder={inputPlaceholders.category} 
+                    allowClear 
+                    style={selectStyles.base}
                   >
-                    无限制
-                  </Checkbox>
+                    {categories.map(cat => (
+                      <Option key={cat.id} value={cat.name}>
+                        {cat.name}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="unit"
+                  label="单位"
+                  rules={[inputValidationRules.required('请输入单位')]}
+                  initialValue="个"
+                >
+                  <Input 
+                    placeholder={inputPlaceholders.unit} 
+                    style={inputStyles.form}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="description" label="描述">
+                  <Input 
+                    placeholder={inputPlaceholders.description} 
+                    style={inputStyles.form}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </div>
+
+          {/* 库存管理 */}
+          <div style={{
+            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+            borderRadius: designTokens.borderRadius.lg,
+            padding: '20px',
+            marginBottom: '20px',
+            border: '1px solid #86efac',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '16px',
+              fontSize: '15px',
+              fontWeight: '600',
+              color: designTokens.colors.neutral[700],
+            }}>
+              <div style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                background: designTokens.colors.success.gradient,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontSize: '12px',
+              }}>2</div>
+              库存管理
+              <Text type="secondary" style={{ fontSize: '12px', marginLeft: 'auto' }}>
+                设置库存预警和上限
+              </Text>
+            </div>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item
+                  name="currentStock"
+                  label="当前库存"
+                  rules={[inputValidationRules.required('请输入当前库存')]}
+                >
+                  <InputNumber 
+                    min={0} 
+                    style={{ ...inputNumberStyles.base, width: '100%' }} 
+                    placeholder={inputPlaceholders.stock}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  name="minStock"
+                  label="最小库存(预警线)"
+                  rules={[inputValidationRules.required('请输入最小库存')]}
+                >
+                  <InputNumber 
+                    min={0} 
+                    style={{ ...inputNumberStyles.base, width: '100%' }} 
+                    placeholder={inputPlaceholders.minStock}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item label="最大库存">
+                  <div style={{ marginBottom: '8px' }}>
+                    <Checkbox
+                      checked={maxStockUnlimited}
+                      onChange={e => {
+                        setMaxStockUnlimited(e.target.checked);
+                        if (e.target.checked) {
+                          form.setFieldsValue({ maxStock: undefined });
+                        }
+                      }}
+                    >
+                      无限制
+                    </Checkbox>
+                  </div>
                   {!maxStockUnlimited && (
                     <Form.Item
                       name="maxStock"
                       noStyle
                       rules={[inputValidationRules.required('请输入最大库存')]}
                     >
-                      <InputNumber min={0} style={inputNumberStyles.base} placeholder={inputPlaceholders.maxStock} />
+                      <InputNumber 
+                        min={0} 
+                        style={{ ...inputNumberStyles.base, width: '100%' }} 
+                        placeholder={inputPlaceholders.maxStock}
+                      />
                     </Form.Item>
                   )}
-                </Space>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="unitPrice" label="单价(元)">
-                <InputNumber
-                  min={0}
-                  step={0.01}
-                  precision={2}
-                  style={inputNumberStyles.base}
-                  placeholder={inputPlaceholders.unitPrice}
-                  prefix="¥"
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+                </Form.Item>
+              </Col>
+            </Row>
+          </div>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="supplier" label="供应商">
-                <Input placeholder={inputPlaceholders.supplier} style={inputStyles.form} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="location" label="存放位置">
-                <Input placeholder={inputPlaceholders.location} style={inputStyles.form} />
-              </Form.Item>
-            </Col>
-          </Row>
+          {/* 价格与状态 */}
+          <div style={{
+            background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+            borderRadius: designTokens.borderRadius.lg,
+            padding: '20px',
+            marginBottom: '20px',
+            border: '1px solid #fcd34d',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '16px',
+              fontSize: '15px',
+              fontWeight: '600',
+              color: designTokens.colors.neutral[700],
+            }}>
+              <div style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                background: designTokens.colors.warning.gradient,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontSize: '12px',
+              }}>3</div>
+              价格与状态
+            </div>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="unitPrice" label="单价(元)">
+                  <InputNumber
+                    min={0}
+                    step={0.01}
+                    precision={2}
+                    style={{ ...inputNumberStyles.base, width: '100%' }}
+                    placeholder={inputPlaceholders.unitPrice}
+                    prefix="¥"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="status" label="状态" rules={[inputValidationRules.required('请选择状态')]}>
+                  <Select placeholder="请选择状态" style={selectStyles.base}>
+                    <Option value="active">
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />
+                        启用
+                      </span>
+                    </Option>
+                    <Option value="inactive">
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <ExclamationCircleOutlined style={{ color: designTokens.colors.error.main }} />
+                        停用
+                      </span>
+                    </Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+          </div>
 
-          <Form.Item name="description" label="描述">
-            <TextArea rows={3} placeholder={inputPlaceholders.description} style={textAreaStyles.base} />
-          </Form.Item>
+          {/* 其他信息 */}
+          <div style={{
+            background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
+            borderRadius: designTokens.borderRadius.lg,
+            padding: '20px',
+            marginBottom: '20px',
+            border: '1px solid #d8b4fe',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '16px',
+              fontSize: '15px',
+              fontWeight: '600',
+              color: designTokens.colors.neutral[700],
+            }}>
+              <div style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontSize: '12px',
+              }}>4</div>
+              其他信息
+            </div>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="supplier" label="供应商">
+                  <Input 
+                    placeholder={inputPlaceholders.supplier} 
+                    style={inputStyles.form}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="location" label="存放位置">
+                  <Input 
+                    placeholder={inputPlaceholders.location} 
+                    style={inputStyles.form}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </div>
 
-          <Form.Item label={
-            <span>
-              SN序列号 
-              <Text type="secondary" style={{ fontSize: '12px', marginLeft: '8px' }}>
-                (非必填，已录入 {snList.length} 个)
-              </Text>
-            </span>
-          }>
-            <div style={{ marginBottom: '8px' }}>
+          {/* SN序列号管理 */}
+          <div style={{
+            background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
+            borderRadius: designTokens.borderRadius.lg,
+            padding: '20px',
+            marginBottom: '20px',
+            border: '1px solid #fda4af',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px',
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '15px',
+                fontWeight: '600',
+                color: designTokens.colors.neutral[700],
+              }}>
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: designTokens.colors.error.gradient,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                  fontSize: '12px',
+                }}>5</div>
+                SN序列号管理
+                <Tag color="red" style={{ marginLeft: '8px', borderRadius: '12px' }}>
+                  已录入 {snList.length} 个
+                </Tag>
+              </div>
               <Space>
+                <Button 
+                  type="primary"
+                  size="small" 
+                  icon={<ScanOutlined />}
+                  onClick={() => {
+                    setScanMode('add');
+                    setScanValue('');
+                    setScanModalVisible(true);
+                    setTimeout(() => scanInputRef.current?.focus(), 100);
+                  }}
+                  style={{
+                    background: designTokens.colors.primary.gradient,
+                    border: 'none',
+                    borderRadius: designTokens.borderRadius.sm,
+                  }}
+                >
+                  扫码添加
+                </Button>
                 <Button 
                   size="small" 
                   icon={<PlusOutlined />}
                   onClick={() => setSnInputVisible(!snInputVisible)}
+                  style={{ borderRadius: designTokens.borderRadius.sm }}
                 >
                   批量添加
                 </Button>
                 <Button 
                   size="small" 
                   danger
-                  onClick={() => {
-                    setSnList([]);
-                  }}
+                  icon={<DeleteOutlined />}
+                  onClick={() => setSnList([])}
                   disabled={snList.length === 0}
+                  style={{ borderRadius: designTokens.borderRadius.sm }}
                 >
                   清空全部
                 </Button>
               </Space>
             </div>
             
+            {/* 批量添加输入区 */}
             {snInputVisible && (
-              <div style={{ marginBottom: '12px' }}>
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                style={{ marginBottom: '12px' }}
+              >
+                <Alert
+                  message="批量添加提示"
+                  description="每行输入一个SN序列号，系统会自动过滤重复项"
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: '12px', borderRadius: designTokens.borderRadius.md }}
+                />
                 <TextArea
-                  rows={3}
-                  placeholder="输入SN序列号，每行一个"
+                  rows={4}
+                  placeholder="输入SN序列号，每行一个&#10;例如：&#10;SN001&#10;SN002&#10;SN003"
                   value={snInputValue}
                   onChange={e => setSnInputValue(e.target.value)}
-                  style={{ marginBottom: '8px' }}
+                  style={{ ...textAreaStyles.base, marginBottom: '8px' }}
                 />
-                <Button 
-                  type="primary" 
-                  size="small"
-                  onClick={() => {
-                    const newSns = snInputValue
-                      .split('\n')
-                      .map(s => s.trim())
-                      .filter(s => s && !snList.includes(s));
-                    if (newSns.length > 0) {
-                      setSnList([...snList, ...newSns]);
+                <Space>
+                  <Button 
+                    type="primary" 
+                    size="small"
+                    onClick={() => {
+                      const newSns = snInputValue
+                        .split('\n')
+                        .map(s => s.trim())
+                        .filter(s => s && !snList.includes(s));
+                      if (newSns.length > 0) {
+                        setSnList([...snList, ...newSns]);
+                        setSnInputValue('');
+                        message.success(`成功添加 ${newSns.length} 个SN`);
+                      } else {
+                        message.warning('没有新的SN可添加（可能已存在或为空）');
+                      }
+                    }}
+                    style={{
+                      background: designTokens.colors.success.gradient,
+                      border: 'none',
+                      borderRadius: designTokens.borderRadius.sm,
+                    }}
+                  >
+                    确认添加
+                  </Button>
+                  <Button 
+                    size="small"
+                    onClick={() => {
                       setSnInputValue('');
-                      message.success(`成功添加 ${newSns.length} 个SN`);
-                    } else {
-                      message.warning('没有新的SN可添加（可能已存在或为空）');
-                    }
-                  }}
-                >
-                  确认添加
-                </Button>
-              </div>
+                      setSnInputVisible(false);
+                    }}
+                    style={{ borderRadius: designTokens.borderRadius.sm }}
+                  >
+                    取消
+                  </Button>
+                </Space>
+              </motion.div>
             )}
 
-            {snList.length > 0 && (
+            {/* SN列表展示 */}
+            {snList.length > 0 ? (
               <div 
                 style={{ 
-                  maxHeight: '150px', 
+                  maxHeight: '200px', 
                   overflowY: 'auto', 
                   border: `1px solid ${designTokens.colors.neutral[200]}`,
-                  borderRadius: designTokens.borderRadius.sm,
-                  padding: '8px'
+                  borderRadius: designTokens.borderRadius.md,
+                  padding: '12px',
+                  background: '#fff',
                 }}
               >
-                {snList.map((sn, index) => (
-                  <Tag
-                    key={index}
-                    closable
-                    onClose={() => {
-                      setSnList(snList.filter((_, i) => i !== index));
-                    }}
-                    style={{ marginBottom: '4px' }}
-                  >
-                    {sn}
-                  </Tag>
-                ))}
+                <AnimatePresence>
+                  {snList.map((sn, index) => (
+                    <motion.div
+                      key={sn}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      transition={{ duration: 0.2 }}
+                      style={{ display: 'inline-block', marginBottom: '8px', marginRight: '8px' }}
+                    >
+                      <Tag
+                        closable
+                        onClose={() => setSnList(snList.filter((_, i) => i !== index))}
+                        color="blue"
+                        style={{ 
+                          padding: '4px 8px',
+                          borderRadius: designTokens.borderRadius.sm,
+                          fontSize: '13px',
+                        }}
+                      >
+                        {sn}
+                      </Tag>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                padding: '24px',
+                color: designTokens.colors.neutral[400],
+                background: '#fff',
+                borderRadius: designTokens.borderRadius.md,
+                border: `1px dashed ${designTokens.colors.neutral[300]}`,
+              }}>
+                <BarcodeOutlined style={{ fontSize: '32px', marginBottom: '8px', display: 'block' }} />
+                <div>暂无SN序列号</div>
+                <div style={{ fontSize: '12px', marginTop: '4px' }}>点击上方按钮添加</div>
               </div>
             )}
-          </Form.Item>
+          </div>
 
-          <Form.Item name="status" label="状态" rules={[inputValidationRules.required('请选择状态')]}>
-            <Select placeholder="请选择状态" style={selectStyles.base}>
-              <Option value="active">启用</Option>
-              <Option value="inactive">停用</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item>
-            <Space>
-              <Button 
-                type="primary" 
-                htmlType="submit"
-                style={{
-                  background: designTokens.colors.primary.gradient,
-                  border: 'none',
-                  borderRadius: designTokens.borderRadius.sm,
-                }}
-              >
-                {editingConsumable ? '更新' : '创建'}
-              </Button>
-              <Button onClick={handleCancel}>取消</Button>
-            </Space>
-          </Form.Item>
+          {/* 操作按钮 */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '12px',
+            paddingTop: '16px',
+            borderTop: `1px solid ${designTokens.colors.neutral[200]}`,
+          }}>
+            <Button 
+              size="large"
+              onClick={handleCancel}
+              style={{ 
+                borderRadius: designTokens.borderRadius.sm,
+                minWidth: '100px',
+              }}
+            >
+              取消
+            </Button>
+            <Button 
+              type="primary" 
+              size="large"
+              htmlType="submit"
+              style={{
+                background: designTokens.colors.primary.gradient,
+                border: 'none',
+                borderRadius: designTokens.borderRadius.sm,
+                minWidth: '120px',
+                boxShadow: designTokens.shadows.md,
+              }}
+            >
+              {editingConsumable ? '更新耗材' : '创建耗材'}
+            </Button>
+          </div>
         </Form>
       </Modal>
 
@@ -1632,6 +2086,148 @@ function ConsumableManagement() {
             </Space>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 扫码弹窗 */}
+      <Modal
+        title={scanMode === 'add' ? '扫码添加SN' : scanMode === 'in' ? '扫码入库' : '扫码出库'}
+        open={scanModalVisible}
+        onCancel={handleScanCancel}
+        footer={null}
+        width={500}
+      >
+        <div style={{ padding: '16px 0' }}>
+          <Alert
+            message={
+              scanMode === 'add' 
+                ? '扫描SN序列号，自动添加到表单中' 
+                : '请使用扫码枪扫描SN序列号'
+            }
+            type="info"
+            showIcon
+            style={{ marginBottom: '16px', borderRadius: designTokens.borderRadius.md }}
+          />
+
+          <div style={{ marginBottom: '16px' }}>
+            <Input
+              ref={scanInputRef}
+              value={scanValue}
+              onChange={e => setScanValue(e.target.value)}
+              onKeyDown={handleScanKeyDown}
+              placeholder={scanMode === 'add' ? '扫描SN后自动添加...' : '扫描SN后自动识别...'}
+              prefix={<BarcodeOutlined style={{ color: designTokens.colors.neutral[400] }} />}
+              size="large"
+              autoFocus
+              disabled={scanChecking}
+              style={{ borderRadius: designTokens.borderRadius.md }}
+            />
+          </div>
+
+          {scanMode === 'add' && snList.length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ marginBottom: '8px', fontWeight: 500, color: designTokens.colors.neutral[700] }}>
+                已添加SN列表 ({snList.length}个)
+              </div>
+              <div 
+                style={{ 
+                  maxHeight: '150px', 
+                  overflowY: 'auto', 
+                  border: `1px solid ${designTokens.colors.neutral[200]}`,
+                  borderRadius: designTokens.borderRadius.sm,
+                  padding: '8px'
+                }}
+              >
+                {snList.map((sn, index) => (
+                  <Tag
+                    key={index}
+                    closable
+                    onClose={() => setSnList(prev => prev.filter((_, i) => i !== index))}
+                    color="blue"
+                    style={{ marginBottom: '4px' }}
+                  >
+                    {sn}
+                  </Tag>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {scanMode === 'in' && scannedSnList.length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ marginBottom: '8px', fontWeight: 500, color: designTokens.colors.neutral[700] }}>
+                已扫描SN列表 ({scannedSnList.length}个)
+              </div>
+              <div 
+                style={{ 
+                  maxHeight: '150px', 
+                  overflowY: 'auto', 
+                  border: `1px solid ${designTokens.colors.neutral[200]}`,
+                  borderRadius: designTokens.borderRadius.sm,
+                  padding: '8px'
+                }}
+              >
+                {scannedSnList.map((sn, index) => (
+                  <Tag
+                    key={index}
+                    closable
+                    onClose={() => setScannedSnList(prev => prev.filter((_, i) => i !== index))}
+                    color="blue"
+                    style={{ marginBottom: '4px' }}
+                  >
+                    {sn}
+                  </Tag>
+                ))}
+              </div>
+              
+              <div style={{ marginTop: '16px' }}>
+                <div style={{ marginBottom: '8px', fontWeight: 500, color: designTokens.colors.neutral[700] }}>
+                  选择入库耗材
+                </div>
+                <Select
+                  placeholder="选择要入库的耗材"
+                  style={{ width: '100%' }}
+                  showSearch
+                  optionFilterProp="children"
+                  filterOption={(input, option) =>
+                    option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                  }
+                  value={selectedScanInConsumable}
+                  onChange={(value) => setSelectedScanInConsumable(value)}
+                >
+                  {consumables.map(item => (
+                    <Option key={item.consumableId} value={item.consumableId}>
+                      {item.name} ({item.category}) - 库存: {item.currentStock}
+                    </Option>
+                  ))}
+                </Select>
+              </div>
+              
+              <Button
+                type="primary"
+                style={{
+                  width: '100%',
+                  marginTop: '16px',
+                  background: designTokens.colors.success.gradient,
+                  border: 'none',
+                  borderRadius: designTokens.borderRadius.sm,
+                }}
+                onClick={() => {
+                  if (!selectedScanInConsumable) {
+                    message.warning('请选择要入库的耗材');
+                    return;
+                  }
+                  handleScanInSubmit(selectedScanInConsumable);
+                }}
+              >
+                确认入库 {scannedSnList.length} 个SN
+              </Button>
+            </div>
+          )}
+
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            💡 提示：也可手动输入条码后按回车键确认
+          </Text>
+        </div>
       </Modal>
     </motion.div>
   );
