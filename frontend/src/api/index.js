@@ -45,13 +45,8 @@ api.interceptors.response.use(
 
       if (status === 401) {
         const currentPath = window.location.pathname;
-        console.log('[API] 401 error, current path:', currentPath);
 
         if (!currentPath.startsWith('/login')) {
-          const savedToken = localStorage.getItem('token');
-          if (savedToken) {
-            console.log('[API] Token exists but got 401, might be expired');
-          }
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           window.location.href = '/login';

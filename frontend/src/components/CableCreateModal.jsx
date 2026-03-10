@@ -116,7 +116,6 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
           targetDeviceId: values.sourceDeviceId,
           targetPort: values.sourcePort,
         };
-        console.log('Swapped source/target to ensure Switch is Source');
       }
 
       await axios.post('/api/cables', payload);

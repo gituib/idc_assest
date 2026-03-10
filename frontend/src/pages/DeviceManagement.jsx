@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Button,
@@ -6,17 +6,9 @@ import {
   Form,
   Input,
   Select,
-  DatePicker,
   message,
   Card,
   Space,
-  InputNumber,
-  Switch,
-  Upload,
-  Progress,
-  Checkbox,
-  Spin,
-  Dropdown,
   Tooltip,
   Tag,
   Row,
@@ -28,38 +20,18 @@ import {
   DeleteOutlined,
   SearchOutlined,
   UploadOutlined,
-  DownloadOutlined,
-  SettingOutlined,
-  UndoOutlined,
-  CloudServerOutlined,
-  SafetyOutlined,
-  DatabaseOutlined,
-  AppstoreOutlined,
-  MoreOutlined,
-  ReloadOutlined,
   ExportOutlined,
-  FileExcelOutlined,
-  SwapOutlined,
+  SettingOutlined,
+  CloudServerOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
-import dayjs from 'dayjs';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { designTokens } from '../config/theme';
 import {
   PAGINATION_CONFIG,
   DEBOUNCE_DELAY,
-  TABLE_SCROLL_CONFIG,
   DEFAULT_DEVICE_FIELDS,
-  BASE_FIELD_NAMES,
-  SYSTEM_FIELDS,
-  FIXED_FIELDS,
-  IMPORT_CONFIG,
-  EXPORT_CONFIG,
-  MODAL_CONFIG,
-  DEVICE_TYPE_OPTIONS,
-  DEVICE_STATUS_OPTIONS,
-  COLUMN_WIDTH_CONFIG,
-  EMPTY_STATE_CONFIG,
   STATUS_MAP,
   TYPE_MAP,
 } from '../constants/deviceManagementConstants';
@@ -72,177 +44,51 @@ import {
   titleTextStyle,
   pageTitleStyle,
   pageSubtitleStyle,
-  primaryActionStyle,
   secondaryActionStyle,
-  statsRowStyle,
-  statCardStyle,
-  statValueStyle,
-  statLabelStyle,
-  statCardRunningStyle,
-  statCardMaintenanceStyle,
-  statCardFaultStyle,
   cardStyle,
   filterCardStyle,
   modalHeaderStyle,
-  tableStyles,
-  searchInputStyle,
-  selectStyle,
-  refreshButtonStyle,
-  searchButtonStyle,
-  resetButtonStyle,
-  importModalStyles,
-  detailModalStyles,
-  exportModalStyles,
-  generateGlobalStyles,
+  tableContainerStyle,
   emptyStateStyle,
   emptyStateIconStyle,
-  tableContainerStyle,
-  resizableTitleStyles,
+  generateGlobalStyles,
 } from '../styles/deviceManagementStyles';
+import {
+  ResizableTitle,
+  DeviceDetailModal,
+  DeviceFormModal,
+  ImportModal,
+  ExportModal,
+  FieldConfigModal,
+  BatchStatusModal,
+} from '../components/device';
+import { useDebounce } from '../hooks/useDebounce';
+import {
+  getDeviceTypeIcon,
+  getStatusConfig,
+  processDeviceData,
+} from '../utils/deviceUtils.jsx';
 
 const { Option } = Select;
-const { RangePicker } = DatePicker;
 
-// 防抖 Hook
-function useDebounce(value, delay = DEBOUNCE_DELAY) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
-
-// 工具函数提取到组件外部，避免每次渲染重复创建
-const getStatusConfig = status => {
-  const statusMap = {
-    running: { text: '运行中', color: 'green' },
-    maintenance: { text: '维护中', color: 'orange' },
-    offline: { text: '离线', color: 'gray' },
-    fault: { text: '故障', color: 'red' },
-  };
-  return statusMap[status] || { text: status, color: 'black' };
-};
-
-const getTypeLabel = type => {
-  const typeMap = {
-    server: '服务器',
-    switch: '交换机',
-    router: '路由器',
-    storage: '存储设备',
-    other: '其他设备',
-  };
-  return typeMap[type] || type;
-};
-
-const getDeviceTypeIcon = type => {
-  const iconMap = {
-    server: <CloudServerOutlined style={{ color: '#1890ff' }} />,
-    switch: <SwapOutlined style={{ color: '#52c41a' }} />,
-    router: <SafetyOutlined style={{ color: '#faad14' }} />,
-    storage: <DatabaseOutlined style={{ color: '#722ed1' }} />,
-    other: <AppstoreOutlined style={{ color: '#8c8c8c' }} />,
-  };
-  return iconMap[type] || <AppstoreOutlined style={{ color: '#8c8c8c' }} />;
-};
-
-// 格式化日期
-const formatDate = (date, fieldName) => {
-  if (!date) return '';
-
-  const dateObj = new Date(date);
-  const formattedDate = dateObj.toLocaleDateString('zh-CN');
-
-  if (fieldName === 'warrantyExpiry') {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    dateObj.setHours(0, 0, 0, 0);
-
-    if (dateObj < today) {
-      return <span style={{ color: '#d93025', fontWeight: 'bold' }}>{formattedDate}</span>;
-    }
-  }
-
-  return formattedDate;
-};
-
-// 使用从常量文件导入的默认设备字段配置
-const defaultDeviceFields = DEFAULT_DEVICE_FIELDS;
-
-// 简单的可调整列宽的表头组件
-const ResizableTitle = props => {
-  const { children, onResize, width, ...restProps } = props;
-
-  const handleMouseDown = e => {
-    if (!onResize) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    const th = e.currentTarget.closest('th');
-    if (!th) return;
-
-    const startWidth = th.offsetWidth;
-    const startX = e.clientX;
-
-    const handleMouseMove = moveEvent => {
-      const diff = moveEvent.clientX - startX;
-      const newWidth = Math.max(50, startWidth + diff);
-      onResize(newWidth);
-    };
-
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
-
-  return (
-    <th {...restProps} style={{ position: 'relative' }}>
-      <div style={resizableTitleStyles.container}>
-        <span style={resizableTitleStyles.text}>
-          {children}
-        </span>
-        {onResize && (
-          <div
-            onMouseDown={handleMouseDown}
-            style={resizableTitleStyles.resizeHandle}
-          />
-        )}
-      </div>
-    </th>
-  );
-};
+const DEFAULT_DEVICE_FIELDS_LOCAL = DEFAULT_DEVICE_FIELDS;
 
 function DeviceManagement() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+
   const [devices, setDevices] = useState([]);
   const [allDevices, setAllDevices] = useState([]);
   const [racks, setRacks] = useState([]);
   const [rooms, setRooms] = useState([]);
-  const [selectedRoomId, setSelectedRoomId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingDevice, setEditingDevice] = useState(null);
-  const [form] = Form.useForm();
-  // 搜索和筛选状态
+
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState('all');
   const [type, setType] = useState('all');
   const [searchForm] = Form.useForm();
-  // 分页状态 - 使用常量配置
+
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: PAGINATION_CONFIG.defaultPageSize,
@@ -252,60 +98,35 @@ function DeviceManagement() {
     showTotal: PAGINATION_CONFIG.showTotal,
   });
 
-  // 设备字段配置
   const [deviceFields, setDeviceFields] = useState([]);
   const [loadingFields, setLoadingFields] = useState(true);
-  // 导入状态
+
   const [importModalVisible, setImportModalVisible] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
-  const [importPhase, setImportPhase] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-  const [importResult, setImportResult] = useState(null);
-  const [selectedDevices, setSelectedDevices] = useState([]);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState(null);
 
-  // 自定义字段状态
-  const [customFieldName, setCustomFieldName] = useState('');
-  const [customFieldValue, setCustomFieldValue] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingDevice, setEditingDevice] = useState(null);
 
-  // 字段配置模态框
   const [fieldConfigModalVisible, setFieldConfigModalVisible] = useState(false);
 
-  // 批量状态变更模态框
   const [batchStatusModalVisible, setBatchStatusModalVisible] = useState(false);
   const [batchStatusLoading, setBatchStatusLoading] = useState(false);
-  const [batchStatusForm] = Form.useForm();
 
-  // 导出选项模态框
   const [exportModalVisible, setExportModalVisible] = useState(false);
-  const [exportFormat, setExportFormat] = useState('csv');
-  const [exportScope, setExportScope] = useState('selected');
-  const [exportFields, setExportFields] = useState([]);
-  const [exportLoading, setExportLoading] = useState(false);
   const [currentPageDevices, setCurrentPageDevices] = useState([]);
 
-  // 全选状态
+  const [selectedDevices, setSelectedDevices] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
-
-  // 列宽状态
   const [columnWidths, setColumnWidths] = useState({});
 
-  // 防抖搜索关键词 - 使用常量配置的延迟时间
   const debouncedKeyword = useDebounce(keyword, DEBOUNCE_DELAY);
 
-  // 使用 useMemo 缓存筛选后的设备数据（现在直接使用 allDevices，因为后端已经处理了筛选）
-  const filteredDevicesMemo = useMemo(() => {
-    return allDevices;
-  }, [allDevices]);
-
-  // 获取所有设备（支持搜索、筛选和分页）
   const fetchDevices = useCallback(
     async (page = 1, pageSize = 10, forceRefresh = false) => {
       try {
         setLoading(true);
 
-        // 使用后端分页加载
         const params = {
           page,
           pageSize,
@@ -315,21 +136,12 @@ function DeviceManagement() {
         };
 
         const response = await axios.get('/api/devices', { params });
-        const { devices, total } = response.data;
+        const { devices: deviceList, total } = response.data;
 
-        // 处理设备数据，展开自定义字段
-        const processedDevices = devices.map(device => {
-          const deviceWithFields = { ...device };
-          if (device.customFields && typeof device.customFields === 'object') {
-            Object.entries(device.customFields).forEach(([fieldName, value]) => {
-              deviceWithFields[fieldName] = value;
-            });
-          }
-          return deviceWithFields;
-        });
+        const processedDevices = deviceList.map(processDeviceData);
 
         setAllDevices(processedDevices);
-        setPagination(prev => ({ ...prev, current: page, pageSize, total }));
+        setPagination((prev) => ({ ...prev, current: page, pageSize, total }));
       } catch (error) {
         message.error('获取设备列表失败');
         console.error('获取设备列表失败:', error);
@@ -340,158 +152,25 @@ function DeviceManagement() {
     [debouncedKeyword, status, type]
   );
 
-  // 获取设备字段配置
   const fetchDeviceFields = async () => {
     try {
       setLoadingFields(true);
       const response = await axios.get('/api/deviceFields');
-      // 按顺序排序字段
       const sortedFields = response.data.sort((a, b) => a.order - b.order);
       setDeviceFields(sortedFields);
     } catch (error) {
       message.error('获取字段配置失败');
       console.error('获取字段配置失败:', error);
-      // 如果获取失败，使用默认字段配置
-      setDeviceFields(defaultDeviceFields);
+      setDeviceFields(DEFAULT_DEVICE_FIELDS_LOCAL);
     } finally {
       setLoadingFields(false);
     }
   };
 
-  // 默认设备字段配置
-  const defaultDeviceFields = [
-    {
-      fieldName: 'deviceId',
-      displayName: '设备ID',
-      fieldType: 'string',
-      required: false,
-      order: 1,
-      visible: false,
-    },
-    {
-      fieldName: 'name',
-      displayName: '设备名称',
-      fieldType: 'string',
-      required: true,
-      order: 2,
-      visible: true,
-    },
-    {
-      fieldName: 'type',
-      displayName: '设备类型',
-      fieldType: 'select',
-      required: true,
-      order: 3,
-      visible: true,
-      options: [
-        { value: 'server', label: '服务器' },
-        { value: 'switch', label: '交换机' },
-        { value: 'router', label: '路由器' },
-        { value: 'storage', label: '存储设备' },
-        { value: 'other', label: '其他设备' },
-      ],
-    },
-    {
-      fieldName: 'model',
-      displayName: '型号',
-      fieldType: 'string',
-      required: false,
-      order: 4,
-      visible: true,
-    },
-    {
-      fieldName: 'serialNumber',
-      displayName: '序列号',
-      fieldType: 'string',
-      required: true,
-      order: 5,
-      visible: true,
-    },
-    {
-      fieldName: 'rackId',
-      displayName: '所在机柜',
-      fieldType: 'select',
-      required: true,
-      order: 6,
-      visible: true,
-    },
-    {
-      fieldName: 'position',
-      displayName: '位置(U)',
-      fieldType: 'number',
-      required: true,
-      order: 7,
-      visible: true,
-    },
-    {
-      fieldName: 'height',
-      displayName: '高度(U)',
-      fieldType: 'number',
-      required: true,
-      order: 8,
-      visible: true,
-    },
-    {
-      fieldName: 'powerConsumption',
-      displayName: '功率(W)',
-      fieldType: 'number',
-      required: true,
-      order: 9,
-      visible: true,
-    },
-    {
-      fieldName: 'status',
-      displayName: '状态',
-      fieldType: 'select',
-      required: true,
-      order: 10,
-      visible: true,
-      options: [
-        { value: 'running', label: '运行中' },
-        { value: 'maintenance', label: '维护中' },
-        { value: 'offline', label: '离线' },
-        { value: 'fault', label: '故障' },
-      ],
-    },
-    {
-      fieldName: 'purchaseDate',
-      displayName: '购买日期',
-      fieldType: 'date',
-      required: false,
-      order: 11,
-      visible: true,
-    },
-    {
-      fieldName: 'warrantyExpiry',
-      displayName: '保修到期',
-      fieldType: 'date',
-      required: false,
-      order: 12,
-      visible: true,
-    },
-    {
-      fieldName: 'ipAddress',
-      displayName: 'IP地址',
-      fieldType: 'string',
-      required: false,
-      order: 13,
-      visible: true,
-    },
-    {
-      fieldName: 'description',
-      displayName: '描述',
-      fieldType: 'textarea',
-      required: false,
-      order: 14,
-      visible: true,
-    },
-  ];
-
-  // 获取所有机柜
   const fetchRacks = async () => {
     try {
       const response = await axios.get('/api/racks', {
-        params: { pageSize: 1000 }
+        params: { pageSize: 1000 },
       });
       setRacks(response.data.racks || []);
     } catch (error) {
@@ -500,7 +179,6 @@ function DeviceManagement() {
     }
   };
 
-  // 获取所有机房
   const fetchRooms = async () => {
     try {
       const response = await axios.get('/api/rooms');
@@ -518,7 +196,6 @@ function DeviceManagement() {
     fetchDeviceFields();
   }, [fetchDevices]);
 
-  // 处理URL参数中的设备ID，自动打开设备详情
   useEffect(() => {
     const deviceIdFromUrl = searchParams.get('deviceId');
     if (deviceIdFromUrl) {
@@ -534,7 +211,7 @@ function DeviceManagement() {
           console.error('获取设备详情失败:', error);
           const errorStatus = error.response?.status;
           const errorMessage = error.response?.data?.error;
-          
+
           if (errorStatus === 404 || errorMessage === '设备不存在') {
             message.warning('该设备已被删除，无法查看详情');
           } else {
@@ -547,145 +224,33 @@ function DeviceManagement() {
     }
   }, [searchParams, setSearchParams]);
 
-  // 同步当前页设备数据
   useEffect(() => {
-    if (filteredDevicesMemo.length > 0) {
+    if (allDevices.length > 0) {
       const start = (pagination.current - 1) * pagination.pageSize;
       const end = start + pagination.pageSize;
-      const currentPageData = filteredDevicesMemo.slice(start, end);
+      const currentPageData = allDevices.slice(start, end);
       setCurrentPageDevices(currentPageData);
     } else {
       setCurrentPageDevices([]);
     }
-  }, [filteredDevicesMemo, pagination.current, pagination.pageSize]);
+  }, [allDevices, pagination.current, pagination.pageSize]);
 
-  // 打开模态框
   const showModal = (device = null) => {
     setEditingDevice(device);
-    if (device) {
-      // 转换日期字段为dayjs格式
-      const deviceData = { ...device };
-      if (deviceData.purchaseDate) deviceData.purchaseDate = dayjs(deviceData.purchaseDate);
-      if (deviceData.warrantyExpiry) deviceData.warrantyExpiry = dayjs(deviceData.warrantyExpiry);
-
-      // 定义设备模型的固定字段
-      const fixedFields = [
-        'deviceId',
-        'name',
-        'type',
-        'model',
-        'serialNumber',
-        'rackId',
-        'position',
-        'height',
-        'powerConsumption',
-        'status',
-        'purchaseDate',
-        'warrantyExpiry',
-        'ipAddress',
-        'description',
-      ];
-
-      // 定义需要排除的系统字段
-      const systemFields = ['createdAt', 'updatedAt', 'Rack', 'Room', 'customFields'];
-
-      // 创建一个干净的设备数据对象
-      const cleanDeviceData = {};
-
-      // 复制固定字段
-      fixedFields.forEach(field => {
-        if (deviceData[field] !== undefined) {
-          cleanDeviceData[field] = deviceData[field];
-        }
-      });
-
-      // 将自定义字段直接添加到表单数据中（不在customFields对象内）
-      Object.entries(deviceData).forEach(([key, value]) => {
-        // 排除固定字段、系统字段和非基本类型的值
-        if (
-          !fixedFields.includes(key) &&
-          !systemFields.includes(key) &&
-          key !== 'deviceId' &&
-          typeof value !== 'object' &&
-          value !== null
-        ) {
-          cleanDeviceData[key] = value;
-        }
-      });
-
-      // 如果有原始customFields对象，将其字段也添加到表单数据中
-      if (deviceData.customFields && typeof deviceData.customFields === 'object') {
-        Object.entries(deviceData.customFields).forEach(([key, value]) => {
-          cleanDeviceData[key] = value;
-        });
-      }
-
-      form.setFieldsValue(cleanDeviceData);
-
-      // 编辑设备时，根据 rackId 找到对应的机房并设置 selectedRoomId
-      if (device.rackId) {
-        const rack = racks.find(r => r.rackId === device.rackId);
-        if (rack) {
-          setSelectedRoomId(rack.roomId);
-        }
-      }
-    } else {
-      form.resetFields();
-      setSelectedRoomId(null);
-    }
     setModalVisible(true);
   };
 
-  // 关闭模态框
   const handleCancel = () => {
     setModalVisible(false);
     setEditingDevice(null);
-    setSelectedRoomId(null);
   };
 
-  // 提交表单
-  const handleSubmit = async values => {
+  const handleSubmit = async (deviceData) => {
     try {
-      const fixedFields = [
-        'deviceId',
-        'name',
-        'type',
-        'model',
-        'serialNumber',
-        'rackId',
-        'position',
-        'height',
-        'powerConsumption',
-        'status',
-        'purchaseDate',
-        'warrantyExpiry',
-        'ipAddress',
-        'description',
-        'roomId',
-      ];
-
-      const deviceData = {
-        ...values,
-        purchaseDate: values.purchaseDate ? values.purchaseDate.format('YYYY-MM-DD') : null,
-        warrantyExpiry: values.warrantyExpiry ? values.warrantyExpiry.format('YYYY-MM-DD') : null,
-        customFields: {},
-      };
-
-      Object.keys(deviceData).forEach(key => {
-        if (!fixedFields.includes(key) && key !== 'customFields') {
-          deviceData.customFields[key] = deviceData[key];
-          delete deviceData[key];
-        }
-      });
-
-      delete deviceData.roomId;
-
       if (editingDevice) {
-        // 更新设备
         await axios.put(`/api/devices/${editingDevice.deviceId}`, deviceData);
         message.success('设备更新成功');
       } else {
-        // 创建设备
         await axios.post('/api/devices', deviceData);
         message.success('设备创建成功');
       }
@@ -700,22 +265,18 @@ function DeviceManagement() {
     }
   };
 
-  // 搜索处理函数
-  const handleSearch = values => {
+  const handleSearch = (values) => {
     setSearching(true);
 
     setKeyword(values.keyword || '');
     setStatus(values.status || 'all');
     setType(values.type || 'all');
 
-    // 筛选后的数据会通过useMemo自动更新，这里只需更新分页
-    setPagination(prev => ({ ...prev, current: 1 }));
+    setPagination((prev) => ({ ...prev, current: 1 }));
 
-    // 短暂延迟后移除搜索状态，提供视觉反馈
     setTimeout(() => setSearching(false), 300);
   };
 
-  // 重置筛选条件
   const handleReset = () => {
     setSearching(true);
 
@@ -724,23 +285,20 @@ function DeviceManagement() {
     setType('all');
     searchForm.resetFields();
 
-    // 短暂延迟后移除搜索状态
     setTimeout(() => setSearching(false), 300);
   };
 
-  // 表格分页变化处理
-  const handleTableChange = newPagination => {
+  const handleTableChange = (newPagination) => {
     setPagination(newPagination);
 
     const start = (newPagination.current - 1) * newPagination.pageSize;
     const end = start + newPagination.pageSize;
-    const currentPageData = filteredDevicesMemo.slice(start, end);
+    const currentPageData = allDevices.slice(start, end);
     setCurrentPageDevices(currentPageData);
 
     fetchDevices(newPagination.current, newPagination.pageSize);
   };
 
-  // 批量删除设备
   const handleBatchDelete = async () => {
     Modal.confirm({
       title: '批量删除确认',
@@ -765,7 +323,6 @@ function DeviceManagement() {
     });
   };
 
-  // 一键删除所有设备
   const handleDeleteAll = async () => {
     Modal.confirm({
       title: '危险操作确认',
@@ -789,8 +346,7 @@ function DeviceManagement() {
     });
   };
 
-  // 删除设备
-  const handleDelete = async deviceId => {
+  const handleDelete = async (deviceId) => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个设备吗？',
@@ -810,41 +366,37 @@ function DeviceManagement() {
     });
   };
 
-  // 显示设备详情
-  const handleShowDetail = device => {
+  const handleShowDetail = (device) => {
     setSelectedDevice(device);
     setDetailModalVisible(true);
   };
 
-  // 查看设备关联的工单
-  const handleViewDeviceTickets = device => {
-    navigate(`/tickets?deviceId=${device.deviceId}&deviceName=${encodeURIComponent(device.name)}&serialNumber=${encodeURIComponent(device.serialNumber || '')}&view=true`);
+  const handleViewDeviceTickets = (device) => {
+    navigate(
+      `/tickets?deviceId=${device.deviceId}&deviceName=${encodeURIComponent(device.name)}&serialNumber=${encodeURIComponent(device.serialNumber || '')}&view=true`
+    );
   };
 
-  // 为设备创建工单
-  const handleCreateTicketForDevice = device => {
-    navigate(`/tickets?deviceId=${device.deviceId}&deviceName=${encodeURIComponent(device.name)}&serialNumber=${encodeURIComponent(device.serialNumber || '')}&create=true`);
+  const handleCreateTicketForDevice = (device) => {
+    navigate(
+      `/tickets?deviceId=${device.deviceId}&deviceName=${encodeURIComponent(device.name)}&serialNumber=${encodeURIComponent(device.serialNumber || '')}&create=true`
+    );
   };
 
-  // 打开批量状态变更模态框
   const showBatchStatusModal = () => {
     if (selectedDevices.length === 0) {
       message.warning('请先选择要操作的设备');
       return;
     }
-    batchStatusForm.resetFields();
     setBatchStatusModalVisible(true);
   };
 
-  // 执行批量状态变更
-  const handleBatchStatusChange = async () => {
+  const handleBatchStatusChange = async (newStatus) => {
+    setBatchStatusLoading(true);
     try {
-      const values = await batchStatusForm.validateFields();
-      setBatchStatusLoading(true);
-
       const response = await axios.put('/api/devices/batch-status', {
         deviceIds: selectedDevices,
-        status: values.status,
+        status: newStatus,
       });
 
       message.success(response.data.message || '批量状态变更成功');
@@ -853,9 +405,6 @@ function DeviceManagement() {
       setSelectAll(false);
       fetchDevices();
     } catch (error) {
-      if (error.errorFields) {
-        return;
-      }
       message.error('批量状态变更失败');
       console.error('批量状态变更失败:', error);
     } finally {
@@ -863,113 +412,61 @@ function DeviceManagement() {
     }
   };
 
-  // 打开导出选项模态框
   const showExportModal = () => {
     if (selectedDevices.length === 0) {
       message.warning('请先选择要导出的设备');
       return;
     }
-    setExportFormat('csv');
-    setExportFields(
-      deviceFields.filter(f => f.visible && f.fieldName !== 'rackId').map(f => f.fieldName)
-    );
     setExportModalVisible(true);
   };
 
-  // 执行增强导出
-  const handleEnhancedExport = async () => {
+  const handleEnhancedExport = async ({ format, scope, fields }) => {
+    const fieldLabels = {};
+    deviceFields.forEach((field) => {
+      fieldLabels[field.fieldName] = field.displayName;
+    });
+
+    let deviceIds = [];
+    if (scope === 'selected') {
+      deviceIds = selectedDevices;
+    } else if (scope === 'currentPage') {
+      deviceIds = allDevices.map((device) => device.deviceId);
+    } else if (scope === 'all') {
+      deviceIds = allDevices.map((device) => device.deviceId);
+    }
+
+    if (deviceIds.length === 0) {
+      message.warning('没有可导出的设备');
+      return;
+    }
+
+    const params = new URLSearchParams();
+    deviceIds.forEach((id) => params.append('deviceIds', id));
+    params.append('format', format);
+    params.append('fields', JSON.stringify(fields));
+    params.append('fieldLabels', JSON.stringify(fieldLabels));
+
+    const response = await axios.get(`/api/devices/enhanced-export?${params.toString()}`, {
+      responseType: 'blob',
+    });
+
+    const contentType = format === 'csv' ? 'text/csv; charset=gbk' : 'application/json';
+    const blob = new Blob([response.data], { type: contentType });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `devices_export_${new Date().toISOString().split('T')[0]}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    message.success(`成功导出 ${deviceIds.length} 个设备`);
+  };
+
+  const handleImport = async (file, callbacks) => {
     try {
-      setExportLoading(true);
-
-      const fieldLabels = {};
-      deviceFields.forEach(field => {
-        fieldLabels[field.fieldName] = field.displayName;
-      });
-
-      let deviceIds = [];
-      if (exportScope === 'selected') {
-        deviceIds = selectedDevices;
-      } else if (exportScope === 'currentPage') {
-        deviceIds = filteredDevicesMemo.map(device => device.deviceId);
-      } else if (exportScope === 'all') {
-        deviceIds = allDevices.map(device => device.deviceId);
-      }
-
-      if (deviceIds.length === 0) {
-        message.warning('没有可导出的设备');
-        setExportLoading(false);
-        return;
-      }
-
-      const params = new URLSearchParams();
-      deviceIds.forEach(id => params.append('deviceIds', id));
-      params.append('format', exportFormat);
-      params.append('fields', JSON.stringify(exportFields));
-      params.append('fieldLabels', JSON.stringify(fieldLabels));
-
-      const response = await axios.get(`/api/devices/enhanced-export?${params.toString()}`, {
-        responseType: 'blob',
-      });
-
-      const contentType = exportFormat === 'csv' ? 'text/csv; charset=gbk' : 'application/json';
-      const blob = new Blob([response.data], { type: contentType });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `devices_export_${new Date().toISOString().split('T')[0]}.${exportFormat}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      message.success(`成功导出 ${deviceIds.length} 个设备`);
-      setExportModalVisible(false);
-    } catch (error) {
-      message.error('导出失败');
-      console.error('增强导出失败:', error);
-    } finally {
-      setExportLoading(false);
-    }
-  };
-
-  // 切换选择全部设备
-  const handleSelectAll = () => {
-    if (selectAll) {
-      setSelectedDevices([]);
-      setSelectAll(false);
-    } else {
-      const allIds = filteredDevicesMemo.map(device => device.deviceId);
-      setSelectedDevices(allIds);
-      setSelectAll(true);
-    }
-  };
-
-  // 处理选择变化
-  const handleSelectionChange = selectedRowKeys => {
-    setSelectedDevices(selectedRowKeys);
-    setSelectAll(
-      selectedRowKeys.length === filteredDevicesMemo.length && filteredDevicesMemo.length > 0
-    );
-  };
-
-  // 全选复选框的处理函数
-  const handleSelectAllCheckbox = e => {
-    const checked = e.target.checked;
-    if (checked) {
-      const allIds = filteredDevicesMemo.map(device => device.deviceId);
-      setSelectedDevices(allIds);
-      setSelectAll(true);
-    } else {
-      setSelectedDevices([]);
-      setSelectAll(false);
-    }
-  };
-  const handleImport = async file => {
-    try {
-      setIsImporting(true);
-      setImportProgress(0);
-      setImportPhase('正在上传文件...');
-      setImportResult(null);
+      callbacks.onProgress(0, '正在上传文件...');
 
       const formData = new FormData();
       formData.append('csvFile', file);
@@ -978,30 +475,23 @@ function DeviceManagement() {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        onUploadProgress: progressEvent => {
+        onUploadProgress: (progressEvent) => {
           const progress = Math.round((progressEvent.loaded * 50) / progressEvent.total);
-          setImportProgress(Math.min(progress, 50));
-          setImportPhase('正在上传文件...');
+          callbacks.onProgress(Math.min(progress, 50), '正在上传文件...');
         },
       });
 
-      setImportProgress(60);
-      setImportPhase('正在处理数据...');
+      callbacks.onProgress(60, '正在处理数据...');
 
       setTimeout(() => {
-        setImportProgress(80);
-        setImportPhase('正在验证数据...');
+        callbacks.onProgress(80, '正在验证数据...');
       }, 200);
 
       setTimeout(() => {
-        setImportProgress(90);
-        setImportPhase('正在保存数据...');
+        callbacks.onProgress(90, '正在保存数据...');
       }, 400);
 
-      setImportResult(response.data);
-      setImportProgress(100);
-      setImportPhase('导入完成');
-      setIsImporting(false);
+      callbacks.onSuccess(response.data);
 
       const { success, failed } = response.data.statistics;
       if (failed > 0) {
@@ -1014,9 +504,6 @@ function DeviceManagement() {
         fetchDevices();
       }, 1000);
     } catch (error) {
-      setIsImporting(false);
-      setImportProgress(0);
-
       let errorMessage = '导入失败';
       let errorDetails = [];
 
@@ -1030,7 +517,7 @@ function DeviceManagement() {
           Array.isArray(data.errors) &&
           data.errors.length > 0
         ) {
-          errorDetails = data.errors.map(err => ({
+          errorDetails = data.errors.map((err) => ({
             row: err.row || 0,
             error: err.error || err.message || '服务器内部错误',
           }));
@@ -1048,69 +535,51 @@ function DeviceManagement() {
         errorMessage = error.message;
       }
 
-      setImportResult({
-        success: false,
-        statistics: {
-          total: 0,
-          success: 0,
-          failed: errorDetails.length > 0 ? errorDetails.length : 1,
-          errors: errorDetails.length > 0 ? errorDetails : [{ row: 0, error: errorMessage }],
-          message: errorMessage,
-        },
+      callbacks.onError({
+        message: errorMessage,
+        errors: errorDetails,
       });
 
       message.error(errorMessage);
       console.error('导入设备失败:', error);
     }
-
-    return false;
   };
 
-  // 使用从常量导入的映射，避免每次渲染重新创建
-
-  // 获取设备类型图标
-  const getDeviceTypeIcon = type => {
-    const iconMap = {
-      server: <CloudServerOutlined style={{ color: '#1890ff' }} />,
-      switch: <SwapOutlined style={{ color: '#52c41a' }} />,
-      router: <SafetyOutlined style={{ color: '#faad14' }} />,
-      storage: <DatabaseOutlined style={{ color: '#722ed1' }} />,
-      other: <AppstoreOutlined style={{ color: '#8c8c8c' }} />,
-    };
-    return iconMap[type] || <AppstoreOutlined style={{ color: '#8c8c8c' }} />;
+  const handleSaveFieldConfig = async (updatedFields) => {
+    try {
+      const response = await axios.post('/api/deviceFields/config', updatedFields);
+      setDeviceFields(response.data);
+      message.success('字段配置保存成功');
+      setFieldConfigModalVisible(false);
+    } catch (error) {
+      message.error('字段配置保存失败');
+      console.error('保存字段配置失败:', error);
+    }
   };
 
-  // 处理列宽变化
-  const handleColumnResize = (key, width) => {
-    setColumnWidths(prev => ({ ...prev, [key]: width }));
+  const handleResetFieldConfig = (defaultFields) => {
+    setDeviceFields(defaultFields);
   };
 
-  // 重置列宽到默认值
-  const resetColumnWidths = () => {
-    setColumnWidths({});
-    message.success('列宽已重置为默认值');
+  const handleSelectionChange = (selectedRowKeys) => {
+    setSelectedDevices(selectedRowKeys);
+    setSelectAll(selectedRowKeys.length === allDevices.length && allDevices.length > 0);
   };
 
-  // 处理表头单元格拖拽 - 自定义实现
-  const handleHeaderCellResize = key => column => ({
+  const handleHeaderCellResize = (key) => (column) => ({
     width: column.width,
-    onResize: width => {
-      setColumnWidths(prev => ({ ...prev, [key]: width }));
+    onResize: (width) => {
+      setColumnWidths((prev) => ({ ...prev, [key]: width }));
     },
   });
 
-  // 动态生成表格列配置
-  const columns = React.useMemo(() => {
+  const columns = useMemo(() => {
     const generatedColumns = [];
 
-    // 根据字段配置动态生成列，只显示visible为true的字段
-    deviceFields.forEach(field => {
-      // 只处理可见字段
+    deviceFields.forEach((field) => {
       if (!field.visible) return;
 
-      // 特殊处理机柜字段
       if (field.fieldName === 'rackId') {
-        // 添加机房信息列
         generatedColumns.push({
           title: '所在机房',
           dataIndex: ['Rack', 'Room', 'name'],
@@ -1118,7 +587,6 @@ function DeviceManagement() {
           width: columnWidths.roomName || 120,
           onHeaderCell: handleHeaderCellResize('roomName'),
         });
-        // 添加机柜信息列
         generatedColumns.push({
           title: field.displayName,
           dataIndex: ['Rack', 'name'],
@@ -1126,38 +594,32 @@ function DeviceManagement() {
           width: columnWidths[field.fieldName] || 120,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
         });
-      }
-      // 特殊处理设备类型
-      else if (field.fieldName === 'type') {
+      } else if (field.fieldName === 'type') {
         generatedColumns.push({
           title: field.displayName,
           dataIndex: field.fieldName,
           key: field.fieldName,
           width: columnWidths[field.fieldName] || 100,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
-          render: type => {
-            return (
-              <Space>
-                {getDeviceTypeIcon(type)}
-                <span>{TYPE_MAP[type]}</span>
-              </Space>
-            );
-          },
+          render: (type) => (
+            <Space>
+              {getDeviceTypeIcon(type)}
+              <span>{TYPE_MAP[type]}</span>
+            </Space>
+          ),
         });
-      }
-      // 特殊处理状态字段
-      else if (field.fieldName === 'status') {
+      } else if (field.fieldName === 'status') {
         generatedColumns.push({
           title: field.displayName,
           dataIndex: field.fieldName,
           key: field.fieldName,
           width: columnWidths[field.fieldName] || 100,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
-          render: status => {
+          render: (status) => {
             if (Array.isArray(status)) {
               return (
                 <Space>
-                  {status.map(s => (
+                  {status.map((s) => (
                     <span key={s} style={{ color: STATUS_MAP[s]?.color || 'black' }}>
                       {STATUS_MAP[s]?.text || s}
                     </span>
@@ -1172,29 +634,24 @@ function DeviceManagement() {
             );
           },
         });
-      }
-      // 特殊处理日期字段
-      else if (field.fieldType === 'date') {
+      } else if (field.fieldType === 'date') {
         generatedColumns.push({
           title: field.displayName,
           dataIndex: field.fieldName,
           key: field.fieldName,
           width: columnWidths[field.fieldName] || 120,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
-          render: date => {
+          render: (date) => {
             if (!date) return '';
 
             const dateObj = new Date(date);
             const formattedDate = dateObj.toLocaleDateString('zh-CN');
 
-            // 检查是否是保修到期字段
             if (field.fieldName === 'warrantyExpiry') {
               const today = new Date();
-              // 设置时间为同一天的00:00:00，确保只比较日期部分
               today.setHours(0, 0, 0, 0);
               dateObj.setHours(0, 0, 0, 0);
 
-              // 如果保修日期已过期，显示为红色
               if (dateObj < today) {
                 return (
                   <span style={{ color: '#d93025', fontWeight: 'bold' }}>{formattedDate}</span>
@@ -1205,10 +662,7 @@ function DeviceManagement() {
             return formattedDate;
           },
         });
-      }
-      // 普通字段
-      else {
-        // 为不同类型的字段设置不同的默认宽度
+      } else {
         let defaultWidth = 120;
         if (field.fieldName === 'deviceId' || field.fieldName === 'name') {
           defaultWidth = 150;
@@ -1220,7 +674,6 @@ function DeviceManagement() {
           defaultWidth = 180;
         }
 
-        // 为设备名称和ID列添加点击查看详情功能
         const columnConfig = {
           title: field.displayName,
           dataIndex: field.fieldName,
@@ -1232,7 +685,6 @@ function DeviceManagement() {
           ellipsis: field.fieldType !== 'textarea',
         };
 
-        // 设备名称和ID列添加点击效果
         if (field.fieldName === 'deviceId' || field.fieldName === 'name') {
           columnConfig.render = (value, record) => (
             <a
@@ -1246,8 +698,8 @@ function DeviceManagement() {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}
-              onMouseEnter={e => (e.target.style.textDecoration = 'underline')}
-              onMouseLeave={e => (e.target.style.textDecoration = 'none')}
+              onMouseEnter={(e) => (e.target.style.textDecoration = 'underline')}
+              onMouseLeave={(e) => (e.target.style.textDecoration = 'none')}
             >
               {value || '-'}
             </a>
@@ -1258,7 +710,6 @@ function DeviceManagement() {
       }
     });
 
-    // 添加操作列
     generatedColumns.push({
       title: '操作',
       key: 'action',
@@ -1293,37 +744,6 @@ function DeviceManagement() {
 
     return generatedColumns;
   }, [deviceFields, columnWidths]);
-
-  // 保存字段配置
-  const handleSaveFieldConfig = async values => {
-    try {
-      const updatedFields = deviceFields.map(field => ({
-        fieldId: field.fieldId,
-        fieldName: field.fieldName,
-        displayName: field.displayName,
-        visible: values[`visible_${field.fieldName}`] ?? field.visible,
-        required: values[`required_${field.fieldName}`] ?? field.required,
-      }));
-
-      const response = await axios.post('/api/deviceFields/config', updatedFields);
-
-      setDeviceFields(response.data);
-      message.success('字段配置保存成功');
-      setFieldConfigModalVisible(false);
-    } catch (error) {
-      message.error('字段配置保存失败');
-      console.error('保存字段配置失败:', error);
-    }
-  };
-
-  // 重置字段配置为默认值
-  const handleResetFieldConfig = () => {
-    const defaultFields = defaultDeviceFields;
-    setDeviceFields(defaultFields);
-    message.success('字段配置已重置为默认值');
-  };
-
-  // 样式已从外部样式文件导入，无需在组件内定义
 
   return (
     <div style={pageContainerStyle}>
@@ -1462,7 +882,7 @@ function DeviceManagement() {
                 transition: `all ${designTokens.transitions.fast}`,
               }}
               value={keyword}
-              onChange={e => setKeyword(e.target.value)}
+              onChange={(e) => setKeyword(e.target.value)}
             />
           </Form.Item>
 
@@ -1471,7 +891,6 @@ function DeviceManagement() {
               value={status}
               onChange={setStatus}
               style={{ width: '140px', borderRadius: designTokens.borderRadius.medium }}
-              styles={{ popup: { root: { borderRadius: designTokens.borderRadius.medium } } }}
             >
               <Option value="all">所有状态</Option>
               <Option value="running">运行中</Option>
@@ -1486,7 +905,6 @@ function DeviceManagement() {
               value={type}
               onChange={setType}
               style={{ width: '140px', borderRadius: designTokens.borderRadius.medium }}
-              styles={{ popup: { root: { borderRadius: designTokens.borderRadius.medium } } }}
             >
               <Option value="all">所有类型</Option>
               <Option value="server">服务器</Option>
@@ -1544,7 +962,7 @@ function DeviceManagement() {
       </Card>
 
       <Card style={cardStyle}>
-        {!loading && filteredDevicesMemo.length === 0 && !searching && (
+        {!loading && allDevices.length === 0 && !searching && (
           <div
             style={{
               ...emptyStateStyle,
@@ -1560,7 +978,7 @@ function DeviceManagement() {
             <p>暂无设备数据</p>
           </div>
         )}
-        {filteredDevicesMemo.length > 0 && (
+        {allDevices.length > 0 && (
           <div
             className="device-table-wrapper"
             style={{
@@ -1570,7 +988,7 @@ function DeviceManagement() {
           >
             <Table
               columns={columns}
-              dataSource={filteredDevicesMemo}
+              dataSource={allDevices}
               rowKey="deviceId"
               loading={loading || searching}
               pagination={{
@@ -1578,7 +996,7 @@ function DeviceManagement() {
                 showSizeChanger: true,
                 showQuickJumper: true,
                 pageSizeOptions: ['10', '20', '30', '50', '100'],
-                showTotal: total => `共 ${total} 条记录`,
+                showTotal: (total) => `共 ${total} 条记录`,
                 style: { marginTop: '16px' },
               }}
               onChange={handleTableChange}
@@ -1591,7 +1009,7 @@ function DeviceManagement() {
               }}
               style={{ width: '100%', maxWidth: '100%' }}
               size="middle"
-              showHeader={filteredDevicesMemo.length > 0}
+              showHeader={allDevices.length > 0}
               rowSelection={{
                 selectedRowKeys: selectedDevices,
                 onChange: handleSelectionChange,
@@ -1604,7 +1022,7 @@ function DeviceManagement() {
                     key: 'all',
                     text: '全选',
                     onSelect: () => {
-                      const allIds = filteredDevicesMemo.map(device => device.deviceId);
+                      const allIds = allDevices.map((device) => device.deviceId);
                       setSelectedDevices(allIds);
                       setSelectAll(true);
                     },
@@ -1613,10 +1031,10 @@ function DeviceManagement() {
                     key: 'invert',
                     text: '反选',
                     onSelect: () => {
-                      const visibleIds = filteredDevicesMemo.map(device => device.deviceId);
-                      const newSelected = visibleIds.filter(id => !selectedDevices.includes(id));
+                      const visibleIds = allDevices.map((device) => device.deviceId);
+                      const newSelected = visibleIds.filter((id) => !selectedDevices.includes(id));
                       setSelectedDevices(newSelected);
-                      setSelectAll(newSelected.length === filteredDevicesMemo.length);
+                      setSelectAll(newSelected.length === allDevices.length);
                     },
                   },
                   {
@@ -1629,11 +1047,11 @@ function DeviceManagement() {
                   },
                 ],
               }}
-              onRow={record => ({
+              onRow={(record) => ({
                 onClick: () =>
                   handleSelectionChange(
                     selectedDevices.includes(record.deviceId)
-                      ? selectedDevices.filter(id => id !== record.deviceId)
+                      ? selectedDevices.filter((id) => id !== record.deviceId)
                       : [...selectedDevices, record.deviceId]
                   ),
               })}
@@ -1648,1171 +1066,62 @@ function DeviceManagement() {
         )}
       </Card>
 
-      <Modal
-        title={
-          <div style={{ ...modalHeaderStyle, paddingRight: '32px' }}>
-            {editingDevice ? (
-              <EditOutlined style={{ color: '#667eea' }} />
-            ) : (
-              <PlusOutlined style={{ color: '#667eea' }} />
-            )}
-            {editingDevice ? '编辑设备' : '添加设备'}
-          </div>
-        }
-        open={modalVisible}
+      <DeviceFormModal
+        visible={modalVisible}
+        editingDevice={editingDevice}
+        deviceFields={deviceFields}
+        racks={racks}
+        rooms={rooms}
         onCancel={handleCancel}
-        footer={null}
-        width={700}
-        style={{ borderRadius: '16px' }}
-        styles={{
-          header: {
-            borderBottom: '1px solid #f0f0f0',
-            padding: '16px 24px',
-            position: 'relative',
-          },
-          body: { padding: '24px' },
-        }}
-        className="device-modal"
-      >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          {(() => {
-            const filteredFields = deviceFields.filter(
-              field => field.fieldName !== 'deviceId' && field.fieldName !== 'rackId'
-            );
-            const formItems = [];
+        onSubmit={handleSubmit}
+      />
 
-            filteredFields.forEach((field, index) => {
-              let control = null;
-              const inputStyle = {
-                borderRadius: '8px',
-                transition: 'all 0.3s ease',
-              };
-
-              switch (field.fieldType) {
-                case 'text':
-                case 'string':
-                  control = (
-                    <Input
-                      placeholder={`请输入${field.displayName}`}
-                      style={inputStyle}
-                      className="form-input-enhanced"
-                    />
-                  );
-                  break;
-                case 'number':
-                  control = (
-                    <InputNumber
-                      placeholder={`请输入${field.displayName}`}
-                      min={0}
-                      style={{ width: '100%', ...inputStyle }}
-                      className="form-input-enhanced"
-                    />
-                  );
-                  break;
-                case 'boolean':
-                  control = <Switch />;
-                  break;
-                case 'date':
-                  control = (
-                    <DatePicker
-                      style={{ width: '100%', ...inputStyle }}
-                      placeholder={`请选择${field.displayName}`}
-                      className="form-input-enhanced"
-                    />
-                  );
-                  break;
-                case 'textarea':
-                  control = (
-                    <Input.TextArea
-                      placeholder={`请输入${field.displayName}`}
-                      rows={3}
-                      style={inputStyle}
-                      className="form-input-enhanced"
-                    />
-                  );
-                  break;
-                case 'select':
-                  control = (
-                    <Select
-                      placeholder={`请选择${field.displayName}`}
-                      style={inputStyle}
-                      className="form-input-enhanced"
-                    >
-                      {field.options &&
-                        field.options.map(option => (
-                          <Option key={option.value} value={option.value}>
-                            {option.label}
-                          </Option>
-                        ))}
-                    </Select>
-                  );
-                  break;
-                default:
-                  control = (
-                    <Input
-                      placeholder={`请输入${field.displayName}`}
-                      style={inputStyle}
-                      className="form-input-enhanced"
-                    />
-                  );
-              }
-
-              // 机房和机柜联动选择区域特殊处理
-              if (field.fieldName === 'serialNumber') {
-                formItems.push(
-                  <React.Fragment key={field.fieldName}>
-                    <Col span={12} key={`${field.fieldName}-col`}>
-                      <Form.Item
-                        name={field.fieldName}
-                        label={
-                          <span>
-                            {field.displayName}
-                            {field.required && (
-                              <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
-                            )}
-                          </span>
-                        }
-                        rules={
-                          field.required
-                            ? [{ required: true, message: `请输入${field.displayName}` }]
-                            : []
-                        }
-                      >
-                        {control}
-                      </Form.Item>
-                    </Col>
-                    {/* 机房机柜联动选择区域 - 特殊突出显示 */}
-                    <Col span={24} key="room-rack-section">
-                      <div
-                        style={{
-                          background: 'linear-gradient(135deg, #f0f5ff 0%, #e6f7ff 100%)',
-                          borderRadius: '12px',
-                          padding: '20px',
-                          marginBottom: '16px',
-                          border: '2px solid #d6e4ff',
-                          boxShadow: '0 2px 8px rgba(24, 144, 255, 0.1)',
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            color: '#1890ff',
-                            marginBottom: '16px',
-                            display: 'flex',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <DatabaseOutlined style={{ marginRight: '8px' }} />
-                          设备位置选择
-                        </div>
-                        <Row gutter={16}>
-                          <Col span={12}>
-                            <Form.Item
-                              name="roomId"
-                              label={
-                                <span>
-                                  机房
-                                  <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
-                                </span>
-                              }
-                              rules={[{ required: true, message: '请选择机房' }]}
-                              style={{ marginBottom: '0' }}
-                            >
-                              <Select
-                                placeholder="请选择机房"
-                                style={{ borderRadius: '8px' }}
-                                showSearch
-                                optionFilterProp="children"
-                                onChange={(value) => {
-                                  setSelectedRoomId(value);
-                                  form.setFieldValue('rackId', undefined);
-                                }}
-                              >
-                                {rooms.map(room => (
-                                  <Option key={room.roomId} value={room.roomId}>
-                                    {room.name}
-                                  </Option>
-                                ))}
-                              </Select>
-                            </Form.Item>
-                          </Col>
-                          <Col span={12}>
-                            <Form.Item
-                              name="rackId"
-                              label={
-                                <span>
-                                  机柜
-                                  <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
-                                </span>
-                              }
-                              rules={[{ required: true, message: '请选择机柜' }]}
-                              style={{ marginBottom: '0' }}
-                            >
-                              <Select
-                                placeholder={selectedRoomId ? '请选择机柜' : '请先选择机房'}
-                                style={{ borderRadius: '8px' }}
-                                disabled={!selectedRoomId}
-                                showSearch
-                                optionFilterProp="children"
-                              >
-                                {(selectedRoomId
-                                  ? racks.filter(rack => rack.roomId === selectedRoomId)
-                                  : []
-                                ).map(rack => (
-                                  <Option key={rack.rackId} value={rack.rackId}>
-                                    {rack.name} ({rack.rackId})
-                                  </Option>
-                                ))}
-                              </Select>
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                      </div>
-                    </Col>
-                  </React.Fragment>
-                );
-              } else if (field.fieldType === 'textarea') {
-                // textarea 占整行
-                formItems.push(
-                  <Col span={24} key={field.fieldName}>
-                    <Form.Item
-                      name={field.fieldName}
-                      label={
-                        <span>
-                          {field.displayName}
-                          {field.required && (
-                            <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
-                          )}
-                        </span>
-                      }
-                      rules={
-                        field.required
-                          ? [{ required: true, message: `请输入${field.displayName}` }]
-                          : []
-                      }
-                    >
-                      {control}
-                    </Form.Item>
-                  </Col>
-                );
-              } else {
-                // 其他字段两列布局
-                formItems.push(
-                  <Col span={12} key={field.fieldName}>
-                    <Form.Item
-                      name={field.fieldName}
-                      label={
-                        <span>
-                          {field.displayName}
-                          {field.required && (
-                            <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
-                          )}
-                        </span>
-                      }
-                      rules={
-                        field.required
-                          ? [{ required: true, message: `请输入${field.displayName}` }]
-                          : []
-                      }
-                    >
-                      {control}
-                    </Form.Item>
-                  </Col>
-                );
-              }
-            });
-
-            return <Row gutter={16}>{formItems}</Row>;
-          })()}
-
-          {/* 底部按钮区域 */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '12px',
-              marginTop: '32px',
-              paddingTop: '24px',
-              borderTop: '1px solid #f0f0f0',
-            }}
-          >
-            <Button
-              onClick={handleCancel}
-              style={{
-                height: '40px',
-                borderRadius: '8px',
-                padding: '0 24px',
-                fontWeight: '500',
-                transition: 'all 0.3s ease',
-              }}
-            >
-              取消
-            </Button>
-            <Button
-              type="primary"
-              htmlType="submit"
-              style={{
-                height: '40px',
-                borderRadius: '8px',
-                background: designTokens.colors.primary.gradient,
-                border: 'none',
-                color: '#ffffff',
-                boxShadow: designTokens.shadows.small,
-                fontWeight: '500',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0 32px',
-                transition: 'all 0.3s ease',
-              }}
-            >
-              确定
-            </Button>
-          </div>
-        </Form>
-      </Modal>
-
-      <Modal
-        title={
-          <div style={{ ...modalHeaderStyle, paddingRight: '32px' }}>
-            <SettingOutlined style={{ color: '#667eea' }} />
-            字段配置
-          </div>
-        }
-        open={fieldConfigModalVisible}
-        onCancel={() => setFieldConfigModalVisible(false)}
-        footer={null}
-        width={600}
-        styles={{
-          header: {
-            borderBottom: '1px solid #f0f0f0',
-            padding: '16px 24px',
-            position: 'relative',
-          },
-          body: { padding: '24px' },
-        }}
-      >
-        <Form
-          layout="vertical"
-          onFinish={handleSaveFieldConfig}
-          initialValues={{
-            ...deviceFields.reduce(
-              (acc, field) => ({
-                ...acc,
-                [`visible_${field.fieldName}`]: field.visible,
-                [`required_${field.fieldName}`]: field.required,
-              }),
-              {}
-            ),
-          }}
-        >
-          <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <th style={{ padding: '8px', textAlign: 'left', width: '40%' }}>字段名称</th>
-                  <th style={{ padding: '8px', textAlign: 'center', width: '30%' }}>可见</th>
-                  <th style={{ padding: '8px', textAlign: 'center', width: '30%' }}>必填</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deviceFields
-                  .filter(field => field.fieldName !== 'deviceId')
-                  .map(field => (
-                    <tr key={field.fieldName} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={{ padding: '8px' }}>{field.displayName}</td>
-                      <td style={{ padding: '8px', textAlign: 'center' }}>
-                        <Form.Item name={`visible_${field.fieldName}`} valuePropName="checked" noStyle>
-                          <Switch size="small" />
-                        </Form.Item>
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'center' }}>
-                        <Form.Item name={`required_${field.fieldName}`} valuePropName="checked" noStyle>
-                          <Switch size="small" />
-                        </Form.Item>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-
-          <Form.Item style={{ textAlign: 'right', marginTop: '20px' }}>
-            <Space>
-              <Button
-                onClick={() => setFieldConfigModalVisible(false)}
-                style={secondaryActionStyle}
-              >
-                取消
-              </Button>
-              <Button onClick={handleResetFieldConfig} style={secondaryActionStyle}>
-                重置默认
-              </Button>
-              <Button
-                type="primary"
-                htmlType="submit"
-                style={{
-                  height: '40px',
-                  borderRadius: designTokens.borderRadius.small,
-                  background: designTokens.colors.primary.gradient,
-                  border: 'none',
-                  color: '#ffffff',
-                  boxShadow: designTokens.shadows.small,
-                  fontWeight: '500',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                保存
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal
-        title={
-          <div style={{ ...modalHeaderStyle, paddingRight: '32px' }}>
-            <UploadOutlined style={{ color: '#667eea' }} />
-            导入设备
-          </div>
-        }
-        open={importModalVisible}
-        onCancel={() => {
-          setImportModalVisible(false);
-          setImportProgress(0);
-          setImportPhase('');
-          setImportResult(null);
-          setIsImporting(false);
-        }}
-        footer={null}
-        width={650}
-        destroyOnHidden
-        styles={{
-          header: {
-            borderBottom: '1px solid #f0f0f0',
-            padding: '16px 24px',
-            position: 'relative',
-          },
-          body: { padding: '24px' },
-        }}
-      >
-        {!isImporting && !importResult ? (
-          <div>
-            <p style={{ color: '#666', marginBottom: '8px' }}>请上传CSV格式的设备数据文件</p>
-            <p style={{ color: '#999', fontSize: '12px', marginBottom: '20px' }}>
-              支持的编码格式：GBK
-            </p>
-
-            <div
-              style={{
-                marginBottom: '20px',
-                padding: '16px',
-                background: 'linear-gradient(180deg, #fafafa 0%, #ffffff 100%)',
-                borderRadius: '12px',
-                border: '1px solid #f0f0f0',
-              }}
-            >
-              <p style={{ fontWeight: '600', marginBottom: '8px', color: '#333' }}>
-                CSV文件格式要求：
-              </p>
-              <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                {(() => {
-                  // 获取必填字段
-                  const requiredFields = deviceFields.filter(f => f.visible && f.required);
-                  // 获取可选字段
-                  const optionalFields = deviceFields.filter(f => f.visible && !f.required);
-
-                  return (
-                    <>
-                      {requiredFields.length > 0 && (
-                        <div style={{ marginBottom: '8px' }}>
-                          <span style={{ color: '#d93025', fontWeight: '500' }}>必填字段：</span>
-                          <span style={{ color: '#666', fontSize: '13px' }}>
-                            {requiredFields.map(f => f.displayName).join('、')}
-                          </span>
-                        </div>
-                      )}
-                      {optionalFields.length > 0 && (
-                        <div style={{ marginBottom: '8px' }}>
-                          <span style={{ color: '#666', fontWeight: '500' }}>可选字段：</span>
-                          <span style={{ color: '#666', fontSize: '13px' }}>
-                            {optionalFields.map(f => f.displayName).join('、')}
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-                <ul
-                  style={{
-                    paddingLeft: '20px',
-                    marginBottom: '10px',
-                    color: '#666',
-                    fontSize: '13px',
-                    marginTop: '12px',
-                  }}
-                >
-                  <li>
-                    设备类型：server(服务器)、switch(交换机)、router(路由器)、storage(存储设备)、other(其他)
-                  </li>
-                  <li>状态值：running(运行中)、maintenance(维护中)、offline(离线)、fault(故障)</li>
-                  <li>日期格式：YYYY-MM-DD (例如：2023-01-01)</li>
-                </ul>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <a href="/api/devices/import-template" download="设备导入模板.csv">
-                <Button icon={<DownloadOutlined />} style={secondaryActionStyle}>
-                  下载导入模板
-                </Button>
-              </a>
-              <span style={{ color: '#999', fontSize: '12px', marginLeft: '10px' }}>
-                包含示例数据的CSV模板文件（根据当前字段配置生成）
-              </span>
-            </div>
-
-            <Upload
-              name="csvFile"
-              accept=".csv"
-              showUploadList={false}
-              beforeUpload={handleImport}
-              maxCount={1}
-            >
-              <Button
-                type="primary"
-                icon={<UploadOutlined />}
-                block
-                style={{
-                  height: '40px',
-                  borderRadius: designTokens.borderRadius.small,
-                  background: designTokens.colors.primary.gradient,
-                  border: 'none',
-                  color: '#ffffff',
-                  boxShadow: designTokens.shadows.small,
-                  fontWeight: '500',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                选择CSV文件
-              </Button>
-            </Upload>
-          </div>
-        ) : isImporting ? (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-              <div
-                style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: '16px',
-                  color: '#fff',
-                  fontSize: '20px',
-                }}
-              >
-                <UploadOutlined spin />
-              </div>
-              <div>
-                <p
-                  style={{
-                    margin: '0 0 4px 0',
-                    fontWeight: '600',
-                    color: '#333',
-                    fontSize: '16px',
-                  }}
-                >
-                  正在导入设备数据
-                </p>
-                <p style={{ margin: 0, color: '#667eea', fontSize: '14px' }}>{importPhase}</p>
-              </div>
-            </div>
-            <Progress
-              percent={importProgress}
-              status="active"
-              strokeColor={{ '0%': '#667eea', '100%': '#764ba2' }}
-              format={() => `${importProgress}%`}
-            />
-          </div>
-        ) : importResult?.statistics ? (
-          <div>
-            <p style={{ marginBottom: '10px', fontWeight: '600' }}>导入完成：</p>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '12px',
-                marginBottom: '16px',
-              }}
-            >
-              <div
-                style={{
-                  padding: '12px',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: '24px', fontWeight: '700' }}>
-                  {importResult.statistics.total || 0}
-                </div>
-                <div style={{ fontSize: '12px', opacity: 0.9 }}>总记录数</div>
-              </div>
-              <div
-                style={{
-                  padding: '12px',
-                  background: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: '24px', fontWeight: '700' }}>
-                  {importResult.statistics.success || 0}
-                </div>
-                <div style={{ fontSize: '12px', opacity: 0.9 }}>成功</div>
-              </div>
-              <div
-                style={{
-                  padding: '12px',
-                  background: 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: '24px', fontWeight: '700' }}>
-                  {importResult.statistics.failed || 0}
-                </div>
-                <div style={{ fontSize: '12px', opacity: 0.9 }}>失败</div>
-              </div>
-            </div>
-            {(() => {
-              const errors = importResult.statistics?.errors;
-              const hasErrors = Array.isArray(errors) && errors.length > 0;
-              const hasFailedRecords = importResult.statistics?.failed > 0;
-
-              return (
-                (hasErrors || hasFailedRecords) && (
-                  <div
-                    style={{
-                      marginTop: '20px',
-                      maxHeight: 400,
-                      overflowY: 'auto',
-                      border: '1px solid #ffcccc',
-                      borderRadius: '8px',
-                      padding: '12px',
-                      backgroundColor: '#fff7f7',
-                    }}
-                  >
-                    <h4 style={{ color: '#d93025', marginBottom: '12px', fontWeight: '600' }}>
-                      失败记录详情：
-                    </h4>
-
-                    {hasErrors ? (
-                      <table
-                        style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}
-                      >
-                        <thead>
-                          <tr style={{ backgroundColor: '#ffeeee' }}>
-                            <th
-                              style={{
-                                border: '1px solid #ffcccc',
-                                padding: '8px',
-                                textAlign: 'left',
-                                width: '80px',
-                              }}
-                            >
-                              行号
-                            </th>
-                            <th
-                              style={{
-                                border: '1px solid #ffcccc',
-                                padding: '8px',
-                                textAlign: 'left',
-                              }}
-                            >
-                              失败原因
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {errors.map((item, index) => (
-                            <tr key={index} style={{ borderBottom: '1px solid #ffcccc' }}>
-                              <td
-                                style={{
-                                  border: '1px solid #ffcccc',
-                                  padding: '8px',
-                                  fontWeight: 'bold',
-                                }}
-                              >
-                                {item.row || index + 1}
-                              </td>
-                              <td
-                                style={{
-                                  border: '1px solid #ffcccc',
-                                  padding: '8px',
-                                  color: '#d93025',
-                                }}
-                              >
-                                {item.error || '未知错误'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <div style={{ color: '#d93025', padding: '20px', textAlign: 'center' }}>
-                        检测到 {importResult.statistics.failed} 条导入失败记录，但未提供详细错误信息
-                      </div>
-                    )}
-                  </div>
-                )
-              );
-            })()}
-            <Button
-              type="primary"
-              onClick={() => {
-                setImportModalVisible(false);
-                setImportProgress(0);
-                setImportResult(null);
-                setIsImporting(false);
-                fetchDevices();
-              }}
-              style={{
-                marginTop: '20px',
-                height: '40px',
-                borderRadius: designTokens.borderRadius.small,
-                background: designTokens.colors.primary.gradient,
-                border: 'none',
-                color: '#ffffff',
-                boxShadow: designTokens.shadows.small,
-                fontWeight: '500',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              确定
-            </Button>
-          </div>
-        ) : null}
-      </Modal>
-
-      <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '18px', fontWeight: 600, paddingRight: '32px' }}>
-            <AppstoreOutlined style={{ color: '#667eea' }} />
-            设备详情
-          </div>
-        }
-        open={detailModalVisible}
-        onCancel={() => {
+      <DeviceDetailModal
+        visible={detailModalVisible}
+        device={selectedDevice}
+        deviceFields={deviceFields}
+        onClose={() => {
           setDetailModalVisible(false);
           setSelectedDevice(null);
         }}
-        footer={[
-          <Button
-            key="close"
-            onClick={() => {
-              setDetailModalVisible(false);
-              setSelectedDevice(null);
-            }}
-            style={secondaryActionStyle}
-          >
-            关闭
-          </Button>,
-          <Button
-            key="viewTickets"
-            onClick={() => {
-              handleViewDeviceTickets(selectedDevice);
-            }}
-            style={secondaryActionStyle}
-          >
-            查看工单
-          </Button>,
-          <Button
-            key="createTicket"
-            onClick={() => {
-              handleCreateTicketForDevice(selectedDevice);
-            }}
-            style={secondaryActionStyle}
-          >
-            创建工单
-          </Button>,
-          <Button
-            key="edit"
-            type="primary"
-            onClick={() => {
-              setDetailModalVisible(false);
-              showModal(selectedDevice);
-            }}
-            style={{
-              height: '40px',
-              borderRadius: designTokens.borderRadius.small,
-              background: designTokens.colors.primary.gradient,
-              border: 'none',
-              color: '#ffffff',
-              boxShadow: designTokens.shadows.small,
-              fontWeight: '500',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            编辑
-          </Button>,
-        ]}
-        width={700}
-        destroyOnHidden
-        styles={{
-          header: {
-            borderBottom: '1px solid #f0f0f0',
-            padding: '16px 24px',
-            position: 'relative',
-          },
-          body: { padding: '0', overflow: 'auto' },
-        }}
-      >
-        {selectedDevice && (
-          <div>
-            {/* 头部信息区域 */}
-            <div style={{
-              padding: '24px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: '#fff'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{
-                  width: '64px',
-                  height: '64px',
-                  borderRadius: '12px',
-                  backgroundColor: 'rgba(255,255,255,0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {getDeviceTypeIcon(selectedDevice.type)}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px' }}>
-                    {selectedDevice.name}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', opacity: 0.9 }}>
-                    <span>{getTypeLabel(selectedDevice.type)}</span>
-                    <span>|</span>
-                    <span>{selectedDevice.deviceId}</span>
-                    <span>|</span>
-                    <Tag color={selectedDevice.status ? getStatusConfig(selectedDevice.status).badgeColor : 'default'} style={{ margin: 0 }}>
-                      {selectedDevice.status ? getStatusConfig(selectedDevice.status).text : '-'}
-                    </Tag>
-                  </div>
-                </div>
-              </div>
-            </div>
+        onEdit={showModal}
+        onViewTickets={handleViewDeviceTickets}
+        onCreateTicket={handleCreateTicketForDevice}
+      />
 
-            {/* 内容区域 */}
-            <div style={{ padding: '20px 24px' }}>
-              {/* 基本信息卡片 */}
-              <Card
-                size="small"
-                title={<span style={{ fontWeight: 600 }}>基本信息</span>}
-                style={{ marginBottom: '16px', borderRadius: '8px' }}
-              >
-                <Row gutter={[24, 16]}>
-                  <Col span={8}>
-                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>设备型号</div>
-                    <div style={{ fontWeight: 500 }}>{selectedDevice.model || '-'}</div>
-                  </Col>
-                  <Col span={8}>
-                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>序列号</div>
-                    <div style={{ fontWeight: 500 }}>{selectedDevice.serialNumber || '-'}</div>
-                  </Col>
-                  <Col span={8}>
-                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>IP地址</div>
-                    <div style={{ fontWeight: 500 }}>{selectedDevice.ipAddress || '-'}</div>
-                  </Col>
-                  <Col span={8}>
-                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>所在机房</div>
-                    <div style={{ fontWeight: 500 }}>{selectedDevice.Rack?.Room?.name || '-'}</div>
-                  </Col>
-                  <Col span={8}>
-                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>所在机柜</div>
-                    <div style={{ fontWeight: 500 }}>{selectedDevice.Rack?.name || '-'}</div>
-                  </Col>
-                  <Col span={8}>
-                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>位置(U)</div>
-                    <div style={{ fontWeight: 500 }}>U{selectedDevice.position || '-'}</div>
-                  </Col>
-                  <Col span={8}>
-                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>高度</div>
-                    <div style={{ fontWeight: 500 }}>{selectedDevice.height ? `${selectedDevice.height}U` : '-'}</div>
-                  </Col>
-                  <Col span={8}>
-                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>功率</div>
-                    <div style={{ fontWeight: 500 }}>{selectedDevice.power ? `${selectedDevice.power}W` : '-'}</div>
-                  </Col>
-                  <Col span={8}>
-                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>状态</div>
-                    <div style={{
-                      fontWeight: 500,
-                      color: selectedDevice.status ? getStatusConfig(selectedDevice.status).color : '#666'
-                    }}>
-                      {selectedDevice.status ? getStatusConfig(selectedDevice.status).text : '-'}
-                    </div>
-                  </Col>
-                </Row>
-              </Card>
+      <ImportModal
+        visible={importModalVisible}
+        deviceFields={deviceFields}
+        onImport={handleImport}
+        onCancel={() => setImportModalVisible(false)}
+      />
 
-              {/* 维保信息卡片 */}
-              <Card
-                size="small"
-                title={<span style={{ fontWeight: 600 }}>维保信息</span>}
-                style={{ marginBottom: '16px', borderRadius: '8px' }}
-              >
-                <Row gutter={[24, 16]}>
-                  <Col span={12}>
-                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>购买日期</div>
-                    <div style={{ fontWeight: 500 }}>
-                      {selectedDevice.purchaseDate
-                        ? new Date(selectedDevice.purchaseDate).toLocaleDateString('zh-CN')
-                        : '-'}
-                    </div>
-                  </Col>
-                  <Col span={12}>
-                    <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>保修到期</div>
-                    <div style={{
-                      fontWeight: selectedDevice.warrantyExpiry && new Date(selectedDevice.warrantyExpiry) < new Date() ? 600 : 500,
-                      color: selectedDevice.warrantyExpiry && new Date(selectedDevice.warrantyExpiry) < new Date() ? '#d93025' : '#333'
-                    }}>
-                      {selectedDevice.warrantyExpiry
-                        ? new Date(selectedDevice.warrantyExpiry).toLocaleDateString('zh-CN')
-                        : '-'}
-                    </div>
-                  </Col>
-                </Row>
-              </Card>
-
-              {/* 描述信息 */}
-              {selectedDevice.description && (
-                <Card
-                  size="small"
-                  title={<span style={{ fontWeight: 600 }}>描述</span>}
-                  style={{ marginBottom: '16px', borderRadius: '8px' }}
-                >
-                  <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                    {selectedDevice.description}
-                  </div>
-                </Card>
-              )}
-
-              {/* 自定义字段卡片 */}
-              {selectedDevice.customFields && Object.keys(selectedDevice.customFields).length > 0 && (
-                <Card
-                  size="small"
-                  title={<span style={{ fontWeight: 600 }}>自定义字段</span>}
-                  style={{ borderRadius: '8px' }}
-                >
-                  <Row gutter={[24, 16]}>
-                    {Object.entries(selectedDevice.customFields).map(([key, value]) => {
-                      // 从 deviceFields 中查找对应的中文显示名称
-                      const fieldConfig = deviceFields.find(f => f.fieldName === key);
-                      const displayName = fieldConfig?.displayName || key;
-                      return (
-                        <Col span={8} key={key}>
-                          <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>{displayName}</div>
-                          <div style={{ fontWeight: 500 }}>{String(value)}</div>
-                        </Col>
-                      );
-                    })}
-                  </Row>
-                </Card>
-              )}
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        title={
-          <div style={{ ...modalHeaderStyle, paddingRight: '32px' }}>
-            <ReloadOutlined style={{ color: '#52c41a' }} />
-            批量状态变更
-          </div>
-        }
-        open={batchStatusModalVisible}
-        onCancel={() => setBatchStatusModalVisible(false)}
-        footer={[
-          <Button
-            key="cancel"
-            onClick={() => setBatchStatusModalVisible(false)}
-            style={secondaryActionStyle}
-          >
-            取消
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            loading={batchStatusLoading}
-            onClick={handleBatchStatusChange}
-            style={{
-              height: '40px',
-              borderRadius: designTokens.borderRadius.small,
-              background: designTokens.colors.primary.gradient,
-              border: 'none',
-              color: '#ffffff',
-              boxShadow: designTokens.shadows.small,
-              fontWeight: '500',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            确定
-          </Button>,
-        ]}
-        destroyOnHidden
-        styles={{
-          header: {
-            borderBottom: '1px solid #f0f0f0',
-            padding: '16px 24px',
-            position: 'relative',
-          },
-          body: { padding: '24px' },
-        }}
-      >
-        <Form form={batchStatusForm} layout="vertical">
-          <Form.Item
-            name="status"
-            label="选择新状态"
-            rules={[{ required: true, message: '请选择设备状态' }]}
-          >
-            <Select placeholder="请选择设备状态" style={{ width: '100%' }}>
-              <Option value="running">运行中</Option>
-              <Option value="maintenance">维护中</Option>
-              <Option value="offline">离线</Option>
-              <Option value="fault">故障</Option>
-            </Select>
-          </Form.Item>
-          <div style={{ color: '#666', fontSize: '13px' }}>
-            已选择{' '}
-            <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedDevices.length}</span>{' '}
-            个设备
-          </div>
-        </Form>
-      </Modal>
-
-      <Modal
-        title={
-          <div style={{ ...modalHeaderStyle, paddingRight: '32px' }}>
-            <ExportOutlined style={{ color: '#fa8c16' }} />
-            导出设备数据
-          </div>
-        }
-        open={exportModalVisible}
+      <ExportModal
+        visible={exportModalVisible}
+        deviceFields={deviceFields}
+        selectedDevices={selectedDevices}
+        currentPageDevices={currentPageDevices}
+        allDevices={allDevices}
+        onExport={handleEnhancedExport}
         onCancel={() => setExportModalVisible(false)}
-        footer={[
-          <Button
-            key="cancel"
-            onClick={() => setExportModalVisible(false)}
-            style={secondaryActionStyle}
-          >
-            取消
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            loading={exportLoading}
-            onClick={handleEnhancedExport}
-            style={{
-              height: '40px',
-              borderRadius: designTokens.borderRadius.small,
-              background: designTokens.colors.primary.gradient,
-              border: 'none',
-              color: '#ffffff',
-              boxShadow: designTokens.shadows.small,
-              fontWeight: '500',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            导出
-          </Button>,
-        ]}
-        destroyOnHidden
-        styles={{
-          header: {
-            borderBottom: '1px solid #f0f0f0',
-            padding: '16px 24px',
-            position: 'relative',
-          },
-          body: { padding: '24px' },
-        }}
-        width={600}
-      >
-        <Form layout="vertical">
-          <Form.Item label="导出格式">
-            <Select value={exportFormat} onChange={setExportFormat} style={{ width: '100%' }}>
-              <Option value="csv">CSV 格式</Option>
-              <Option value="json">JSON 格式</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item label="导出范围">
-            <Select value={exportScope} onChange={setExportScope} style={{ width: '100%' }}>
-              <Option value="selected">选择的行 ({selectedDevices.length} 个)</Option>
-              <Option value="currentPage">当前页 ({currentPageDevices.length} 个)</Option>
-              <Option value="all">全部设备 ({allDevices.length} 个)</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item label="选择导出字段">
-            <div
-              style={{
-                maxHeight: '300px',
-                overflow: 'auto',
-                border: '1px solid #f0f0f0',
-                borderRadius: '8px',
-                padding: '12px',
-              }}
-            >
-              {deviceFields
-                .filter(f => f.visible && f.fieldName !== 'rackId')
-                .map(field => (
-                  <div key={field.fieldName} style={{ marginBottom: '8px' }}>
-                    <Checkbox
-                      checked={exportFields.includes(field.fieldName)}
-                      onChange={e => {
-                        if (e.target.checked) {
-                          setExportFields([...exportFields, field.fieldName]);
-                        } else {
-                          setExportFields(exportFields.filter(f => f !== field.fieldName));
-                        }
-                      }}
-                    >
-                      {field.displayName}
-                    </Checkbox>
-                  </div>
-                ))}
-            </div>
-          </Form.Item>
-          <div style={{ color: '#666', fontSize: '13px' }}>
-            已选择{' '}
-            <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedDevices.length}</span>{' '}
-            个设备， 将导出{' '}
-            <span style={{ color: '#52c41a', fontWeight: 600 }}>{exportFields.length}</span> 个字段
-          </div>
-        </Form>
-      </Modal>
+      />
+
+      <FieldConfigModal
+        visible={fieldConfigModalVisible}
+        deviceFields={deviceFields}
+        defaultDeviceFields={DEFAULT_DEVICE_FIELDS_LOCAL}
+        onSave={handleSaveFieldConfig}
+        onReset={handleResetFieldConfig}
+        onCancel={() => setFieldConfigModalVisible(false)}
+      />
+
+      <BatchStatusModal
+        visible={batchStatusModalVisible}
+        selectedCount={selectedDevices.length}
+        loading={batchStatusLoading}
+        onSubmit={handleBatchStatusChange}
+        onCancel={() => setBatchStatusModalVisible(false)}
+      />
     </div>
   );
 }

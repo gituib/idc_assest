@@ -81,8 +81,6 @@ router.get('/plans', async (req, res) => {
 
 router.get('/plans/:planId', async (req, res) => {
   try {
-    console.log('=== GET /plans/:planId ===', req.params.planId);
-    
     const plan = await InventoryPlan.findByPk(req.params.planId, {
       include: [
         { model: require('../models/User'), as: 'Creator', attributes: ['userId', 'username', 'realName'] }
@@ -90,7 +88,6 @@ router.get('/plans/:planId', async (req, res) => {
     });
 
     if (!plan) {
-      console.log('Plan not found');
       return res.status(404).json({ error: '盘点计划不存在' });
     }
 
@@ -102,10 +99,8 @@ router.get('/plans/:planId', async (req, res) => {
       order: [['createdAt', 'ASC']]
     });
 
-    console.log('Found tasks:', tasks.length);
     res.json({ plan, tasks });
   } catch (error) {
-    console.error('Error:', error);
     res.status(500).json({ error: error.message });
   }
 });

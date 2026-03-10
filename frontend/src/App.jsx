@@ -50,6 +50,7 @@ import { ConfigProvider, useConfig } from './context/ConfigContext';
 import { Scene3DProvider } from './context/Scene3DContext';
 import { useDesignTokens } from './hooks/useDesignTokens';
 import useIdleTimeout from './hooks/useIdleTimeout';
+import { SWRConfig, swrConfig } from './hooks/useSWR';
 import axios from 'axios';
 import { Spin } from 'antd';
 
@@ -561,55 +562,50 @@ const AppLayout = ({ children }) => {
   );
 };
 
+const routeConfig = [
+  { path: '/', component: Dashboard },
+  { path: '/devices', component: DeviceManagement },
+  { path: '/racks', component: RackManagement },
+  { path: '/rooms', component: RoomManagement },
+  { path: '/fields', component: DeviceFieldManagement },
+  { path: '/consumables', component: ConsumableManagement },
+  { path: '/consumables-categories', component: CategoryManagement },
+  { path: '/consumables-stats', component: ConsumableStatistics },
+  { path: '/consumables-logs', component: ConsumableLogs },
+  { path: '/users', component: UserManagement },
+  { path: '/tickets', component: TicketManagement },
+  { path: '/ticket-categories', component: TicketCategoryManagement },
+  { path: '/ticket-statistics', component: TicketStatistics },
+  { path: '/ticket-fields', component: TicketFieldManagement },
+  { path: '/settings', component: SystemSettings },
+  { path: '/cables', component: CableManagement },
+  { path: '/inventory', component: InventoryManagement },
+  { path: '/inventory/execution', component: InventoryTaskExecution },
+  { path: '/pending-devices', component: PendingDeviceManagement },
+  { path: '/ports', component: PortManagement },
+];
+
 const ThemeConfig = () => {
   const designTokens = useDesignTokens();
 
   return (
     <AntdConfigProvider theme={{ token: designTokens }}>
-      <Router>
-        <Suspense fallback={<PageLoading />}>
-          <Routes>
+      <SWRConfig value={swrConfig}>
+        <Router>
+          <Suspense fallback={<PageLoading />}>
+            <Routes>
             <Route path="/login" element={<Login />} />
-            <Route
-              path="/"
-              element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/devices"
-              element={
-                <PrivateRoute>
-                  <DeviceManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/racks"
-              element={
-                <PrivateRoute>
-                  <RackManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/rooms"
-              element={
-                <PrivateRoute>
-                  <RoomManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/fields"
-              element={
-                <PrivateRoute>
-                  <DeviceFieldManagement />
-                </PrivateRoute>
-              }
-            />
+            {routeConfig.map(({ path, component: Component }) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <PrivateRoute>
+                    <Component />
+                  </PrivateRoute>
+                }
+              />
+            ))}
             <Route
               path="/visualization-3d"
               element={
@@ -620,130 +616,11 @@ const ThemeConfig = () => {
                 </PrivateRoute>
               }
             />
-            <Route
-              path="/consumables"
-              element={
-                <PrivateRoute>
-                  <ConsumableManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/consumables-categories"
-              element={
-                <PrivateRoute>
-                  <CategoryManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/consumables-stats"
-              element={
-                <PrivateRoute>
-                  <ConsumableStatistics />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/consumables-logs"
-              element={
-                <PrivateRoute>
-                  <ConsumableLogs />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/users"
-              element={
-                <PrivateRoute>
-                  <UserManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/tickets"
-              element={
-                <PrivateRoute>
-                  <TicketManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/ticket-categories"
-              element={
-                <PrivateRoute>
-                  <TicketCategoryManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/ticket-statistics"
-              element={
-                <PrivateRoute>
-                  <TicketStatistics />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/ticket-fields"
-              element={
-                <PrivateRoute>
-                  <TicketFieldManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <PrivateRoute>
-                  <SystemSettings />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/cables"
-              element={
-                <PrivateRoute>
-                  <CableManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/inventory"
-              element={
-                <PrivateRoute>
-                  <InventoryManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/inventory/execution"
-              element={
-                <PrivateRoute>
-                  <InventoryTaskExecution />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/pending-devices"
-              element={
-                <PrivateRoute>
-                  <PendingDeviceManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/ports"
-              element={
-                <PrivateRoute>
-                  <PortManagement />
-                </PrivateRoute>
-              }
-            />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
       </Router>
+      </SWRConfig>
     </AntdConfigProvider>
   );
 };

@@ -536,7 +536,6 @@ function CableManagement() {
 
     if (errors.length > 0) {
       message.warning(`发现 ${errors.length} 条数据错误，已跳过`);
-      console.log('导入错误:', errors);
     }
 
     return validatedData;

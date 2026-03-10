@@ -1256,8 +1256,16 @@ function ConsumableManagement() {
         footer={null}
         width={900}
         style={{ top: 20 }}
-        bodyStyle={{ padding: '24px', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}
       >
+        <div 
+          style={{ 
+            maxHeight: '65vh', 
+            overflowY: 'auto', 
+            padding: '24px',
+            paddingRight: '16px',
+          }}
+          className="custom-scroll-container"
+        >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           {/* 基本信息 */}
           <div style={{
@@ -1778,6 +1786,7 @@ function ConsumableManagement() {
             </Button>
           </div>
         </Form>
+        </div>
       </Modal>
 
       {/* 导入耗材弹窗 */}

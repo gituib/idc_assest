@@ -55,12 +55,10 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
-    console.log('接收到的数据:', JSON.stringify(req.body, null, 2));
     const consumableData = {
       ...req.body,
       consumableId: req.body.consumableId || `CON${Date.now()}`
     };
-    console.log('处理后的数据:', JSON.stringify(consumableData, null, 2));
     const consumable = await Consumable.create(consumableData, { transaction });
     
     await ConsumableLog.create({

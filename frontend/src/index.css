@@ -592,7 +592,29 @@ body {
 
 .ant-modal-body {
   padding: 24px !important;
-  overflow: hidden !important;
+}
+
+.custom-scroll-container {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.custom-scroll-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scroll-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.custom-scroll-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.custom-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 .ant-modal-header {
