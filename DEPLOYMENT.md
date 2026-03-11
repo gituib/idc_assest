@@ -33,6 +33,21 @@ git clone https://gitee.com/zhang96110/idc_assest.git
 git clone https://github.com/gituib/idc_assest.git
 cd idc_assest
 
+#如果没安装nodejs需要先安装
+
+**Ubuntu/Debian:**
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+**CentOS/RHEL/Fedora:**
+```bash
+curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+sudo yum install -y nodejs
+
+系统已经安装了nodejs的可以直接执行一键安装脚本
+
 # 运行部署脚本
 npm run deploy
 # 或
@@ -108,40 +123,6 @@ node install.js
 ## 开发环境部署
 
 ### 1. 环境准备
-
-#### Windows
-
-**方式一：官方安装包（推荐）**
-1. 访问: https://nodejs.org/
-2. 下载 LTS 版本（推荐 v20.x）
-3. 运行安装包，按向导完成安装
-
-**方式二：nvm-windows（推荐开发者）**
-1. 下载安装 nvm-windows: https://github.com/coreybutler/nvm-windows/releases
-2. 执行: `nvm install 20`
-3. 执行: `nvm use 20`
-
-**方式三：Winget（Windows 10/11）**
-```powershell
-winget install OpenJS.NodeJS.LTS
-```
-
-#### macOS
-
-**方式一：Homebrew（推荐）**
-```bash
-brew install node@20
-```
-
-**方式二：nvm（推荐开发者）**
-```bash
-# 安装 nvm
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-
-# 安装 Node.js 20
-nvm install 20
-nvm use 20
-```
 
 #### Linux
 
