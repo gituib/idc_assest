@@ -180,6 +180,37 @@ app.use('/api/inventory', inventoryRoutes);
 
 app.use('/uploads', express.static('uploads'));
 
+app.get('/api', (req, res) => {
+  res.json({
+    name: 'IDC设备管理系统 API',
+    version: '1.0.0',
+    description: '数据中心设备管理平台后端服务',
+    endpoints: {
+      auth: '/api/auth',
+      rooms: '/api/rooms',
+      racks: '/api/racks',
+      devices: '/api/devices',
+      deviceFields: '/api/deviceFields',
+      devicePorts: '/api/device-ports',
+      networkCards: '/api/network-cards',
+      cables: '/api/cables',
+      tickets: '/api/tickets',
+      ticketCategories: '/api/ticket-categories',
+      ticketFields: '/api/ticket-fields',
+      consumables: '/api/consumables',
+      consumableRecords: '/api/consumable-records',
+      consumableCategories: '/api/consumable-categories',
+      users: '/api/users',
+      roles: '/api/roles',
+      systemSettings: '/api/system-settings',
+      background: '/api/background',
+      inventory: '/api/inventory'
+    },
+    health: '/health',
+    documentation: '/docs/api/README.md'
+  });
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'IDC设备管理系统后端服务正常运行' });
 });

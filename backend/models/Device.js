@@ -1,6 +1,5 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
-const Rack = require('./Rack');
 
 const Device = sequelize.define('Device', {
   deviceId: {
@@ -28,11 +27,7 @@ const Device = sequelize.define('Device', {
   },
   rackId: {
     type: DataTypes.STRING,
-    allowNull: true,
-    references: {
-      model: Rack,
-      key: 'rackId'
-    }
+    allowNull: true
   },
   position: {
     type: DataTypes.INTEGER,
@@ -85,8 +80,5 @@ const Device = sequelize.define('Device', {
     { fields: ['name'] }
   ]
 });
-
-Device.belongsTo(Rack, { foreignKey: 'rackId' });
-Rack.hasMany(Device, { foreignKey: 'rackId' });
 
 module.exports = Device;

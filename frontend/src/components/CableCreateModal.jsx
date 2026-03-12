@@ -13,20 +13,27 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
   const [sourcePorts, setSourcePorts] = useState([]);
   const [targetPorts, setTargetPorts] = useState([]);
   const [fetchingDevices, setFetchingDevices] = useState(false);
-  const prevVisibleRef = useRef(false);
+  const devicesRef = useRef([]);
 
   const fetchDevices = useCallback(async (keyword = '') => {
     try {
       setFetchingDevices(true);
-      const params = { pageSize: 50 };
+      const params = { pageSize: 100 };
       if (keyword && keyword.trim()) {
         params.keyword = keyword.trim();
       }
+      console.log('[CableCreateModal] Fetching devices with params:', params);
       const response = await axios.get('/api/devices', { params });
-      setDevices(response.data.devices || []);
+      console.log('[CableCreateModal] API response:', response.data);
+      const deviceList = response.data.devices || [];
+      console.log('[CableCreateModal] Device list:', deviceList.length, 'devices');
+      setDevices(deviceList);
+      devicesRef.current = deviceList;
+      return deviceList;
     } catch (error) {
-      console.error('Failed to fetch devices:', error);
+      console.error('[CableCreateModal] Failed to fetch devices:', error);
       message.error('获取设备列表失败');
+      return [];
     } finally {
       setFetchingDevices(false);
     }
@@ -40,18 +47,32 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
   );
 
   useEffect(() => {
-    if (visible && !prevVisibleRef.current) {
+    if (visible) {
+      console.log('[CableCreateModal] Modal opened, sourceDevice:', sourceDevice);
       form.resetFields();
-      if (sourceDevice) {
-        form.setFieldsValue({
-          sourceDeviceId: sourceDevice.deviceId || sourceDevice.id,
-        });
-        fetchDevicePorts(sourceDevice.deviceId || sourceDevice.id, 'source');
-      }
-      fetchDevices();
+      setSourcePorts([]);
+      setTargetPorts([]);
+      setDevices([]);
+      devicesRef.current = [];
+      
+      fetchDevices().then(deviceList => {
+        console.log('[CableCreateModal] Devices fetched:', deviceList.length);
+        const sourceDeviceId = sourceDevice?.deviceId || sourceDevice?.id;
+        console.log('[CableCreateModal] sourceDeviceId:', sourceDeviceId);
+        if (sourceDeviceId && deviceList.length > 0) {
+          const deviceExists = deviceList.some(d => d.deviceId === sourceDeviceId);
+          console.log('[CableCreateModal] Device exists in list:', deviceExists);
+          if (deviceExists) {
+            console.log('[CableCreateModal] Setting form value:', sourceDeviceId);
+            form.setFieldsValue({
+              sourceDeviceId: sourceDeviceId,
+            });
+            fetchDevicePorts(sourceDeviceId, 'source');
+          }
+        }
+      });
     }
-    prevVisibleRef.current = visible;
-  }, [visible, sourceDevice, form, fetchDevices]);
+  }, [visible, sourceDevice?.deviceId, sourceDevice?.id, form, fetchDevices]);
 
   const fetchDevicePorts = async (deviceId, type) => {
     if (!deviceId) {
@@ -138,9 +159,11 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
           <Select
             showSearch
             filterOption={false}
-            placeholder="搜索设备..."
+            placeholder={fetchingDevices ? '加载中...' : '搜索设备...'}
+            loading={fetchingDevices}
             onSearch={handleDeviceSearch}
             onChange={handleSourceDeviceChange}
+            notFoundContent={fetchingDevices ? <Spin size="small" /> : '暂无数据'}
           >
             {devices.map(device => (
               <Option key={device.deviceId} value={device.deviceId}>
@@ -167,9 +190,11 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
           <Select
             showSearch
             filterOption={false}
-            placeholder="搜索设备..."
+            placeholder={fetchingDevices ? '加载中...' : '搜索设备...'}
+            loading={fetchingDevices}
             onSearch={handleDeviceSearch}
             onChange={handleTargetDeviceChange}
+            notFoundContent={fetchingDevices ? <Spin size="small" /> : '暂无数据'}
           >
             {devices.map(device => (
               <Option key={device.deviceId} value={device.deviceId}>

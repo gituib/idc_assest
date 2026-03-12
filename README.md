@@ -641,7 +641,7 @@ SOFTWARE.
 - **Gitee Issues**: https://gitee.com/zhang96110/idc_assest/issues
 - **GitHub Issues**: https://github.com/gituib/idc_assest/issues
 - 功能建议：提交 Issue 并标注 `feature-request`
-
+- QQ群：1081123775
 ---
 
 **⭐ 如果这个项目对您有帮助，请给我们一个 Star！**

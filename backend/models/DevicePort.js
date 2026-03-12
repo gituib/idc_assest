@@ -1,7 +1,5 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
-const Device = require('./Device');
-const NetworkCard = require('./NetworkCard');
 
 const DevicePort = sequelize.define('DevicePort', {
   portId: {
@@ -66,11 +64,5 @@ const DevicePort = sequelize.define('DevicePort', {
     { unique: true, fields: ['deviceId', 'portName'] }
   ]
 });
-
-DevicePort.belongsTo(Device, { foreignKey: 'deviceId', as: 'device' });
-Device.hasMany(DevicePort, { foreignKey: 'deviceId', as: 'ports' });
-
-DevicePort.belongsTo(NetworkCard, { foreignKey: 'nicId', as: 'networkCard' });
-NetworkCard.hasMany(DevicePort, { foreignKey: 'nicId', as: 'ports' });
 
 module.exports = DevicePort;

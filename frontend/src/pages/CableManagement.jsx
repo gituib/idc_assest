@@ -206,18 +206,36 @@ function CableManagement() {
   const fetchDevices = useCallback(async (keyword = '') => {
     try {
       setDeviceSearching(true);
-      const params = { pageSize: 50 };
+      
+      // 并行获取所有设备和交换机设备
+      const params = { pageSize: 1000 };
       if (keyword && keyword.trim()) {
         params.keyword = keyword.trim();
       }
-      const response = await axios.get('/api/devices', { params });
-      const allDevices = response.data.devices || [];
-      const switches = allDevices.filter(device => device.type === 'switch');
+      
+      const [allResponse, switchResponse] = await Promise.all([
+        axios.get('/api/devices', { params }),
+        axios.get('/api/devices', { params: { ...params, type: 'switch' } })
+      ]);
+      
+      const allDevices = allResponse.data.devices || [];
+      const switchDevices = switchResponse.data.devices || [];
+      
+      // 统计各类型设备数量
+      const typeCount = {};
+      allDevices.forEach(d => {
+        const t = d.type || 'undefined';
+        typeCount[t] = (typeCount[t] || 0) + 1;
+      });
+      console.log('[CableManagement] 设备类型统计:', typeCount);
+      console.log('[CableManagement] All devices:', allDevices.length);
+      console.log('[CableManagement] Switch devices (from API):', switchDevices.length);
+      
       setDevices(allDevices);
-      setSwitchDevices(switches);
+      setSwitchDevices(switchDevices);
     } catch (error) {
       message.error('获取设备列表失败');
-      console.error('获取设备列表失败:', error);
+      console.error('[CableManagement] 获取设备列表失败:', error);
     } finally {
       setDeviceSearching(false);
     }
@@ -1244,7 +1262,7 @@ function CableManagement() {
                   rules={[{ required: true, message: '请选择源设备' }]}
                 >
                   <Select
-                    placeholder="输入关键词搜索源设备"
+                    placeholder="输入关键词搜索交换机"
                     showSearch
                     loading={deviceSearching}
                     filterOption={false}

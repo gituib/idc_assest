@@ -5,6 +5,10 @@ const NetworkCard = require('../models/NetworkCard');
 const Device = require('../models/Device');
 const DevicePort = require('../models/DevicePort');
 
+NetworkCard.belongsTo(Device, { foreignKey: 'deviceId', as: 'device' });
+Device.hasMany(NetworkCard, { foreignKey: 'deviceId', as: 'networkCards' });
+NetworkCard.hasMany(DevicePort, { foreignKey: 'nicId', as: 'ports' });
+
 router.get('/', async (req, res) => {
   try {
     const { deviceId } = req.query;

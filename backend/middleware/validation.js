@@ -3,49 +3,54 @@ const validate = (schema, source = 'body') => {
     const data = source === 'query' ? req.query : req.body;
     
     try {
-      let result;
+      let value;
       
       if (schema.validate && typeof schema.validate === 'function') {
-        if (schema.validate.constructor.name === 'AsyncFunction' || 
-            schema.validate.length === 1) {
-          result = await schema.validate(data, {
-            abortEarly: false,
-            stripUnknown: true,
-            allowUnknown: source === 'query'
+        const result = schema.validate(data, {
+          abortEarly: false,
+          stripUnknown: true,
+          allowUnknown: source === 'query'
+        });
+        
+        if (result && typeof result.then === 'function') {
+          value = await result;
+        } else if (result && result.error) {
+          const errorMessages = result.error.details.map(detail => ({
+            field: detail.path.join('.'),
+            message: detail.message
+          }));
+          return res.status(400).json({
+            error: '参数验证失败',
+            details: errorMessages
           });
+        } else if (result && result.value !== undefined) {
+          value = result.value;
         } else {
-          result = schema.validate(data, {
-            abortEarly: false,
-            stripUnknown: true,
-            allowUnknown: source === 'query'
-          });
+          value = result;
         }
       } else if (schema.validateAsync) {
-        result = await schema.validateAsync(data, {
+        value = await schema.validateAsync(data, {
           abortEarly: false,
           stripUnknown: true,
           allowUnknown: source === 'query'
         });
       } else {
-        result = schema.validate(data, {
+        const result = schema.validate(data, {
           abortEarly: false,
           stripUnknown: true,
           allowUnknown: source === 'query'
         });
-      }
-
-      const { error, value } = result;
-
-      if (error) {
-        const errorMessages = error.details.map(detail => ({
-          field: detail.path.join('.'),
-          message: detail.message
-        }));
-
-        return res.status(400).json({
-          error: '参数验证失败',
-          details: errorMessages
-        });
+        if (result.error) {
+          const errorMessages = result.error.details.map(detail => ({
+            field: detail.path.join('.'),
+            message: detail.message
+          }));
+          return res.status(400).json({
+            error: '参数验证失败',
+            details: errorMessages
+          });
+        }
+        value = result.value;
       }
 
       if (source === 'query') {

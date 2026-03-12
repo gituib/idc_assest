@@ -110,6 +110,17 @@ export const designTokens = {
       date: '#06b6d4',
       textarea: '#64748b',
     },
+    slot: {
+      empty: '#4b5563',
+      occupied: '#3b82f6',
+      warning: '#f59e0b',
+      error: '#ef4444',
+    },
+    metal: {
+      light: '#9ca3af',
+      medium: '#6b7280',
+      dark: '#374151',
+    },
   },
   shadows: {
     small: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',

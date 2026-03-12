@@ -3,6 +3,11 @@ const router = express.Router();
 const { Op } = require('sequelize');
 const DevicePort = require('../models/DevicePort');
 const Device = require('../models/Device');
+const NetworkCard = require('../models/NetworkCard');
+
+DevicePort.belongsTo(Device, { foreignKey: 'deviceId', as: 'device' });
+Device.hasMany(DevicePort, { foreignKey: 'deviceId', as: 'ports' });
+DevicePort.belongsTo(NetworkCard, { foreignKey: 'nicId', as: 'networkCard' });
 
 router.get('/', async (req, res) => {
   try {

@@ -1,6 +1,5 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
-const Device = require('./Device');
 
 const NetworkCard = sequelize.define('NetworkCard', {
   nicId: {
@@ -62,8 +61,5 @@ const NetworkCard = sequelize.define('NetworkCard', {
     { unique: true, fields: ['deviceId', 'name'] }
   ]
 });
-
-NetworkCard.belongsTo(Device, { foreignKey: 'deviceId', as: 'device' });
-Device.hasMany(NetworkCard, { foreignKey: 'deviceId', as: 'networkCards' });
 
 module.exports = NetworkCard;

@@ -116,9 +116,30 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
-    const user = await User.findByPk(decoded.userId);
+    // 验证用户是否存在，增加详细的错误日志
+    let user;
+    try {
+      user = await User.findByPk(decoded.userId);
+    } catch (dbError) {
+      // 数据库查询错误
+      console.error('[认证中间件] 数据库查询失败:', {
+        userId: decoded.userId,
+        error: dbError.message,
+        stack: dbError.stack,
+        timestamp: new Date().toISOString()
+      });
+      return res.status(500).json({
+        success: false,
+        message: '数据库查询失败，请稍后重试'
+      });
+    }
     
     if (!user) {
+      console.warn('[认证中间件] 用户不存在:', {
+        userId: decoded.userId,
+        username: decoded.username,
+        timestamp: new Date().toISOString()
+      });
       return res.status(401).json({
         success: false,
         message: '用户不存在'
@@ -126,6 +147,11 @@ const authMiddleware = async (req, res, next) => {
     }
 
     if (user.status === 'locked') {
+      console.warn('[认证中间件] 账户已被锁定:', {
+        userId: user.userId,
+        username: user.username,
+        timestamp: new Date().toISOString()
+      });
       return res.status(403).json({
         success: false,
         message: '账户已被锁定'
@@ -133,6 +159,11 @@ const authMiddleware = async (req, res, next) => {
     }
 
     if (user.status === 'inactive') {
+      console.warn('[认证中间件] 账户已禁用:', {
+        userId: user.userId,
+        username: user.username,
+        timestamp: new Date().toISOString()
+      });
       return res.status(403).json({
         success: false,
         message: '账户已禁用'
@@ -143,10 +174,18 @@ const authMiddleware = async (req, res, next) => {
     req.userModel = user;
     next();
   } catch (error) {
-    console.error('认证中间件错误:', error);
+    // 捕获未预期的错误
+    console.error('[认证中间件] 未预期的错误:', {
+      error: error.message,
+      stack: error.stack,
+      url: req?.url,
+      method: req?.method,
+      ip: req?.ip,
+      timestamp: new Date().toISOString()
+    });
     return res.status(500).json({
       success: false,
-      message: '认证失败'
+      message: '认证失败，请稍后重试'
     });
   }
 };
@@ -160,7 +199,21 @@ const optionalAuth = async (req, res, next) => {
       const decoded = verifyToken(token);
       
       if (decoded) {
-        const user = await User.findByPk(decoded.userId);
+        let user;
+        try {
+          user = await User.findByPk(decoded.userId);
+        } catch (dbError) {
+          // 数据库错误时不中断请求，仅记录日志
+          console.warn('[可选认证] 数据库查询失败:', {
+            userId: decoded.userId,
+            error: dbError.message,
+            timestamp: new Date().toISOString()
+          });
+          // 继续执行，不设置用户信息
+          next();
+          return;
+        }
+        
         if (user && user.status === 'active') {
           req.user = decoded;
           req.userModel = user;
@@ -170,6 +223,12 @@ const optionalAuth = async (req, res, next) => {
     
     next();
   } catch (error) {
+    // 可选认证失败不影响主流程，仅记录日志
+    console.warn('[可选认证] 认证失败（已忽略）:', {
+      error: error.message,
+      url: req?.url,
+      timestamp: new Date().toISOString()
+    });
     next();
   }
 };

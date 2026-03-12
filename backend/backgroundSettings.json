@@ -1,5 +1,6 @@
 {
-  "type": "image",
-  "image": null,
-  "size": "contain"
+  "opacity": 0.8,
+  "blur": 5,
+  "value": "/images/bg.jpg",
+  "type": "image"
 }

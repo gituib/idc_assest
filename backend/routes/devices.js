@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
-const { sequelize, dbDialect } = require('../db'); // Import sequelize and dbDialect for transactions
+const { sequelize, dbDialect } = require('../db');
 const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
@@ -12,9 +12,9 @@ const Rack = require('../models/Rack');
 const Room = require('../models/Room');
 const DeviceField = require('../models/DeviceField');
 const Ticket = require('../models/Ticket');
-const DevicePort = require('../models/DevicePort'); // Import DevicePort
-const Cable = require('../models/Cable'); // Import Cable
-const NetworkCard = require('../models/NetworkCard'); // Import NetworkCard
+const DevicePort = require('../models/DevicePort');
+const Cable = require('../models/Cable');
+const NetworkCard = require('../models/NetworkCard');
 const { validateBody, validateQuery } = require('../middleware/validation');
 const {
   createDeviceSchema,
@@ -25,7 +25,9 @@ const {
   queryDeviceSchema
 } = require('../validation/deviceSchema');
 
-// 获取所有设备（支持搜索和筛选）
+Device.belongsTo(Rack, { foreignKey: 'rackId' });
+Rack.hasMany(Device, { foreignKey: 'rackId' });
+
 router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
   try {
     const { keyword, status, type, rackId, page = 1, pageSize = 10 } = req.query;
@@ -772,6 +774,16 @@ router.post('/import', async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('导入设备数据失败:', error);
+    
+    // 清理临时文件
+    try {
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (fileErr) {
+      console.error('删除临时文件失败:', fileErr);
+    }
+    
     res.status(500).json({ 
       errors: [{ row: 0, error: error.message || '导入过程中发生未知错误' }] 
     });
@@ -1224,7 +1236,22 @@ router.delete('/:deviceId', async (req, res) => {
       { where: { deviceId: deviceId }, transaction: t }
     );
     
-    // 5. 删除设备 (Delete Device)
+    // 5. 更新机柜功率 (必须在删除设备之前)
+    if (device.rackId) {
+      try {
+        const rack = await Rack.findByPk(device.rackId, { transaction: t });
+        if (rack) {
+          await rack.update({
+            currentPower: Math.max(0, rack.currentPower - device.powerConsumption)
+          }, { transaction: t });
+        }
+      } catch (err) {
+        console.error('更新机柜功率失败:', err);
+        throw err; // 重新抛出错误，触发事务回滚
+      }
+    }
+    
+    // 6. 删除设备 (Delete Device)
     await Device.destroy({
       where: { deviceId: deviceId },
       transaction: t
@@ -1235,23 +1262,6 @@ router.delete('/:deviceId', async (req, res) => {
     
     if (deletedCables > 0) {
       console.log(`已删除 ${deletedCables} 条相关接线`);
-    }
-    
-    // 更新机柜功率 (Update Rack power)
-    // 注意：设备已删除，不需要再减去功率？或者需要？
-    // 原逻辑是：rack.currentPower - device.powerConsumption
-    // 既然设备已经物理删除了，机柜的当前功率确实应该减少。
-    if (device.rackId) {
-      try {
-        const rack = await Rack.findByPk(device.rackId);
-        if (rack) {
-          await rack.update({
-            currentPower: Math.max(0, rack.currentPower - device.powerConsumption)
-          });
-        }
-      } catch (err) {
-        console.error('更新机柜功率失败:', err);
-      }
     }
     
     res.status(200).json({ 
