@@ -32,7 +32,7 @@ import {
   CloudDownloadOutlined,
   FileProtectOutlined,
 } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api';
 import { useNavigate } from 'react-router-dom';
 
 const { Title, Text, Paragraph } = Typography;
@@ -67,9 +67,9 @@ const AutoBackupSettings = () => {
     try {
       setLoading(true);
       isFetching.current = true;
-      const response = await axios.get('/api/backup/auto/status');
-      if (response.data?.success) {
-        const data = response.data.data;
+      const response = await api.get('/backup/auto/status');
+      if (response?.success) {
+        const data = response.data;
         setStatus(data);
         
         // 解析 Cron 表达式获取小时和分钟
@@ -101,7 +101,7 @@ const AutoBackupSettings = () => {
   const handleSave = async () => {
     try {
       setLoading(true);
-      const response = await axios.post('/api/backup/auto/settings', {
+      const response = await api.post('/backup/auto/settings', {
         enabled: settings.enabled,
         hour: settings.hour,
         minute: settings.minute,
@@ -111,7 +111,7 @@ const AutoBackupSettings = () => {
         maxAgeDays: settings.maxAgeDays,
       });
 
-      if (response.data?.success) {
+      if (response?.success) {
         message.success('自动备份设置已保存');
         setModified(false);
         // 不需要立即刷新，因为保存成功后状态已经是最新的
@@ -147,13 +147,13 @@ const AutoBackupSettings = () => {
       onOk: async () => {
         try {
           setLoading(true);
-          const response = await axios.post('/api/backup/auto/execute', {
+          const response = await api.post('/backup/auto/execute', {
             description: `手动触发 - ${new Date().toLocaleString('zh-CN')}`,
             includeFiles: settings.includeFiles,
             compress: settings.compress,
           });
 
-          if (response.data?.success) {
+          if (response?.success) {
             message.success('备份执行成功！');
           }
         } catch (error) {

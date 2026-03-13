@@ -34,7 +34,7 @@ import {
   InfoCircleOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
-import axios from 'axios';
+import api, { backupAPI } from '../api';
 import CloseButton from '../components/CloseButton';
 import { useNavigate } from 'react-router-dom';
 
@@ -125,9 +125,9 @@ const BackupManagement = () => {
   const fetchBackups = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/backup/list');
-      if (response.data?.success) {
-        setBackups(response.data.data?.backups || []);
+      const response = await api.get('/backup/list');
+      if (response?.success) {
+        setBackups(response.data?.backups || []);
       }
     } catch (error) {
       message.error('获取备份列表失败');
@@ -138,9 +138,9 @@ const BackupManagement = () => {
 
   const fetchBackupInfo = useCallback(async () => {
     try {
-      const response = await axios.get('/api/backup/info');
-      if (response.data?.success) {
-        setBackupInfo(response.data.data);
+      const response = await api.get('/backup/info');
+      if (response?.success) {
+        setBackupInfo(response.data);
       }
     } catch (error) {
       console.error('获取备份信息失败:', error);
@@ -155,11 +155,11 @@ const BackupManagement = () => {
   const handleCreateBackup = async () => {
     setBackupLoading(true);
     try {
-      const response = await axios.post('/api/backup', {
+      const response = await api.post('/backup', {
         description: '手动备份',
         includeFiles: true,
       });
-      if (response.data?.success) {
+      if (response?.success) {
         message.success('备份创建成功');
         fetchBackups();
         fetchBackupInfo();
@@ -179,9 +179,9 @@ const BackupManagement = () => {
 
   const handleValidate = async (filename) => {
     try {
-      const response = await axios.get(`/api/backup/validate/${filename}`);
-      if (response.data?.success && response.data.data?.valid) {
-        const data = response.data.data;
+      const response = await api.get(`/backup/validate/${filename}`);
+      if (response?.success && response.data?.valid) {
+        const data = response.data;
         Modal.info({
           title: (
             <Space>
@@ -535,7 +535,7 @@ const BackupManagement = () => {
       setRestoreProgress(10);
       setRestoreStatus('正在读取备份数据...');
 
-      const response = await axios.post('/api/backup/restore', {
+      const response = await api.post('/backup/restore', {
         filename,
         options: {
           overwriteExisting: true,
@@ -546,8 +546,8 @@ const BackupManagement = () => {
       setRestoreProgress(90);
       setRestoreStatus('正在完成恢复...');
 
-      if (response.data?.success) {
-        const data = response.data.data;
+      if (response?.success) {
+        const data = response.data;
         setRestoreProgress(100);
         setRestoreStatus('恢复完成!');
 
@@ -817,13 +817,13 @@ const BackupManagement = () => {
 
   const handleDelete = async (filename) => {
     try {
-      const response = await axios.delete(`/api/backup/${filename}`);
-      if (response.data?.success) {
+      const response = await api.delete(`/backup/${filename}`);
+      if (response?.success) {
         message.success('删除成功');
         fetchBackups();
         fetchBackupInfo();
       } else {
-        message.error(response.data?.message || '删除失败');
+        message.error(response?.message || '删除失败');
       }
     } catch (error) {
       message.error('删除失败: ' + (error.response?.data?.message || error.message || '未知错误'));
@@ -836,18 +836,18 @@ const BackupManagement = () => {
     formData.append('backup', file);
 
     try {
-      const response = await axios.post('/api/backup/upload', formData, {
+      const response = await api.post('/backup/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      if (response.data?.success) {
+      if (response?.success) {
         message.success('备份文件上传成功');
         fetchBackups();
         fetchBackupInfo();
-        onSuccess(response.data.data);
+        onSuccess(response.data);
       } else {
-        message.error(response.data?.message || '上传失败');
-        onError(new Error(response.data?.message));
+        message.error(response?.message || '上传失败');
+        onError(new Error(response?.message));
       }
     } catch (error) {
       message.error('上传失败: ' + (error.response?.data?.message || error.message || '未知错误'));
@@ -857,14 +857,14 @@ const BackupManagement = () => {
 
   const handleCleanBackups = async (maxCount = 30, maxAgeDays = 90, dryRun = false) => {
     try {
-      const response = await axios.post('/api/backup/clean', {
+      const response = await api.post('/backup/clean', {
         maxCount,
         maxAgeDays,
         dryRun,
       });
 
-      if (response.data?.success) {
-        const data = response.data.data;
+      if (response?.success) {
+        const data = response.data;
         if (dryRun) {
           Modal.info({
             title: '清理预览',
