@@ -161,6 +161,15 @@ const rl = readline.createInterface({
   output: process.stdout  // 标准输出（屏幕）
 });
 
+rl.on('close', () => {
+  process.exit(0);
+});
+
+rl.on('error', (err) => {
+  log.error(`输入错误: ${err.message}`);
+  process.exit(1);
+});
+
 /**
  * 提问函数 - 获取用户输入
  * 
@@ -196,13 +205,15 @@ function askPassword(question) {
     
     let password = '';
     const stdin = process.stdin;
-    const wasRaw = stdin.isRaw;
     
-    if (stdin.isTTY) {
-      stdin.setRawMode(true);
-    }
-    stdin.resume();
-    stdin.setEncoding('utf8');
+    const cleanup = () => {
+      if (stdin.isTTY) {
+        try {
+          stdin.setRawMode(false);
+        } catch {}
+      }
+      stdin.removeListener('data', onData);
+    };
     
     const onData = (char) => {
       const c = char;
@@ -211,28 +222,35 @@ function askPassword(question) {
         case '\n':
         case '\r':
         case '\u0004':
-          if (stdin.isTTY) {
-            stdin.setRawMode(wasRaw || false);
-          }
-          stdin.pause();
-          stdin.removeListener('data', onData);
+          cleanup();
           console.log();
           resolve(password);
           break;
         case '\u0003':
-          process.exit();
+          cleanup();
+          console.log('\n已取消');
+          process.exit(0);
           break;
         case '\u007F':
         case '\b':
-          password = password.slice(0, -1);
+          if (password.length > 0) {
+            password = password.slice(0, -1);
+            process.stdout.write('\b \b');
+          }
           break;
         default:
           password += c;
+          process.stdout.write('*');
           break;
       }
     };
     
+    if (stdin.isTTY) {
+      stdin.setRawMode(true);
+    }
+    stdin.setEncoding('utf8');
     stdin.on('data', onData);
+    stdin.resume();
   });
 }
 
