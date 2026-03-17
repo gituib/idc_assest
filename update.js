@@ -53,6 +53,7 @@ function parseArgs() {
     skipMigrate: args.includes('--skip-migrate'),
     skipBuild: args.includes('--skip-build'),
     skipRestart: args.includes('--skip-restart'),
+    skipDeps: args.includes('--skip-deps'),
     dryRun: args.includes('--dry-run'),
     force: args.includes('--force'),
     help: args.includes('--help') || args.includes('-h')
@@ -68,6 +69,7 @@ ${colors.bright}IDC设备管理系统 - 一键更新脚本 v${SCRIPT_VERSION}${c
 选项:
   --skip-git      跳过 Git 拉取
   --skip-backup   跳过数据库备份
+  --skip-deps     跳过依赖安装
   --skip-migrate  跳过数据库迁移
   --skip-build    跳过前端构建
   --skip-restart  跳过服务重启
@@ -77,7 +79,7 @@ ${colors.bright}IDC设备管理系统 - 一键更新脚本 v${SCRIPT_VERSION}${c
 
 示例:
   node update.js                  # 完整更新流程
-  node update.js --skip-backup    # 跳过备份
+  node update.js --skip-deps      # 跳过依赖安装
   node update.js --dry-run        # 模拟运行
 `);
   process.exit(0);
@@ -298,33 +300,102 @@ function pullCode(options) {
   return { success: false };
 }
 
+function checkDepsNeedInstall(dirPath, dirName) {
+  const nodeModulesPath = path.join(dirPath, 'node_modules');
+  const packageJsonPath = path.join(dirPath, 'package.json');
+  const packageLockPath = path.join(dirPath, 'package-lock.json');
+
+  if (!fs.existsSync(packageJsonPath)) {
+    return { needInstall: false, reason: '未找到 package.json' };
+  }
+
+  if (!fs.existsSync(nodeModulesPath)) {
+    return { needInstall: true, reason: 'node_modules 不存在' };
+  }
+
+  try {
+    const gitDiff = execSync(`git diff HEAD~1 --name-only -- "${dirName}/package.json" "${dirName}/package-lock.json" 2>nul`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      cwd: __dirname
+    }).trim();
+
+    if (gitDiff) {
+      return { needInstall: true, reason: 'package.json 或 package-lock.json 有更新' };
+    }
+  } catch {
+    // Git 检查失败，继续其他检测
+  }
+
+  try {
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    const depsCount = Object.keys(packageJson.dependencies || {}).length + 
+                      Object.keys(packageJson.devDependencies || {}).length;
+    
+    const installedCount = fs.readdirSync(nodeModulesPath).filter(f => 
+      !f.startsWith('.') && fs.statSync(path.join(nodeModulesPath, f)).isDirectory()
+    ).length;
+
+    if (depsCount > 0 && installedCount < depsCount * 0.5) {
+      return { needInstall: true, reason: `已安装依赖数量不足 (${installedCount}/${depsCount})` };
+    }
+  } catch {
+    // 检测失败，保守起见执行安装
+    return { needInstall: true, reason: '依赖状态检测失败' };
+  }
+
+  return { needInstall: false, reason: '依赖已是最新' };
+}
+
 function installDependencies(options) {
+  if (options.skipDeps) {
+    log.info('已跳过依赖安装');
+    return { success: true, skipped: true };
+  }
+
   const backendPath = path.join(__dirname, 'backend');
   const frontendPath = path.join(__dirname, 'frontend');
 
   if (options.dryRun) {
-    log.subStep('[模拟] 安装后端依赖');
-    log.subStep('[模拟] 安装前端依赖');
+    log.subStep('[模拟] 检测后端依赖');
+    log.subStep('[模拟] 检测前端依赖');
     return { success: true, dryRun: true };
   }
 
-  log.subStep('安装后端依赖...');
-  const backendResult = runCommand('npm install --production=false', { cwd: backendPath });
-  if (!backendResult.success) {
-    log.error('后端依赖安装失败');
-    return { success: false, step: 'backend' };
-  }
-  log.success('后端依赖安装完成');
+  let backendSkipped = false;
+  let frontendSkipped = false;
 
-  log.subStep('安装前端依赖...');
-  const frontendResult = runCommand('npm install', { cwd: frontendPath });
-  if (!frontendResult.success) {
-    log.error('前端依赖安装失败');
-    return { success: false, step: 'frontend' };
+  log.subStep('检测后端依赖状态...');
+  const backendCheck = checkDepsNeedInstall(backendPath, 'backend');
+  if (backendCheck.needInstall) {
+    log.info(`后端依赖需要更新: ${backendCheck.reason}`);
+    const backendResult = runCommand('npm install --production=false', { cwd: backendPath });
+    if (!backendResult.success) {
+      log.error('后端依赖安装失败');
+      return { success: false, step: 'backend' };
+    }
+    log.success('后端依赖安装完成');
+  } else {
+    log.success(`后端依赖已是最新 (${backendCheck.reason})`);
+    backendSkipped = true;
   }
-  log.success('前端依赖安装完成');
 
-  return { success: true };
+  log.subStep('检测前端依赖状态...');
+  const frontendCheck = checkDepsNeedInstall(frontendPath, 'frontend');
+  if (frontendCheck.needInstall) {
+    log.info(`前端依赖需要更新: ${frontendCheck.reason}`);
+    const frontendResult = runCommand('npm install', { cwd: frontendPath });
+    if (!frontendResult.success) {
+      log.error('前端依赖安装失败');
+      return { success: false, step: 'frontend' };
+    }
+    log.success('前端依赖安装完成');
+  } else {
+    log.success(`前端依赖已是最新 (${frontendCheck.reason})`);
+    frontendSkipped = true;
+  }
+
+  return { success: true, skipped: backendSkipped && frontendSkipped };
 }
 
 function runMigrations(options) {
@@ -461,7 +532,7 @@ async function healthCheck() {
   
   for (let i = 1; i <= maxRetries; i++) {
     try {
-      const result = execSync('curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/health 2>nul || echo "000"', {
+      const result = execSync('curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health 2>nul || echo "000"', {
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 5000
@@ -520,7 +591,7 @@ function printSummary(options, results) {
   console.log(`\n  ${colors.cyan}步骤状态:${colors.reset}`);
   console.log(`    数据库备份: ${results.backup?.skipped ? '已跳过' : results.backup?.success ? '成功' : '失败'}`);
   console.log(`    代码更新:   ${results.git?.skipped ? '已跳过' : results.git?.success ? '成功' : '失败'}`);
-  console.log(`    依赖安装:   ${results.deps?.success ? '成功' : '失败'}`);
+  console.log(`    依赖安装:   ${results.deps?.skipped ? '已跳过' : results.deps?.success ? '成功' : '失败'}`);
   console.log(`    数据库迁移: ${results.migrate?.skipped ? '已跳过' : results.migrate?.success ? '成功' : '失败'}`);
   console.log(`    前端构建:   ${results.build?.skipped ? '已跳过' : results.build?.success ? '成功' : '失败'}`);
   console.log(`    服务重启:   ${results.restart?.skipped ? '已跳过' : results.restart?.success ? '成功' : '失败'}`);
