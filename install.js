@@ -1074,22 +1074,27 @@ async function testMySQLConnection() {
   log.subStep('测试 MySQL 连接...');
   
   try {
-    const mysql = require('mysql2/promise');
-    const connection = await mysql.createConnection({
-      host: config.dbConfig.host,
-      port: parseInt(config.dbConfig.port),
-      user: config.dbConfig.username,
-      password: config.dbConfig.password,
-      database: config.dbConfig.database,
-      connectTimeout: 5000
+    execSync(`mysql -h ${config.dbConfig.host} -P ${config.dbConfig.port} -u ${config.dbConfig.username} -p'${config.dbConfig.password}' -e "SELECT 1" ${config.dbConfig.database}`, {
+      shell: '/bin/bash',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 5000
     });
-    
-    await connection.execute('SELECT 1');
-    await connection.end();
     log.success('MySQL 连接测试成功');
     return { success: true };
   } catch (error) {
-    return { success: false, error: error.message };
+    const errorMsg = error.stderr ? error.stderr.toString() : error.message;
+    
+    if (errorMsg.includes('Access denied') || errorMsg.includes('ERROR 1045')) {
+      return { success: false, error: '用户名或密码错误' };
+    }
+    if (errorMsg.includes('Unknown database')) {
+      return { success: false, error: `数据库 ${config.dbConfig.database} 不存在` };
+    }
+    if (errorMsg.includes('Connection refused') || errorMsg.includes("Can't connect")) {
+      return { success: false, error: `无法连接到 ${config.dbConfig.host}:${config.dbConfig.port}` };
+    }
+    
+    return { success: false, error: errorMsg.trim() || '连接失败' };
   }
 }
 
