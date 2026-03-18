@@ -216,7 +216,8 @@ function askPassword(question) {
       stdin.removeListener('data', onData);
     };
     
-    const onData = (char) => {
+    const onData = (data) => {
+      const char = data.toString();
       const code = char.charCodeAt(0);
       
       if (code === 10 || code === 13) {
