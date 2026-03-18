@@ -200,54 +200,40 @@ function ask(question, defaultValue = '') {
  */
 function askPassword(question) {
   return new Promise((resolve) => {
-    const prompt = `${question}: `;
-    process.stdout.write(prompt);
+    process.stdout.write(`${question}: `);
     
     let password = '';
-    const stdin = process.stdin;
-    const stdout = process.stdout;
+    const wasRaw = process.stdin.isRaw;
     
-    const cleanup = () => {
-      if (stdin.isTTY) {
-        try {
-          stdin.setRawMode(false);
-        } catch {}
-      }
-      stdin.removeListener('data', onData);
-    };
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
     
     const onData = (data) => {
       const char = data.toString();
       const code = char.charCodeAt(0);
       
       if (code === 10 || code === 13) {
-        cleanup();
-        stdout.write('\n');
+        process.stdin.setRawMode(wasRaw || false);
+        process.stdin.removeListener('data', onData);
+        process.stdout.write('\n');
         resolve(password);
       } else if (code === 3) {
-        cleanup();
-        stdout.write('\n已取消\n');
+        process.stdin.setRawMode(wasRaw || false);
+        process.stdout.write('\n已取消\n');
         process.exit(0);
       } else if (code === 127 || code === 8) {
         if (password.length > 0) {
           password = password.slice(0, -1);
-          stdout.write('\b \b');
+          process.stdout.write('\b \b');
         }
-      } else if (code >= 32) {
+      } else if (code >= 32 && code < 127) {
         password += char;
-        stdout.write('*');
+        process.stdout.write('*');
       }
     };
     
-    if (stdin.isTTY) {
-      stdin.setRawMode(true);
-      stdin.resume();
-      stdin.on('data', onData);
-    } else {
-      rl.question('', (answer) => {
-        resolve(answer.trim());
-      });
-    }
+    process.stdin.on('data', onData);
   });
 }
 
