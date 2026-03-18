@@ -190,39 +190,64 @@ function ask(question, defaultValue = '') {
 }
 
 /**
- * 密码输入函数 - 隐藏输入内容并显示星号
+ * 密码输入函数 - 隐藏输入内容
  * 
  * @param {string} question - 提示问题文本
- * @param {boolean} requireConfirm - 是否需要确认密码
  * @returns {Promise<string>} 用户输入的密码
  * 
  * 使用示例：
  *   const password = await askPassword('请输入密码');
- *   const password = await askPassword('请输入密码', true);  // 需要确认
  */
-function askPassword(question, requireConfirm = false) {
+function askPassword(question) {
   return new Promise((resolve) => {
-    const rl2 = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
+    const prompt = `${question}: `;
+    process.stdout.write(prompt);
     
-    rl2.question(`${question}: `, { silent: true }, (password1) => {
-      if (requireConfirm) {
-        rl2.question('请再次输入密码确认: ', { silent: true }, (password2) => {
-          rl2.close();
-          if (password1 === password2) {
-            resolve(password1);
-          } else {
-            log.error('两次输入的密码不一致，请重新输入');
-            resolve(askPassword(question, requireConfirm));
-          }
-        });
-      } else {
-        rl2.close();
-        resolve(password1);
+    let password = '';
+    const stdin = process.stdin;
+    const stdout = process.stdout;
+    
+    const cleanup = () => {
+      if (stdin.isTTY) {
+        try {
+          stdin.setRawMode(false);
+        } catch {}
       }
-    });
+      stdin.removeListener('data', onData);
+    };
+    
+    const onData = (data) => {
+      const char = data.toString();
+      const code = char.charCodeAt(0);
+      
+      if (code === 10 || code === 13) {
+        cleanup();
+        stdout.write('\n');
+        resolve(password);
+      } else if (code === 3) {
+        cleanup();
+        stdout.write('\n已取消\n');
+        process.exit(0);
+      } else if (code === 127 || code === 8) {
+        if (password.length > 0) {
+          password = password.slice(0, -1);
+          stdout.write('\b \b');
+        }
+      } else if (code >= 32) {
+        password += char;
+        stdout.write('*');
+      }
+    };
+    
+    if (stdin.isTTY) {
+      stdin.setRawMode(true);
+      stdin.resume();
+      stdin.on('data', onData);
+    } else {
+      rl.question('', (answer) => {
+        resolve(answer.trim());
+      });
+    }
   });
 }
 
