@@ -73,6 +73,13 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    },
     rollupOptions: {
       output: {
         manualChunks: {
@@ -84,13 +91,6 @@ export default defineConfig({
         entryFileNames: 'js/[name]-[hash].js',
         assetFileNames: '[ext]/[name]-[hash].[ext]',
         compact: true
-      }
-    },
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true
       }
     }
   },

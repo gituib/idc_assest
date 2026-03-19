@@ -28,6 +28,265 @@ const {
 
 Device.belongsTo(Rack, { foreignKey: 'rackId' });
 Rack.hasMany(Device, { foreignKey: 'rackId' });
+Rack.belongsTo(Room, { foreignKey: 'roomId' });
+Room.hasMany(Rack, { foreignKey: 'roomId' });
+
+const PREVIEW_COUNT = 20;
+
+router.post('/import-preview', async (req, res) => {
+  try {
+    if (!req.files || !req.files.csvFile) {
+      return res.status(400).json({ error: '请上传CSV文件' });
+    }
+
+    const csvFile = req.files.csvFile;
+    const stats = { total: 0, valid: 0, invalid: 0, errors: [] };
+
+    if (!fs.existsSync(path.join(__dirname, '../temp'))) {
+      fs.mkdirSync(path.join(__dirname, '../temp'), { recursive: true });
+    }
+
+    const filePath = path.join(__dirname, '../temp', `preview_${Date.now()}_${csvFile.name}`);
+    await csvFile.mv(filePath);
+
+    const results = [];
+    const stream = fs.createReadStream(filePath)
+      .pipe(iconv.decodeStream('gbk'))
+      .pipe(csv());
+
+    await new Promise((resolve, reject) => {
+      stream.on('data', (data) => results.push(data))
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    fs.unlinkSync(filePath);
+
+    const [rooms, racks, deviceFields] = await Promise.all([
+      Room.findAll(),
+      Rack.findAll({ include: [{ model: Room }] }),
+      DeviceField.findAll({ order: [['order', 'ASC']] })
+    ]);
+
+    const roomNameToIdMap = new Map(rooms.map(room => [room.name, room.roomId]));
+    const rackLocationMap = new Map(racks.map(rack => [`${rack.Room?.name || ''}_${rack.name}`, rack.rackId]));
+    const fieldMapping = {};
+    const fieldNameToDisplayName = {};
+    deviceFields.forEach(field => {
+      fieldMapping[field.displayName] = field;
+      fieldNameToDisplayName[field.fieldName] = field.displayName;
+    });
+
+    const extractFieldName = (fieldNameWithFormat) => {
+      const match = fieldNameWithFormat.match(/^(.+?)(\(必填\)|\(可选\)|\([a-zA-Z0-9\-\/]+\))$/);
+      return match ? match[1].trim() : fieldNameWithFormat;
+    };
+
+    const validTypes = ['server', 'switch', 'router', 'storage', 'other'];
+    const validStatuses = ['running', 'maintenance', 'offline', 'fault'];
+    const baseFieldNames = ['deviceId', 'name', 'type', 'model', 'serialNumber', 'rackId', 'position', 'height', 'powerConsumption', 'ipAddress', 'status', 'purchaseDate', 'warrantyExpiry', 'description'];
+
+    const previewData = [];
+    const allDeviceIds = new Set();
+    const allSerialNumbers = new Set();
+
+    stats.total = results.length;
+
+    for (let i = 0; i < results.length; i++) {
+      const row = results[i];
+      const rowNum = i + 2;
+      const rowErrors = [];
+      const parsedRow = { _rowNum: rowNum };
+
+      try {
+        const fieldValueMap = {};
+        Object.entries(row).forEach(([displayName, value]) => {
+          const originalFieldName = extractFieldName(displayName);
+          fieldValueMap[originalFieldName] = value;
+          fieldValueMap[displayName] = value;
+        });
+
+        const getFieldValue = (fieldName) => {
+          const displayName = fieldNameToDisplayName[fieldName];
+          return displayName ? fieldValueMap[displayName] : undefined;
+        };
+
+        const trulyRequiredFields = [];
+        deviceFields.forEach(field => {
+          if (field.fieldName === 'deviceId') return;
+          if (field.fieldName === 'rackId') {
+            if (field.required) {
+              trulyRequiredFields.push('所在机房名称', '所在机柜名称');
+            }
+            return;
+          }
+          if (field.required) trulyRequiredFields.push(field.displayName);
+        });
+
+        const missingFields = trulyRequiredFields.filter(fieldName => {
+          const value = fieldValueMap[fieldName];
+          return !value || (typeof value === 'string' && value.trim() === '');
+        });
+
+        if (missingFields.length > 0) {
+          rowErrors.push(`缺少必填字段：${missingFields.join('、')}`);
+        }
+
+        const deviceType = getFieldValue('type');
+        if (deviceType && !validTypes.includes(deviceType)) {
+          rowErrors.push(`设备类型无效：${deviceType}`);
+        }
+
+        let deviceId = getFieldValue('deviceId');
+        if (deviceId && deviceId.trim() !== '') {
+          if (allDeviceIds.has(deviceId)) {
+            rowErrors.push(`设备ID重复：${deviceId}`);
+          }
+          allDeviceIds.add(deviceId);
+        }
+
+        const serialNumber = getFieldValue('serialNumber');
+        if (!serialNumber || serialNumber.trim() === '') {
+          rowErrors.push('序列号不能为空');
+        } else if (allSerialNumbers.has(serialNumber)) {
+          rowErrors.push(`序列号重复：${serialNumber}`);
+        } else {
+          allSerialNumbers.add(serialNumber);
+        }
+
+        const roomName = fieldValueMap['所在机房名称'];
+        const rackName = fieldValueMap['所在机柜名称'];
+        if (!roomName?.trim()) {
+          rowErrors.push('所在机房名称不能为空');
+        } else if (!roomNameToIdMap.get(roomName.trim())) {
+          rowErrors.push(`机房不存在：${roomName}`);
+        }
+
+        if (!rackName?.trim()) {
+          rowErrors.push('所在机柜名称不能为空');
+        }
+
+        const status = getFieldValue('status');
+        if (status && !validStatuses.includes(status)) {
+          rowErrors.push(`状态值无效：${status}`);
+        }
+
+        const position = getFieldValue('position');
+        const height = getFieldValue('height');
+        const powerConsumption = getFieldValue('powerConsumption');
+
+        if (position !== undefined && position !== '' && isNaN(Number(position))) {
+          rowErrors.push(`位置必须是数字：${position}`);
+        }
+        if (height !== undefined && height !== '' && isNaN(Number(height))) {
+          rowErrors.push(`高度必须是数字：${height}`);
+        }
+        if (powerConsumption !== undefined && powerConsumption !== '' && isNaN(Number(powerConsumption))) {
+          rowErrors.push(`功率必须是数字：${powerConsumption}`);
+        }
+
+        const purchaseDateValue = getFieldValue('purchaseDate');
+        const warrantyExpiryValue = getFieldValue('warrantyExpiry');
+        const purchaseDate = purchaseDateValue ? new Date(purchaseDateValue) : null;
+        const warrantyExpiry = warrantyExpiryValue ? new Date(warrantyExpiryValue) : null;
+
+        if (purchaseDateValue && isNaN(purchaseDate.getTime())) {
+          rowErrors.push(`购买日期格式无效：${purchaseDateValue}`);
+        }
+        if (warrantyExpiryValue && isNaN(warrantyExpiry.getTime())) {
+          rowErrors.push(`保修日期格式无效：${warrantyExpiryValue}`);
+        }
+        if (purchaseDate && warrantyExpiry && warrantyExpiry <= purchaseDate) {
+          rowErrors.push('保修日期必须晚于购买日期');
+        }
+
+        Object.keys(row).forEach(displayName => {
+          const originalDisplayName = extractFieldName(displayName);
+          const fieldConfig = fieldMapping[originalDisplayName];
+          if (fieldConfig && !baseFieldNames.includes(fieldConfig.fieldName)) {
+            parsedRow[fieldConfig.fieldName] = row[displayName];
+          }
+        });
+
+        parsedRow.name = getFieldValue('name') || '';
+        parsedRow.type = deviceType || '';
+        parsedRow.model = getFieldValue('model') || '';
+        parsedRow.serialNumber = serialNumber || '';
+        parsedRow.roomName = roomName || '';
+        parsedRow.rackName = rackName || '';
+        parsedRow.status = status || '';
+        parsedRow.position = position || '';
+        parsedRow.height = height || '';
+        parsedRow.powerConsumption = powerConsumption || '';
+        parsedRow.ipAddress = getFieldValue('ipAddress') || '';
+        parsedRow.description = getFieldValue('description') || '';
+
+        if (rowErrors.length === 0) {
+          stats.valid++;
+          parsedRow._hasError = false;
+        } else {
+          stats.invalid++;
+          parsedRow._hasError = true;
+          parsedRow._errors = rowErrors;
+          stats.errors.push({ row: rowNum, errors: rowErrors });
+        }
+
+        if (previewData.length < PREVIEW_COUNT) {
+          previewData.push(parsedRow);
+        }
+
+      } catch (error) {
+        stats.invalid++;
+        const errorMsg = error.message || '未知错误';
+        stats.errors.push({ row: rowNum, errors: [errorMsg] });
+        if (previewData.length < PREVIEW_COUNT) {
+          previewData.push({
+            _rowNum: rowNum,
+            _hasError: true,
+            _errors: [errorMsg],
+            name: row['设备名称'] || '',
+            type: row['设备类型'] || '',
+            serialNumber: row['序列号'] || '',
+            roomName: row['所在机房名称'] || '',
+            rackName: row['所在机柜名称'] || '',
+            status: row['状态'] || ''
+          });
+        }
+      }
+    }
+
+    const fieldList = deviceFields
+      .filter(field => field.visible && field.fieldName !== 'deviceId')
+      .map(field => ({
+        fieldName: field.fieldName,
+        displayName: field.displayName,
+        fieldType: field.fieldType,
+        required: field.required
+      }));
+
+    res.json({
+      success: true,
+      data: {
+        preview: previewData,
+        total: stats.total,
+        previewCount: PREVIEW_COUNT,
+        statistics: {
+          total: stats.total,
+          valid: stats.valid,
+          invalid: stats.invalid
+        },
+        errors: stats.errors.slice(0, 50),
+        fieldList
+      }
+    });
+
+  } catch (error) {
+    console.error('预览设备数据失败:', error);
+    res.status(500).json({
+      error: error.message || '预览过程中发生未知错误'
+    });
+  }
+});
 
 router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
   try {
