@@ -692,7 +692,7 @@ async function migrateIdleDeviceAndBusiness() {
       await addColumnIfNotExists('devices', 'idleDate', 'DATETIME');
       await addColumnIfNotExists('devices', 'idleReason', 'TEXT');
       await addColumnIfNotExists('devices', 'warehouseId', 'VARCHAR(255)');
-      await addColumnIfNotExists('devices', 'sourceType', "TEXT DEFAULT 'rack'");
+      await addColumnIfNotExists('devices', 'sourceType', "VARCHAR(255) DEFAULT 'rack'");
     }
 
     console.log('    空闲设备与业务关联迁移完成');
