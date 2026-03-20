@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 const { ensureJwtSecret } = require('./initConfig');
 ensureJwtSecret();
 
@@ -84,6 +85,23 @@ async function syncBackupLogModel() {
   console.log('备份日志模型同步完成');
 }
 
+async function syncOperationLogModel() {
+  const OperationLog = require('./models/OperationLog');
+  await OperationLog.sync();
+  console.log('操作日志模型同步完成');
+}
+
+async function syncBusinessModels() {
+  const Business = require('./models/Business');
+  const DeviceBusiness = require('./models/DeviceBusiness');
+  const Warehouse = require('./models/Warehouse');
+
+  await Business.sync({ alter: true });
+  await DeviceBusiness.sync({ alter: true });
+  await Warehouse.sync({ alter: true });
+  console.log('业务/设备关联/库房模型同步完成');
+}
+
 async function initDefaultSystemSettings() {
   console.log('开始初始化系统设置默认值...');
   const { initDefaultSettings } = require('./routes/systemSettings');
@@ -144,6 +162,8 @@ async function initializeApp() {
     await syncConsumableModels();
     await syncInventoryModels();
     await syncBackupLogModel();
+    await syncOperationLogModel();
+    await syncBusinessModels();
     await initDefaultSystemSettings();
     await initFaultCategories();
     await initAutoBackupScheduler();
@@ -154,6 +174,9 @@ async function initializeApp() {
     process.exit(1);
   }
 }
+
+const swaggerUi = require('swagger-ui-express');
+const { specs, customCSS } = require('./swagger');
 
 initializeApp();
 
@@ -178,6 +201,10 @@ const networkCardRoutes = require('./routes/networkCards');
 const inventoryRoutes = require('./routes/inventory');
 const backupRoutes = require('./routes/backup');
 const statisticsRoutes = require('./routes/statistics');
+const operationLogsRoutes = require('./routes/operationLogs');
+const idleDeviceRoutes = require('./routes/idleDevices');
+const warehouseRoutes = require('./routes/warehouses');
+const dangerousOperationsRoutes = require('./routes/dangerousOperations');
 
 app.use('/api/devices', deviceRoutes);
 app.use('/api/racks', rackRoutes);
@@ -200,8 +227,33 @@ app.use('/api/network-cards', networkCardRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/backup', backupRoutes);
 app.use('/api/statistics', statisticsRoutes);
+app.use('/api/operation-logs', operationLogsRoutes);
+app.use('/api/idle-devices', idleDeviceRoutes);
+app.use('/api/warehouses', warehouseRoutes);
+app.use('/api/dangerous-operations', dangerousOperationsRoutes);
 
 app.use('/uploads', express.static('uploads'));
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  customCss: customCSS,
+  customSiteTitle: 'IDC设备管理系统 API文档',
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+    docExpansion: 'none',
+    deepLinking: true,
+    defaultModelsExpandDepth: -1,
+    defaultModelExpandDepth: 2
+  }
+}));
+
+app.get('/api-docs', (req, res) => {
+  res.sendFile(path.join(__dirname, 'swagger_index.html'));
+});
+
+app.get('/api-docs.json', (req, res) => {
+  res.json(specs);
+});
 
 app.get('/api', (req, res) => {
   res.json({
@@ -234,8 +286,12 @@ app.get('/api', (req, res) => {
   });
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'IDC设备管理系统后端服务正常运行' });
+const { performHealthCheck } = require('./utils/healthCheck');
+
+app.get('/health', async (req, res) => {
+  const health = await performHealthCheck();
+  const statusCode = health.status === 'error' ? 503 : health.status === 'warning' ? 200 : 200;
+  res.status(statusCode).json(health);
 });
 
 app.listen(PORT, () => {

@@ -243,17 +243,26 @@ function ConsumableManagement() {
 
   const handleDelete = useCallback(
     async consumableId => {
-      try {
-        await axios.delete(`/api/consumables/${consumableId}`);
-        message.success({
-          content: '删除成功',
-          icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
-        });
-        fetchConsumables();
-      } catch (error) {
-        message.error('删除失败');
-        console.error('删除失败:', error);
-      }
+      Modal.confirm({
+        title: '确认删除',
+        content: '确定要删除这个耗材吗？此操作不可恢复！',
+        okText: '删除',
+        okType: 'danger',
+        cancelText: '取消',
+        onOk: async () => {
+          try {
+            await axios.delete(`/api/consumables/${consumableId}`);
+            message.success({
+              content: '删除成功',
+              icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+            });
+            fetchConsumables();
+          } catch (error) {
+            message.error('删除失败');
+            console.error('删除失败:', error);
+          }
+        },
+      });
     },
     [fetchConsumables]
   );

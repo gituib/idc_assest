@@ -84,6 +84,16 @@ const migrations = [
     name: '暂存设备自定义字段',
     description: '为 pending_devices 表添加 customFields 字段，支持自定义字段存储',
     migrate: migratePendingDeviceCustomFields
+  },
+  {
+    name: '空闲设备与业务关联',
+    description: '创建 businesses、warehouses、device_business 表，为 devices 添加空闲设备字段',
+    migrate: migrateIdleDeviceAndBusiness
+  },
+  {
+    name: '设备字段系统标记',
+    description: '为 deviceFields 表添加 isSystem 字段，标记系统字段不可删除',
+    migrate: migrateDeviceFieldsIsSystem
   }
 ];
 
@@ -563,6 +573,134 @@ async function migratePendingDeviceCustomFields() {
 
   const columnDef = dbDialect === 'sqlite' ? "JSON DEFAULT '{}'" : "JSON";
   await addColumnIfNotExists('pending_devices', 'customFields', columnDef);
+}
+
+async function migrateDeviceFieldsIsSystem() {
+  const dialect = sequelize.getDialect();
+
+  if (!(await tableExists('deviceFields'))) {
+    console.log('    deviceFields 表不存在，跳过');
+    return;
+  }
+
+  if (dialect === 'mysql') {
+    const [columns] = await sequelize.query(`
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'deviceFields'
+      AND COLUMN_NAME = 'isSystem'
+      AND TABLE_SCHEMA = '${process.env.MYSQL_DATABASE || 'it_assest'}'
+    `);
+
+    if (columns.length === 0) {
+      await sequelize.query(`
+        ALTER TABLE deviceFields
+        ADD COLUMN isSystem BOOLEAN DEFAULT 0
+        COMMENT '是否为系统字段，系统字段不可删除'
+      `);
+      console.log('    deviceFields 表添加 isSystem 字段成功');
+    } else {
+      console.log('    deviceFields 表 isSystem 字段已存在，跳过');
+    }
+  } else {
+    const columns = await getTableColumns('deviceFields');
+    if (!columns.includes('isSystem')) {
+      await sequelize.query(
+        "ALTER TABLE deviceFields ADD COLUMN isSystem BOOLEAN DEFAULT 0",
+        { type: sequelize.QueryTypes.RAW }
+      );
+      console.log('    deviceFields 表添加 isSystem 字段成功');
+    } else {
+      console.log('    deviceFields 表 isSystem 字段已存在，跳过');
+    }
+  }
+
+  const systemFields = [
+    'deviceId', 'name', 'type', 'model', 'serialNumber',
+    'rackId', 'position', 'height', 'powerConsumption',
+    'status', 'purchaseDate', 'warrantyExpiry'
+  ];
+
+  for (const fieldName of systemFields) {
+    await sequelize.query(
+      `UPDATE deviceFields SET isSystem = 1 WHERE fieldName = ?`,
+      { replacements: [fieldName], type: sequelize.QueryTypes.RAW }
+    );
+    console.log(`    标记系统字段: ${fieldName}`);
+  }
+
+  console.log('    设备字段系统标记迁移完成');
+}
+
+async function migrateIdleDeviceAndBusiness() {
+  const queryInterface = sequelize.getQueryInterface();
+  const dialect = sequelize.getDialect();
+
+  if (dialect === 'sqlite') {
+    await sequelize.query('PRAGMA foreign_keys = OFF');
+  }
+
+  try {
+    if (!(await tableExists('businesses'))) {
+      await queryInterface.createTable('businesses', {
+        businessId: { type: sequelize.Sequelize.STRING, primaryKey: true, allowNull: false, unique: true },
+        name: { type: sequelize.Sequelize.STRING, allowNull: false },
+        description: { type: sequelize.Sequelize.TEXT },
+        status: { type: sequelize.Sequelize.ENUM('active', 'offline'), defaultValue: 'active' },
+        offlineDate: { type: sequelize.Sequelize.DATE },
+        offlineReason: { type: sequelize.Sequelize.STRING },
+        createdAt: { type: sequelize.Sequelize.DATE, allowNull: false },
+        updatedAt: { type: sequelize.Sequelize.DATE, allowNull: false }
+      });
+      console.log('    businesses 表创建成功');
+    } else {
+      console.log('    businesses 表已存在，跳过');
+    }
+
+    if (!(await tableExists('warehouses'))) {
+      await queryInterface.createTable('warehouses', {
+        warehouseId: { type: sequelize.Sequelize.STRING, primaryKey: true, allowNull: false, unique: true },
+        name: { type: sequelize.Sequelize.STRING, allowNull: false },
+        location: { type: sequelize.Sequelize.STRING },
+        capacity: { type: sequelize.Sequelize.INTEGER, defaultValue: 100 },
+        status: { type: sequelize.Sequelize.ENUM('active', 'inactive'), defaultValue: 'active' },
+        description: { type: sequelize.Sequelize.TEXT },
+        createdAt: { type: sequelize.Sequelize.DATE, allowNull: false },
+        updatedAt: { type: sequelize.Sequelize.DATE, allowNull: false }
+      });
+      console.log('    warehouses 表创建成功');
+    } else {
+      console.log('    warehouses 表已存在，跳过');
+    }
+
+    if (!(await tableExists('device_business'))) {
+      await queryInterface.createTable('device_business', {
+        id: { type: sequelize.Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
+        deviceId: { type: sequelize.Sequelize.STRING, allowNull: false },
+        businessId: { type: sequelize.Sequelize.STRING, allowNull: false },
+        isPrimary: { type: sequelize.Sequelize.BOOLEAN, defaultValue: false },
+        createdAt: { type: sequelize.Sequelize.DATE, allowNull: false },
+        updatedAt: { type: sequelize.Sequelize.DATE, allowNull: false }
+      });
+      console.log('    device_business 表创建成功');
+    } else {
+      console.log('    device_business 表已存在，跳过');
+    }
+
+    if (await tableExists('devices')) {
+      await addColumnIfNotExists('devices', 'isIdle', 'BOOLEAN DEFAULT 0');
+      await addColumnIfNotExists('devices', 'idleDate', 'DATETIME');
+      await addColumnIfNotExists('devices', 'idleReason', 'TEXT');
+      await addColumnIfNotExists('devices', 'warehouseId', 'VARCHAR(255)');
+      await addColumnIfNotExists('devices', 'sourceType', "TEXT DEFAULT 'rack'");
+    }
+
+    console.log('    空闲设备与业务关联迁移完成');
+  } finally {
+    if (dialect === 'sqlite') {
+      await sequelize.query('PRAGMA foreign_keys = ON');
+    }
+  }
 }
 
 // 执行迁移

@@ -298,17 +298,26 @@ function PortManagement() {
   };
 
   const handleDelete = async portId => {
-    try {
-      await api.delete(`/device-ports/${portId}`);
-      message.success({
-        content: '删除成功',
-        icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
-      });
-      fetchPorts();
-    } catch (error) {
-      message.error('删除失败');
-      console.error('删除失败:', error);
-    }
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除这个端口吗？此操作不可恢复！',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await api.delete(`/device-ports/${portId}`);
+          message.success({
+            content: '删除成功',
+            icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+          });
+          fetchPorts();
+        } catch (error) {
+          message.error('删除失败');
+          console.error('删除失败:', error);
+        }
+      },
+    });
   };
 
   const parsePortRange = portName => {

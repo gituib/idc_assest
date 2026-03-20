@@ -89,6 +89,7 @@ function DeviceManagement() {
   const [type, setType] = useState('all');
   const [roomId, setRoomId] = useState('all');
   const [rackId, setRackId] = useState('all');
+  const [isIdle, setIsIdle] = useState('');
   const [searchForm] = Form.useForm();
 
   const [pagination, setPagination] = useState({
@@ -137,6 +138,7 @@ function DeviceManagement() {
           type: type !== 'all' ? type : undefined,
           roomId: roomId !== 'all' ? roomId : undefined,
           rackId: rackId !== 'all' ? rackId : undefined,
+          isIdle: isIdle || undefined,
         };
 
         const response = await axios.get('/api/devices', { params });
@@ -160,8 +162,22 @@ function DeviceManagement() {
     try {
       setLoadingFields(true);
       const response = await axios.get('/api/deviceFields');
-      const sortedFields = response.data.sort((a, b) => a.order - b.order);
-      setDeviceFields(sortedFields);
+      let fields = response.data.sort((a, b) => a.order - b.order);
+      
+      // 补充缺失的 options（状态和设备类型）
+      fields = fields.map(field => {
+        if (field.fieldName === 'type' && !field.options) {
+          const defaultTypeField = DEFAULT_DEVICE_FIELDS_LOCAL.find(f => f.fieldName === 'type');
+          return { ...field, options: defaultTypeField?.options || [] };
+        }
+        if (field.fieldName === 'status' && !field.options) {
+          const defaultStatusField = DEFAULT_DEVICE_FIELDS_LOCAL.find(f => f.fieldName === 'status');
+          return { ...field, options: defaultStatusField?.options || [] };
+        }
+        return field;
+      });
+      
+      setDeviceFields(fields);
     } catch (error) {
       message.error('获取字段配置失败');
       console.error('获取字段配置失败:', error);
@@ -186,7 +202,7 @@ function DeviceManagement() {
   const fetchRooms = async () => {
     try {
       const response = await axios.get('/api/rooms');
-      setRooms(response.data || []);
+      setRooms(response.data.rooms || []);
     } catch (error) {
       message.error('获取机房列表失败');
       console.error('获取机房列表失败:', error);
@@ -277,6 +293,7 @@ function DeviceManagement() {
     setType(values.type || 'all');
     setRoomId(values.roomId || 'all');
     setRackId(values.rackId || 'all');
+    setIsIdle(values.isIdle || '');
 
     setPagination((prev) => ({ ...prev, current: 1 }));
 
@@ -291,6 +308,7 @@ function DeviceManagement() {
     setType('all');
     setRoomId('all');
     setRackId('all');
+    setIsIdle('');
     searchForm.resetFields();
 
     setTimeout(() => setSearching(false), 300);
@@ -353,6 +371,34 @@ function DeviceManagement() {
         } catch (error) {
           message.error('删除所有设备失败');
           console.error('删除所有设备失败:', error);
+        }
+      },
+    });
+  };
+
+  const handleBatchToIdle = async () => {
+    if (selectedDevices.length === 0) {
+      message.warning('请先选择要标记为空闲的设备');
+      return;
+    }
+    Modal.confirm({
+      title: '确认标记为空闲',
+      content: `确定要将选中的 ${selectedDevices.length} 个设备标记为空闲设备吗？`,
+      okText: '确认',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await axios.post('/api/idle-devices/batch-from-devices', {
+            deviceIds: selectedDevices,
+            idleReason: '从设备管理批量转入',
+          });
+          message.success(response.data.message || '设备已标记为空闲');
+          setSelectedDevices([]);
+          setSelectAll(false);
+          fetchDevices(1, 10, true);
+        } catch (error) {
+          message.error(error.response?.data?.error || '标记为空闲失败');
+          console.error('标记为空闲失败:', error);
         }
       },
     });
@@ -628,21 +674,27 @@ function DeviceManagement() {
           width: columnWidths[field.fieldName] || 100,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
           render: (status) => {
-            if (Array.isArray(status)) {
-              return (
-                <Space>
-                  {status.map((s) => (
-                    <span key={s} style={{ color: STATUS_MAP[s]?.color || 'black' }}>
-                      {STATUS_MAP[s]?.text || s}
-                    </span>
-                  ))}
-                </Space>
-              );
-            }
+            const config = STATUS_MAP[status] || { text: status, color: 'default' };
+            const statusStyles = {
+              running: { bg: '#f6ffed', border: '#52c41a', text: '#389e0d' },
+              maintenance: { bg: '#fffbE6', border: '#faad14', text: '#d48806' },
+              offline: { bg: '#f5f5f5', border: '#8c8c8c', text: '#595959' },
+              fault: { bg: '#fff2f0', border: '#ff4d4f', text: '#cf1322' },
+            };
+            const style = statusStyles[status] || { bg: '#fafafa', border: '#d9d9d9', text: '#595959' };
             return (
-              <span style={{ color: STATUS_MAP[status]?.color || 'black' }}>
-                {STATUS_MAP[status]?.text || status}
-              </span>
+              <Tag
+                style={{
+                  backgroundColor: style.bg,
+                  borderColor: style.border,
+                  color: style.text,
+                  borderRadius: '4px',
+                  fontWeight: 500,
+                  boxShadow: `0 1px 2px ${style.border}30`,
+                }}
+              >
+                {config.text}
+              </Tag>
             );
           },
         });
@@ -833,6 +885,18 @@ function DeviceManagement() {
             <Button
               style={{
                 ...secondaryActionStyle,
+                color: '#f59e0b',
+                borderColor: '#f59e0b',
+              }}
+              icon={<CloudServerOutlined />}
+              disabled={selectedDevices.length === 0}
+              onClick={handleBatchToIdle}
+            >
+              标记为空闲 ({selectedDevices.length})
+            </Button>
+            <Button
+              style={{
+                ...secondaryActionStyle,
                 color: designTokens.colors.primary.main,
                 borderColor: designTokens.colors.primary.main,
               }}
@@ -961,6 +1025,16 @@ function DeviceManagement() {
                     {rack.name}
                   </Option>
                 ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item name="isIdle" style={{ margin: 0 }}>
+            <Select
+              style={{ width: 140, borderRadius: designTokens.borderRadius.medium }}
+            >
+              <Option value="">所有设备</Option>
+              <Option value="false">在用设备</Option>
+              <Option value="true">空闲设备</Option>
             </Select>
           </Form.Item>
 

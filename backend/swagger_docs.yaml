@@ -1,0 +1,2596 @@
+openapi: 3.0.0
+info:
+  title: IDC设备管理系统 API
+  version: 1.0.0
+  description: |
+    IDC设备管理系统后端API文档
+
+    ## 认证说明
+    除健康检查接口外，所有接口都需要在请求头中携带JWT Token：
+    ```
+    Authorization: Bearer <token>
+    ```
+
+    ## 通用响应格式
+    ### 成功响应
+    ```json
+    {
+      "success": true,
+      "data": {...},
+      "message": "操作成功"
+    }
+    ```
+
+    ### 错误响应
+    ```json
+    {
+      "success": false,
+      "error": "错误类型",
+      "message": "详细描述"
+    }
+    ```
+
+    ## 分页参数
+    列表接口支持 `page` 和 `pageSize` 参数，默认 page=1, pageSize=10
+
+servers:
+  - url: http://localhost:8000
+    description: 开发环境服务器
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: health
+    description: 健康检查
+  - name: auth
+    description: 认证接口
+  - name: rooms
+    description: 机房管理
+  - name: racks
+    description: 机柜管理
+  - name: devices
+    description: 设备管理
+  - name: deviceFields
+    description: 设备字段
+  - name: device-ports
+    description: 设备端口
+  - name: network-cards
+    description: 网卡管理
+  - name: cables
+    description: 线缆管理
+  - name: tickets
+    description: 工单管理
+  - name: ticket-categories
+    description: 工单分类
+  - name: ticket-fields
+    description: 工单字段
+  - name: consumables
+    description: 耗材管理
+  - name: consumable-categories
+    description: 耗材分类
+  - name: consumable-records
+    description: 耗材记录
+  - name: users
+    description: 用户管理
+  - name: roles
+    description: 角色管理
+  - name: system-settings
+    description: 系统设置
+  - name: background
+    description: 背景配置
+  - name: inventory
+    description: 盘点管理
+  - name: statistics
+    description: 统计接口
+  - name: operation-logs
+    description: 操作日志
+  - name: backup
+    description: 备份管理
+
+paths:
+  /health:
+    get:
+      summary: 健康检查
+      description: 服务状态检查接口，无需认证
+      tags: [health]
+      responses:
+        '200':
+          description: 服务正常运行
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  message:
+                    type: string
+                    example: IDC设备管理系统后端服务正常运行
+
+  /api-docs:
+    get:
+      summary: API文档页面
+      description: 返回Swagger UI界面
+
+  /api/auth/login:
+    post:
+      summary: 用户登录
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  description: 用户名
+                password:
+                  type: string
+                  description: 密码
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      user:
+                        type: object
+                        properties:
+                          userId:
+                            type: string
+                          username:
+                            type: string
+                          email:
+                            type: string
+                          phone:
+                            type: string
+                          status:
+                            type: string
+                          roles:
+                            type: array
+                            items:
+                              type: object
+                  message:
+                    type: string
+
+  /api/auth/register:
+    post:
+      summary: 用户注册
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  description: 用户名（3-20字符）
+                password:
+                  type: string
+                  description: 密码（6-20字符）
+                email:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        '201':
+          description: 注册成功
+
+  /api/auth/me:
+    get:
+      summary: 获取当前用户信息
+      tags: [auth]
+      responses:
+        '200':
+          description: 成功
+
+  /api/rooms:
+    get:
+      summary: 获取机房列表
+      tags: [rooms]
+      parameters:
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: 按名称搜索
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: 按状态筛选
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roomId:
+                    type: string
+                  name:
+                    type: string
+                  location:
+                    type: string
+                  area:
+                    type: number
+                  status:
+                    type: string
+    post:
+      summary: 创建机房
+      tags: [rooms]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roomId, name]
+              properties:
+                roomId:
+                  type: string
+                  description: 机房ID（唯一标识）
+                name:
+                  type: string
+                  description: 机房名称
+                location:
+                  type: string
+                  description: 机房位置
+                area:
+                  type: number
+                  description: 面积(平方米)
+                description:
+                  type: string
+                  description: 描述
+                status:
+                  type: string
+                  enum: [active, inactive]
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/rooms/{roomId}:
+    get:
+      summary: 获取单个机房
+      tags: [rooms]
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新机房
+      tags: [rooms]
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                location:
+                  type: string
+                area:
+                  type: number
+                description:
+                  type: string
+                status:
+                  type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除机房
+      tags: [rooms]
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/racks:
+    get:
+      summary: 获取机柜列表
+      tags: [racks]
+      parameters:
+        - name: roomId
+          in: query
+          schema:
+            type: string
+          description: 按机房ID筛选
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: 按状态筛选
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: 按名称搜索
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  racks:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+    post:
+      summary: 创建机柜
+      tags: [racks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, roomId]
+              properties:
+                name:
+                  type: string
+                  description: 机柜名称
+                height:
+                  type: integer
+                  description: 高度(U)，默认42
+                maxPower:
+                  type: integer
+                  description: 额定功率(W)
+                roomId:
+                  type: string
+                  description: 所属机房ID
+                status:
+                  type: string
+                  enum: [active, maintenance, inactive]
+                description:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/racks/{rackId}:
+    get:
+      summary: 获取单个机柜
+      tags: [racks]
+      parameters:
+        - name: rackId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新机柜
+      tags: [racks]
+      parameters:
+        - name: rackId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除机柜
+      tags: [racks]
+      parameters:
+        - name: rackId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/racks/import-template:
+    get:
+      summary: 获取机柜导入模板
+      tags: [racks]
+      responses:
+        '200':
+          description: 返回Excel模板文件
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /api/racks/export:
+    get:
+      summary: 导出机柜数据
+      tags: [racks]
+      responses:
+        '200':
+          description: 返回Excel文件
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /api/racks/import:
+    post:
+      summary: 导入机柜数据
+      tags: [racks]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Excel格式的机柜数据文件
+      responses:
+        '200':
+          description: 导入成功
+
+  /api/devices:
+    get:
+      summary: 获取设备列表
+      tags: [devices]
+      parameters:
+        - name: rackId
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+          description: 设备类型
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: 关键词搜索（名称/IP/序列号）
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+    post:
+      summary: 创建设备
+      tags: [devices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, serialNumber]
+              properties:
+                name:
+                  type: string
+                  description: 设备名称
+                type:
+                  type: string
+                  enum: [server, switch, router, storage, other]
+                  description: 设备类型
+                model:
+                  type: string
+                serialNumber:
+                  type: string
+                rackId:
+                  type: string
+                position:
+                  type: integer
+                  description: 机柜位置（从1开始）
+                height:
+                  type: integer
+                  description: 占用高度(U)
+                powerConsumption:
+                  type: integer
+                  description: 功耗(W)
+                ipAddress:
+                  type: string
+                status:
+                  type: string
+                  enum: [running, maintenance, offline, fault]
+                purchaseDate:
+                  type: string
+                  format: date
+                warrantyExpiry:
+                  type: string
+                  format: date
+                description:
+                  type: string
+                customFields:
+                  type: object
+                  description: 自定义字段值
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/devices/{deviceId}:
+    get:
+      summary: 获取单个设备
+      tags: [devices]
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新设备
+      tags: [devices]
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除设备
+      tags: [devices]
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/devices/batch-delete:
+    post:
+      summary: 批量删除设备
+      tags: [devices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceIds]
+              properties:
+                deviceIds:
+                  type: array
+                  items:
+                    type: string
+                  description: 设备ID列表
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/devices/delete-all:
+    delete:
+      summary: 删除所有设备
+      tags: [devices]
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/devices/batch-online:
+    put:
+      summary: 批量上线设备
+      tags: [devices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceIds]
+              properties:
+                deviceIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: 操作成功
+
+  /api/devices/batch-offline:
+    put:
+      summary: 批量下线设备
+      tags: [devices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceIds]
+              properties:
+                deviceIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: 操作成功
+
+  /api/devices/batch-status:
+    put:
+      summary: 批量变更设备状态
+      tags: [devices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceIds, status]
+              properties:
+                deviceIds:
+                  type: array
+                  items:
+                    type: string
+                status:
+                  type: string
+                  enum: [running, maintenance, offline, fault]
+      responses:
+        '200':
+          description: 操作成功
+
+  /api/devices/batch-move:
+    put:
+      summary: 批量移动设备
+      tags: [devices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceIds, targetRackId]
+              properties:
+                deviceIds:
+                  type: array
+                  items:
+                    type: string
+                targetRackId:
+                  type: string
+                  description: 目标机柜ID
+                startPosition:
+                  type: integer
+                  description: 起始位置
+      responses:
+        '200':
+          description: 操作成功
+
+  /api/devices/import-template:
+    get:
+      summary: 获取设备导入模板
+      tags: [devices]
+      responses:
+        '200':
+          description: 返回CSV模板文件
+
+  /api/devices/export:
+    get:
+      summary: 导出设备数据
+      tags: [devices]
+      parameters:
+        - name: deviceIds
+          in: query
+          schema:
+            type: string
+          description: 指定导出的设备ID（逗号分隔）
+      responses:
+        '200':
+          description: 返回CSV文件
+
+  /api/devices/import:
+    post:
+      summary: 导入设备数据
+      tags: [devices]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                csvFile:
+                  type: string
+                  format: binary
+                  description: CSV格式的设备数据文件
+      responses:
+        '200':
+          description: 导入成功
+
+  /api/devices/enhanced-export:
+    get:
+      summary: 增强导出设备数据
+      tags: [devices]
+      parameters:
+        - name: deviceIds
+          in: query
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, json]
+            default: csv
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: JSON格式的字段列表
+        - name: fieldLabels
+          in: query
+          schema:
+            type: string
+          description: JSON格式的字段标签映射
+      responses:
+        '200':
+          description: 导出成功
+
+  /api/devices/{deviceId}/tickets:
+    get:
+      summary: 获取设备的工单列表
+      tags: [devices]
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 成功
+
+  /api/tickets:
+    get:
+      summary: 获取工单列表
+      tags: [tickets]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: 按状态筛选（pending/in_progress/completed/closed）
+        - name: priority
+          in: query
+          schema:
+            type: string
+          description: 按优先级筛选（urgent/high/medium/low）
+        - name: faultCategory
+          in: query
+          schema:
+            type: string
+        - name: deviceId
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建工单
+      tags: [tickets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [faultCategory, description]
+              properties:
+                title:
+                  type: string
+                faultCategory:
+                  type: string
+                  description: 故障分类
+                faultSubCategory:
+                  type: string
+                priority:
+                  type: string
+                  enum: [urgent, high, medium, low]
+                description:
+                  type: string
+                deviceId:
+                  type: string
+                deviceName:
+                  type: string
+                serialNumber:
+                  type: string
+                expectedCompletionDate:
+                  type: string
+                  format: date
+                reporterId:
+                  type: string
+                reporterName:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/cables:
+    get:
+      summary: 获取线缆列表
+      tags: [cables]
+      parameters:
+        - name: sourceDeviceId
+          in: query
+          schema:
+            type: string
+          description: 源设备ID
+        - name: targetDeviceId
+          in: query
+          schema:
+            type: string
+          description: 目标设备ID
+        - name: cableType
+          in: query
+          schema:
+            type: string
+          description: 线缆类型
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建线缆
+      tags: [cables]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sourceDeviceId:
+                  type: string
+                  description: 源设备ID
+                sourcePortId:
+                  type: string
+                  description: 源端口ID
+                targetDeviceId:
+                  type: string
+                  description: 目标设备ID
+                targetPortId:
+                  type: string
+                  description: 目标端口ID
+                cableType:
+                  type: string
+                  description: 线缆类型
+                fiberType:
+                  type: string
+                  description: 光纤类型
+                length:
+                  type: number
+                  description: 长度(米)
+                status:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/cables/{cableId}:
+    get:
+      summary: 获取单个线缆
+      tags: [cables]
+      parameters:
+        - name: cableId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新线缆
+      tags: [cables]
+      parameters:
+        - name: cableId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除线缆
+      tags: [cables]
+      parameters:
+        - name: cableId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/cables/batch:
+    post:
+      summary: 批量创建线缆
+      tags: [cables]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cables:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/cables/batch-delete:
+    post:
+      summary: 批量删除线缆
+      tags: [cables]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cableIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/cables/device/:deviceId:
+    get:
+      summary: 获取设备关联的线缆列表
+      tags: [cables]
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /api/cables/rack/:rackId:
+    get:
+      summary: 获取机柜关联的线缆列表
+      tags: [cables]
+      parameters:
+        - name: rackId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /api/cables/check-conflict:
+    post:
+      summary: 检查线缆路径冲突
+      tags: [cables]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sourceDeviceId:
+                  type: string
+                sourcePortId:
+                  type: string
+                targetDeviceId:
+                  type: string
+                targetPortId:
+                  type: string
+      responses:
+        '200':
+          description: 检查成功
+
+  /api/tickets/{ticketId}:
+    get:
+      summary: 获取单个工单
+      tags: [tickets]
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新工单
+      tags: [tickets]
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除工单
+      tags: [tickets]
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/consumables:
+    get:
+      summary: 获取耗材列表
+      tags: [consumables]
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: keyword
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建耗材
+      tags: [consumables]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, category]
+              properties:
+                name:
+                  type: string
+                category:
+                  type: string
+                specification:
+                  type: string
+                unit:
+                  type: string
+                currentStock:
+                  type: integer
+                minStock:
+                  type: integer
+                maxStock:
+                  type: integer
+                unitPrice:
+                  type: number
+                supplier:
+                  type: string
+                location:
+                  type: string
+                status:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/consumables/{id}:
+    get:
+      summary: 获取单个耗材
+      tags: [consumables]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新耗材
+      tags: [consumables]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除耗材
+      tags: [consumables]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/deviceFields:
+    get:
+      summary: 获取设备字段列表
+      tags: [deviceFields]
+      parameters:
+        - name: entityType
+          in: query
+          schema:
+            type: string
+          description: 实体类型（如device）
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建设备字段
+      tags: [deviceFields]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fieldName:
+                  type: string
+                  description: 字段名称
+                fieldLabel:
+                  type: string
+                  description: 字段标签
+                fieldType:
+                  type: string
+                  description: 字段类型
+                entityType:
+                  type: string
+                  description: 实体类型
+                required:
+                  type: boolean
+                defaultValue:
+                  type: string
+                options:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/deviceFields/{fieldId}:
+    get:
+      summary: 获取单个设备字段
+      tags: [deviceFields]
+      parameters:
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新设备字段
+      tags: [deviceFields]
+      parameters:
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除设备字段
+      tags: [deviceFields]
+      parameters:
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/deviceFields/batch:
+    post:
+      summary: 批量创建设备字段
+      tags: [deviceFields]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fields:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/deviceFields/reorder:
+    put:
+      summary: 重新排序设备字段
+      tags: [deviceFields]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fieldIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: 更新成功
+
+  /api/device-ports:
+    get:
+      summary: 获取设备端口列表
+      tags: [device-ports]
+      parameters:
+        - name: deviceId
+          in: query
+          schema:
+            type: string
+        - name: portType
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建设备端口
+      tags: [device-ports]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId:
+                  type: string
+                portName:
+                  type: string
+                portType:
+                  type: string
+                portNumber:
+                  type: integer
+                status:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/device-ports/{portId}:
+    get:
+      summary: 获取单个设备端口
+      tags: [device-ports]
+      parameters:
+        - name: portId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新设备端口
+      tags: [device-ports]
+      parameters:
+        - name: portId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除设备端口
+      tags: [device-ports]
+      parameters:
+        - name: portId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/device-ports/batch:
+    post:
+      summary: 批量创建设备端口
+      tags: [device-ports]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ports:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/device-ports/{portId}/connect:
+    post:
+      summary: 连接端口
+      tags: [device-ports]
+      parameters:
+        - name: portId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cableId:
+                  type: string
+                targetPortId:
+                  type: string
+      responses:
+        '200':
+          description: 连接成功
+
+  /api/device-ports/{portId}/disconnect:
+    post:
+      summary: 断开端口连接
+      tags: [device-ports]
+      parameters:
+        - name: portId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 断开成功
+
+  /api/network-cards:
+    get:
+      summary: 获取网卡列表
+      tags: [network-cards]
+      parameters:
+        - name: deviceId
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建网卡
+      tags: [network-cards]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId:
+                  type: string
+                cardName:
+                  type: string
+                cardType:
+                  type: string
+                portCount:
+                  type: integer
+                speed:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/network-cards/{cardId}:
+    get:
+      summary: 获取单个网卡
+      tags: [network-cards]
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新网卡
+      tags: [network-cards]
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除网卡
+      tags: [network-cards]
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/network-cards/{cardId}/ports:
+    get:
+      summary: 获取网卡端口列表
+      tags: [network-cards]
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /api/ticket-categories:
+    get:
+      summary: 获取工单分类列表
+      tags: [ticket-categories]
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建工单分类
+      tags: [ticket-categories]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                categoryName:
+                  type: string
+                description:
+                  type: string
+                priority:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/ticket-categories/{categoryId}:
+    get:
+      summary: 获取单个工单分类
+      tags: [ticket-categories]
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新工单分类
+      tags: [ticket-categories]
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除工单分类
+      tags: [ticket-categories]
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/ticket-fields:
+    get:
+      summary: 获取工单字段列表
+      tags: [ticket-fields]
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建工单字段
+      tags: [ticket-fields]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fieldName:
+                  type: string
+                fieldLabel:
+                  type: string
+                fieldType:
+                  type: string
+                required:
+                  type: boolean
+                options:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/ticket-fields/{fieldId}:
+    get:
+      summary: 获取单个工单字段
+      tags: [ticket-fields]
+      parameters:
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新工单字段
+      tags: [ticket-fields]
+      parameters:
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除工单字段
+      tags: [ticket-fields]
+      parameters:
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/consumables/low-stock:
+    get:
+      summary: 获取低库存耗材
+      tags: [consumables]
+      responses:
+        '200':
+          description: 成功
+
+  /api/consumables/quick-inout:
+    post:
+      summary: 快速出入库
+      tags: [consumables]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [consumableId, type, quantity]
+              properties:
+                consumableId:
+                  type: string
+                type:
+                  type: string
+                  enum: [in, out]
+                quantity:
+                  type: integer
+                operator:
+                  type: string
+                reason:
+                  type: string
+                notes:
+                  type: string
+                snList:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: 操作成功
+
+  /api/consumables/inout:
+    post:
+      summary: 出入库操作
+      tags: [consumables]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [consumableId, type, quantity]
+              properties:
+                consumableId:
+                  type: string
+                type:
+                  type: string
+                  enum: [in, out]
+                quantity:
+                  type: integer
+                operator:
+                  type: string
+                reason:
+                  type: string
+                recipient:
+                  type: string
+                notes:
+                  type: string
+                snList:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: 操作成功
+
+  /api/consumables/adjust:
+    post:
+      summary: 库存调整
+      tags: [consumables]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [consumableId, adjustType, quantity]
+              properties:
+                consumableId:
+                  type: string
+                adjustType:
+                  type: string
+                  enum: [add, subtract, set]
+                quantity:
+                  type: integer
+                operator:
+                  type: string
+                reason:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: 操作成功
+
+  /api/consumables/logs:
+    get:
+      summary: 获取耗材操作日志
+      tags: [consumables]
+      parameters:
+        - name: consumableId
+          in: query
+          schema:
+            type: string
+        - name: operationType
+          in: query
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 成功
+
+  /api/inventory/plans:
+    get:
+      summary: 获取盘点计划列表
+      tags: [inventory]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建盘点计划
+      tags: [inventory]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                planName:
+                  type: string
+                description:
+                  type: string
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/inventory/plans/{planId}:
+    get:
+      summary: 获取单个盘点计划
+      tags: [inventory]
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新盘点计划
+      tags: [inventory]
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除盘点计划
+      tags: [inventory]
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/inventory/tasks:
+    get:
+      summary: 获取盘点任务列表
+      tags: [inventory]
+      parameters:
+        - name: planId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建盘点任务
+      tags: [inventory]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                planId:
+                  type: string
+                assignedTo:
+                  type: string
+                deviceIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/inventory/tasks/{taskId}:
+    get:
+      summary: 获取单个盘点任务
+      tags: [inventory]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新盘点任务
+      tags: [inventory]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除盘点任务
+      tags: [inventory]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/inventory/tasks/{taskId}/records:
+    get:
+      summary: 获取盘点记录列表
+      tags: [inventory]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /api/inventory/records:
+    get:
+      summary: 获取盘点记录列表
+      tags: [inventory]
+      parameters:
+        - name: taskId
+          in: query
+          schema:
+            type: string
+        - name: planId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+
+  /api/inventory/start/{taskId}:
+    post:
+      summary: 开始盘点任务
+      tags: [inventory]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 操作成功
+
+  /api/inventory/complete/{taskId}:
+    post:
+      summary: 完成盘点任务
+      tags: [inventory]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 操作成功
+
+  /api/operation-logs:
+    get:
+      summary: 获取操作日志列表
+      tags: [operation-logs]
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: module
+          in: query
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+
+  /api/operation-logs/export:
+    get:
+      summary: 导出操作日志
+      tags: [operation-logs]
+      responses:
+        '200':
+          description: 导出成功
+
+  /api/backup:
+    get:
+      summary: 获取备份列表
+      tags: [backup]
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建备份
+      tags: [backup]
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/backup/{backupId}/restore:
+    post:
+      summary: 恢复备份
+      tags: [backup]
+      parameters:
+        - name: backupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 恢复成功
+
+  /api/backup/{backupId}:
+    delete:
+      summary: 删除备份
+      tags: [backup]
+      parameters:
+        - name: backupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/backup/settings:
+    get:
+      summary: 获取备份设置
+      tags: [backup]
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新备份设置
+      tags: [backup]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                autoBackup:
+                  type: boolean
+                backupPath:
+                  type: string
+                retentionDays:
+                  type: integer
+      responses:
+        '200':
+          description: 更新成功
+
+  /api/statistics:
+    get:
+      summary: 获取统计数据
+      tags: [statistics]
+      responses:
+        '200':
+          description: 成功
+
+  /api/statistics/overview:
+    get:
+      summary: 获取总览统计
+      tags: [statistics]
+      responses:
+        '200':
+          description: 成功
+
+  /api/statistics/trends:
+    get:
+      summary: 获取趋势数据
+      tags: [statistics]
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month, year]
+      responses:
+        '200':
+          description: 成功
+
+  /api/statistics/export:
+    get:
+      summary: 导出统计数据
+      tags: [statistics]
+      responses:
+        '200':
+          description: 导出成功
+
+  /api/users:
+    get:
+      summary: 获取用户列表
+      tags: [users]
+      parameters:
+        - name: keyword
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建用户
+      tags: [users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                email:
+                  type: string
+                phone:
+                  type: string
+                roleId:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/users/{userId}:
+    get:
+      summary: 获取单个用户
+      tags: [users]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新用户
+      tags: [users]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除用户
+      tags: [users]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/roles:
+    get:
+      summary: 获取角色列表
+      tags: [roles]
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建角色
+      tags: [roles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                roleName:
+                  type: string
+                description:
+                  type: string
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/roles/{roleId}:
+    get:
+      summary: 获取单个角色
+      tags: [roles]
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新角色
+      tags: [roles]
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除角色
+      tags: [roles]
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/system-settings:
+    get:
+      summary: 获取系统设置
+      tags: [system-settings]
+      responses:
+        '200':
+          description: 成功
+    put:
+      summary: 更新系统设置
+      tags: [system-settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 更新成功
+
+  /api/background:
+    get:
+      summary: 获取背景配置
+      tags: [background]
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 上传背景图片
+      tags: [background]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: 上传成功
+    delete:
+      summary: 删除背景图片
+      tags: [background]
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/consumable-categories:
+    get:
+      summary: 获取耗材分类列表
+      tags: [consumable-categories]
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建耗材分类
+      tags: [consumable-categories]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/consumable-categories/{categoryId}:
+    put:
+      summary: 更新耗材分类
+      tags: [consumable-categories]
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除耗材分类
+      tags: [consumable-categories]
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/consumable-records:
+    get:
+      summary: 获取耗材记录列表
+      tags: [consumable-records]
+      parameters:
+        - name: consumableId
+          in: query
+          schema:
+            type: string
+        - name: operationType
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 输入 JWT token

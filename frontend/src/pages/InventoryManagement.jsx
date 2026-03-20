@@ -183,14 +183,23 @@ const InventoryManagement = () => {
   };
 
   const handleDelete = async (planId) => {
-    try {
-      await api.delete(`/inventory/plans/${planId}`);
-      message.success('删除成功');
-      fetchPlans();
-      fetchStats();
-    } catch (error) {
-      message.error('删除失败');
-    }
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除这个盘点计划吗？此操作不可恢复！',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await api.delete(`/inventory/plans/${planId}`);
+          message.success('删除成功');
+          fetchPlans();
+          fetchStats();
+        } catch (error) {
+          message.error('删除失败');
+        }
+      },
+    });
   };
 
   const handleSubmit = async (values) => {

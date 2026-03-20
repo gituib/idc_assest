@@ -11,7 +11,11 @@
     "lint": "eslint . --ext js --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext js --fix",
     "format": "prettier --write \"**/*.js\"",
-    "format:check": "prettier --check \"**/*.js\""
+    "format:check": "prettier --check \"**/*.js\"",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:operation-logs": "jest tests/operationLog.model.test.js tests/operationLogger.test.js tests/operationLogs.api.test.js --runInBand"
   },
   "dependencies": {
     "axios": "^1.13.6",
@@ -34,6 +38,8 @@
     "smb2": "^0.2.2",
     "sqlite3": "^5.1.7",
     "ssh2-sftp-client": "^9.1.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "three": "^0.182.0",
     "webdav": "^5.3.1",
     "winston": "^3.19.0",

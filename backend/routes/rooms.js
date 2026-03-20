@@ -8,10 +8,20 @@ const { createRoomSchema, updateRoomSchema } = require('../validation/roomSchema
 // 获取所有机房
 router.get('/', async (req, res) => {
   try {
-    const rooms = await Room.findAll({
-      include: Rack
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 100;
+    const offset = (page - 1) * pageSize;
+
+    const { count, rows } = await Room.findAndCountAll({
+      include: [{ model: Rack, attributes: ['rackId', 'name'] }],
+      offset: offset,
+      limit: pageSize
     });
-    res.json(rooms);
+
+    res.json({
+      rooms: rows,
+      total: count
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

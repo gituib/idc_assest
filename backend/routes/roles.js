@@ -4,6 +4,7 @@ const Permission = require('../models/Permission');
 const UserRole = require('../models/UserRole');
 const User = require('../models/User');
 const { authMiddleware } = require('../middleware/auth');
+const { logRoleOperation } = require('../utils/operationLogger');
 
 const router = express.Router();
 
@@ -134,6 +135,18 @@ router.post('/', authMiddleware, async (req, res) => {
       sort: sort || 0
     });
 
+    const permissionNames = permissions && permissions.length > 0
+      ? permissions.join('、')
+      : '无';
+
+    await logRoleOperation('create', `创建角色【${roleName}】（编码：${roleCode}，权限：${permissionNames}）`, {
+      targetId: role.roleId,
+      targetName: roleName,
+      afterState: role.toJSON(),
+      req,
+      metadata: { roleCode, permissions, permissionNames }
+    });
+
     res.status(201).json({
       success: true,
       message: '创建成功',
@@ -160,6 +173,8 @@ router.put('/:roleId', authMiddleware, async (req, res) => {
       });
     }
 
+    const beforeState = role.toJSON();
+
     if (roleName !== undefined) role.roleName = roleName;
     if (description !== undefined) role.description = description;
     if (permissions !== undefined) role.permissions = permissions;
@@ -167,6 +182,53 @@ router.put('/:roleId', authMiddleware, async (req, res) => {
     if (sort !== undefined) role.sort = sort;
 
     await role.save();
+
+    const afterState = role.toJSON();
+    const changedFields = {};
+
+    if (roleName !== undefined && beforeState.roleName !== roleName) {
+      changedFields.roleName = { from: beforeState.roleName, to: roleName };
+    }
+    if (description !== undefined && beforeState.description !== description) {
+      changedFields.description = { from: beforeState.description, to: description };
+    }
+    if (permissions !== undefined) {
+      const oldPerms = (beforeState.permissions || []).sort().join(',');
+      const newPerms = (permissions || []).sort().join(',');
+      if (oldPerms !== newPerms) {
+        changedFields.permissions = { from: beforeState.permissions, to: permissions };
+      }
+    }
+    if (status !== undefined && beforeState.status !== status) {
+      const statusText = { active: '启用', inactive: '禁用' };
+      changedFields.status = { from: beforeState.status, to: status, fromText: statusText[beforeState.status], toText: statusText[status] };
+    }
+
+    const changeDetails = Object.entries(changedFields).map(([field, values]) => {
+      const fieldNames = { roleName: '角色名称', description: '描述', permissions: '权限', status: '状态' };
+      const displayName = fieldNames[field] || field;
+
+      if (field === 'permissions') {
+        return `权限: ${(values.from || []).join('、') || '无'} → ${(values.to || []).join('、') || '无'}`;
+      }
+      if (field === 'status') {
+        return `状态: ${values.fromText} → ${values.toText}`;
+      }
+      return `${displayName}: ${values.from ?? '空'} → ${values.to ?? '空'}`;
+    }).join('；');
+
+    const updateDesc = changeDetails
+      ? `更新角色【${role.roleName}】：${changeDetails}`
+      : `更新角色【${role.roleName}】`;
+
+    await logRoleOperation('update', updateDesc, {
+      targetId: role.roleId,
+      targetName: role.roleName,
+      beforeState,
+      afterState,
+      req,
+      metadata: { changedFields, oldRoleName: beforeState.roleName, oldPermissions: beforeState.permissions }
+    });
 
     res.json({
       success: true,
@@ -208,7 +270,19 @@ router.delete('/:roleId', authMiddleware, async (req, res) => {
       });
     }
 
+    const roleName = role.roleName;
+    const roleCode = role.roleCode;
+    const beforeState = role.toJSON();
+
     await role.destroy();
+
+    await logRoleOperation('delete', `删除角色【${roleName}】（编码：${roleCode}，权限：${(role.permissions || []).join('、') || '无'}）`, {
+      targetId: req.params.roleId,
+      targetName: roleName,
+      beforeState,
+      req,
+      metadata: { roleCode, userCount, permissions: role.permissions }
+    });
 
     res.json({
       success: true,

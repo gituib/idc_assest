@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IDC设备管理系统 API文档</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui.css">
+  <style>
+    .swagger-ui .topbar { display: none }
+    .swagger-ui .title { font-size: 24px; font-weight: 700; color: #166534; font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+    .swagger-ui .swagger-container { background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #e2e8e0 100%); min-height: 100vh; }
+    .swagger-ui .info { margin: 30px 0; padding: 24px; background: rgba(255, 255, 255, 0.9); border-radius: 16px; border: 1px solid rgba(34, 197, 94, 0.2); box-shadow: 0 4px 24px rgba(22, 101, 52, 0.08); }
+    .swagger-ui .info .title { color: #166534; font-size: 28px; }
+    .swagger-ui .info p { color: #64748b; }
+    .swagger-ui .opblock-tag { background: rgba(255, 255, 255, 0.8); border: none; border-bottom: 2px solid transparent; padding: 16px 20px; transition: all 0.3s; }
+    .swagger-ui .opblock-tag:hover { background: rgba(34, 197, 94, 0.08); }
+    .swagger-ui .opblock-tag .tag-header { color: #1e293b; font-size: 15px; font-weight: 600; }
+    .swagger-ui .opblock { background: rgba(255, 255, 255, 0.85); border: 1px solid rgba(0, 0, 0, 0.06); border-radius: 12px; margin: 8px 0; transition: all 0.3s; }
+    .swagger-ui .opblock:hover { border-color: rgba(34, 197, 94, 0.3); transform: translateY(-1px); }
+    .swagger-ui .opblock.opblock-post { border-left: 4px solid #22c55e; }
+    .swagger-ui .opblock.opblock-get { border-left: 4px solid #3b82f6; }
+    .swagger-ui .opblock.opblock-put { border-left: 4px solid #f59e0b; }
+    .swagger-ui .opblock.opblock-delete { border-left: 4px solid #ef4444; }
+    .swagger-ui .opblock.opblock-patch { border-left: 4px solid #8b5cf6; }
+    .swagger-ui .opblock .opblock-summary { padding: 12px 16px; }
+    .swagger-ui .opblock .opblock-summary .opblock-summary-method { border-radius: 6px; font-size: 12px; font-weight: 700; min-width: 60px; padding: 6px 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .swagger-ui .opblock-get .opblock-summary-method { background: linear-gradient(135deg, #60a5fa, #3b82f6); color: white; }
+    .swagger-ui .opblock-post .opblock-summary-method { background: linear-gradient(135deg, #4ade80, #22c55e); color: white; }
+    .swagger-ui .opblock-put .opblock-summary-method { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: white; }
+    .swagger-ui .opblock-delete .opblock-summary-method { background: linear-gradient(135deg, #f87171, #ef4444); color: white; }
+    .swagger-ui .opblock-patch .opblock-summary-method { background: linear-gradient(135deg, #a78bfa, #8b5cf6); color: white; }
+    .swagger-ui .opblock .opblock-summary .opblock-summary-path { color: #1e293b; font-family: 'SF Mono', Consolas, monospace; }
+    .swagger-ui .opblock .opblock-summary .opblock-summary-path:hover { color: #166534; }
+    .swagger-ui .parameters .parameter input, .swagger-ui .parameters .parameter textarea { background: rgba(255, 255, 255, 0.95); border: 1px solid rgba(0, 0, 0, 0.1); border-radius: 8px; color: #1e293b; padding: 10px 14px; }
+    .swagger-ui .parameters .parameter input:focus, .swagger-ui .parameters .parameter textarea:focus { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1); outline: none; }
+    .swagger-ui .btn.execute { background: linear-gradient(135deg, #4ade80, #22c55e); border: none; color: white; border-radius: 8px; font-weight: 600; padding: 10px 20px; text-transform: uppercase; box-shadow: 0 4px 16px rgba(34, 197, 94, 0.3); }
+    .swagger-ui .btn.execute:hover { background: linear-gradient(135deg, #22c55e, #16a34a); box-shadow: 0 6px 24px rgba(34, 197, 94, 0.4); }
+    .swagger-ui .try-out-btn { background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 6px; color: #166534; font-size: 12px; padding: 6px 12px; }
+    .swagger-ui .try-out-btn:hover { background: rgba(34, 197, 94, 0.2); }
+    .swagger-ui .auth-wrapper { background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 12px; padding: 16px; }
+    .swagger-ui .auth-wrapper .authorize { background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; color: #166534; padding: 8px 16px; font-weight: 600; }
+    .swagger-ui .auth-wrapper .authorize:hover { background: rgba(34, 197, 94, 0.2); }
+    .swagger-ui .servers select { background: rgba(255, 255, 255, 0.95); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; color: #166534; padding: 10px 16px; cursor: pointer; }
+    .swagger-ui .model-container { background: rgba(255, 255, 255, 0.8); border: 1px solid rgba(0, 0, 0, 0.06); border-radius: 8px; padding: 16px; }
+    .swagger-ui .model .model-title { color: #166534; font-weight: 600; }
+    .swagger-ui .model .prop-type { color: #f59e0b; }
+    .swagger-ui .model .prop-primitive { color: #22c55e; }
+    .swagger-ui ::-webkit-scrollbar { width: 8px; height: 8px; }
+    .swagger-ui ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.04); }
+    .swagger-ui ::-webkit-scrollbar-thumb { background: rgba(34, 197, 94, 0.3); border-radius: 4px; }
+    .swagger-ui ::-webkit-scrollbar-thumb:hover { background: rgba(34, 197, 94, 0.5); }
+    .swagger-ui .version-stamp { background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(22, 163, 74, 0.15)); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 6px; }
+    .swagger-ui .version-stamp span { color: #166534; font-weight: 600; }
+    .swagger-ui .filter-container input { background: rgba(255, 255, 255, 0.95); border: none; color: #1e293b; padding: 8px 12px; border-radius: 6px; }
+    .swagger-ui .copy-to-clipboard { background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(0, 0, 0, 0.06); border-radius: 6px; }
+    .swagger-ui .copy-to-clipboard button { color: #64748b; }
+    .swagger-ui .markdown code { background: rgba(34, 197, 94, 0.1); border-radius: 4px; color: #166534; padding: 2px 6px; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.addEventListener('load', function() {
+      var translations = {
+        "Operations":"接口列表","Operation":"操作","Parameters":"参数列表","Parameter":"参数",
+        "Headers":"请求头","Request_Body":"请求体","Body":"请求体","Responses":"响应列表",
+        "Response":"响应","Try it out":"在线测试","Execute":"执行","Cancel":"取消",
+        "Copy":"复制","Copied":"已复制","reset":"重置","Authorize":"授权","Log Out":"退出",
+        "Logout":"退出","Welcome":"欢迎","Authorized":"已授权","Explore":"浏览",
+        "Filter":"过滤","Search":"搜索","Collapse":"收起","Expand":"展开",
+        "Loading":"加载中...","Fetch error":"获取失败","No parameters":"无参数",
+        "No response":"无响应","No content":"无内容","schema":"结构","Model Schema":"模型结构","Model":"模型",
+        "Example":"示例","Examples":"示例","Value":"值","Type":"类型",
+        "Description":"描述","Required":"必填","Deprecated":"已弃用","Version":"版本",
+        "Host":"主机","Base URL":"基础地址","Schemes":"协议","Info":"信息",
+        "External Documentation":"外部文档","Response Class":"响应类型","Status Codes":"状态码",
+        "Success":"成功","Error":"错误","Server":"服务器","Servers":"服务器列表",
+        "Security":"安全设置","Actions":"操作","DELETE":"删除","POST":"创建",
+        "GET":"查询","PUT":"更新","PATCH":"部分更新","OPTIONS":"选项","HEAD":"头信息",
+        "userId":"用户ID","Device ID":"设备ID","Room ID":"机房ID","Rack ID":"机柜ID","Ticket ID":"工单ID",
+        "Created at":"创建时间","Updated at":"更新时间","Created":"创建于","Updated":"更新于",
+        "Status":"状态","Name":"名称","ID":"ID","type":"类型","status":"状态",
+        "page":"页码","pageSize":"每页数量","total":"总数","keyword":"关键词",
+        "Filter by":"筛选","Sort by":"排序","Showing":"显示",
+        "Authorizations":"授权","Available authorizations":"可用授权",
+        "Close":"关闭","OK":"确定","Yes":"是","No":"否",
+        "Path Parameters":"路径参数","Query Parameters":"查询参数","Request Body":"请求体",
+        "Response Headers":"响应头","Response Body":"响应体",
+        "Implementation notes":"实现说明","Response messages":"响应消息",
+        "Default":"默认","Example Value":"示例值","Model":"模型",
+        "Request Headers":"请求头","Response Code":"响应码","Response Description":"响应描述",
+        "page":"页码","pageSize":"每页数量","total":"总数",
+        "password":"密码","username":"用户名","email":"邮箱","phone":"电话",
+        "Authorization":"授权","Bearer":"令牌","access_token":"访问令牌","token_type":"令牌类型",
+        "expires_in":"过期时间","scope":"作用域","grant_type":"授权类型",
+        "client_id":"客户端ID","client_secret":"客户端密钥",
+        "undefined":"未定义","None":"无","object":"对象","string":"字符串","integer":"整数",
+        "number":"数字","boolean":"布尔值","array":"数组"
+      };
+
+      window.ui = SwaggerUIBundle({
+        url: "/api-docs.json",
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+        layout: "BaseLayout",
+        docExpansion: "none",
+        displayRequestDuration: true,
+        defaultModelsExpandDepth: -1,
+        defaultModelExpandDepth: 2,
+        onComplete: function() {
+          translatePage();
+          setInterval(translatePage, 1000);
+        }
+      });
+
+      function translatePage() {
+        var els = document.querySelectorAll('.swagger-ui');
+        els.forEach(function(el) {
+          var nodes = el.querySelectorAll('*');
+          nodes.forEach(function(node) {
+            if (node.childNodes.length === 1 && node.childNodes[0].nodeType === 3) {
+              var text = node.nodeValue.trim();
+              for (var key in translations) {
+                if (text === key && node.nodeValue === key) {
+                  node.nodeValue = translations[key];
+                  break;
+                }
+              }
+            }
+          });
+        });
+      }
+    });
+  </script>
+</body>
+</html>

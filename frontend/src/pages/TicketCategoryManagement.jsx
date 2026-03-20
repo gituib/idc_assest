@@ -83,14 +83,23 @@ function TicketCategoryManagement() {
   };
 
   const handleDelete = async categoryId => {
-    try {
-      await axios.delete(`/api/ticket-categories/${categoryId}`);
-      message.success('分类删除成功');
-      fetchCategories();
-    } catch (error) {
-      message.error('分类删除失败');
-      console.error(error);
-    }
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除这个故障分类吗？此操作不可恢复！',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await axios.delete(`/api/ticket-categories/${categoryId}`);
+          message.success('分类删除成功');
+          fetchCategories();
+        } catch (error) {
+          message.error('分类删除失败');
+          console.error(error);
+        }
+      },
+    });
   };
 
   const columns = [

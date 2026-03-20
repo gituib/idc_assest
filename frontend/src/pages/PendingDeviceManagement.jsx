@@ -284,14 +284,23 @@ const PendingDeviceManagement = () => {
   };
 
   const handleDelete = async (pendingId) => {
-    try {
-      await api.delete(`/inventory/pending-devices/${pendingId}`);
-      message.success('删除成功');
-      fetchPendingDevices();
-      fetchStats();
-    } catch (error) {
-      message.error(error.response?.data?.error || '删除失败');
-    }
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除这个待同步设备吗？此操作不可恢复！',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await api.delete(`/inventory/pending-devices/${pendingId}`);
+          message.success('删除成功');
+          fetchPendingDevices();
+          fetchStats();
+        } catch (error) {
+          message.error(error.response?.data?.error || '删除失败');
+        }
+      },
+    });
   };
 
   const getStatusTag = (status) => {

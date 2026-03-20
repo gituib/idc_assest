@@ -102,14 +102,23 @@ function CategoryManagement() {
   };
 
   const handleDelete = async id => {
-    try {
-      await axios.delete(`/api/consumable-categories/${id}`);
-      message.success('删除成功');
-      fetchCategories();
-    } catch (error) {
-      message.error(error.response?.data?.error || '删除失败');
-      console.error('删除失败:', error);
-    }
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除这个耗材分类吗？此操作不可恢复！',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await axios.delete(`/api/consumable-categories/${id}`);
+          message.success('删除成功');
+          fetchCategories();
+        } catch (error) {
+          message.error(error.response?.data?.error || '删除失败');
+          console.error('删除失败:', error);
+        }
+      },
+    });
   };
 
   const columns = [

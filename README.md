@@ -319,6 +319,7 @@ npm run dev
 **访问地址：**
 - 前端应用：http://localhost:3000
 - 后端API：http://localhost:8000/api
+- API文档：http://localhost:8000/api-docs
 - 健康检查：http://localhost:8000/health
 
 ---
@@ -725,62 +726,13 @@ node uninstall.js --skip-deps   # 跳过依赖删除
 
 ## API接口
 
-完整接口文档请参考 [docs/api/README.md](docs/api/README.md)。
+完整交互式API文档请访问：**http://localhost:8000/api-docs**
 
-### 基础信息
-
-| 项目 | 值 |
-|------|-----|
-| Base URL | `http://localhost:8000/api` |
-| Content-Type | `application/json` |
-| 认证方式 | Bearer Token (JWT) |
-
-### API端点列表
-
-| 模块 | 路由端点 | 功能说明 |
-|------|----------|----------|
-| 认证 | `/api/auth` | 登录、注册、登出、令牌刷新 |
-| 机房 | `/api/rooms` | 机房增删改查 |
-| 机柜 | `/api/racks` | 机柜增删改查 |
-| 设备 | `/api/devices` | 设备管理、批量导入导出 |
-| 设备字段 | `/api/deviceFields` | 设备自定义字段配置 |
-| 设备端口 | `/api/device-ports` | 设备端口管理 |
-| 网卡 | `/api/network-cards` | 网卡管理 |
-| 线缆 | `/api/cables` | 线缆连接管理 |
-| 工单 | `/api/tickets` | 工单管理、状态更新 |
-| 工单分类 | `/api/ticket-categories` | 工单分类管理 |
-| 工单字段 | `/api/ticket-fields` | 工单自定义字段配置 |
-| 耗材 | `/api/consumables` | 耗材库存管理 |
-| 耗材分类 | `/api/consumable-categories` | 耗材分类管理 |
-| 耗材记录 | `/api/consumable-records` | 耗材领用记录 |
-| 盘点 | `/api/inventory` | 盘点计划、任务、记录 |
-| 用户 | `/api/users` | 用户管理 |
-| 角色 | `/api/roles` | 角色权限管理 |
-| 系统设置 | `/api/system-settings` | 系统配置管理 |
-| 背景配置 | `/api/background` | 系统背景配置 |
-| 备份管理 | `/api/backup` | 数据库备份、恢复、自动备份设置 |
-| 统计分析 | `/api/statistics` | 多维度数据统计报表 |
-| 健康检查 | `/health` | 后端服务健康状态 |
-
-### 通用响应格式
-
-**成功响应：**
-```json
-{
-  "success": true,
-  "data": {...},
-  "message": "操作成功"
-}
-```
-
-**错误响应：**
-```json
-{
-  "success": false,
-  "error": "错误信息",
-  "message": "详细描述"
-}
-```
+该文档基于Swagger/OpenAPI 3.0标准，提供：
+- 📚 可视化API文档界面
+- 🔐 在线JWT认证测试
+- ⚡ 支持直接在线调试API接口
+- 📊 自动同步最新接口信息
 
 ---
 

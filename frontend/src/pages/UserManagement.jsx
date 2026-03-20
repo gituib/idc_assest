@@ -173,17 +173,26 @@ const UserManagement = () => {
 
   const handleDelete = useCallback(
     async userId => {
-      try {
-        const response = await userAPI.delete(userId);
-        if (response.success) {
-          message.success('删除成功');
-          fetchUsers();
-        } else {
-          message.error(response.message || '删除失败');
-        }
-      } catch (error) {
-        message.error('删除失败');
-      }
+      Modal.confirm({
+        title: '确认删除',
+        content: '确定要删除这个用户吗？此操作不可恢复！',
+        okText: '删除',
+        okType: 'danger',
+        cancelText: '取消',
+        onOk: async () => {
+          try {
+            const response = await userAPI.delete(userId);
+            if (response.success) {
+              message.success('删除成功');
+              fetchUsers();
+            } else {
+              message.error(response.message || '删除失败');
+            }
+          } catch (error) {
+            message.error('删除失败');
+          }
+        },
+      });
     },
     [fetchUsers]
   );

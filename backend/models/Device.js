@@ -1,5 +1,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
+const Rack = require('./Rack');
+const Warehouse = require('./Warehouse');
 
 const Device = sequelize.define('Device', {
   deviceId: {
@@ -47,6 +49,26 @@ const Device = sequelize.define('Device', {
     type: DataTypes.STRING,
     defaultValue: 'offline'
   },
+  isIdle: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  idleDate: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  idleReason: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  warehouseId: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  sourceType: {
+    type: DataTypes.ENUM('rack', 'warehouse'),
+    defaultValue: 'rack'
+  },
   purchaseDate: {
     type: DataTypes.DATE,
     allowNull: true
@@ -80,5 +102,8 @@ const Device = sequelize.define('Device', {
     { fields: ['name'] }
   ]
 });
+
+Device.belongsTo(Rack, { foreignKey: 'rackId' });
+Device.belongsTo(Warehouse, { foreignKey: 'warehouseId' });
 
 module.exports = Device;

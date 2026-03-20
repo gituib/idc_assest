@@ -172,8 +172,13 @@ async function initDeviceFields() {
         await DeviceField.create(field);
         console.log(`创建字段: ${field.displayName}`);
       } else {
-        // 已存在的字段跳过，保留用户自定义配置
-        console.log(`跳过已存在字段: ${field.displayName}`);
+        // 如果字段已存在但缺少 options，则补充 options
+        if (field.options && !existingField.options) {
+          await existingField.update({ options: field.options });
+          console.log(`更新字段 options: ${field.displayName}`);
+        } else {
+          console.log(`跳过已存在字段: ${field.displayName}`);
+        }
       }
     }
     

@@ -80,7 +80,9 @@ const PendingDeviceManagement = lazy(() => import('./pages/PendingDeviceManageme
 const BackupManagement = lazy(() => import('./pages/BackupManagement'));
 const AutoBackupSettings = lazy(() => import('./pages/AutoBackupSettings'));
 const RemoteBackupSettings = lazy(() => import('./pages/RemoteBackupSettings'));
+const OperationLogs = lazy(() => import('./pages/OperationLogs'));
 const ErrorBoundaryTest = lazy(() => import('./pages/ErrorBoundaryTest'));
+const IdleDeviceManagement = lazy(() => import('./pages/IdleDeviceManagement'));
 
 const { Header, Content, Sider } = Layout;
 
@@ -191,11 +193,11 @@ const AppLayout = ({ children }) => {
     if (path === '/') return 'dashboard';
     if (path.startsWith('/visualization-3d')) return 'visualization-3d';
     if (path.startsWith('/rooms') || path.startsWith('/racks')) return 'room-management';
-    if (
-      path.startsWith('/devices') ||
+    if (path.startsWith('/devices') ||
       path.startsWith('/fields') ||
       path.startsWith('/cables') ||
-      path.startsWith('/ports')
+      path.startsWith('/ports') ||
+      path.startsWith('/idle-devices')
     )
       return 'asset-management';
     if (path.startsWith('/consumables')) return 'consumables-management';
@@ -249,6 +251,11 @@ const AppLayout = ({ children }) => {
           key: 'devices',
           icon: <CloudServerOutlined style={{ fontSize: '16px' }} />,
           label: <Link to="/devices">设备管理</Link>,
+        },
+        {
+          key: 'idle-devices',
+          icon: <CloudServerOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/idle-devices">空闲设备</Link>,
         },
         {
           key: 'fields',
@@ -357,6 +364,11 @@ const AppLayout = ({ children }) => {
           key: 'backup',
           icon: <DatabaseOutlined style={{ fontSize: '16px' }} />,
           label: <Link to="/backup">数据备份</Link>,
+        },
+        {
+          key: 'operation-logs',
+          icon: <AuditOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/operation-logs">操作日志</Link>,
         },
       ],
     },
@@ -597,7 +609,9 @@ const routeConfig = [
   { path: '/backup', component: BackupManagement },
   { path: '/auto-backup-settings', component: AutoBackupSettings },
   { path: '/remote-backup-settings', component: RemoteBackupSettings },
+  { path: '/operation-logs', component: OperationLogs },
   { path: '/error-boundary-test', component: ErrorBoundaryTest },
+  { path: '/idle-devices', component: IdleDeviceManagement },
 ];
 
 const ThemeConfig = () => {

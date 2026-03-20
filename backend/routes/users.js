@@ -7,6 +7,7 @@ const Role = require('../models/Role');
 const UserRole = require('../models/UserRole');
 const { authMiddleware } = require('../middleware/auth');
 const { SALT_ROUNDS, PASSWORD_MIN_LENGTH, FILE_UPLOAD, PAGINATION } = require('../config');
+const { logUserOperation } = require('../utils/operationLogger');
 
 const router = express.Router();
 
@@ -16,20 +17,28 @@ const generateId = () => {
 
 const getWhereClause = (query) => {
   const where = {};
-  
+
   if (query.username) {
     where.username = { [Op.like]: `%${query.username}%` };
   }
-  
+
   if (query.status) {
     where.status = query.status;
   }
-  
+
   if (query.realName) {
     where.realName = { [Op.like]: `%${query.realName}%` };
   }
-  
+
   return where;
+};
+
+const getUserRoleIds = async (userId) => {
+  const userRoles = await UserRole.findAll({
+    where: { UserId: userId },
+    attributes: ['RoleId']
+  });
+  return userRoles.map(ur => ur.RoleId);
 };
 
 const { Op } = require('sequelize');
@@ -204,6 +213,23 @@ router.post('/', authMiddleware, async (req, res) => {
       }
     }
 
+    const roleNames = roleIds && roleIds.length > 0
+      ? (await Role.findAll({ where: { roleId: { [Op.in]: roleIds } } })).map(r => r.roleName).join('、')
+      : '未分配角色';
+
+    await logUserOperation('create', `创建用户【${username}】（姓名：${realName || '未填写'}，邮箱：${email || '未填写'}，角色：${roleNames}）`, {
+      targetId: user.userId,
+      targetName: username,
+      afterState: {
+        username: user.username,
+        email: user.email,
+        realName: user.realName,
+        status: user.status
+      },
+      req,
+      metadata: { roleIds, roleNames }
+    });
+
     res.status(201).json({
       success: true,
       message: '创建成功',
@@ -236,9 +262,20 @@ router.put('/:userId', authMiddleware, async (req, res) => {
       });
     }
 
+    const beforeState = {
+      username: user.username,
+      email: user.email,
+      phone: user.phone,
+      realName: user.realName,
+      status: user.status,
+      remark: user.remark
+    };
+
+    const oldRoleIds = roleIds !== undefined ? null : await getUserRoleIds(user.userId);
+
     if (username !== undefined && username !== user.username) {
-      const existingUser = await User.findOne({ 
-        where: { username, userId: { [Op.ne]: user.userId } } 
+      const existingUser = await User.findOne({
+        where: { username, userId: { [Op.ne]: user.userId } }
       });
       if (existingUser) {
         return res.status(400).json({
@@ -261,20 +298,81 @@ router.put('/:userId', authMiddleware, async (req, res) => {
 
     await user.save();
 
+    let permissionChanged = false;
+    let oldRoleNames = [];
+    let newRoleNames = [];
+
     if (roleIds !== undefined) {
+      const oldRoles = await Role.findAll({ where: { roleId: { [Op.in]: oldRoleIds || [] } } });
+      oldRoleNames = oldRoles.map(r => r.roleName);
+
       await UserRole.destroy({ where: { UserId: user.userId } });
-      
+
       for (const roleId of roleIds) {
         await UserRole.create({
           UserId: user.userId,
           RoleId: roleId
         });
       }
+
+      const newRoles = await Role.findAll({ where: { roleId: { [Op.in]: roleIds } } });
+      newRoleNames = newRoles.map(r => r.roleName);
+      permissionChanged = true;
     }
 
     const updatedUser = await User.findByPk(req.params.userId, {
       attributes: { exclude: ['password'] }
     });
+
+    if (permissionChanged) {
+      const roleChangeDesc = `变更用户【${updatedUser.username}】的角色：${oldRoleNames.join('、') || '无'} → ${newRoleNames.join('、') || '无'}`;
+      await logUserOperation('permission_change', roleChangeDesc, {
+        targetId: updatedUser.userId,
+        targetName: updatedUser.username,
+        beforeState: { ...beforeState, roleIds: oldRoleIds, roleNames: oldRoleNames },
+        afterState: { ...beforeState, roleIds, roleNames: newRoleNames },
+        req,
+        metadata: { oldRoleIds, newRoleIds: roleIds, oldRoleNames, newRoleNames }
+      });
+    } else {
+      const afterState = {
+        username: updatedUser.username,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        realName: updatedUser.realName,
+        status: updatedUser.status,
+        remark: updatedUser.remark
+      };
+
+      const changedFields = {};
+      for (const key of Object.keys(beforeState)) {
+        if (JSON.stringify(beforeState[key]) !== JSON.stringify(afterState[key])) {
+          changedFields[key] = { from: beforeState[key], to: afterState[key] };
+        }
+      }
+
+      const changeDetails = Object.entries(changedFields).map(([field, values]) => {
+        const fieldNames = {
+          username: '用户名', email: '邮箱', phone: '电话', realName: '姓名',
+          status: '状态', remark: '备注'
+        };
+        const displayName = fieldNames[field] || field;
+        return `${displayName}: ${values.from ?? '空'} → ${values.to ?? '空'}`;
+      }).join('；');
+
+      const updateDesc = changeDetails
+        ? `更新用户【${updatedUser.username}】：${changeDetails}`
+        : `更新用户【${updatedUser.username}】`;
+
+      await logUserOperation('update', updateDesc, {
+        targetId: updatedUser.userId,
+        targetName: updatedUser.username,
+        beforeState,
+        afterState,
+        req,
+        metadata: { changedFields }
+      });
+    }
 
     res.json({
       success: true,
@@ -343,8 +441,26 @@ router.delete('/:userId', authMiddleware, async (req, res) => {
       });
     }
 
+    const userName = user.username;
+    const userRealName = user.realName;
+    const userEmail = user.email;
+    const beforeState = {
+      username: user.username,
+      email: user.email,
+      realName: user.realName,
+      status: user.status
+    };
+
     await UserRole.destroy({ where: { UserId: user.userId } });
     await user.destroy();
+
+    await logUserOperation('delete', `删除用户【${userName}】（姓名：${userRealName || '未填写'}，邮箱：${userEmail || '未填写'}）`, {
+      targetId: req.params.userId,
+      targetName: userName,
+      beforeState,
+      req,
+      metadata: { deletedUsername: userName, realName: userRealName, email: userEmail }
+    });
 
     res.json({
       success: true,
