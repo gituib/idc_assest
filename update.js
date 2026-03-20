@@ -192,6 +192,60 @@ function getGitInfo() {
   }
 }
 
+function findBackendServiceName() {
+  try {
+    const jlistResult = execSync('pm2 jlist', {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    const processes = JSON.parse(jlistResult);
+
+    for (const proc of processes) {
+      const scriptPath = proc.pm2_env?.pm_out_log_path || proc.pm2_env?.pm_err_log_path || '';
+      const script = proc.pm2_env?.script || '';
+
+      if (scriptPath.includes('server.js') || script.includes('server.js')) {
+        return proc.name;
+      }
+    }
+
+    for (const proc of processes) {
+      if (proc.name === 'server' || proc.name === 'idc-backend' || proc.name === 'backend') {
+        return proc.name;
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function findFrontendServiceName() {
+  try {
+    const jlistResult = execSync('pm2 jlist', {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    const processes = JSON.parse(jlistResult);
+
+    for (const proc of processes) {
+      const script = proc.pm2_env?.script || '';
+      const scriptPath = proc.pm2_env?.pm_out_log_path || '';
+
+      if (script.includes('vite') || scriptPath.includes('vite') ||
+          script.includes('react') || script.includes('nginx') ||
+          proc.name === 'frontend' || proc.name === 'idc-frontend') {
+        return proc.name;
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function backupDatabase(options) {
   if (options.skipBackup || options.dryRun) {
     if (options.skipBackup) log.info('已跳过数据库备份');
@@ -546,8 +600,18 @@ function restartServices(options) {
     return startDirectly();
   }
 
-  log.subStep('重启后端服务...');
-  const backendRestart = runCommand('pm2 restart idc-backend 2>nul || pm2 start backend/server.js --name idc-backend');
+  const backendServiceName = findBackendServiceName();
+  if (!backendServiceName) {
+    log.warning('未找到后端服务，创建新服务...');
+    const startResult = runCommand('pm2 start backend/server.js --name server');
+    if (startResult.success) {
+      log.success('后端服务已创建');
+    }
+    return { success: startResult.success };
+  }
+
+  log.subStep(`重启后端服务 (${backendServiceName})...`);
+  const backendRestart = runCommand(`pm2 restart ${backendServiceName}`);
   
   if (backendRestart.success) {
     log.success('后端服务已重启');
@@ -556,10 +620,10 @@ function restartServices(options) {
     return { success: false };
   }
 
-  const frontendCheck = runCommand('pm2 describe idc-frontend', { silent: true });
-  if (frontendCheck.success) {
-    log.subStep('重启前端服务...');
-    const frontendRestart = runCommand('pm2 restart idc-frontend');
+  const frontendServiceName = findFrontendServiceName();
+  if (frontendServiceName) {
+    log.subStep(`重启前端服务 (${frontendServiceName})...`);
+    const frontendRestart = runCommand(`pm2 restart ${frontendServiceName}`);
     if (frontendRestart.success) {
       log.success('前端服务已重启');
     }

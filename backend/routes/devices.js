@@ -33,6 +33,107 @@ Room.hasMany(Rack, { foreignKey: 'roomId' });
 
 const PREVIEW_COUNT = 20;
 
+async function checkPositionAvailable(rackId, position, height, excludeDeviceId = null, transaction = null) {
+  if (!position || position <= 0) {
+    return { available: true, reason: null };
+  }
+
+  const deviceHeight = height || 1;
+  const startU = position;
+  const endU = position + deviceHeight - 1;
+
+  const queryOptions = {
+    where: {
+      rackId: rackId,
+      position: { [Op.ne]: null }
+    },
+    attributes: ['deviceId', 'position', 'height']
+  };
+
+  if (transaction) {
+    queryOptions.transaction = transaction;
+  }
+
+  const existingDevices = await Device.findAll(queryOptions);
+
+  for (const device of existingDevices) {
+    if (excludeDeviceId && device.deviceId === excludeDeviceId) {
+      continue;
+    }
+
+    const existStart = device.position;
+    const existEnd = device.position + (device.height || 1) - 1;
+
+    if (!(endU < existStart || startU > existEnd)) {
+      return {
+        available: false,
+        reason: `U位冲突：机柜中已有设备 ${device.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}，与当前位置范围 U${startU}-U${endU} 冲突`
+      };
+    }
+  }
+
+  return { available: true, reason: null };
+}
+
+async function checkBatchPositions(rackId, devices, excludeDeviceIds = [], transaction = null) {
+  const conflicts = [];
+  const sortedDevices = [...devices].sort((a, b) => a.position - b.position);
+
+  for (let i = 0; i < sortedDevices.length; i++) {
+    const device = sortedDevices[i];
+    if (!device.position || device.position <= 0) continue;
+
+    const startU = device.position;
+    const endU = device.position + (device.height || 1) - 1;
+
+    for (let j = i + 1; j < sortedDevices.length; j++) {
+      const other = sortedDevices[j];
+      if (!other.position || other.position <= 0) continue;
+
+      const otherStart = other.position;
+      const otherEnd = other.position + (other.height || 1) - 1;
+
+      if (!(endU < otherStart || startU > otherEnd)) {
+        conflicts.push(`导入数据内部冲突：设备 ${device.deviceId || '新设备'}(U${startU}-U${endU}) 与 设备 ${other.deviceId || '新设备'}(U${otherStart}-U${otherEnd}) U位重叠`);
+      }
+    }
+  }
+
+  const queryOptions = {
+    where: {
+      rackId: rackId,
+      position: { [Op.ne]: null }
+    },
+    attributes: ['deviceId', 'position', 'height']
+  };
+
+  if (transaction) {
+    queryOptions.transaction = transaction;
+  }
+
+  const existingDevices = await Device.findAll(queryOptions);
+
+  for (const existing of existingDevices) {
+    if (excludeDeviceIds.includes(existing.deviceId)) continue;
+
+    const existStart = existing.position;
+    const existEnd = existing.position + (existing.height || 1) - 1;
+
+    for (const device of devices) {
+      if (!device.position || device.position <= 0) continue;
+
+      const startU = device.position;
+      const endU = device.position + (device.height || 1) - 1;
+
+      if (!(endU < existStart || startU > existEnd)) {
+        conflicts.push(`与已有设备冲突：机柜中已有设备 ${existing.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}，与导入设备 ${device.deviceId || '新设备'}(U${startU}-U${endU}) 冲突`);
+      }
+    }
+  }
+
+  return conflicts;
+}
+
 router.post('/import-preview', async (req, res) => {
   try {
     if (!req.files || !req.files.csvFile) {
@@ -89,6 +190,7 @@ router.post('/import-preview', async (req, res) => {
     const previewData = [];
     const allDeviceIds = new Set();
     const allSerialNumbers = new Set();
+    const rackDevicesMap = new Map();
 
     stats.total = results.length;
 
@@ -224,6 +326,21 @@ router.post('/import-preview', async (req, res) => {
         if (rowErrors.length === 0) {
           stats.valid++;
           parsedRow._hasError = false;
+
+          const rackId = rackLocationMap.get(`${roomName?.trim()}_${rackName?.trim()}`);
+          if (rackId && position) {
+            const posNum = parseInt(position);
+            const heightNum = parseInt(height) || 1;
+            if (!rackDevicesMap.has(rackId)) {
+              rackDevicesMap.set(rackId, []);
+            }
+            rackDevicesMap.get(rackId).push({
+              rowNum,
+              deviceId: getFieldValue('deviceId') || null,
+              position: posNum,
+              height: heightNum
+            });
+          }
         } else {
           stats.invalid++;
           parsedRow._hasError = true;
@@ -251,6 +368,68 @@ router.post('/import-preview', async (req, res) => {
             rackName: row['所在机柜名称'] || '',
             status: row['状态'] || ''
           });
+        }
+      }
+    }
+
+    const positionConflictRows = new Set();
+
+    for (const [rackId, devices] of rackDevicesMap) {
+      const existingDevices = await Device.findAll({
+        where: { rackId, position: { [Op.ne]: null } },
+        attributes: ['deviceId', 'position', 'height']
+      });
+
+      for (const newDevice of devices) {
+        const startU = newDevice.position;
+        const endU = newDevice.position + newDevice.height - 1;
+        let hasConflict = false;
+
+        for (const existing of existingDevices) {
+          const existStart = existing.position;
+          const existEnd = existing.position + (existing.height || 1) - 1;
+
+          if (!(endU < existStart || startU > existEnd)) {
+            const conflictMsg = `U位冲突：机柜中已有设备 ${existing.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}，与第 ${newDevice.rowNum} 行设备(导入)占用 U${startU}${endU !== startU ? '-' + endU : ''} 冲突`;
+            stats.errors.push({ row: newDevice.rowNum, errors: [conflictMsg] });
+            hasConflict = true;
+            break;
+          }
+        }
+
+        if (!hasConflict) {
+          for (const otherDevice of devices) {
+            if (otherDevice === newDevice) continue;
+
+            const otherStart = otherDevice.position;
+            const otherEnd = otherDevice.position + otherDevice.height - 1;
+
+            if (!(endU < otherStart || startU > otherEnd)) {
+              const conflictMsg = `U位冲突：第 ${newDevice.rowNum} 行设备与第 ${otherDevice.rowNum} 行设备在 U位上重叠 (U${startU}-U${endU} vs U${otherStart}-U${otherEnd})`;
+              stats.errors.push({ row: newDevice.rowNum, errors: [conflictMsg] });
+              hasConflict = true;
+              break;
+            }
+          }
+        }
+
+        if (hasConflict) {
+          positionConflictRows.add(newDevice.rowNum);
+        }
+      }
+    }
+
+    if (positionConflictRows.size > 0) {
+      stats.invalid += positionConflictRows.size;
+      stats.valid -= positionConflictRows.size;
+
+      for (const rowNum of positionConflictRows) {
+        const previewItem = previewData.find(item => item._rowNum === rowNum);
+        if (previewItem) {
+          previewItem._hasError = true;
+          const existingErrors = previewItem._errors || [];
+          const positionErrors = stats.errors.filter(e => e.row === rowNum).flatMap(e => e.errors);
+          previewItem._errors = [...existingErrors, ...positionErrors];
         }
       }
     }
@@ -431,14 +610,23 @@ router.post('/', validateBody(createDeviceSchema), async (req, res) => {
   try {
     const deviceData = { ...req.body };
     
-    // 如果没有提供deviceId或为空，则自动生成
     if (!deviceData.deviceId || deviceData.deviceId.trim() === '') {
       deviceData.deviceId = await generateDeviceId();
     }
     
+    if (deviceData.rackId && deviceData.position) {
+      const positionCheck = await checkPositionAvailable(
+        deviceData.rackId,
+        deviceData.position,
+        deviceData.height
+      );
+      if (!positionCheck.available) {
+        return res.status(400).json({ error: positionCheck.reason });
+      }
+    }
+    
     const device = await Device.create(deviceData);
     
-    // 更新机柜当前功率
     const rack = await Rack.findByPk(deviceData.rackId);
     if (rack) {
       await rack.update({
@@ -977,6 +1165,74 @@ router.post('/import', async (req, res) => {
         stats.errors.push({ row: rowNum, error: error.message, data: row });
       }
     }
+
+    if (validDevices.length > 0) {
+      const rackDevicesMap = new Map();
+      for (const device of validDevices) {
+        if (device.rackId && device.position > 0) {
+          if (!rackDevicesMap.has(device.rackId)) {
+            rackDevicesMap.set(device.rackId, []);
+          }
+          rackDevicesMap.get(device.rackId).push(device);
+        }
+      }
+
+      for (const [rackId, devices] of rackDevicesMap) {
+        const existingDevices = await Device.findAll({
+          where: { rackId, position: { [Op.ne]: null } },
+          attributes: ['deviceId', 'position', 'height'],
+          transaction: t
+        });
+
+        for (const newDevice of devices) {
+          const startU = newDevice.position;
+          const endU = newDevice.position + newDevice.height - 1;
+
+          let hasConflict = false;
+
+          for (const existing of existingDevices) {
+            const existStart = existing.position;
+            const existEnd = existing.position + (existing.height || 1) - 1;
+
+            if (!(endU < existStart || startU > existEnd)) {
+              stats.failed++;
+              stats.errors.push({
+                row: 0,
+                error: `U位冲突：机柜中已有设备 ${existing.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}，与导入设备 ${newDevice.deviceId}(U${startU}-U${endU}) 冲突`,
+                data: { deviceId: newDevice.deviceId }
+              });
+              hasConflict = true;
+              break;
+            }
+          }
+
+          if (!hasConflict) {
+            for (const otherDevice of devices) {
+              if (otherDevice === newDevice) continue;
+
+              const otherStart = otherDevice.position;
+              const otherEnd = otherDevice.position + otherDevice.height - 1;
+
+              if (!(endU < otherStart || startU > otherEnd)) {
+                stats.failed++;
+                stats.errors.push({
+                  row: 0,
+                  error: `U位冲突：导入数据内部冲突，设备 ${newDevice.deviceId}(U${startU}-U${endU}) 与设备 ${otherDevice.deviceId}(U${otherStart}-U${otherEnd}) U位重叠`,
+                  data: { deviceId: newDevice.deviceId }
+                });
+                hasConflict = true;
+                break;
+              }
+            }
+          }
+
+          if (hasConflict) {
+            const idx = validDevices.indexOf(newDevice);
+            if (idx > -1) validDevices.splice(idx, 1);
+          }
+        }
+      }
+    }
     
     // 【优化3】批量查询已存在的设备ID和序列号（单次查询）
     if (validDevices.length > 0) {
@@ -1161,41 +1417,100 @@ router.put('/batch-status', async (req, res) => {
 router.put('/batch-move', async (req, res) => {
   try {
     const { deviceIds, targetRackId, startPosition } = req.body;
-    
+
     if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
       return res.status(400).json({ error: '请提供有效的设备ID列表' });
     }
-    
+
     if (!targetRackId) {
       return res.status(400).json({ error: '请提供目标机柜ID' });
     }
-    
-    // 验证目标机柜是否存在
+
     const targetRack = await Rack.findByPk(targetRackId);
     if (!targetRack) {
       return res.status(404).json({ error: '目标机柜不存在' });
     }
-    
-    // 批量更新设备位置
+
+    const devicesToMove = await Device.findAll({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      attributes: ['deviceId', 'position', 'height']
+    });
+
+    const deviceHeightMap = new Map(devicesToMove.map(d => [d.deviceId, d.height || 1]));
+
+    if (startPosition) {
+      const devicesToCheck = [];
+      for (let i = 0; i < deviceIds.length; i++) {
+        const deviceId = deviceIds[i];
+        const height = deviceHeightMap.get(deviceId) || 1;
+        devicesToCheck.push({
+          deviceId,
+          position: startPosition + i,
+          height
+        });
+      }
+
+      const existingDevices = await Device.findAll({
+        where: {
+          rackId: targetRackId,
+          position: { [Op.ne]: null }
+        },
+        attributes: ['deviceId', 'position', 'height']
+      });
+
+      for (const newDevice of devicesToCheck) {
+        const startU = newDevice.position;
+        const endU = newDevice.position + newDevice.height - 1;
+
+        for (const existing of existingDevices) {
+          if (devicesToCheck.some(d => d.deviceId === existing.deviceId)) {
+            continue;
+          }
+
+          const existStart = existing.position;
+          const existEnd = existing.position + (existing.height || 1) - 1;
+
+          if (!(endU < existStart || startU > existEnd)) {
+            return res.status(400).json({
+              error: `U位冲突：机柜中已有设备 ${existing.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}，与移动设备 ${newDevice.deviceId}(U${startU}-U${endU}) 冲突`
+            });
+          }
+        }
+
+        for (const other of devicesToCheck) {
+          if (other === newDevice) continue;
+
+          const otherStart = other.position;
+          const otherEnd = other.position + other.height - 1;
+
+          if (!(endU < otherStart || startU > otherEnd)) {
+            return res.status(400).json({
+              error: `U位冲突：移动设备 ${newDevice.deviceId}(U${startU}-U${endU}) 与设备 ${other.deviceId}(U${otherStart}-U${otherEnd}) U位重叠`
+            });
+          }
+        }
+      }
+    }
+
     let movedCount = 0;
     for (let i = 0; i < deviceIds.length; i++) {
       const deviceId = deviceIds[i];
       const position = startPosition ? startPosition + i : undefined;
-      
+
       const updateData = { rackId: targetRackId };
       if (position) {
         updateData.position = position;
       }
-      
+
       const [updated] = await Device.update(updateData, {
         where: { deviceId }
       });
-      
+
       if (updated) {
         movedCount++;
       }
     }
-    
+
     res.json({
       message: `批量移动成功，已将 ${movedCount} 个设备移动到机柜 ${targetRackId}`,
       movedCount

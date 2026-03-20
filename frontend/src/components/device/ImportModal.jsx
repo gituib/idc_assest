@@ -139,13 +139,19 @@ const ImportModal = ({
   const optionalFields = deviceFields.filter((f) => f.visible && !f.required);
 
   const previewColumns = previewData?.fieldList
-    ? previewData.fieldList.map((field) => ({
-        title: field.displayName + (field.required ? ' *' : ''),
-        dataIndex: field.fieldName,
-        key: field.fieldName,
-        width: 120,
-        ellipsis: true,
-      }))
+    ? [
+        ...previewData.fieldList
+          .filter((field) => field.fieldName !== 'rackId')
+          .map((field) => ({
+            title: field.displayName + (field.required ? ' *' : ''),
+            dataIndex: field.fieldName,
+            key: field.fieldName,
+            width: 120,
+            ellipsis: true,
+          })),
+        { title: '所在机房', dataIndex: 'roomName', key: 'roomName', width: 100 },
+        { title: '所在机柜', dataIndex: 'rackName', key: 'rackName', width: 100 },
+      ]
     : [
         { title: '行号', dataIndex: '_rowNum', key: '_rowNum', width: 60 },
         { title: '设备名称', dataIndex: 'name', key: 'name', width: 120 },
