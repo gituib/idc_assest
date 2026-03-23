@@ -1624,6 +1624,9 @@ function generateNginxConfig() {
   const nginxConfig = `# IDC设备管理系统 - Nginx配置
 # 生成时间: ${new Date().toISOString()}
 
+# 全局请求体大小限制（支持大文件上传）
+client_max_body_size 100M;
+
 server {
     listen ${config.frontendPort};
     server_name ${config.domain};
@@ -1668,7 +1671,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        client_max_body_size 50M;  # 最大上传文件大小
+        client_max_body_size 100M;
     }
 }
 `;
