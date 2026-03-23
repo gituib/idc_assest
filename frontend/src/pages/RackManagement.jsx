@@ -346,7 +346,7 @@ function RackManagement() {
   const fetchRooms = useCallback(async () => {
     try {
       const response = await axios.get('/api/rooms');
-      setRooms(response.data);
+      setRooms(response.data.rooms || []);
     } catch (error) {
       message.error('获取机房列表失败');
       console.error('获取机房列表失败:', error);
