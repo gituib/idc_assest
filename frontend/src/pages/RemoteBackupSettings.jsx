@@ -293,8 +293,10 @@ const RemoteBackupSettings = () => {
     try {
       setTesting(true);
       setTestStatus('testing');
-      
-      const values = await form.validateFields();
+
+      await form.validateFields();
+      const values = form.getFieldsValue(true);
+      console.log('[TestConnection] getFieldsValue(true):', JSON.stringify(values));
       const response = await api.post('/backup/remote/test', values);
       
       if (response?.success) {
@@ -832,7 +834,20 @@ const RemoteBackupSettings = () => {
           placeholder="选择协议类型"
           size="large"
           onChange={() => {
-            form.setFieldsValue({});
+            form.setFieldsValue({
+              host: undefined,
+              port: undefined,
+              username: undefined,
+              password: undefined,
+              secure: undefined,
+              privateKey: undefined,
+              passphrase: undefined,
+              share: undefined,
+              domain: undefined,
+              url: undefined,
+              authType: undefined,
+              rootPath: '/',
+            });
             setTestStatus(null);
           }}
         >

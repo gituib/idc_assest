@@ -798,6 +798,59 @@ router.delete('/remote/targets/:id', (req, res) => {
   }
 });
 
+// 直接测试远端连接（不保存，用于添加节点前的测试）
+router.post('/remote/test', async (req, res) => {
+  try {
+    const config = req.body;
+    console.log(`[RemoteBackup] 收到连接测试请求:`, JSON.stringify(config));
+
+    if (!config.host || !config.port || !config.username) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供完整的连接信息（主机、端口、用户名）',
+      });
+    }
+
+    if (!config.protocol) {
+      const port = parseInt(config.port);
+      if (port === 22 || port === 2222) {
+        config.protocol = 'sftp';
+      } else if (port === 445 || port === 139 || port === 443) {
+        config.protocol = 'smb';
+      } else if (port === 80 || port === 443 || config.url) {
+        config.protocol = 'webdav';
+      } else {
+        config.protocol = 'ftp';
+      }
+      console.log(`[RemoteBackup] 推断协议类型: ${config.protocol} (基于端口 ${config.port})`);
+    }
+
+    const result = await testRemoteConnection(config);
+    console.log(`[RemoteBackup] 连接测试结果:`, JSON.stringify(result));
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: '连接测试成功',
+        data: result,
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: result.message,
+        error: result.error,
+      });
+    }
+  } catch (error) {
+    console.error('[RemoteBackup] 测试远端连接失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '测试远端连接失败',
+      error: error.message,
+    });
+  }
+});
+
 // 测试远端连接
 router.post('/remote/targets/:id/test', async (req, res) => {
   try {
