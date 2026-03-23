@@ -146,7 +146,7 @@ const buttonStyles = {
     transition: `all ${designTokens.transitions.normal}`,
   },
   danger: {
-    background: designTokens.colors.error.gradient,
+    background: designTokens.colors.danger.gradient,
     border: 'none',
     borderRadius: designTokens.borderRadius.md,
     fontWeight: 600,
@@ -541,7 +541,7 @@ const RemoteBackupSettings = () => {
                   background: designTokens.colors.background.accent,
                   border: 'none',
                   borderRadius: designTokens.borderRadius.sm,
-                  color: designTokens.colors.error.main,
+                  color: designTokens.colors.danger.main,
                   width: '32px',
                   height: '32px',
                 }}
