@@ -23,7 +23,7 @@ router.get('/stats', async (req, res) => {
 
     const Sequelize = require('sequelize');
 
-    const [total, statusStats, priorityStats, categoryStats, monthlyStats, deviceStats, dailyStats] = await Promise.all([
+    const [total, statusStats, priorityStats, categoryStats, monthlyStats, deviceStats, dailyCreatedStats, dailyCompletedStats] = await Promise.all([
       Ticket.count({ where }),
       Ticket.findAll({
         where,
@@ -68,8 +68,26 @@ router.get('/stats', async (req, res) => {
       Ticket.findAll({
         where,
         attributes: [
-          [Sequelize.fn('DATE', Sequelize.col('createdAt')), 'date'],
+          [dbDialect === 'mysql' 
+            ? Sequelize.fn('DATE_FORMAT', Sequelize.col('createdAt'), '%Y-%m-%d')
+            : Sequelize.fn('date', Sequelize.col('createdAt')), 
+            'date'],
           [Sequelize.fn('COUNT', '*'), 'created']
+        ],
+        group: ['date'],
+        order: [['date', 'ASC']]
+      }),
+      Ticket.findAll({
+        where: {
+          ...where,
+          status: 'completed'
+        },
+        attributes: [
+          [dbDialect === 'mysql' 
+            ? Sequelize.fn('DATE_FORMAT', Sequelize.col('updatedAt'), '%Y-%m-%d')
+            : Sequelize.fn('date', Sequelize.col('updatedAt')), 
+            'date'],
+          [Sequelize.fn('COUNT', '*'), 'completed']
         ],
         group: ['date'],
         order: [['date', 'ASC']]
@@ -110,16 +128,42 @@ router.get('/stats', async (req, res) => {
       deviceType: ''
     }));
 
-    const trend = dailyStats.map(d => ({
-      date: d.dataValues.date,
-      created: d.dataValues.created,
-      completed: 0,
+    const createdMap = {};
+    dailyCreatedStats.forEach(d => {
+      createdMap[d.dataValues.date] = d.dataValues.created;
+    });
+    const completedMap = {};
+    dailyCompletedStats.forEach(d => {
+      completedMap[d.dataValues.date] = d.dataValues.completed;
+    });
+
+    const allDates = [...new Set([...Object.keys(createdMap), ...Object.keys(completedMap)])].sort();
+    const trend = allDates.map(date => ({
+      date,
+      created: createdMap[date] || 0,
+      completed: completedMap[date] || 0,
       closed: 0,
       inProgress: 0,
       pending: 0
     }));
 
-    const avgProcessingTime = 0;
+    const completedTickets = await Ticket.findAll({
+      where: {
+        ...where,
+        status: 'completed'
+      },
+      attributes: ['createdAt', 'updatedAt']
+    });
+
+    let avgProcessingTime = 0;
+    if (completedTickets.length > 0) {
+      const totalProcessingTime = completedTickets.reduce((sum, ticket) => {
+        const created = new Date(ticket.createdAt);
+        const updated = new Date(ticket.updatedAt);
+        return sum + (updated - created);
+      }, 0);
+      avgProcessingTime = (totalProcessingTime / completedTickets.length / (1000 * 60 * 60)).toFixed(1);
+    }
 
     res.json({
       total,
@@ -127,7 +171,7 @@ router.get('/stats', async (req, res) => {
       inProgress,
       completed,
       closed,
-      avgProcessingTime,
+      avgProcessingTime: parseFloat(avgProcessingTime),
       byStatus,
       byPriority,
       byCategory,

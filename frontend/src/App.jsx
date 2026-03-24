@@ -70,7 +70,6 @@ const Login = lazy(() => import('./pages/Login'));
 const TicketManagement = lazy(() => import('./pages/TicketManagement'));
 const TicketCategoryManagement = lazy(() => import('./pages/TicketCategoryManagement'));
 const TicketStatistics = lazy(() => import('./pages/TicketStatistics'));
-const TicketFieldManagement = lazy(() => import('./pages/TicketFieldManagement'));
 const SystemSettings = lazy(() => import('./pages/SystemSettings'));
 const CableManagement = lazy(() => import('./pages/CableManagement'));
 const PortManagement = lazy(() => import('./pages/PortManagement'));
@@ -320,11 +319,6 @@ const AppLayout = ({ children }) => {
           key: 'ticket-statistics',
           icon: <BarChartOutlined style={{ fontSize: '16px' }} />,
           label: <Link to="/ticket-statistics">统计报表</Link>,
-        },
-        {
-          key: 'ticket-fields',
-          icon: <DatabaseOutlined style={{ fontSize: '16px' }} />,
-          label: <Link to="/ticket-fields">字段管理</Link>,
         },
       ],
     },
@@ -599,7 +593,6 @@ const routeConfig = [
   { path: '/tickets', component: TicketManagement },
   { path: '/ticket-categories', component: TicketCategoryManagement },
   { path: '/ticket-statistics', component: TicketStatistics },
-  { path: '/ticket-fields', component: TicketFieldManagement },
   { path: '/settings', component: SystemSettings },
   { path: '/cables', component: CableManagement },
   { path: '/inventory', component: InventoryManagement },

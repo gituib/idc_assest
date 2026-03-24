@@ -140,6 +140,20 @@ const DEFAULT_TICKET_FIELDS = [
     ],
   },
   {
+    fieldName: 'status',
+    displayName: '状态',
+    fieldType: 'select',
+    required: false,
+    order: 6.5,
+    visible: true,
+    options: [
+      { value: 'pending', label: '待处理' },
+      { value: 'in_progress', label: '处理中' },
+      { value: 'completed', label: '已完成' },
+      { value: 'closed', label: '已关闭' },
+    ],
+  },
+  {
     fieldName: 'description',
     displayName: '故障描述',
     fieldType: 'textarea',
@@ -255,7 +269,7 @@ function TicketManagement() {
   });
 
   const [searchFilters, setSearchFilters] = useState({});
-  const [deviceSource, setDeviceSource] = useState('select');
+  const [manualDeviceSource, setManualDeviceSource] = useState(false);
   const [ticketFields, setTicketFields] = useState(DEFAULT_TICKET_FIELDS);
   const [loadingFields, setLoadingFields] = useState(true);
   const [deviceFields, setDeviceFields] = useState([]);
@@ -302,11 +316,11 @@ function TicketManagement() {
   const fetchDevices = useCallback(async (keyword = '') => {
     try {
       setDeviceSearching(true);
-      const params = { pageSize: 50 };
+      const params = {};
       if (keyword && keyword.trim()) {
         params.keyword = keyword.trim();
       }
-      const response = await axios.get('/api/devices', { params });
+      const response = await axios.get('/api/devices/all', { params });
       setDevices(response.data.devices || []);
     } catch (error) {
       console.error('获取设备列表失败:', error);
@@ -344,8 +358,34 @@ function TicketManagement() {
     try {
       setLoadingFields(true);
       const response = await axios.get('/api/ticket-fields');
-      const sortedFields = response.data.sort((a, b) => a.order - b.order);
-      setTicketFields(sortedFields);
+      const dbFields = response.data.sort((a, b) => a.order - b.order);
+
+      const isValidOptions = (opts) => {
+        if (!opts) return false;
+        if (!Array.isArray(opts)) return false;
+        if (opts.length === 0) return false;
+        return opts.some(opt => opt && opt.value !== undefined && opt.value !== null && opt.value !== '');
+      };
+
+      const mergedFields = DEFAULT_TICKET_FIELDS.map(defaultField => {
+        const dbField = dbFields.find(f => f.fieldName === defaultField.fieldName);
+        if (dbField) {
+          return {
+            ...defaultField,
+            ...dbField,
+            options: isValidOptions(dbField.options) ? dbField.options : defaultField.options,
+          };
+        }
+        return defaultField;
+      });
+
+      dbFields.forEach(dbField => {
+        if (!DEFAULT_TICKET_FIELDS.some(f => f.fieldName === dbField.fieldName)) {
+          mergedFields.push(dbField);
+        }
+      });
+
+      setTicketFields(mergedFields);
     } catch (error) {
       console.error('获取工单字段配置失败:', error);
       setTicketFields(DEFAULT_TICKET_FIELDS);
@@ -378,12 +418,9 @@ function TicketManagement() {
   // 处理从设备详情页跳转过来创建工单的情况
   useEffect(() => {
     if (urlDeviceId && devices.length > 0 && urlCreate === 'true') {
-      // 自动打开创建工单弹窗
       setEditingTicket(null);
-      setDeviceSource('select');
       setModalVisible(true);
 
-      // 填充设备信息 - 使用 setTimeout 确保弹窗打开后再设置表单值
       setTimeout(() => {
         form.setFieldsValue({
           deviceId: urlDeviceId,
@@ -418,34 +455,35 @@ function TicketManagement() {
       let formItem;
       switch (fieldType) {
         case 'string':
-          formItem = <Input placeholder={placeholder || `请输入${displayName}`} />;
+          formItem = <Input placeholder={placeholder || `请输入${displayName}`} size="large" />;
           break;
         case 'number':
           formItem = (
             <InputNumber
               placeholder={placeholder || `请输入${displayName}`}
               style={{ width: '100%' }}
+              size="large"
             />
           );
           break;
         case 'textarea':
           formItem = (
-            <Input.TextArea rows={3} placeholder={placeholder || `请输入${displayName}`} />
+            <Input.TextArea rows={3} placeholder={placeholder || `请输入${displayName}`} showCount />
           );
           break;
         case 'boolean':
           formItem = <Switch />;
           break;
         case 'date':
-          formItem = <DatePicker style={{ width: '100%' }} />;
+          formItem = <DatePicker style={{ width: '100%' }} size="large" />;
           break;
         case 'datetime':
-          formItem = <DatePicker showTime style={{ width: '100%' }} />;
+          formItem = <DatePicker showTime style={{ width: '100%' }} size="large" />;
           break;
         case 'select':
           const selectOptions = options && Array.isArray(options) ? options : [];
           formItem = (
-            <Select placeholder={placeholder || `请选择${displayName}`}>
+            <Select placeholder={placeholder || `请选择${displayName}`} size="large">
               {selectOptions.map((opt, idx) => (
                 <Option key={idx} value={opt.value}>
                   {opt.label}
@@ -469,6 +507,7 @@ function TicketManagement() {
                   fetchDevices();
                 }
               }}
+              size="large"
             >
               {devices.map(device => (
                 <Option key={device.deviceId} value={device.deviceId}>
@@ -479,11 +518,17 @@ function TicketManagement() {
           );
           break;
         default:
-          formItem = <Input placeholder={placeholder || `请输入${displayName}`} />;
+          formItem = <Input placeholder={placeholder || `请输入${displayName}`} size="large" />;
       }
 
       return (
-        <Form.Item key={fieldName} name={fieldName} label={displayName} rules={rules}>
+        <Form.Item
+          key={fieldName}
+          name={fieldName}
+          label={<span style={{ fontWeight: 500 }}>{displayName}</span>}
+          rules={rules}
+          valuePropName={fieldType === 'boolean' ? 'checked' : undefined}
+        >
           {formItem}
         </Form.Item>
       );
@@ -596,20 +641,13 @@ function TicketManagement() {
   const showModal = useCallback((ticket = null) => {
     setEditingTicket(ticket);
     if (ticket) {
+      setManualDeviceSource(!ticket.deviceId);
       const ticketData = { ...ticket };
       if (ticketData.expectedCompletionDate) {
         ticketData.expectedCompletionDate = dayjs(ticketData.expectedCompletionDate);
       }
       if (ticketData.completionDate) {
         ticketData.completionDate = dayjs(ticketData.completionDate);
-      }
-      if (ticket.deviceId) {
-        setDeviceSource('select');
-        ticketData.deviceId = ticket.deviceId;
-      } else {
-        setDeviceSource('manual');
-        ticketData.deviceName = ticket.deviceName;
-        ticketData.serialNumber = ticket.serialNumber;
       }
       if (ticket.metadata && typeof ticket.metadata === 'object') {
         Object.entries(ticket.metadata).forEach(([key, value]) => {
@@ -618,8 +656,8 @@ function TicketManagement() {
       }
       form.setFieldsValue(ticketData);
     } else {
+      setManualDeviceSource(false);
       form.resetFields();
-      setDeviceSource('select');
       const newTicketId = generateTicketId();
       form.setFieldsValue({ ticketId: newTicketId });
     }
@@ -654,9 +692,9 @@ function TicketManagement() {
           }
         });
 
-        if (deviceSource === 'manual') {
+        if (manualDeviceSource) {
           ticketData.deviceId = null;
-          ticketData.deviceName = values.deviceName;
+          ticketData.deviceName = values.deviceName || '未知设备';
           ticketData.serialNumber = values.serialNumber;
         } else {
           const selectedDevice = devices.find(d => d.deviceId === values.deviceId);
@@ -680,13 +718,12 @@ function TicketManagement() {
         setModalVisible(false);
         fetchTickets();
         setEditingTicket(null);
-        setDeviceSource('select');
       } catch (error) {
         message.error(editingTicket ? '工单更新失败' : '工单创建失败');
         console.error(error);
       }
     },
-    [editingTicket, fetchTickets, deviceSource, ticketFields, devices]
+    [editingTicket, fetchTickets, ticketFields, devices, manualDeviceSource]
   );
 
   const handleDelete = useCallback(
@@ -779,57 +816,6 @@ function TicketManagement() {
     [fetchTickets, searchFilters]
   );
 
-  const handleDeviceSourceChange = useCallback(value => {
-    setDeviceSource(value);
-  }, []);
-
-  const renderDeviceFormItems = useCallback(() => {
-    if (deviceSource === 'select') {
-      return (
-        <Form.Item name="deviceId" label="关联设备" rules={[{ required: false }]}>
-          <Select
-            placeholder="输入关键词搜索设备（序列号/名称/IP等）"
-            showSearch
-            allowClear
-            loading={deviceSearching}
-            filterOption={false}
-            onSearch={handleDeviceSearch}
-            notFoundContent={deviceSearching ? '搜索中...' : '请输入关键词搜索'}
-            onDropdownVisibleChange={open => {
-              if (open && devices.length === 0) {
-                fetchDevices();
-              }
-            }}
-          >
-            {devices.map(device => (
-              <Option key={device.deviceId} value={device.deviceId}>
-                {device.name} {device.serialNumber ? `- ${device.serialNumber}` : ''}
-              </Option>
-            ))}
-          </Select>
-        </Form.Item>
-      );
-    }
-    return (
-      <>
-        <Form.Item
-          name="deviceName"
-          label="设备名称"
-          rules={[{ required: true, message: '请输入设备名称' }]}
-        >
-          <Input placeholder="请输入设备名称" />
-        </Form.Item>
-        <Form.Item
-          name="serialNumber"
-          label="设备序列号"
-          rules={[{ required: true, message: '请输入设备序列号' }]}
-        >
-          <Input placeholder="请输入设备序列号" />
-        </Form.Item>
-      </>
-    );
-  }, [deviceSource, devices, deviceSearching, handleDeviceSearch, fetchDevices]);
-
   const renderFormItems = useCallback(() => {
     const items = [];
     if (!editingTicket) {
@@ -839,84 +825,181 @@ function TicketManagement() {
         </Form.Item>
       );
     }
-    
-    // 检查 ticketFields 是否包含 deviceId
+
     const hasDeviceIdField = ticketFields.some(f => f.fieldName === 'deviceId');
     const hasDeviceNameField = ticketFields.some(f => f.fieldName === 'deviceName');
-    
+
     ticketFields.forEach(field => {
       if (field.fieldName === 'ticketId') {
-        // 已处理
       } else if (field.fieldName === 'deviceId') {
-        // 渲染设备选择器
         items.push(
           <React.Fragment key="deviceSource">
             <Form.Item label="设备来源" required>
               <Select
-                value={deviceSource}
-                onChange={handleDeviceSourceChange}
+                value={manualDeviceSource ? 'manual' : 'select'}
+                onChange={val => setManualDeviceSource(val === 'manual')}
                 style={{ width: 200 }}
               >
-                <Option value="select">从设备管理选择</Option>
-                <Option value="manual">手动输入</Option>
+                <Option value="select">从设备列表选择</Option>
+                <Option value="manual">手动输入序列号</Option>
               </Select>
             </Form.Item>
-            {renderDeviceFormItems()}
+            {manualDeviceSource ? (
+              <>
+                <Form.Item
+                  name="serialNumber"
+                  label="设备序列号"
+                  rules={[{ required: true, message: '请输入设备序列号' }]}
+                >
+                  <Input placeholder="请输入设备序列号" />
+                </Form.Item>
+                <Form.Item
+                  name="deviceName"
+                  label="设备名称"
+                  rules={[{ required: false, message: '请输入设备名称（选填）' }]}
+                >
+                  <Input placeholder="请输入设备名称（选填）" />
+                </Form.Item>
+              </>
+            ) : (
+              <Form.Item
+                name="deviceId"
+                label="关联设备"
+                rules={[{ required: true, message: '请选择关联设备' }]}
+              >
+                <Select
+                  placeholder="输入关键词搜索设备（序列号/名称/IP等）"
+                  showSearch
+                  allowClear
+                  loading={deviceSearching}
+                  filterOption={false}
+                  onSearch={handleDeviceSearch}
+                  notFoundContent={deviceSearching ? '搜索中...' : '请输入关键词搜索'}
+                  onDropdownVisibleChange={open => {
+                    if (open && devices.length === 0) {
+                      fetchDevices();
+                    }
+                  }}
+                >
+                  {devices.map(device => (
+                    <Option key={device.deviceId} value={device.deviceId}>
+                      {device.name} {device.serialNumber ? `- ${device.serialNumber}` : ''}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            )}
           </React.Fragment>
         );
       } else if (field.fieldName === 'deviceName' || field.fieldName === 'serialNumber') {
-        // 如果存在 deviceId 字段，这些字段会在 renderDeviceFormItems 中处理
-        // 如果不存在 deviceId 字段但存在 deviceName，则显示手动输入模式
         if (!hasDeviceIdField && field.fieldName === 'deviceName') {
           items.push(
-            <React.Fragment key="deviceSource">
-              <Form.Item label="设备来源" required>
-                <Select
-                  value={deviceSource}
-                  onChange={handleDeviceSourceChange}
-                  style={{ width: 200 }}
-                >
-                  <Option value="select">从设备管理选择</Option>
-                  <Option value="manual">手动输入</Option>
-                </Select>
-              </Form.Item>
-              {renderDeviceFormItems()}
-            </React.Fragment>
+            <Form.Item
+              key="deviceId"
+              name="deviceId"
+              label="关联设备"
+              rules={[{ required: true, message: '请选择关联设备' }]}
+            >
+              <Select
+                placeholder="输入关键词搜索设备（序列号/名称/IP等）"
+                showSearch
+                allowClear
+                loading={deviceSearching}
+                filterOption={false}
+                onSearch={handleDeviceSearch}
+                notFoundContent={deviceSearching ? '搜索中...' : '请输入关键词搜索'}
+                onDropdownVisibleChange={open => {
+                  if (open && devices.length === 0) {
+                    fetchDevices();
+                  }
+                }}
+              >
+                {devices.map(device => (
+                  <Option key={device.deviceId} value={device.deviceId}>
+                    {device.name} {device.serialNumber ? `- ${device.serialNumber}` : ''}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
           );
         }
       } else {
         items.push(renderFormItem(field));
       }
     });
-    
-    // 如果 ticketFields 中既没有 deviceId 也没有 deviceName，则手动添加设备选择器
+
     if (!hasDeviceIdField && !hasDeviceNameField) {
       items.push(
         <React.Fragment key="deviceSource">
           <Form.Item label="设备来源" required>
             <Select
-              value={deviceSource}
-              onChange={handleDeviceSourceChange}
+              value={manualDeviceSource ? 'manual' : 'select'}
+              onChange={val => setManualDeviceSource(val === 'manual')}
               style={{ width: 200 }}
             >
-              <Option value="select">从设备管理选择</Option>
-              <Option value="manual">手动输入</Option>
+              <Option value="select">从设备列表选择</Option>
+              <Option value="manual">手动输入序列号</Option>
             </Select>
           </Form.Item>
-          {renderDeviceFormItems()}
+          {manualDeviceSource ? (
+            <>
+              <Form.Item
+                name="serialNumber"
+                label="设备序列号"
+                rules={[{ required: true, message: '请输入设备序列号' }]}
+              >
+                <Input placeholder="请输入设备序列号" />
+              </Form.Item>
+              <Form.Item
+                name="deviceName"
+                label="设备名称"
+                rules={[{ required: false, message: '请输入设备名称（选填）' }]}
+              >
+                <Input placeholder="请输入设备名称（选填）" />
+              </Form.Item>
+            </>
+          ) : (
+            <Form.Item
+              name="deviceId"
+              label="关联设备"
+              rules={[{ required: true, message: '请选择关联设备' }]}
+            >
+              <Select
+                placeholder="输入关键词搜索设备（序列号/名称/IP等）"
+                showSearch
+                allowClear
+                loading={deviceSearching}
+                filterOption={false}
+                onSearch={handleDeviceSearch}
+                notFoundContent={deviceSearching ? '搜索中...' : '请输入关键词搜索'}
+                onDropdownVisibleChange={open => {
+                  if (open && devices.length === 0) {
+                    fetchDevices();
+                  }
+                }}
+              >
+                {devices.map(device => (
+                  <Option key={device.deviceId} value={device.deviceId}>
+                    {device.name} {device.serialNumber ? `- ${device.serialNumber}` : ''}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
         </React.Fragment>
       );
     }
-    
+
     return items;
   }, [
     ticketFields,
-    deviceSource,
     devices,
-    handleDeviceSourceChange,
-    renderDeviceFormItems,
-    renderFormItem,
+    deviceSearching,
+    handleDeviceSearch,
+    fetchDevices,
     editingTicket,
+    renderFormItem,
+    manualDeviceSource,
   ]);
 
   const getActionItems = useCallback(
@@ -1046,23 +1129,354 @@ function TicketManagement() {
       </Card>
 
       <Modal
-        title={editingTicket ? '编辑工单' : '创建工单'}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontSize: 16,
+            }}>
+              <PlusOutlined />
+            </div>
+            <span style={{ fontWeight: 600, fontSize: 18 }}>
+              {editingTicket ? '编辑工单' : '创建工单'}
+            </span>
+          </div>
+        }
         open={modalVisible}
         closeIcon={<CloseButton />}
         onCancel={handleCancel}
         footer={null}
-        width={700}
+        width={800}
+        destroyOnClose
+        style={{ top: 40 }}
+        bodyStyle={{ padding: '24px 24px 8px 24px' }}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          {renderFormItems()}
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit">
-                {editingTicket ? '更新' : '创建'}
-              </Button>
-              <Button onClick={handleCancel}>取消</Button>
-            </Space>
-          </Form.Item>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          requiredMark="optional"
+          style={{ marginBottom: 16 }}
+        >
+          {!editingTicket && (
+            <div style={{
+              background: 'linear-gradient(135deg, #f0f4ff 0%, #fafbff 100%)',
+              border: '1px solid #e8eaff',
+              borderRadius: 12,
+              padding: '12px 16px',
+              marginBottom: 20,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+            }}>
+              <div style={{
+                width: 40,
+                height: 40,
+                borderRadius: 8,
+                background: '#667eea',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontSize: 14,
+                fontWeight: 600,
+              }}>
+                TKT
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>工单编号（自动生成）</div>
+                <Form.Item name="ticketId" noStyle>
+                  <Input
+                    disabled
+                    placeholder="点击创建后自动生成"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      fontWeight: 600,
+                      color: '#333',
+                    }}
+                  />
+                </Form.Item>
+              </div>
+            </div>
+          )}
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '0 24px',
+          }}>
+            <div style={{ gridColumn: '1 / -1', marginBottom: 8 }}>
+              <div style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#333',
+                marginBottom: 12,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                <span style={{
+                  width: 4,
+                  height: 16,
+                  background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: 2,
+                  display: 'inline-block',
+                }} />
+                设备信息
+              </div>
+            </div>
+
+            {(() => {
+              const hasDeviceIdField = ticketFields.some(f => f.fieldName === 'deviceId');
+              const hasDeviceNameField = ticketFields.some(f => f.fieldName === 'deviceName');
+
+              const renderDeviceSection = () => (
+                <React.Fragment>
+                  <div style={{ gridColumn: '1 / -1', marginBottom: 16 }}>
+                    <Form.Item
+                      label={<span style={{ fontWeight: 500 }}>设备来源</span>}
+                      name="deviceSource"
+                      initialValue="select"
+                    >
+                      <Select
+                        value={manualDeviceSource ? 'manual' : 'select'}
+                        onChange={val => setManualDeviceSource(val === 'manual')}
+                        style={{ width: '100%' }}
+                        size="large"
+                      >
+                        <Option value="select">从设备列表选择</Option>
+                        <Option value="manual">手动输入序列号</Option>
+                      </Select>
+                    </Form.Item>
+                  </div>
+
+                  {manualDeviceSource ? (
+                    <>
+                      <div>
+                        <Form.Item
+                          name="serialNumber"
+                          label={<span style={{ fontWeight: 500 }}>设备序列号 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                          rules={[{ required: true, message: '请输入设备序列号' }]}
+                        >
+                          <Input placeholder="请输入设备序列号" size="large" />
+                        </Form.Item>
+                      </div>
+                      <div>
+                        <Form.Item
+                          name="deviceName"
+                          label={<span style={{ fontWeight: 500 }}>设备名称</span>}
+                        >
+                          <Input placeholder="请输入设备名称（选填）" size="large" />
+                        </Form.Item>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <Form.Item
+                        name="deviceId"
+                        label={<span style={{ fontWeight: 500 }}>关联设备 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                        rules={[{ required: true, message: '请选择关联设备' }]}
+                      >
+                        <Select
+                          placeholder="输入关键词搜索设备（序列号/名称/IP等）"
+                          showSearch
+                          allowClear
+                          loading={deviceSearching}
+                          filterOption={false}
+                          onSearch={handleDeviceSearch}
+                          notFoundContent={deviceSearching ? '搜索中...' : '请输入关键词搜索'}
+                          onDropdownVisibleChange={open => {
+                            if (open && devices.length === 0) {
+                              fetchDevices();
+                            }
+                          }}
+                          size="large"
+                        >
+                          {devices.map(device => (
+                            <Option key={device.deviceId} value={device.deviceId}>
+                              {device.name} {device.serialNumber ? `- ${device.serialNumber}` : ''}
+                            </Option>
+                          ))}
+                        </Select>
+                      </Form.Item>
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+
+              if (hasDeviceIdField) {
+                return renderDeviceSection();
+              } else if (hasDeviceNameField) {
+                if (!ticketFields.some(f => f.fieldName === 'deviceId')) {
+                  return (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      {renderDeviceSection()}
+                    </div>
+                  );
+                }
+              } else {
+                return renderDeviceSection();
+              }
+              return null;
+            })()}
+
+            <div style={{ gridColumn: '1 / -1', marginBottom: 8, marginTop: 8 }}>
+              <div style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#333',
+                marginBottom: 12,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                <span style={{
+                  width: 4,
+                  height: 16,
+                  background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: 2,
+                  display: 'inline-block',
+                }} />
+                工单信息
+              </div>
+            </div>
+
+            {ticketFields.filter(f =>
+              !['ticketId', 'deviceId', 'deviceName', 'serialNumber', 'expectedCompletionDate', 'resolution', 'notes', 'description'].includes(f.fieldName)
+            ).map(field => (
+              <div key={field.fieldName}>
+                {renderFormItem(field)}
+              </div>
+            ))}
+
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Form.Item
+                name="title"
+                label={<span style={{ fontWeight: 500 }}>工单标题 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                rules={[{ required: true, message: '请输入工单标题' }]}
+              >
+                <Input placeholder="请输入工单标题" size="large" />
+              </Form.Item>
+            </div>
+
+            <div>
+              <Form.Item
+                name="faultCategory"
+                label={<span style={{ fontWeight: 500 }}>故障分类 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                rules={[{ required: true, message: '请选择故障分类' }]}
+              >
+                <Select placeholder="请选择故障分类" size="large">
+                  {categories.map(cat => (
+                    <Option key={cat.categoryId} value={cat.name}>
+                      {cat.name}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </div>
+
+            <div>
+              <Form.Item
+                name="priority"
+                label={<span style={{ fontWeight: 500 }}>优先级 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                rules={[{ required: true, message: '请选择优先级' }]}
+                initialValue="medium"
+              >
+                <Select placeholder="请选择优先级" size="large">
+                  <Option value="low">
+                    <Tag color="green" style={{ margin: 0 }}>低</Tag>
+                  </Option>
+                  <Option value="medium">
+                    <Tag color="orange" style={{ margin: 0 }}>中</Tag>
+                  </Option>
+                  <Option value="high">
+                    <Tag color="red" style={{ margin: 0 }}>高</Tag>
+                  </Option>
+                  <Option value="urgent">
+                    <Tag color="magenta" style={{ margin: 0 }}>紧急</Tag>
+                  </Option>
+                </Select>
+              </Form.Item>
+            </div>
+
+            <div>
+              <Form.Item
+                name="expectedCompletionDate"
+                label={<span style={{ fontWeight: 500 }}>期望完成时间</span>}
+              >
+                <DatePicker
+                  showTime
+                  format="YYYY-MM-DD HH:mm"
+                  style={{ width: '100%' }}
+                  size="large"
+                  placeholder="选择期望完成时间"
+                />
+              </Form.Item>
+            </div>
+
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Form.Item
+                name="description"
+                label={<span style={{ fontWeight: 500 }}>故障描述 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                rules={[{ required: true, message: '请输入故障描述' }]}
+              >
+                <TextArea
+                  rows={4}
+                  placeholder="请详细描述故障现象、发生时间、影响范围等信息"
+                  showCount
+                  maxLength={500}
+                />
+              </Form.Item>
+            </div>
+
+            <div style={{ gridColumn: '1 / -1', marginTop: 8 }}>
+              <Form.Item
+                name="notes"
+                label={<span style={{ fontWeight: 500 }}>备注信息</span>}
+              >
+                <TextArea
+                  rows={2}
+                  placeholder="补充说明或其他相关信息（选填）"
+                  showCount
+                  maxLength={200}
+                />
+              </Form.Item>
+            </div>
+          </div>
+
+          <div style={{
+            borderTop: '1px solid #f0f0f0',
+            marginTop: 24,
+            paddingTop: 20,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 12,
+          }}>
+            <Button onClick={handleCancel} size="large" style={{ minWidth: 100 }}>
+              取消
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              size="large"
+              style={{
+                minWidth: 120,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                border: 'none',
+              }}
+            >
+              {editingTicket ? '更新工单' : '创建工单'}
+            </Button>
+          </div>
         </Form>
       </Modal>
 

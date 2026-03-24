@@ -193,9 +193,7 @@ function DeviceManagement() {
 
   const fetchRacks = async () => {
     try {
-      const response = await axios.get('/api/racks', {
-        params: { pageSize: 1000 },
-      });
+      const response = await axios.get('/api/racks/all');
       setRacks(response.data.racks || []);
     } catch (error) {
       message.error('获取机柜列表失败');

@@ -60,6 +60,55 @@ router.get('/', async (req, res) => {
   }
 });
 
+const MAX_EXPORT_SIZE = 50000;
+
+router.get('/export', async (req, res) => {
+  try {
+    const { keyword, category, status } = req.query;
+
+    const where = {};
+
+    if (keyword) {
+      where[Op.or] = [
+        { consumableId: { [Op.like]: `%${keyword}%` } },
+        { name: { [Op.like]: `%${keyword}%` } },
+        { category: { [Op.like]: `%${keyword}%` } },
+        { supplier: { [Op.like]: `%${keyword}%` } },
+        { location: { [Op.like]: `%${keyword}%` } }
+      ];
+    }
+
+    if (category && category !== 'all') {
+      where.category = category;
+    }
+
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+
+    const consumables = await Consumable.findAll({
+      where,
+      limit: MAX_EXPORT_SIZE,
+      order: [['createdAt', 'DESC']]
+    });
+
+    const result = consumables.map(item => {
+      const data = item.toJSON();
+      if (!Array.isArray(data.snList)) {
+        data.snList = [];
+      }
+      return data;
+    });
+
+    res.json({
+      consumables: result,
+      total: result.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/', async (req, res) => {
   const transaction = await sequelize.transaction();
   try {

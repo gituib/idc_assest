@@ -18,17 +18,19 @@ import CloseButton from '../components/CloseButton';
 
 const { Option } = Select;
 
-const OptionsEditor = ({ value = [], onChange }) => {
+const OptionsEditor = ({ value, onChange }) => {
+  const options = Array.isArray(value) ? value : [];
+
   const handleAdd = () => {
-    onChange([...value, { value: '', label: '' }]);
+    onChange([...options, { value: '', label: '' }]);
   };
 
   const handleRemove = index => {
-    onChange(value.filter((_, i) => i !== index));
+    onChange(options.filter((_, i) => i !== index));
   };
 
   const handleUpdate = (index, field, fieldValue) => {
-    const newOptions = value.map((opt, i) =>
+    const newOptions = options.map((opt, i) =>
       i === index ? { ...opt, [field]: fieldValue } : opt
     );
     onChange(newOptions);
@@ -62,7 +64,7 @@ const OptionsEditor = ({ value = [], onChange }) => {
         </span>
       </div>
 
-      {value.length === 0 ? (
+      {options.length === 0 ? (
         <div style={{
           textAlign: 'center',
           padding: '24px',
@@ -153,7 +155,7 @@ const OptionsEditor = ({ value = [], onChange }) => {
         </div>
       )}
 
-      {value.length > 0 && (
+      {options.length > 0 && (
         <Button
           type="dashed"
           icon={<PlusCircleOutlined />}

@@ -347,8 +347,8 @@ function ConsumableManagement() {
 
   const handleExport = async () => {
     try {
-      const response = await axios.get('/api/consumables', {
-        params: { keyword, category, status, pageSize: 1000 },
+      const response = await axios.get('/api/consumables/export', {
+        params: { keyword, category, status },
       });
       const consumables = response.data.consumables;
       exportToCSV(consumables, `consumables_${new Date().toISOString().split('T')[0]}.csv`);

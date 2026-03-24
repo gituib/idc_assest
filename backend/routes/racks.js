@@ -79,6 +79,59 @@ router.get('/', async (req, res) => {
   }
 });
 
+const MAX_EXPORT_SIZE = 50000;
+
+router.get('/all', async (req, res) => {
+  try {
+    const { roomId, status, keyword } = req.query;
+
+    const where = {};
+    if (roomId && roomId !== 'all') {
+      where.roomId = roomId;
+    }
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+    if (keyword) {
+      where[require('sequelize').Op.or] = [
+        { rackId: { [require('sequelize').Op.like]: `%${keyword}%` } },
+        { name: { [require('sequelize').Op.like]: `%${keyword}%` } }
+      ];
+    }
+
+    const racks = await Rack.findAll({
+      where,
+      include: [{ model: Room, separate: false }],
+      limit: MAX_EXPORT_SIZE
+    });
+
+    const rackIds = racks.map(r => r.rackId);
+    const devices = await Device.findAll({
+      where: { rackId: rackIds },
+      attributes: ['deviceId', 'rackId', 'name', 'powerConsumption', 'height']
+    });
+
+    const deviceMap = {};
+    devices.forEach(d => {
+      if (!deviceMap[d.rackId]) {
+        deviceMap[d.rackId] = [];
+      }
+      deviceMap[d.rackId].push(d);
+    });
+
+    racks.forEach(rack => {
+      rack.dataValues.Devices = deviceMap[rack.rackId] || [];
+    });
+
+    res.json({
+      racks,
+      total: racks.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 导出机柜导入模板 - 必须放在 /:rackId 路由之前，避免被当作 rackId 参数
 router.get('/import-template', async (req, res) => {
   try {

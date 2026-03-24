@@ -584,6 +584,67 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
   }
 });
 
+const MAX_EXPORT_SIZE = 50000;
+
+router.get('/all', async (req, res) => {
+  try {
+    const { keyword, status, type, rackId, roomId } = req.query;
+
+    const where = {};
+
+    if (keyword) {
+      const escapedKeyword = keyword.replace(/'/g, "''");
+      where[Op.or] = [
+        { deviceId: { [Op.like]: `%${escapedKeyword}%` } },
+        { name: { [Op.like]: `%${escapedKeyword}%` } },
+        { type: { [Op.like]: `%${escapedKeyword}%` } },
+        { model: { [Op.like]: `%${escapedKeyword}%` } },
+        { serialNumber: { [Op.like]: `%${escapedKeyword}%` } },
+        { ipAddress: { [Op.like]: `%${escapedKeyword}%` } }
+      ];
+    }
+
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+
+    if (type && type !== 'all') {
+      where.type = type;
+    }
+
+    if (rackId) {
+      where.rackId = rackId;
+    }
+
+    if (roomId && roomId !== 'all') {
+      where['$Rack.roomId$'] = roomId;
+    }
+
+    const devices = await Device.findAll({
+      where,
+      include: [
+        {
+          model: Rack,
+          include: [{ model: Room }],
+          separate: false
+        }
+      ],
+      limit: MAX_EXPORT_SIZE,
+      order: [['createdAt', 'DESC']],
+      distinct: true,
+      subQuery: false
+    });
+
+    res.json({
+      devices,
+      total: devices.length
+    });
+  } catch (error) {
+    console.error('获取设备列表失败:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 生成设备ID的辅助函数
 async function generateDeviceId() {
   // 获取当前最大的设备ID序号

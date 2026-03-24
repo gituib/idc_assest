@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, Row, Col, Statistic, Table, DatePicker, Select, Space, Tag, message } from 'antd';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Card, Row, Col, Statistic, Table, DatePicker, Select, Space, Tag, message, Button, Switch, Tooltip } from 'antd';
 import {
   BarChartOutlined,
   PieChartOutlined,
@@ -8,12 +8,16 @@ import {
   ClockCircleOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
+  ReloadOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
+
+const REFRESH_INTERVAL = 30000;
 
 const getStatusColor = status => {
   const colors = {
@@ -59,7 +63,9 @@ const getPriorityText = priority => {
 
 function TicketStatistics() {
   const [loading, setLoading] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(false);
   const [dateRange, setDateRange] = useState([dayjs().subtract(30, 'days'), dayjs()]);
+  const [lastUpdateTime, setLastUpdateTime] = useState(null);
   const [statistics, setStatistics] = useState({
     total: 0,
     pending: 0,
@@ -74,16 +80,21 @@ function TicketStatistics() {
     trend: [],
   });
 
-  const fetchStatistics = useCallback(async () => {
+  const timerRef = useRef(null);
+
+  const fetchStatistics = useCallback(async (isManual = false) => {
     try {
-      setLoading(true);
+      if (isManual) {
+        setLoading(true);
+      }
       const params = {
         startDate: dateRange[0].format('YYYY-MM-DD'),
         endDate: dateRange[1].format('YYYY-MM-DD'),
       };
 
-      const response = await axios.get('/api/tickets/statistics', { params });
+      const response = await axios.get('/api/tickets/stats', { params });
       setStatistics(response.data);
+      setLastUpdateTime(new Date());
     } catch (error) {
       message.error('获取统计数据失败');
       console.error('获取统计数据失败:', error);
@@ -96,11 +107,33 @@ function TicketStatistics() {
     fetchStatistics();
   }, [fetchStatistics]);
 
+  useEffect(() => {
+    if (autoRefresh) {
+      timerRef.current = setInterval(() => {
+        fetchStatistics();
+      }, REFRESH_INTERVAL);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [autoRefresh, fetchStatistics]);
+
   const handleDateChange = useCallback(dates => {
     if (dates) {
       setDateRange(dates);
     }
   }, []);
+
+  const handleManualRefresh = useCallback(() => {
+    fetchStatistics(true);
+  }, [fetchStatistics]);
 
   const getStatusColor = status => {
     const colors = {
@@ -296,6 +329,23 @@ function TicketStatistics() {
         title="工单统计报表"
         extra={
           <Space>
+            <Tooltip title={lastUpdateTime ? `最后更新: ${dayjs(lastUpdateTime).format('HH:mm:ss')}` : '尚未更新'}>
+              <span style={{ fontSize: 12, color: '#888', marginRight: 8 }}>
+                {lastUpdateTime && `更新于 ${dayjs(lastUpdateTime).format('HH:mm:ss')}`}
+              </span>
+            </Tooltip>
+            <Tooltip title="自动刷新（每30秒）">
+              <Switch
+                checked={autoRefresh}
+                onChange={setAutoRefresh}
+                checkedChildren={<SyncOutlined spin={autoRefresh} />}
+                unCheckedChildren={<SyncOutlined />}
+                size="small"
+              />
+            </Tooltip>
+            <Button icon={<ReloadOutlined />} onClick={handleManualRefresh} size="small">
+              刷新
+            </Button>
             <RangePicker value={dateRange} onChange={handleDateChange} allowClear={false} />
           </Space>
         }
