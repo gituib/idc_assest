@@ -24,6 +24,11 @@ import {
   SettingOutlined,
   CloudServerOutlined,
   ReloadOutlined,
+  AppstoreOutlined,
+  ToolOutlined,
+  EnvironmentOutlined,
+  FilterOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -89,7 +94,6 @@ function DeviceManagement() {
   const [type, setType] = useState('all');
   const [roomId, setRoomId] = useState('all');
   const [rackId, setRackId] = useState('all');
-  const [isIdle, setIsIdle] = useState('');
   const [searchForm] = Form.useForm();
 
   const [pagination, setPagination] = useState({
@@ -122,6 +126,7 @@ function DeviceManagement() {
   const [selectedDevices, setSelectedDevices] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
   const [columnWidths, setColumnWidths] = useState({});
+  const [advancedSearchVisible, setAdvancedSearchVisible] = useState(false);
 
   const debouncedKeyword = useDebounce(keyword, DEBOUNCE_DELAY);
 
@@ -138,7 +143,6 @@ function DeviceManagement() {
           type: type !== 'all' ? type : undefined,
           roomId: roomId !== 'all' ? roomId : undefined,
           rackId: rackId !== 'all' ? rackId : undefined,
-          isIdle: isIdle || undefined,
         };
 
         const response = await axios.get('/api/devices', { params });
@@ -293,7 +297,6 @@ function DeviceManagement() {
     setType(values.type || 'all');
     setRoomId(values.roomId || 'all');
     setRackId(values.rackId || 'all');
-    setIsIdle(values.isIdle || '');
 
     setPagination((prev) => ({ ...prev, current: 1 }));
 
@@ -308,7 +311,6 @@ function DeviceManagement() {
     setType('all');
     setRoomId('all');
     setRackId('all');
-    setIsIdle('');
     searchForm.resetFields();
 
     setTimeout(() => setSearching(false), 300);
@@ -664,7 +666,7 @@ function DeviceManagement() {
           title: field.displayName,
           dataIndex: field.fieldName,
           key: field.fieldName,
-          width: columnWidths[field.fieldName] || 100,
+          width: columnWidths[field.fieldName] || 90,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
           render: (status) => {
             const config = STATUS_MAP[status] || { text: status, color: 'default' };
@@ -673,6 +675,7 @@ function DeviceManagement() {
               maintenance: { bg: '#fffbE6', border: '#faad14', text: '#d48806' },
               offline: { bg: '#f5f5f5', border: '#8c8c8c', text: '#595959' },
               fault: { bg: '#fff2f0', border: '#ff4d4f', text: '#cf1322' },
+              idle: { bg: '#E6FFFA', border: '#36cfc9', text: '#08979d' },
             };
             const style = statusStyles[status] || { bg: '#fafafa', border: '#d9d9d9', text: '#595959' };
             return (
@@ -684,6 +687,10 @@ function DeviceManagement() {
                   borderRadius: '4px',
                   fontWeight: 500,
                   boxShadow: `0 1px 2px ${style.border}30`,
+                  minWidth: '80px',
+                  textAlign: 'center',
+                  padding: '2px 8px',
+                  display: 'block',
                 }}
               >
                 {config.text}
@@ -927,9 +934,8 @@ function DeviceManagement() {
           body: {
             padding: `${designTokens.spacing.md}px ${designTokens.spacing.lg}px`,
             display: 'flex',
-            alignItems: 'center',
+            flexDirection: 'column',
             gap: designTokens.spacing.md,
-            flexWrap: 'wrap',
           },
         }}
       >
@@ -937,144 +943,196 @@ function DeviceManagement() {
           form={searchForm}
           layout="inline"
           onFinish={handleSearch}
-          style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: designTokens.spacing.md }}
+          style={{ width: '100%' }}
           className="filter-form"
         >
-          <Form.Item name="keyword" style={{ margin: 0 }}>
-            <Input
-              placeholder="搜索设备..."
-              prefix={<SearchOutlined style={{ color: designTokens.colors.primary.main }} />}
-              style={{
-                width: '280px',
-                borderRadius: designTokens.borderRadius.medium,
-                border: `1px solid ${designTokens.colors.border.light}`,
-                transition: `all ${designTokens.transitions.fast}`,
-              }}
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-            />
-          </Form.Item>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: designTokens.spacing.md, alignItems: 'center', width: '100%' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: designTokens.spacing.sm,
+              padding: '0 12px',
+              borderRight: `1px solid ${designTokens.colors.border.light}`,
+              marginRight: 4,
+            }}>
+              <FilterOutlined style={{ color: designTokens.colors.primary.main, fontSize: '16px' }} />
+              <span style={{ fontSize: '13px', fontWeight: 500, color: designTokens.colors.text.secondary, whiteSpace: 'nowrap' }}>筛选</span>
+            </div>
 
-          <Form.Item name="status" style={{ margin: 0 }}>
-            <Select
-              value={status}
-              onChange={setStatus}
-              style={{ width: '140px', borderRadius: designTokens.borderRadius.medium }}
-            >
-              <Option value="all">所有状态</Option>
-              <Option value="running">运行中</Option>
-              <Option value="maintenance">维护中</Option>
-              <Option value="offline">离线</Option>
-              <Option value="fault">故障</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="type" style={{ margin: 0 }}>
-            <Select
-              value={type}
-              onChange={setType}
-              style={{ width: '140px', borderRadius: designTokens.borderRadius.medium }}
-            >
-              <Option value="all">所有类型</Option>
-              <Option value="server">服务器</Option>
-              <Option value="switch">交换机</Option>
-              <Option value="router">路由器</Option>
-              <Option value="storage">存储设备</Option>
-              <Option value="other">其他设备</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="roomId" style={{ margin: 0 }}>
-            <Select
-              value={roomId}
-              onChange={(value) => {
-                setRoomId(value);
-                setRackId('all');
-              }}
-              style={{ width: '140px', borderRadius: designTokens.borderRadius.medium }}
-            >
-              <Option value="all">所有机房</Option>
-              {rooms.map((room) => (
-                <Option key={room.roomId} value={room.roomId}>
-                  {room.name}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="rackId" style={{ margin: 0 }}>
-            <Select
-              value={rackId}
-              onChange={setRackId}
-              style={{ width: '140px', borderRadius: designTokens.borderRadius.medium }}
-              showSearch
-              optionFilterProp="children"
-            >
-              <Option value="all">所有机柜</Option>
-              {racks
-                .filter((rack) => roomId === 'all' || rack.roomId === roomId)
-                .map((rack) => (
-                  <Option key={rack.rackId} value={rack.rackId}>
-                    {rack.name}
-                  </Option>
-                ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="isIdle" style={{ margin: 0 }}>
-            <Select
-              style={{ width: 140, borderRadius: designTokens.borderRadius.medium }}
-            >
-              <Option value="">所有设备</Option>
-              <Option value="false">在用设备</Option>
-              <Option value="true">空闲设备</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item style={{ margin: 0 }}>
-            <Space>
-              <Button
-                type="primary"
+            <Form.Item name="keyword" style={{ margin: 0 }}>
+              <Input
+                placeholder="搜索设备名称、型号、序列号..."
+                prefix={<SearchOutlined style={{ color: designTokens.colors.primary.main }} />}
                 style={{
-                  height: '36px',
-                  borderRadius: designTokens.borderRadius.medium,
-                  background: designTokens.colors.primary.gradient,
-                  border: 'none',
-                  boxShadow: designTokens.shadows.small,
-                }}
-                icon={<SearchOutlined />}
-                htmlType="submit"
-                loading={searching}
-              >
-                搜索
-              </Button>
-              <Button
-                style={{
-                  height: '36px',
+                  width: '280px',
                   borderRadius: designTokens.borderRadius.medium,
                   border: `1px solid ${designTokens.colors.border.light}`,
+                  transition: `all ${designTokens.transitions.fast}`,
                 }}
-                onClick={handleReset}
-              >
-                重置
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                allowClear
+              />
+            </Form.Item>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: designTokens.spacing.sm }}>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => fetchDevices(1, pagination.pageSize, true)}
-            style={{
-              borderRadius: designTokens.borderRadius.medium,
-              border: `1px solid ${designTokens.colors.border.light}`,
-              height: '36px',
-            }}
-          >
-            刷新
-          </Button>
-        </div>
+            <Form.Item name="status" style={{ margin: 0 }}>
+              <Select
+                value={status}
+                onChange={setStatus}
+                style={{ width: '140px', borderRadius: designTokens.borderRadius.medium }}
+                suffixIcon={<ToolOutlined style={{ color: '#10b981' }} />}
+              >
+                <Option value="all">所有状态</Option>
+                <Option value="running">运行中</Option>
+                <Option value="maintenance">维护中</Option>
+                <Option value="offline">离线</Option>
+                <Option value="fault">故障</Option>
+                <Option value="idle">空闲</Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item name="type" style={{ margin: 0 }}>
+              <Select
+                value={type}
+                onChange={setType}
+                style={{ width: '140px', borderRadius: designTokens.borderRadius.medium }}
+                suffixIcon={<AppstoreOutlined style={{ color: '#8b5cf6' }} />}
+              >
+                <Option value="all">所有类型</Option>
+                <Option value="server">服务器</Option>
+                <Option value="switch">交换机</Option>
+                <Option value="router">路由器</Option>
+                <Option value="storage">存储设备</Option>
+                <Option value="other">其他设备</Option>
+              </Select>
+            </Form.Item>
+
+            <Button
+              type="link"
+              icon={advancedSearchVisible ? <UnorderedListOutlined /> : <UnorderedListOutlined />}
+              onClick={() => setAdvancedSearchVisible(!advancedSearchVisible)}
+              style={{
+                height: '36px',
+                padding: '0 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: advancedSearchVisible ? designTokens.colors.primary.main : designTokens.colors.text.secondary,
+                fontWeight: 500,
+                borderRadius: designTokens.borderRadius.medium,
+                background: advancedSearchVisible ? `${designTokens.colors.primary.main}10` : 'transparent',
+                transition: `all ${designTokens.transitions.fast}`,
+              }}
+            >
+              高级筛选 {advancedSearchVisible ? '▲' : '▼'}
+            </Button>
+
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: designTokens.spacing.sm }}>
+              <Space>
+                <Button
+                  type="primary"
+                  style={{
+                    height: '36px',
+                    borderRadius: designTokens.borderRadius.medium,
+                    background: designTokens.colors.primary.gradient,
+                    border: 'none',
+                    boxShadow: designTokens.shadows.small,
+                  }}
+                  icon={<SearchOutlined />}
+                  htmlType="submit"
+                  loading={searching}
+                >
+                  搜索
+                </Button>
+                <Button
+                  style={{
+                    height: '36px',
+                    borderRadius: designTokens.borderRadius.medium,
+                    border: `1px solid ${designTokens.colors.border.light}`,
+                  }}
+                  onClick={handleReset}
+                >
+                  重置
+                </Button>
+              </Space>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={() => fetchDevices(1, pagination.pageSize, true)}
+                style={{
+                  borderRadius: designTokens.borderRadius.medium,
+                  border: `1px solid ${designTokens.colors.border.light}`,
+                  height: '36px',
+                }}
+              >
+                刷新
+              </Button>
+            </div>
+          </div>
+
+          {advancedSearchVisible && (
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: designTokens.spacing.md,
+              padding: `${designTokens.spacing.md}px 0`,
+              borderTop: `1px dashed ${designTokens.colors.border.light}`,
+              marginTop: designTokens.spacing.sm,
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: designTokens.spacing.sm,
+                padding: '0 12px',
+                borderRight: `1px solid ${designTokens.colors.border.light}`,
+                marginRight: 4,
+              }}>
+                <EnvironmentOutlined style={{ color: '#3b82f6', fontSize: '16px' }} />
+                <span style={{ fontSize: '13px', fontWeight: 500, color: designTokens.colors.text.secondary, whiteSpace: 'nowrap' }}>位置筛选</span>
+              </div>
+
+              <Form.Item name="roomId" style={{ margin: 0 }}>
+                <Select
+                  value={roomId}
+                  onChange={(value) => {
+                    setRoomId(value);
+                    setRackId('all');
+                  }}
+                  style={{ width: '160px', borderRadius: designTokens.borderRadius.medium }}
+                  placeholder="选择机房"
+                  suffixIcon={<EnvironmentOutlined style={{ color: '#3b82f6' }} />}
+                >
+                  <Option value="all">所有机房</Option>
+                  {rooms.map((room) => (
+                    <Option key={room.roomId} value={room.roomId}>
+                      {room.name}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+
+              <Form.Item name="rackId" style={{ margin: 0 }}>
+                <Select
+                  value={rackId}
+                  onChange={setRackId}
+                  style={{ width: '160px', borderRadius: designTokens.borderRadius.medium }}
+                  placeholder="选择机柜"
+                  showSearch
+                  optionFilterProp="children"
+                  suffixIcon={<EnvironmentOutlined style={{ color: '#f59e0b' }} />}
+                >
+                  <Option value="all">所有机柜</Option>
+                  {racks
+                    .filter((rack) => roomId === 'all' || rack.roomId === roomId)
+                    .map((rack) => (
+                      <Option key={rack.rackId} value={rack.rackId}>
+                        {rack.name}
+                      </Option>
+                    ))}
+                </Select>
+              </Form.Item>
+            </div>
+          )}
+        </Form>
       </Card>
 
       <Card style={cardStyle}>

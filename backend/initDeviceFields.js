@@ -104,7 +104,8 @@ const defaultDeviceFields = [
       { value: 'running', label: '运行中' },
       { value: 'maintenance', label: '维护中' },
       { value: 'offline', label: '离线' },
-      { value: 'fault', label: '故障' }
+      { value: 'fault', label: '故障' },
+      { value: 'idle', label: '空闲' }
     ]
   },
   {
@@ -176,6 +177,18 @@ async function initDeviceFields() {
         if (field.options && !existingField.options) {
           await existingField.update({ options: field.options });
           console.log(`更新字段 options: ${field.displayName}`);
+        } else if (field.options && existingField.options) {
+          // 如果系统字段已有 options，检查是否缺少默认选项，补充缺失的选项
+          const existingValues = existingField.options.map(o => o.value);
+          const defaultValues = field.options.map(o => o.value);
+          const missingOptions = field.options.filter(o => !existingValues.includes(o.value));
+          if (missingOptions.length > 0) {
+            const updatedOptions = [...existingField.options, ...missingOptions];
+            await existingField.update({ options: updatedOptions });
+            console.log(`补充缺失的 options: ${field.displayName}，新增: ${missingOptions.map(o => o.label).join(', ')}`);
+          } else {
+            console.log(`跳过已存在字段: ${field.displayName}`);
+          }
         } else {
           console.log(`跳过已存在字段: ${field.displayName}`);
         }

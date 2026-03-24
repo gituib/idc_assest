@@ -163,7 +163,7 @@ const DeviceDetailModal = ({
               </Col>
               <Col span={8}>
                 <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>功率</div>
-                <div style={{ fontWeight: 500 }}>{device.power ? `${device.power}W` : '-'}</div>
+                <div style={{ fontWeight: 500 }}>{device.powerConsumption ? `${device.powerConsumption}W` : '-'}</div>
               </Col>
               <Col span={8}>
                 <div style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>状态</div>

@@ -181,6 +181,7 @@ router.post('/from-device/:deviceId', async (req, res) => {
 
     await device.update({
       isIdle: true,
+      status: 'idle',
       idleDate: new Date(),
       idleReason: idleReason || `从设备管理转入`,
       sourceType: 'rack'
@@ -230,6 +231,7 @@ router.post('/batch-from-devices', async (req, res) => {
       await Device.update(
         {
           isIdle: true,
+          status: 'idle',
           idleDate: new Date(),
           idleReason: idleReason || `批量转入`
         },

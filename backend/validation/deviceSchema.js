@@ -1,7 +1,7 @@
 const Joi = require('joi');
 
 const DEVICE_TYPES = ['server', 'switch', 'router', 'storage', 'other'];
-const DEVICE_STATUS = ['running', 'maintenance', 'offline', 'fault'];
+const DEVICE_STATUS = ['running', 'maintenance', 'offline', 'fault', 'idle'];
 
 const createDeviceSchema = Joi.object({
   name: Joi.string().required().max(100).messages({

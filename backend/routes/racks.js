@@ -53,7 +53,7 @@ router.get('/', async (req, res) => {
     const rackIds = racks.map(r => r.rackId);
     const devices = await Device.findAll({
       where: { rackId: rackIds },
-      attributes: ['deviceId', 'rackId', 'name', 'powerConsumption']
+      attributes: ['deviceId', 'rackId', 'name', 'powerConsumption', 'height']
     });
 
     // 将设备信息关联到对应的机柜

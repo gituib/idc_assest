@@ -125,6 +125,7 @@ export const DEFAULT_DEVICE_FIELDS = [
       { value: 'maintenance', label: '维护中' },
       { value: 'offline', label: '离线' },
       { value: 'fault', label: '故障' },
+      { value: 'idle', label: '空闲' },
     ],
   },
   {
@@ -240,6 +241,7 @@ export const DEVICE_STATUS_OPTIONS = [
   { value: 'maintenance', label: '维护中' },
   { value: 'offline', label: '离线' },
   { value: 'fault', label: '故障' },
+  { value: 'idle', label: '空闲' },
 ];
 
 // 表格列宽配置
@@ -283,6 +285,7 @@ export const STATUS_MAP = {
   maintenance: { text: '维护中', color: 'orange' },
   offline: { text: '离线', color: 'gray' },
   fault: { text: '故障', color: 'red' },
+  idle: { text: '空闲', color: 'cyan' },
 };
 
 // 设备类型映射

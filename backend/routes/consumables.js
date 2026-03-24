@@ -67,6 +67,9 @@ router.post('/', async (req, res) => {
       ...req.body,
       consumableId: req.body.consumableId || `CON${Date.now()}`
     };
+    if (Array.isArray(consumableData.snList)) {
+      consumableData.currentStock = consumableData.snList.length;
+    }
     const consumable = await Consumable.create(consumableData, { transaction });
     
     await ConsumableLog.create({
@@ -107,7 +110,7 @@ router.post('/', async (req, res) => {
 router.post('/import', async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
-    const { items, operator = '系统' } = req.body;
+    const { items, operator = '系统', mode = 'create' } = req.body;
     
     if (!items || !Array.isArray(items) || items.length === 0) {
       await transaction.rollback();
@@ -117,45 +120,93 @@ router.post('/import', async (req, res) => {
     const results = {
       success: 0,
       failed: 0,
-      errors: []
+      updated: 0,
+      skipped: 0,
+      errors: [],
+      details: []
     };
     
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
+      const rowNumber = i + 1;
+      
       try {
+        let consumableId = item.耗材ID || item.consumableId;
+        const name = item.名称 || item.name;
+        const category = item.分类 || item.category;
+        
+        if (!name || !category) {
+          results.failed++;
+          results.errors.push(`第 ${rowNumber} 行: 名称和分类为必填项`);
+          results.details.push({ row: rowNumber, status: 'failed', error: '名称和分类为必填项' });
+          continue;
+        }
+        
+        let snList = [];
+        if (item.SN序列号 || item.snList) {
+          const snStr = item.SN序列号 || item.snList;
+          if (typeof snStr === 'string') {
+            snList = snStr.split(/[,，;；\n]/).map(s => s.trim()).filter(Boolean);
+          } else if (Array.isArray(snStr)) {
+            snList = snStr;
+          }
+        }
+        
         const consumableData = {
-          consumableId: item.耗材ID || item.consumableId || `CON${Date.now()}${i}`,
-          name: item.名称 || item.name,
-          category: item.分类 || item.category,
+          consumableId: consumableId || `CON${Date.now()}${i}`,
+          name,
+          category,
           unit: item.单位 || item.unit || '个',
-          currentStock: parseInt(item.当前库存 || item.currentStock) || 0,
+          currentStock: snList.length > 0 ? snList.length : (parseInt(item.当前库存 || item.currentStock) || 0),
           minStock: parseInt(item.最小库存 || item.minStock) || 10,
-          maxStock: parseInt(item.最大库存 || item.maxStock) || 100,
+          maxStock: parseInt(item.最大库存 || item.maxStock) || 0,
           unitPrice: parseFloat(item.单价 || item.unitPrice) || 0,
           supplier: item.供应商 || item.supplier || '',
           location: item.存放位置 || item.location || '',
           description: item.描述 || item.description || '',
-          status: item.状态 || item.status || 'active'
+          status: item.状态 || item.status || 'active',
+          snList
         };
         
-        if (!consumableData.name || !consumableData.category) {
-          results.failed++;
-          results.errors.push(`第 ${i + 1} 行: 名称和分类为必填项`);
-          continue;
+        let existingConsumable = null;
+        if (consumableId) {
+          existingConsumable = await Consumable.findByPk(consumableId, { transaction });
         }
         
-        const consumable = await Consumable.create(consumableData, { transaction });
+        let consumable;
+        let operationType;
+        let previousStock = 0;
+        
+        if (existingConsumable) {
+          if (mode === 'update') {
+            previousStock = existingConsumable.currentStock;
+            await existingConsumable.update(consumableData, { transaction });
+            consumable = existingConsumable;
+            operationType = 'import_update';
+            results.updated++;
+            results.details.push({ row: rowNumber, status: 'updated', consumableId: consumable.consumableId, name: consumable.name });
+          } else {
+            results.skipped++;
+            results.details.push({ row: rowNumber, status: 'skipped', reason: '耗材已存在', consumableId: consumableId });
+            continue;
+          }
+        } else {
+          consumable = await Consumable.create(consumableData, { transaction });
+          operationType = 'import';
+          results.success++;
+          results.details.push({ row: rowNumber, status: 'created', consumableId: consumable.consumableId, name: consumable.name });
+        }
         
         await ConsumableLog.create({
           consumableId: consumable.consumableId,
           consumableName: consumable.name,
-          operationType: 'import',
+          operationType,
           quantity: consumable.currentStock,
-          previousStock: 0,
+          previousStock,
           currentStock: consumable.currentStock,
           operator,
           reason: '批量导入',
-          notes: '',
+          notes: existingConsumable ? '更新现有耗材' : '',
           consumableSnapshot: {
             category: consumable.category,
             unit: consumable.unit,
@@ -167,16 +218,16 @@ router.post('/import', async (req, res) => {
           }
         }, { transaction });
         
-        results.success++;
       } catch (error) {
         results.failed++;
-        results.errors.push(`第 ${i + 1} 行: ${error.message}`);
+        results.errors.push(`第 ${rowNumber} 行: ${error.message}`);
+        results.details.push({ row: rowNumber, status: 'failed', error: error.message });
       }
     }
     
     await transaction.commit();
     res.json({
-      message: `导入完成，成功 ${results.success} 条，失败 ${results.failed} 条`,
+      message: `导入完成，成功 ${results.success} 条，更新 ${results.updated} 条，跳过 ${results.skipped} 条，失败 ${results.failed} 条`,
       results
     });
   } catch (error) {
@@ -872,9 +923,13 @@ router.put('/:id', async (req, res) => {
       await transaction.rollback();
       return res.status(404).json({ error: '耗材不存在' });
     }
-    
+
     const oldData = consumable.toJSON();
-    await consumable.update(req.body, { transaction });
+    const updateData = { ...req.body };
+    if (Array.isArray(updateData.snList)) {
+      updateData.currentStock = updateData.snList.length;
+    }
+    await consumable.update(updateData, { transaction });
     
     await ConsumableLog.create({
       consumableId: consumable.consumableId,

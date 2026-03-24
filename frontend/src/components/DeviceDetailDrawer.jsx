@@ -469,12 +469,15 @@ function DeviceDetailDrawer({
         {customFieldEntries.length > 0 && (
           <Card title="自定义字段" size="small" style={{ marginBottom: 16 }}>
             <Row gutter={[24, 16]}>
-              {customFieldEntries.map(([key, value]) => (
-                <Col span={8} key={key}>
-                  <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>{key}</div>
-                  <div style={{ fontWeight: 500 }}>{String(value)}</div>
-                </Col>
-              ))}
+              {customFieldEntries.map(([key, value]) => {
+                const fieldLabel = tooltipFields?.[key]?.label || key;
+                return (
+                  <Col span={8} key={key}>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>{fieldLabel}</div>
+                    <div style={{ fontWeight: 500 }}>{String(value)}</div>
+                  </Col>
+                );
+              })}
             </Row>
           </Card>
         )}

@@ -1798,6 +1798,7 @@ router.put('/:deviceId/to-idle', async (req, res) => {
 
     await device.update({
       isIdle: true,
+      status: 'idle',
       idleDate: new Date(),
       idleReason: idleReason || `从设备管理转入`
     }, { transaction: t });

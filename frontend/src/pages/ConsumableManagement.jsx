@@ -16,6 +16,7 @@ import {
   Upload,
   Progress,
   Checkbox,
+  Radio,
   Row,
   Col,
   Badge,
@@ -25,6 +26,7 @@ import {
   Skeleton,
   Alert,
   Typography,
+  Divider,
 } from 'antd';
 import {
   PlusOutlined,
@@ -35,6 +37,7 @@ import {
   ImportOutlined,
   UploadOutlined,
   FileExcelOutlined,
+  FileTextOutlined,
   ShoppingOutlined,
   FilterOutlined,
   ClearOutlined,
@@ -45,8 +48,12 @@ import {
   ArrowDownOutlined,
   ScanOutlined,
   BarcodeOutlined,
+  DownloadOutlined,
+  WarningOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { designTokens } from '../config/theme';
 import CloseButton from '../components/CloseButton';
@@ -113,6 +120,9 @@ function ConsumableManagement() {
   const [importProgress, setImportProgress] = useState(0);
   const [importPhase, setImportPhase] = useState('');
   const [importResult, setImportResult] = useState(null);
+  const [importMode, setImportMode] = useState('create');
+  const [importValidationErrors, setImportValidationErrors] = useState([]);
+  const [importStep, setImportStep] = useState('upload');
   const [stockModalVisible, setStockModalVisible] = useState(false);
   const [stockRecord, setStockRecord] = useState(null);
   const [stockType, setStockType] = useState('in');
@@ -352,55 +362,98 @@ function ConsumableManagement() {
     }
   };
 
-  const parseCSV = text => {
-    const lines = text.trim().split('\n');
-    if (lines.length < 2) return [];
-
-    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-    const data = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      let values = [];
-      let inQuotes = false;
-      let current = '';
-
-      for (let j = 0; j < line.length; j++) {
-        const char = line[j];
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          values.push(current.trim().replace(/^"|"$/g, ''));
-          current = '';
-        } else {
-          current += char;
-        }
-      }
-      values.push(current.trim().replace(/^"|"$/g, ''));
-
-      const row = {};
-      headers.forEach((header, idx) => {
-        row[header] = values[idx] || '';
-      });
-      data.push(row);
-    }
-
-    return data;
-  };
-
-  const handleFileChange = info => {
-    const file = info.fileList[info.fileList.length - 1];
-    if (file && file.originFileObj) {
+  const parseFile = file => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = e => {
-        const text = e.target.result;
-        const parsedData = parseCSV(text);
-        setImportPreview(parsedData.slice(0, 10));
-        setImportFile(file.originFileObj);
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+          
+          if (jsonData.length < 2) {
+            resolve([]);
+            return;
+          }
+          
+          const headers = jsonData[0].map(h => String(h || '').trim());
+          const result = [];
+          
+          for (let i = 1; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            const obj = {};
+            headers.forEach((header, idx) => {
+              obj[header] = row[idx] !== undefined ? String(row[idx] || '').trim() : '';
+            });
+            if (Object.values(obj).some(v => v)) {
+              result.push(obj);
+            }
+          }
+          
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
       };
-      reader.readAsText(file.originFileObj);
+      reader.onerror = () => reject(new Error('文件读取失败'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const validateImportData = (data, validCategories) => {
+    const errors = [];
+    const validCategoryNames = validCategories.map(c => c.name);
+    data.forEach((item, index) => {
+      const rowNum = index + 1;
+      const name = item['名称'] || item.name;
+      const category = item['分类'] || item.category;
+
+      if (!name) {
+        errors.push({ row: rowNum, field: '名称', message: '名称为必填项' });
+      }
+      if (!category) {
+        errors.push({ row: rowNum, field: '分类', message: '分类为必填项' });
+      } else if (validCategoryNames.length > 0 && !validCategoryNames.includes(category)) {
+        errors.push({ row: rowNum, field: '分类', message: `分类"${category}"不存在，请使用系统已有的分类` });
+      }
+    });
+    return errors;
+  };
+
+  const handleFileChange = async info => {
+    const file = info.fileList[info.fileList.length - 1];
+    if (file && file.originFileObj) {
+      try {
+        setImporting(true);
+        setImportPhase('正在解析文件...');
+        
+        const parsedData = await parseFile(file.originFileObj);
+        
+        if (parsedData.length === 0) {
+          message.warning('文件中没有有效数据');
+          setImporting(false);
+          return;
+        }
+        
+        const validationErrors = validateImportData(parsedData, categories);
+        setImportValidationErrors(validationErrors);
+        setImportPreview(parsedData);
+        setImportFile(file.originFileObj);
+        setImportStep('preview');
+        
+        if (validationErrors.length > 0) {
+          message.warning(`数据校验发现 ${validationErrors.length} 个问题，请检查预览`);
+        } else {
+          message.success(`成功解析 ${parsedData.length} 条数据`);
+        }
+      } catch (error) {
+        message.error('文件解析失败，请确保文件格式正确');
+        console.error('文件解析失败:', error);
+      } finally {
+        setImporting(false);
+        setImportPhase('');
+      }
     }
   };
 
@@ -408,6 +461,10 @@ function ConsumableManagement() {
     setImportPreview([]);
     setImportFile(null);
     setImportModalVisible(true);
+    setImportStep('upload');
+    setImportMode('create');
+    setImportValidationErrors([]);
+    setImportResult(null);
   };
 
   const handleImportCancel = () => {
@@ -417,102 +474,108 @@ function ConsumableManagement() {
     setImportProgress(0);
     setImportPhase('');
     setImportResult(null);
+    setImportStep('upload');
+    setImportValidationErrors([]);
   };
 
   const handleImport = async () => {
-    if (!importFile) {
-      message.warning('请先选择文件');
+    if (!importFile || importPreview.length === 0) {
+      message.warning('请先选择并解析文件');
       return;
     }
 
     setImporting(true);
-    setImportProgress(0);
-    setImportPhase('正在读取文件...');
+    setImportProgress(10);
+    setImportPhase('准备导入数据...');
     setImportResult(null);
 
     try {
-      const reader = new FileReader();
-      reader.onload = async e => {
-        const text = e.target.result;
-        setImportProgress(10);
+      setImportProgress(30);
+      setImportPhase('正在提交到服务器...');
 
-        setTimeout(() => {
-          setImportProgress(20);
-          setImportPhase('正在解析CSV数据...');
-        }, 100);
+      const response = await axios.post('/api/consumables/import', { 
+        items: importPreview, 
+        mode: importMode 
+      });
 
-        const items = parseCSV(text);
-        const totalItems = items.length;
+      setImportProgress(70);
+      setImportPhase('处理导入结果...');
 
-        setTimeout(() => {
-          setImportProgress(30);
-          setImportPhase(`共解析 ${totalItems} 条记录，准备提交...`);
-        }, 200);
-
-        setTimeout(() => {
-          setImportProgress(40);
-          setImportPhase('正在连接服务器...');
-        }, 300);
-
-        const response = await axios.post('/api/consumables/import', { items });
-
-        setTimeout(() => {
-          setImportProgress(60);
-          setImportPhase('正在处理服务器响应...');
-        }, 100);
-
-        setTimeout(() => {
-          setImportProgress(80);
-          setImportPhase('正在更新本地数据...');
-        }, 200);
-
-        const results = response.data.results;
-
-        setTimeout(() => {
-          setImportResult(results);
-          setImportProgress(100);
-          setImportPhase('导入完成');
-          setImporting(false);
-
-          if (results.failed > 0) {
-            message.warning(`导入完成，成功 ${results.success} 条，失败 ${results.failed} 条`);
-          } else {
-            message.success({
-              content: response.data.message || `成功导入 ${results.success} 条记录`,
-              icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
-            });
-          }
-          fetchConsumables();
-        }, 300);
-      };
-      reader.onerror = () => {
-        setImporting(false);
-        setImportProgress(0);
-        setImportPhase('文件读取失败');
-        message.error('文件读取失败');
-      };
-      reader.readAsText(importFile);
+      const results = response.data.results;
+      setImportResult(results);
+      setImportStep('result');
+      setImportProgress(100);
+      setImportPhase('导入完成');
+      
+      if (results.failed > 0) {
+        message.warning(response.data.message);
+      } else {
+        message.success({
+          content: response.data.message,
+          icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+        });
+      }
+      
+      fetchConsumables();
     } catch (error) {
-      setImporting(false);
-      setImportProgress(0);
-      setImportPhase('导入失败');
       message.error('导入失败，请检查网络连接或服务器状态');
       console.error('导入耗材失败:', error);
+    } finally {
+      setImporting(false);
     }
   };
 
   const downloadTemplate = () => {
-    const template =
-      '耗材ID,名称,分类,单位,当前库存,最小库存,最大库存,单价,供应商,存放位置,描述,状态\n,测试耗材,办公用品,个,100,10,500,5.00,XX公司,A柜-01层,测试数据,active';
-    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = '耗材导入模板.csv';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    const template = [
+      {
+        '耗材ID': '',
+        '名称': '示例耗材-网络模块',
+        '分类': '光模块',
+        '单位': '个',
+        '当前库存': 100,
+        '最小库存': 10,
+        '最大库存': 500,
+        '单价': 5.00,
+        '供应商': 'XX公司',
+        '存放位置': 'A柜-01层',
+        '描述': '测试数据',
+        'SN序列号': 'SN001,SN002,SN003',
+        '状态': 'active'
+      }
+    ];
+    
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '耗材导入模板');
+    XLSX.writeFile(wb, '耗材导入模板.xlsx');
+    
+    message.success('模板下载成功');
+  };
+
+  const downloadFailedRecords = () => {
+    if (!importResult || !importResult.details) return;
+    
+    const failedRecords = importResult.details
+      .filter(d => d.status === 'failed')
+      .map(d => {
+        const original = importPreview[d.row - 1] || {};
+        return {
+          '行号': d.row,
+          '错误原因': d.error,
+          ...original
+        };
+      });
+    
+    if (failedRecords.length === 0) {
+      message.info('没有失败记录');
+      return;
+    }
+    
+    const ws = XLSX.utils.json_to_sheet(failedRecords);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '失败记录');
+    XLSX.writeFile(wb, '耗材导入失败记录.xlsx');
+    message.success('失败记录下载成功');
   };
 
   const showStockModal = useCallback(
@@ -904,11 +967,14 @@ function ConsumableManagement() {
   );
 
   const previewColumns = [
-    { title: '名称', dataIndex: '名称', key: 'name', width: 120 },
+    { title: '行号', key: 'row', width: 60, render: (_, __, index) => index + 1 },
+    { title: '耗材ID', dataIndex: '耗材ID', key: 'consumableId', width: 120 },
+    { title: '名称', dataIndex: '名称', key: 'name', width: 150 },
     { title: '分类', dataIndex: '分类', key: 'category', width: 100 },
-    { title: '单位', dataIndex: '单位', key: 'unit', width: 80 },
+    { title: '单位', dataIndex: '单位', key: 'unit', width: 70 },
     { title: '当前库存', dataIndex: '当前库存', key: 'currentStock', width: 90 },
-    { title: '单价', dataIndex: '单价', key: 'unitPrice', width: 80 },
+    { title: '供应商', dataIndex: '供应商', key: 'supplier', width: 120 },
+    { title: 'SN序列号', dataIndex: 'SN序列号', key: 'snList', width: 150, ellipsis: true },
   ];
 
   return (
@@ -1578,7 +1644,10 @@ function ConsumableManagement() {
                   size="small" 
                   danger
                   icon={<DeleteOutlined />}
-                  onClick={() => setSnList([])}
+                  onClick={() => {
+                    setSnList([]);
+                    form.setFieldsValue({ currentStock: 0 });
+                  }}
                   disabled={snList.length === 0}
                   style={{ borderRadius: designTokens.borderRadius.sm }}
                 >
@@ -1619,7 +1688,9 @@ function ConsumableManagement() {
                         .map(s => s.trim())
                         .filter(s => s && !snList.includes(s));
                       if (newSns.length > 0) {
-                        setSnList([...snList, ...newSns]);
+                        const updatedSnList = [...snList, ...newSns];
+                        setSnList(updatedSnList);
+                        form.setFieldsValue({ currentStock: updatedSnList.length });
                         setSnInputValue('');
                         message.success(`成功添加 ${newSns.length} 个SN`);
                       } else {
@@ -1672,7 +1743,11 @@ function ConsumableManagement() {
                     >
                       <Tag
                         closable
-                        onClose={() => setSnList(snList.filter((_, i) => i !== index))}
+                        onClose={() => {
+                          const newSnList = snList.filter((_, i) => i !== index);
+                          setSnList(newSnList);
+                          form.setFieldsValue({ currentStock: newSnList.length });
+                        }}
                         color="blue"
                         style={{ 
                           padding: '4px 8px',
@@ -1739,104 +1814,694 @@ function ConsumableManagement() {
         </div>
       </Modal>
 
-      {/* 导入耗材弹窗 */}
+      {/* 导入耗材弹窗 - 全新UI/UX设计 */}
       <Modal
         title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '4px 0' }}>
             <div
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: designTokens.borderRadius.md,
-                background: designTokens.colors.info.main,
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                background: `linear-gradient(135deg, ${designTokens.colors.info.main} 0%, ${designTokens.colors.primary.main} 100%)`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#fff',
+                boxShadow: `0 4px 12px ${designTokens.colors.info.main}40`,
               }}
             >
-              <ImportOutlined />
+              <ImportOutlined style={{ fontSize: '20px' }} />
             </div>
-            <span style={{ fontSize: '18px', fontWeight: 600 }}>批量导入耗材</span>
+            <div>
+              <span style={{ fontSize: '18px', fontWeight: 600, color: designTokens.colors.neutral[800] }}>批量导入耗材</span>
+              <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], marginTop: '2px' }}>支持 Excel/CSV 格式批量导入</div>
+            </div>
           </div>
         }
         open={importModalVisible}
         closeIcon={<CloseButton />}
         onCancel={handleImportCancel}
         footer={null}
-        width={700}
+        width={920}
+        bodyStyle={{ padding: '24px' }}
+        style={{ top: 40 }}
       >
-        <div style={{ padding: '16px 0' }}>
-          <Alert
-            message="请下载模板文件，按要求填写数据后上传导入"
-            type="info"
-            showIcon
-            style={{ marginBottom: '16px', borderRadius: designTokens.borderRadius.md }}
-          />
+        {/* 步骤指示器 */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginBottom: '32px',
+          padding: '0 40px'
+        }}>
+          {[
+            { key: 'upload', label: '上传文件', icon: UploadOutlined },
+            { key: 'preview', label: '预览确认', icon: FileTextOutlined },
+            { key: 'result', label: '完成', icon: CheckCircleOutlined },
+          ].map((step, index) => {
+            const isActive = importStep === step.key;
+            const isPast = ['upload', 'preview', 'result'].indexOf(importStep) > index;
+            const StepIcon = step.icon;
 
-          <Card
-            style={{
-              background: designTokens.colors.neutral[50],
-              borderRadius: designTokens.borderRadius.md,
-              marginBottom: '16px',
-            }}
-          >
-            <Space>
-              <Button 
-                icon={<FileExcelOutlined />} 
-                onClick={downloadTemplate}
-                style={{ borderRadius: designTokens.borderRadius.sm }}
-              >
-                下载模板
-              </Button>
-              <Text type="secondary" style={{ fontSize: '13px' }}>
-                请下载模板后填写数据再导入
-              </Text>
-            </Space>
-          </Card>
+            return (
+              <React.Fragment key={step.key}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: isActive || isPast
+                        ? `linear-gradient(135deg, ${designTokens.colors.primary.main} 0%, ${designTokens.colors.success.main} 100%)`
+                        : designTokens.colors.neutral[100],
+                      color: isActive || isPast ? '#fff' : designTokens.colors.neutral[400],
+                      boxShadow: isActive
+                        ? `0 4px 16px ${designTokens.colors.primary.main}50`
+                        : 'none',
+                      transition: 'all 0.3s ease',
+                      transform: isActive ? 'scale(1.1)' : 'scale(1)',
+                    }}
+                  >
+                    <StepIcon style={{ fontSize: '18px' }} />
+                  </div>
+                  <span style={{
+                    marginTop: '8px',
+                    fontSize: '13px',
+                    fontWeight: isActive ? 600 : 400,
+                    color: isActive ? designTokens.colors.primary.main : designTokens.colors.neutral[500]
+                  }}>
+                    {step.label}
+                  </span>
+                </div>
+                {index < 2 && (
+                  <div style={{
+                    width: '80px',
+                    height: '2px',
+                    background: isPast ? designTokens.colors.success.main : designTokens.colors.neutral[200],
+                    margin: '0 12px',
+                    marginBottom: '28px',
+                    borderRadius: '1px',
+                    transition: 'background 0.3s ease',
+                  }} />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
 
-          <Upload 
-            accept=".csv" 
-            maxCount={1} 
-            beforeUpload={() => false} 
-            onChange={handleFileChange}
-          >
-            <Button 
-              icon={<UploadOutlined />}
-              style={{ borderRadius: designTokens.borderRadius.sm }}
-            >
-              选择CSV文件
-            </Button>
-          </Upload>
-
-          {importPreview.length > 0 && (
+        <div style={{ minHeight: '400px' }}>
+          {/* 步骤1: 上传文件 */}
+          {importStep === 'upload' && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              style={{ marginTop: '24px' }}
             >
-              <div style={{ marginBottom: '8px', fontWeight: 500, color: designTokens.colors.neutral[700] }}>
-                数据预览（前10条）
+              {/* 模板下载区域 */}
+              <div style={{
+                background: `linear-gradient(135deg, ${designTokens.colors.neutral[50]} 0%, ${designTokens.colors.info.main}08 100%)`,
+                borderRadius: '16px',
+                padding: '24px',
+                marginBottom: '24px',
+                border: `1px solid ${designTokens.colors.neutral[200]}`,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <FileExcelOutlined style={{ fontSize: '20px', color: designTokens.colors.success.main }} />
+                      <span style={{ fontSize: '15px', fontWeight: 600, color: designTokens.colors.neutral[800] }}>下载导入模板</span>
+                    </div>
+                    <Text type="secondary" style={{ fontSize: '13px', lineHeight: 1.6 }}>
+                      先下载标准模板，填写数据后再上传，支持 .xlsx、.xls、.csv 格式
+                    </Text>
+                  </div>
+                  <Button
+                    type="primary"
+                    icon={<DownloadOutlined />}
+                    onClick={downloadTemplate}
+                    size="large"
+                    style={{
+                      background: `linear-gradient(135deg, ${designTokens.colors.success.main} 0%, ${designTokens.colors.primary.main} 100%)`,
+                      border: 'none',
+                      borderRadius: '10px',
+                      height: '44px',
+                      paddingInline: '24px',
+                      boxShadow: `0 4px 12px ${designTokens.colors.success.main}40`,
+                    }}
+                  >
+                    下载模板
+                  </Button>
+                </div>
+
+                <Divider style={{ margin: '20px 0' }} />
+
+                {/* 字段说明 */}
+                <div style={{
+                  background: '#fff',
+                  borderRadius: '10px',
+                  padding: '20px',
+                  border: `1px solid ${designTokens.colors.neutral[100]}`,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      background: `${designTokens.colors.info.main}15`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <InfoCircleOutlined style={{ fontSize: '14px', color: designTokens.colors.info.main }} />
+                    </div>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: designTokens.colors.neutral[800] }}>模板字段说明</span>
+                    <Tag color="error" style={{ marginLeft: '8px', borderRadius: '4px', fontSize: '11px' }}>必填</Tag>
+                    <Tag color="default" style={{ borderRadius: '4px', fontSize: '11px' }}>可选</Tag>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                    {[
+                      { field: '耗材ID', desc: '留空自动生成；填写后可识别并更新现有耗材', required: false, icon: '🔑' },
+                      { field: '名称', desc: '耗材名称，必填项', required: true, icon: '📝' },
+                      { field: '分类', desc: '耗材分类，如"光模块"或"光纤跳线"，必填', required: true, icon: '📂' },
+                      { field: '单位', desc: '计量单位，如"个"、"根"、"箱"，默认"个"', required: false, icon: '📏' },
+                      { field: '当前库存', desc: '当前库存数量，数字类型', required: false, icon: '📦' },
+                      { field: '最小库存', desc: '安全库存阈值，低于此值会触发预警', required: false, icon: '⚠️' },
+                      { field: '最大库存', desc: '最大库存限制，0表示无限制', required: false, icon: '📈' },
+                      { field: '单价', desc: '耗材单价，数字类型', required: false, icon: '💰' },
+                      { field: '供应商', desc: '耗材供应商名称', required: false, icon: '🏭' },
+                      { field: '存放位置', desc: '仓库内存放位置，如"A柜-01层"', required: false, icon: '📍' },
+                      { field: '描述', desc: '耗材的详细描述或备注', required: false, icon: '📄' },
+                      { field: 'SN序列号', desc: '多个SN用逗号分隔，如"SN001,SN002"', required: false, icon: '🏷️' },
+                      { field: '状态', desc: '"active"启用，"inactive"停用，默认启用', required: false, icon: '✅' },
+                    ].map((item, idx) => (
+                      <div key={idx} style={{
+                        display: 'flex',
+                        gap: '10px',
+                        padding: '10px 12px',
+                        background: designTokens.colors.neutral[50],
+                        borderRadius: '8px',
+                        border: `1px solid ${designTokens.colors.neutral[100]}`,
+                      }}>
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '6px',
+                          background: item.required 
+                            ? `${designTokens.colors.error.main}15` 
+                            : `${designTokens.colors.primary.main}10`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}>
+                          <span style={{ fontSize: '14px' }}>{item.icon}</span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: designTokens.colors.neutral[800] }}>
+                              {item.field}
+                            </span>
+                            {item.required && (
+                              <span style={{
+                                fontSize: '10px',
+                                padding: '1px 6px',
+                                borderRadius: '3px',
+                                background: `${designTokens.colors.error.main}15`,
+                                color: designTokens.colors.error.main,
+                                fontWeight: 500,
+                              }}>
+                                必填
+                              </span>
+                            )}
+                          </div>
+                          <Text type="secondary" style={{ fontSize: '11px', lineHeight: 1.4, display: 'block' }}>
+                            {item.desc}
+                          </Text>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <Table
-                columns={previewColumns}
-                dataSource={importPreview}
-                rowKey={(record, index) => index}
-                pagination={false}
-                size="small"
-                scroll={{ x: 500 }}
-                style={{ borderRadius: designTokens.borderRadius.md }}
-              />
+
+              {/* 拖拽上传区域 */}
+              <Upload.Dragger
+                accept=".xlsx,.xls,.csv"
+                maxCount={1}
+                beforeUpload={() => false}
+                onChange={handleFileChange}
+                showUploadList={false}
+                style={{
+                  borderRadius: '16px',
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ padding: '48px 24px' }}>
+                  <div
+                    style={{
+                      width: '72px',
+                      height: '72px',
+                      borderRadius: '50%',
+                      background: `linear-gradient(135deg, ${designTokens.colors.primary.main}10 0%, ${designTokens.colors.info.main}20 100%)`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 20px',
+                    }}
+                  >
+                    <UploadOutlined style={{ fontSize: '32px', color: designTokens.colors.primary.main }} />
+                  </div>
+                  <Text style={{ fontSize: '16px', fontWeight: 500, display: 'block', marginBottom: '8px', color: designTokens.colors.neutral[800] }}>
+                    点击或拖拽文件到此处上传
+                  </Text>
+                  <Text type="secondary" style={{ fontSize: '13px' }}>
+                    支持 .xlsx、.xls、.csv 格式，文件大小不超过 10MB
+                  </Text>
+                  <div style={{
+                    marginTop: '20px',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '12px'
+                  }}>
+                    {['.xlsx', '.xls', '.csv'].map(type => (
+                      <Tag
+                        key={type}
+                        style={{
+                          borderRadius: '6px',
+                          padding: '4px 12px',
+                          fontSize: '12px',
+                          background: designTokens.colors.neutral[100],
+                          border: 'none',
+                        }}
+                      >
+                        {type}
+                      </Tag>
+                    ))}
+                  </div>
+                </div>
+              </Upload.Dragger>
             </motion.div>
           )}
 
+          {/* 步骤2: 预览确认 */}
+          {importStep === 'preview' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {/* 数据统计卡片 */}
+              <div style={{
+                display: 'flex',
+                gap: '16px',
+                marginBottom: '20px',
+              }}>
+                <div style={{
+                  flex: 1,
+                  background: `linear-gradient(135deg, ${designTokens.colors.primary.main} 0%, ${designTokens.colors.info.main} 100%)`,
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  color: '#fff',
+                }}>
+                  <div style={{ fontSize: '28px', fontWeight: 700 }}>{importPreview.length}</div>
+                  <div style={{ fontSize: '13px', opacity: 0.9 }}>待导入记录</div>
+                </div>
+                <div style={{
+                  flex: 1,
+                  background: importValidationErrors.length > 0
+                    ? `linear-gradient(135deg, ${designTokens.colors.warning.main} 0%, ${designTokens.colors.error.main} 100%)`
+                    : `linear-gradient(135deg, ${designTokens.colors.success.main} 0%, #52c41a 100%)`,
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  color: '#fff',
+                }}>
+                  <div style={{ fontSize: '28px', fontWeight: 700 }}>{importValidationErrors.length}</div>
+                  <div style={{ fontSize: '13px', opacity: 0.9 }}>数据问题</div>
+                </div>
+              </div>
+
+              {/* 错误提示 */}
+              {importValidationErrors.length > 0 && (
+                <Alert
+                  message="数据校验发现问题"
+                  description={
+                    <div style={{ maxHeight: '80px', overflowY: 'auto', marginTop: '8px' }}>
+                      {importValidationErrors.slice(0, 5).map((err, idx) => (
+                        <div key={idx} style={{ fontSize: '13px', marginBottom: '4px' }}>
+                          <Tag color="warning" style={{ marginRight: '8px' }}>行{err.row}</Tag>
+                          <Text type="secondary">{err.field && `[${err.field}]`} {err.message}</Text>
+                        </div>
+                      ))}
+                      {importValidationErrors.length > 5 && (
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                          ...还有 {importValidationErrors.length - 5} 个问题
+                        </Text>
+                      )}
+                    </div>
+                  }
+                  type="warning"
+                  showIcon
+                  icon={<WarningOutlined />}
+                  style={{
+                    marginBottom: '20px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: `${designTokens.colors.warning.main}15`,
+                  }}
+                />
+              )}
+
+              {/* 导入模式选择 */}
+              <Card
+                style={{
+                  borderRadius: '12px',
+                  marginBottom: '20px',
+                  border: `1px solid ${designTokens.colors.neutral[200]}`,
+                }}
+                bodyStyle={{ padding: '16px 20px' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: `${designTokens.colors.primary.main}15`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <FileTextOutlined style={{ color: designTokens.colors.primary.main }} />
+                  </div>
+                  <span style={{ fontSize: '14px', fontWeight: 600 }}>导入模式</span>
+                </div>
+                <Radio.Group
+                  value={importMode}
+                  onChange={e => setImportMode(e.target.value)}
+                  style={{ width: '100%' }}
+                >
+                  <Space direction="vertical" style={{ width: '100%' }} size={12}>
+                    <Radio value="create" style={{ width: '100%' }}>
+                      <Card
+                        size="small"
+                        style={{
+                          marginLeft: '8px',
+                          width: 'calc(100% - 8px)',
+                          borderRadius: '10px',
+                          border: importMode === 'create'
+                            ? `2px solid ${designTokens.colors.primary.main}`
+                            : `1px solid ${designTokens.colors.neutral[200]}`,
+                          background: importMode === 'create'
+                            ? `${designTokens.colors.primary.main}08`
+                            : '#fff',
+                        }}
+                        bodyStyle={{ padding: '12px 16px' }}
+                      >
+                        <div style={{ fontWeight: 600, marginBottom: '4px' }}>仅新增模式</div>
+                        <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500] }}>
+                          跳过已存在的耗材（根据耗材ID判断），仅创建新耗材
+                        </div>
+                      </Card>
+                    </Radio>
+                    <Radio value="update" style={{ width: '100%' }}>
+                      <Card
+                        size="small"
+                        style={{
+                          marginLeft: '8px',
+                          width: 'calc(100% - 8px)',
+                          borderRadius: '10px',
+                          border: importMode === 'update'
+                            ? `2px solid ${designTokens.colors.primary.main}`
+                            : `1px solid ${designTokens.colors.neutral[200]}`,
+                          background: importMode === 'update'
+                            ? `${designTokens.colors.primary.main}08`
+                            : '#fff',
+                        }}
+                        bodyStyle={{ padding: '12px 16px' }}
+                      >
+                        <div style={{ fontWeight: 600, marginBottom: '4px' }}>更新模式</div>
+                        <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500] }}>
+                          如果耗材ID已存在则更新现有记录，不存在则创建新耗材
+                        </div>
+                      </Card>
+                    </Radio>
+                  </Space>
+                </Radio.Group>
+              </Card>
+
+              {/* 数据预览表格 */}
+              <Card
+                title={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 600 }}>数据预览</span>
+                    <Tag color="blue" style={{ marginLeft: '8px', borderRadius: '6px' }}>
+                      {importPreview.length} 条
+                    </Tag>
+                  </div>
+                }
+                extra={
+                  <Button
+                    size="small"
+                    icon={<ReloadOutlined />}
+                    onClick={() => setImportStep('upload')}
+                    style={{ borderRadius: '8px' }}
+                  >
+                    重新选择
+                  </Button>
+                }
+                style={{
+                  borderRadius: '12px',
+                  border: `1px solid ${designTokens.colors.neutral[200]}`,
+                }}
+                bodyStyle={{ padding: 0 }}
+              >
+                <Table
+                  columns={previewColumns}
+                  dataSource={importPreview}
+                  rowKey={(record, index) => index}
+                  pagination={{ pageSize: 5, showSizeChanger: false }}
+                  size="small"
+                  scroll={{ x: 900 }}
+                  style={{ borderRadius: '12px' }}
+                />
+              </Card>
+            </motion.div>
+          )}
+
+          {/* 步骤3: 完成 */}
+          {importStep === 'result' && importResult && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
+            >
+              {/* 结果状态 */}
+              <div style={{
+                textAlign: 'center',
+                padding: '32px 0 28px',
+              }}>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+                  style={{
+                    width: '88px',
+                    height: '88px',
+                    borderRadius: '50%',
+                    background: importResult.failed === 0
+                      ? `linear-gradient(135deg, ${designTokens.colors.success.main} 0%, #52c41a 100%)`
+                      : `linear-gradient(135deg, ${designTokens.colors.warning.main} 0%, ${designTokens.colors.error.main} 100%)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 20px',
+                    boxShadow: importResult.failed === 0
+                      ? `0 8px 24px ${designTokens.colors.success.main}50`
+                      : `0 8px 24px ${designTokens.colors.warning.main}50`,
+                  }}
+                >
+                  {importResult.failed === 0 ? (
+                    <CheckCircleOutlined style={{ fontSize: '44px', color: '#fff' }} />
+                  ) : (
+                    <WarningOutlined style={{ fontSize: '44px', color: '#fff' }} />
+                  )}
+                </motion.div>
+                <Title level={4} style={{ margin: 0, marginBottom: '8px', fontSize: '20px' }}>
+                  {importResult.failed === 0 ? '导入成功！' : '导入完成（部分失败）'}
+                </Title>
+                <Text type="secondary" style={{ fontSize: '14px' }}>
+                  {importResult.success > 0 && `成功新增 ${importResult.success} 条，`}
+                  {importResult.updated > 0 && `更新 ${importResult.updated} 条，`}
+                  {importResult.skipped > 0 && `跳过 ${importResult.skipped} 条，`}
+                  {importResult.failed > 0 && `失败 ${importResult.failed} 条`}
+                </Text>
+              </div>
+
+              {/* 统计卡片 */}
+              <Row gutter={[12, 12]} style={{ marginBottom: '24px' }}>
+                {[
+                  { label: '新增成功', value: importResult.success, color: designTokens.colors.success.main, bg: `${designTokens.colors.success.main}15` },
+                  { label: '更新成功', value: importResult.updated, color: designTokens.colors.primary.main, bg: `${designTokens.colors.primary.main}15` },
+                  { label: '跳过', value: importResult.skipped, color: designTokens.colors.neutral[500], bg: designTokens.colors.neutral[100] },
+                  { label: '失败', value: importResult.failed, color: designTokens.colors.error.main, bg: `${designTokens.colors.error.main}15` },
+                ].map((stat, idx) => (
+                  <Col span={6} key={idx}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 + idx * 0.1 }}
+                    >
+                      <Card
+                        size="small"
+                        style={{
+                          textAlign: 'center',
+                          borderRadius: '12px',
+                          border: 'none',
+                          background: stat.bg,
+                        }}
+                        bodyStyle={{ padding: '16px 8px' }}
+                      >
+                        <div style={{
+                          fontSize: '28px',
+                          fontWeight: 700,
+                          color: stat.color,
+                          lineHeight: 1.2,
+                        }}>
+                          {stat.value}
+                        </div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: designTokens.colors.neutral[600],
+                          marginTop: '4px',
+                        }}>
+                          {stat.label}
+                        </div>
+                      </Card>
+                    </motion.div>
+                  </Col>
+                ))}
+              </Row>
+
+              {/* 失败记录 */}
+              {importResult.failed > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  <Card
+                    title={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <WarningOutlined style={{ color: designTokens.colors.error.main }} />
+                        <span style={{ fontSize: '14px', fontWeight: 600 }}>失败记录</span>
+                        <Tag color="error" style={{ marginLeft: '8px', borderRadius: '6px' }}>
+                          {importResult.failed} 条
+                        </Tag>
+                      </div>
+                    }
+                    extra={
+                      <Button
+                        size="small"
+                        icon={<DownloadOutlined />}
+                        onClick={downloadFailedRecords}
+                        style={{ borderRadius: '8px' }}
+                      >
+                        导出失败记录
+                      </Button>
+                    }
+                    style={{
+                      borderRadius: '12px',
+                      border: `1px solid ${designTokens.colors.error.main}30`,
+                    }}
+                    bodyStyle={{ padding: 0 }}
+                  >
+                    <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                      {importResult.details
+                        .filter(d => d.status === 'failed')
+                        .map((detail, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              padding: '12px 20px',
+                              borderBottom: idx < importResult.details.filter(d => d.status === 'failed').length - 1
+                                ? `1px solid ${designTokens.colors.neutral[100]}`
+                                : 'none',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                            }}
+                          >
+                            <div style={{
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '50%',
+                              background: `${designTokens.colors.error.main}15`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}>
+                              <span style={{ fontSize: '12px', fontWeight: 600, color: designTokens.colors.error.main }}>
+                                {detail.row}
+                              </span>
+                            </div>
+                            <Text type="secondary" style={{ fontSize: '13px' }}>
+                              {detail.error}
+                            </Text>
+                          </div>
+                        ))}
+                    </div>
+                  </Card>
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+
+          {/* 导入中状态 */}
           {importing && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              style={{ marginTop: '24px', padding: '24px', textAlign: 'center' }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(255,255,255,0.95)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '16px',
+                zIndex: 10,
+              }}
             >
+              <div
+                style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '50%',
+                  background: `linear-gradient(135deg, ${designTokens.colors.primary.main} 0%, ${designTokens.colors.info.main} 100%)`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '24px',
+                  boxShadow: `0 8px 24px ${designTokens.colors.primary.main}40`,
+                }}
+              >
+                <ImportOutlined style={{ fontSize: '36px', color: '#fff' }} />
+              </div>
+              <Text style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px', color: designTokens.colors.neutral[800] }}>
+                正在导入数据...
+              </Text>
               <Progress
                 percent={importProgress}
                 status={importProgress === 100 ? 'success' : 'active'}
@@ -1844,33 +2509,54 @@ function ConsumableManagement() {
                   '0%': designTokens.colors.primary.main,
                   '100%': designTokens.colors.success.main,
                 }}
-                style={{ borderRadius: designTokens.borderRadius.sm }}
+                style={{ width: '280px', marginBottom: '8px' }}
               />
-              <div style={{ marginTop: '16px', color: designTokens.colors.neutral[600] }}>
+              <Text type="secondary" style={{ fontSize: '13px' }}>
                 {importPhase}
-              </div>
+              </Text>
             </motion.div>
           )}
+        </div>
 
-          <div style={{ textAlign: 'right', marginTop: '24px' }}>
-            <Space>
-              <Button onClick={handleImportCancel}>取消</Button>
+        {/* 底部按钮 */}
+        {!importing && importStep !== 'result' && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingTop: '20px',
+            borderTop: `1px solid ${designTokens.colors.neutral[100]}`,
+            marginTop: '24px',
+          }}>
+            <Button
+              onClick={handleImportCancel}
+              style={{
+                borderRadius: '10px',
+                height: '40px',
+                paddingInline: '20px',
+              }}
+            >
+              取消
+            </Button>
+            {importStep === 'preview' && (
               <Button
                 type="primary"
                 onClick={handleImport}
-                loading={importing}
-                disabled={!importFile}
+                disabled={importValidationErrors.length > 0 && importMode === 'create'}
                 style={{
-                  background: designTokens.colors.primary.gradient,
+                  background: `linear-gradient(135deg, ${designTokens.colors.primary.main} 0%, ${designTokens.colors.success.main} 100%)`,
                   border: 'none',
-                  borderRadius: designTokens.borderRadius.sm,
+                  borderRadius: '10px',
+                  height: '40px',
+                  paddingInline: '32px',
+                  boxShadow: `0 4px 12px ${designTokens.colors.primary.main}40`,
                 }}
               >
                 开始导入
               </Button>
-            </Space>
+            )}
           </div>
-        </div>
+        )}
       </Modal>
 
       {/* 入库/出库弹窗 */}
@@ -2104,7 +2790,11 @@ function ConsumableManagement() {
                   <Tag
                     key={index}
                     closable
-                    onClose={() => setSnList(prev => prev.filter((_, i) => i !== index))}
+                    onClose={() => {
+                      const newSnList = snList.filter((_, i) => i !== index);
+                      setSnList(newSnList);
+                      form.setFieldsValue({ currentStock: newSnList.length });
+                    }}
                     color="blue"
                     style={{ marginBottom: '4px' }}
                   >

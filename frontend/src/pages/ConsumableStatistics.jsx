@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Row,
   Col,
@@ -18,6 +18,7 @@ import {
   Dropdown,
   Menu,
   Statistic,
+  Switch,
 } from 'antd';
 import {
   PieChartOutlined,
@@ -577,23 +578,27 @@ const CategoryCard = styled(motion.div)`
 const StyledTable = styled(Table)`
   .ant-table {
     background: transparent;
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .ant-table-thead > tr > th {
     background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
     font-weight: 600;
-    font-size: 12px;
+    font-size: 11px;
     color: ${designTokens.colors.text.secondary};
     border-bottom: 1px solid ${designTokens.colors.border};
-    padding: 12px 16px;
+    padding: 10px 12px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
 
   .ant-table-tbody > tr > td {
-    padding: 14px 16px;
+    padding: 8px 12px;
     border-bottom: 1px solid ${designTokens.colors.border}40;
+  }
+
+  .ant-table-tbody > tr {
+    height: 48px;
   }
 
   .ant-table-tbody > tr:hover > td {
@@ -602,6 +607,13 @@ const StyledTable = styled(Table)`
 
   .ant-table-wrapper {
     border-radius: 0 0 16px 16px;
+  }
+
+  .ant-pagination {
+    padding: 12px 16px;
+    margin: 0;
+    background: ${designTokens.colors.background.main};
+    border-top: 1px solid ${designTokens.colors.border};
   }
 `;
 
@@ -664,6 +676,10 @@ const LoadingOverlay = styled.div`
 
 const ConsumableStatistics = () => {
   const [loading, setLoading] = useState(true);
+  const [realTimeRefresh, setRealTimeRefresh] = useState(true);
+  const [lastUpdateTime, setLastUpdateTime] = useState(null);
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
+  const refreshIntervalRef = useRef(null);
   const [stats, setStats] = useState({
     inCount: 0,
     outCount: 0,
@@ -678,6 +694,7 @@ const ConsumableStatistics = () => {
     byCategory: [],
   });
   const [lowStockItems, setLowStockItems] = useState([]);
+  const [lowStockPagination, setLowStockPagination] = useState({ current: 1, pageSize: 5 });
   const [categories, setCategories] = useState([]);
   const [dateRange, setDateRange] = useState([dayjs().subtract(30, 'days'), dayjs()]);
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -700,9 +717,11 @@ const ConsumableStatistics = () => {
     }
   };
 
-  const loadStatistics = async () => {
+  const loadStatistics = async (isAuto = false) => {
     try {
-      setLoading(true);
+      if (!isAuto) {
+        setLoading(true);
+      }
       const params = {
         startDate: dateRange[0]?.format('YYYY-MM-DD'),
         endDate: dateRange[1]?.format('YYYY-MM-DD'),
@@ -730,18 +749,27 @@ const ConsumableStatistics = () => {
         totalValue: summaryResponse?.totalValue || 0,
         byCategory: summaryResponse?.byCategory || [],
       });
+
+      if (isAuto) {
+        setLastUpdateTime(new Date());
+        setIsAutoRefreshing(false);
+      }
     } catch (error) {
       const errorMsg = error?.message || error || '未知错误';
-      message.error('加载统计数据失败: ' + errorMsg);
+      if (!isAuto) {
+        message.error('加载统计数据失败: ' + errorMsg);
+      }
       console.error('加载统计数据失败:', error);
       setStats({ inCount: 0, outCount: 0, inQuantity: 0, outQuantity: 0, recentRecords: [] });
       setSummary({ total: 0, lowStock: 0, totalValue: 0, byCategory: [] });
     } finally {
-      setLoading(false);
+      if (!isAuto) {
+        setLoading(false);
+      }
     }
   };
 
-  const loadLowStockItems = async () => {
+  const loadLowStockItems = async (isAuto = false) => {
     try {
       const response = await consumableAPI.getLowStock();
       console.log('[低库存] 返回:', response);
@@ -758,6 +786,28 @@ const ConsumableStatistics = () => {
     loadLowStockItems();
   }, []);
 
+  useEffect(() => {
+    if (realTimeRefresh) {
+      refreshIntervalRef.current = setInterval(() => {
+        setIsAutoRefreshing(true);
+        loadStatistics(true);
+        loadLowStockItems(true);
+        setLastUpdateTime(new Date());
+      }, 30000);
+    } else {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [realTimeRefresh]);
+
   const handleQuickFilter = (key) => {
     setQuickFilter(key);
     const filter = quickFilters.find(f => f.key === key);
@@ -771,9 +821,17 @@ const ConsumableStatistics = () => {
   };
 
   const handleRefresh = () => {
-    loadStatistics();
-    loadLowStockItems();
-    message.success('数据已刷新');
+    setLoading(true);
+    setIsAutoRefreshing(false);
+    Promise.all([
+      loadStatistics(false),
+      loadLowStockItems(false)
+    ]).finally(() => {
+      setLoading(false);
+      if (!realTimeRefresh) {
+        message.success('数据已手动刷新');
+      }
+    });
   };
 
   const handleExport = () => {
@@ -808,80 +866,109 @@ const ConsumableStatistics = () => {
       title: '耗材名称',
       dataIndex: 'name',
       key: 'name',
+      width: '35%',
       render: (text, record) => (
-        <Space>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Avatar
-            size={34}
+            size={28}
             style={{
               background: `linear-gradient(135deg, ${designTokens.colors.warning.main}, #fb923c)`,
-              fontSize: '14px',
+              fontSize: '12px',
+              flexShrink: 0,
             }}
           >
             <WarningOutlined />
           </Avatar>
-          <div>
-            <div style={{ fontWeight: 600, color: designTokens.colors.text.primary, fontSize: '14px' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{
+              fontWeight: 600,
+              color: designTokens.colors.text.primary,
+              fontSize: '13px',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}>
               {text}
             </div>
-            <div style={{ fontSize: '12px', color: designTokens.colors.text.secondary }}>
-              {record.specification || '-'}
+            <div style={{
+              fontSize: '11px',
+              color: designTokens.colors.text.secondary,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}>
+              {record.specification || record.category || '-'}
             </div>
           </div>
-        </Space>
+        </div>
       ),
     },
     {
-      title: '当前库存',
-      dataIndex: 'currentStock',
-      key: 'currentStock',
+      title: '库存状态',
+      key: 'stockStatus',
+      width: '40%',
       align: 'center',
-      width: 100,
-      render: (currentStock, record) => (
-        <Text strong style={{ fontSize: '15px', color: designTokens.colors.error.main }}>
-          {currentStock} {record.unit}
-        </Text>
-      ),
-    },
-    {
-      title: '安全库存',
-      dataIndex: 'minStock',
-      key: 'minStock',
-      align: 'center',
-      width: 100,
-      render: (minStock, record) => (
-        <Text type="secondary">{minStock} {record.unit}</Text>
-      ),
+      render: (_, record) => {
+        const current = record.currentStock || 0;
+        const min = record.minStock || 0;
+        const isLow = current < min;
+        return (
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 4 }}>
+            <span style={{
+              fontWeight: 700,
+              fontSize: '14px',
+              color: isLow ? designTokens.colors.error.main : designTokens.colors.text.primary,
+            }}>
+              {current}
+            </span>
+            <span style={{ color: designTokens.colors.text.secondary, fontSize: '11px' }}>/</span>
+            <span style={{ color: designTokens.colors.text.secondary, fontSize: '12px' }}>
+              {min}
+            </span>
+            <span style={{ color: designTokens.colors.text.secondary, fontSize: '11px' }}>
+              {record.unit || '个'}
+            </span>
+          </div>
+        );
+      },
     },
     {
       title: '充足率',
       key: 'rate',
+      width: '25%',
       align: 'center',
-      width: 140,
       render: (_, record) => {
         const minStock = record.minStock || 0;
         const currentStock = record.currentStock || 0;
-        
+
         if (minStock <= 0) {
-          return <Text type="secondary" style={{ fontSize: '12px' }}>未设置</Text>;
+          return <Text type="secondary" style={{ fontSize: '11px' }}>未设置</Text>;
         }
-        
+
         const rate = Math.min(100, Math.round((currentStock / minStock) * 100));
-        const color = rate < 50 ? designTokens.colors.error.main :
-                     rate < 100 ? designTokens.colors.warning.main :
+        const color = rate < 30 ? designTokens.colors.error.main :
+                     rate < 60 ? designTokens.colors.warning.main :
                      designTokens.colors.success.main;
 
         return (
-          <ProgressBar>
-            <div className="progress-wrapper">
-              <Progress
-                percent={rate}
-                size="small"
-                strokeColor={color}
-                showInfo={false}
-              />
-              <span className="progress-text" style={{ color }}>{rate}%</span>
-            </div>
-          </ProgressBar>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <Progress
+              percent={rate}
+              size="small"
+              strokeColor={color}
+              showInfo={false}
+              style={{ width: 60 }}
+            />
+            <span style={{
+              fontWeight: 600,
+              fontSize: '12px',
+              color,
+              minWidth: 32,
+              textAlign: 'right',
+            }}>
+              {rate}%
+            </span>
+          </div>
         );
       },
     },
@@ -998,6 +1085,28 @@ const ConsumableStatistics = () => {
           </div>
         </TitleSection>
         <Space>
+          {lastUpdateTime && (
+            <div style={{ fontSize: 12, color: designTokens.colors.text.secondary, display: 'flex', alignItems: 'center', gap: 4 }}>
+              {isAutoRefreshing ? (
+                <Spin size="small" />
+              ) : (
+                <span style={{ fontSize: 10 }}>●</span>
+              )}
+              {isAutoRefreshing ? '刷新中...' : `更新于 ${dayjs(lastUpdateTime).format('HH:mm:ss')}`}
+            </div>
+          )}
+          <Tooltip title={realTimeRefresh ? '已开启30秒自动刷新' : '已关闭自动刷新'}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, color: designTokens.colors.text.secondary }}>实时</span>
+              <Switch
+                size="small"
+                checked={realTimeRefresh}
+                onChange={setRealTimeRefresh}
+                checkedChildren="开"
+                unCheckedChildren="关"
+              />
+            </div>
+          </Tooltip>
           <Button
             icon={<ExportOutlined />}
             onClick={handleExport}
@@ -1011,9 +1120,9 @@ const ConsumableStatistics = () => {
           </Button>
           <Button
             type="primary"
-            icon={<ReloadOutlined />}
+            icon={<ReloadOutlined spin={isAutoRefreshing} />}
             onClick={handleRefresh}
-            loading={loading}
+            loading={loading && !isAutoRefreshing}
             style={{
               height: 38,
               borderRadius: 10,
@@ -1346,9 +1455,17 @@ const ConsumableStatistics = () => {
               columns={lowStockColumns}
               dataSource={lowStockItems}
               rowKey="consumableId"
-              pagination={false}
+              pagination={{
+                current: lowStockPagination.current,
+                pageSize: lowStockPagination.pageSize,
+                total: lowStockItems.length,
+                showSizeChanger: false,
+                showQuickJumper: false,
+                showTotal: (total) => `共 ${total} 条`,
+                onChange: (page) => setLowStockPagination(prev => ({ ...prev, current: page })),
+              }}
               size="small"
-              scroll={{ x: 'max-content' }}
+              scroll={{ x: 'max-content', y: 300 }}
               locale={{
                 emptyText: (
                   <EmptyState>

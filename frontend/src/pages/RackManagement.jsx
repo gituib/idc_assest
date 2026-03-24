@@ -151,10 +151,10 @@ const PowerGauge = ({ current, max }) => {
 };
 
 const RackCard = ({ rack, onEdit, onDelete, onView, selected, onSelect }) => {
-  const deviceCount = rack.Devices?.length || 0;
+  const usedU = rack.Devices?.reduce((sum, d) => sum + (d.height || 1), 0) || 0;
   const powerUsage = (rack.currentPower / rack.maxPower) * 100;
   const statusInfo = statusConfig[rack.status];
-  const availableU = rack.height - deviceCount;
+  const availableU = rack.height - usedU;
 
   return (
     <Card
@@ -218,7 +218,7 @@ const RackCard = ({ rack, onEdit, onDelete, onView, selected, onSelect }) => {
           <div
             style={{ fontSize: '14px', fontWeight: '600', color: designTokens.colors.text.primary }}
           >
-            {rack.height}U / {deviceCount}
+            {rack.height}U / {usedU}
           </div>
         </div>
         <div style={{ padding: '12px', background: '#fafafa', borderRadius: '8px' }}>
@@ -602,27 +602,14 @@ function RackManagement() {
       title: '高度/已用U位',
       key: 'heightUsage',
       render: (_, record) => {
-        const used = record.Devices?.length || 0;
-        const percentage = (used / record.height) * 100;
+        const used = record.Devices?.reduce((sum, d) => sum + (d.height || 1), 0) || 0;
         return (
-          <div>
-            <Text style={{ fontSize: '13px' }}>{record.height}U</Text>
-            <Progress
-              percent={percentage}
-              size="small"
-              strokeColor={
-                percentage >= 90 ? designTokens.colors.error.main : designTokens.colors.success.main
-              }
-              trailColor="#f0f0f0"
-              style={{ marginTop: '4px', marginBottom: 0 }}
-            />
-            <Text type="secondary" style={{ fontSize: '12px' }}>
-              已用 {used} U位
-            </Text>
-          </div>
+          <Text style={{ fontSize: '13px' }}>
+            {record.height}U / 已用 {used} U位
+          </Text>
         );
       },
-      sorter: (a, b) => (a.Devices?.length || 0) - (b.Devices?.length || 0),
+      sorter: (a, b) => (a.Devices?.reduce((sum, d) => sum + (d.height || 1), 0) || 0) - (b.Devices?.reduce((sum, d) => sum + (d.height || 1), 0) || 0),
     },
     {
       title: '功率使用',
