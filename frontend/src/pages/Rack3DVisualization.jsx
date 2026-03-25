@@ -1,15 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  Layout,
-  Select,
-  Card,
   Spin,
   message,
   Typography,
-  Descriptions,
-  Tag,
-  Button,
-  Space,
   Empty,
   Modal,
   Form,
@@ -17,23 +10,19 @@ import {
   InputNumber,
   DatePicker,
   Checkbox,
-  Switch,
   Tooltip,
   Badge,
+  Select,
+  Space,
+  Button,
 } from 'antd';
 import {
   CloudServerOutlined,
-  ReloadOutlined,
-  ArrowLeftOutlined,
-  InfoCircleOutlined,
-  UpOutlined,
   DownOutlined,
+  UpOutlined,
+  InfoCircleOutlined,
   EditOutlined,
   SettingOutlined,
-  FullscreenOutlined,
-  EyeOutlined,
-  LeftOutlined,
-  RightOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -44,11 +33,12 @@ import PortCreateModal from '../components/PortCreateModal';
 import CableCreateModal from '../components/CableCreateModal';
 import DeviceDetailDrawer from '../components/DeviceDetailDrawer';
 import CloseButton from '../components/CloseButton';
+import RackSelectorHeader from '../components/3d/RackSelectorHeader';
+import { Layout } from 'antd';
 import { useScene3D } from '../context/Scene3DContext';
+import { useSortedRacks } from '../hooks/useSortedRacks';
 
-const { Header, Content, Sider } = Layout;
-const { Title, Text } = Typography;
-const { Option } = Select;
+const { Content } = Layout;
 
 const Rack3DVisualization = () => {
   const navigate = useNavigate();
@@ -351,7 +341,10 @@ const Rack3DVisualization = () => {
     }
   }, [selectedRack, fetchDevices]);
 
-  // Group racks by room
+  // 使用排序 Hook
+  const sortedRooms = useSortedRacks(racks);
+
+  // Group racks by room (保留用于导航)
   const rooms = useMemo(() => {
     const roomMap = new Map();
     racks.forEach(rack => {
@@ -496,321 +489,51 @@ const Rack3DVisualization = () => {
     setSelectedRack(racksInSelectedRoom[nextIndex]);
   };
 
+  const handleRackSelect = useCallback((rack, room) => {
+    setSelectedRack(rack);
+    if (room) {
+      const roomKey = room.key || room.roomId || room.id || room.name;
+      setSelectedRoom(roomKey);
+    }
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    fetchRacks();
+    if (selectedRack) fetchDevices(selectedRack.rackId);
+  }, [fetchRacks, selectedRack, fetchDevices]);
+
+  const handleResetView = useCallback(() => {
+    if (sceneRef.current) sceneRef.current.resetView();
+  }, []);
+
+  const handleOpenConfig = useCallback(() => {
+    setShowTooltipConfig(true);
+  }, []);
+
+  const handleBack = useCallback(() => {
+    navigate('/');
+  }, [navigate]);
+
   return (
-    <Layout
-      style={{ height: '100vh', overflow: 'hidden', background: '#000', position: 'relative' }}
-    >
-      <Header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 24px',
-          background: 'rgba(15, 23, 42, 0.6)', // Deep blue-grey, semi-transparent
-          backdropFilter: 'blur(20px)',
-          position: 'absolute',
-          width: '100%',
-          zIndex: 100,
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          height: '64px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Button
-            type="text"
-            icon={<ArrowLeftOutlined style={{ color: 'rgba(255,255,255,0.8)' }} />}
-            onClick={() => navigate('/')}
-            style={{ marginRight: 8 }}
-            className="hover-bright"
-          />
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              background: 'rgba(255,255,255,0.05)',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.05)',
-            }}
-          >
-            <CloudServerOutlined
-              style={{ fontSize: '20px', color: '#3b82f6', marginRight: '10px' }}
-            />
-            <span
-              style={{
-                fontSize: '16px',
-                fontWeight: 600,
-                color: '#f8fafc',
-                letterSpacing: '0.5px',
-                textShadow: '0 2px 4px rgba(0,0,0,0.2)',
-              }}
-            >
-              3D 机柜可视化
-            </span>
-          </div>
-        </div>
-        <Space size="middle">
-          <Select
-            placeholder="搜索机房"
-            style={{ width: 180 }}
-            value={selectedRoom}
-            onChange={val => {
-              setSelectedRoom(val);
-              const roomRacks = racks.filter(
-                r => (r.Room?.roomId || r.Room?.id || r.Room?.name) === val
-              );
-              if (roomRacks.length > 0) setSelectedRack(roomRacks[0]);
-              else setSelectedRack(null);
-            }}
-            variant="borderless"
-            popupMatchSelectWidth={false}
-            className="glass-select"
-            showSearch
-            filterOption={(input, option) =>
-              (option?.children?.toString() || '').toLowerCase().includes(input.toLowerCase())
-            }
-          >
-            {rooms.map(room => (
-              <Option key={room.key} value={room.key}>
-                {room.name}
-              </Option>
-            ))}
-          </Select>
-          <Button
-            type="text"
-            icon={<LeftOutlined />}
-            onClick={handlePrevRack}
-            disabled={!selectedRoom || racksInSelectedRoom.length <= 1}
-            className="hover-bright"
-            style={{
-              color: 'rgba(255,255,255,0.9)',
-              borderRadius: '6px',
-            }}
-          />
-          <Select
-            placeholder="搜索机柜"
-            style={{ width: 180 }}
-            value={selectedRack?.rackId}
-            onChange={val => setSelectedRack(racks.find(r => r.rackId === val))}
-            disabled={!selectedRoom}
-            variant="borderless"
-            className="glass-select"
-            showSearch
-            filterOption={(input, option) =>
-              (option?.children?.toString() || '').toLowerCase().includes(input.toLowerCase())
-            }
-          >
-            {racksInSelectedRoom.map(rack => (
-              <Option key={rack.rackId} value={rack.rackId}>
-                {rack.name}
-              </Option>
-            ))}
-          </Select>
-          <Button
-            type="text"
-            icon={<RightOutlined />}
-            onClick={handleNextRack}
-            disabled={!selectedRoom || racksInSelectedRoom.length <= 1}
-            className="hover-bright"
-            style={{
-              color: 'rgba(255,255,255,0.9)',
-              borderRadius: '6px',
-            }}
-          />
-          <Button
-            type="primary"
-            ghost
-            icon={<ReloadOutlined />}
-            onClick={() => {
-              fetchRacks();
-              if (selectedRack) fetchDevices(selectedRack.rackId);
-            }}
-            style={{
-              borderRadius: '6px',
-              borderColor: 'rgba(255,255,255,0.3)',
-              color: 'rgba(255,255,255,0.9)',
-            }}
-            className="hover-bright"
-          >
-            刷新
-          </Button>
-          <Button
-            type="primary"
-            ghost
-            icon={<EyeOutlined />}
-            onClick={() => {
-              if (sceneRef.current) sceneRef.current.resetView();
-            }}
-            style={{
-              borderRadius: '6px',
-              borderColor: 'rgba(255,255,255,0.3)',
-              color: 'rgba(255,255,255,0.9)',
-            }}
-            className="hover-bright"
-          >
-            重置视角
-          </Button>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              background: 'rgba(255,255,255,0.05)',
-              padding: '4px 12px',
-              borderRadius: '6px',
-              border: '1px solid rgba(255,255,255,0.05)',
-            }}
-          >
-            <FullscreenOutlined
-              style={{
-                color: deviceSlideEnabled ? '#22c55e' : 'rgba(255,255,255,0.4)',
-                marginRight: 8,
-              }}
-            />
-            <span
-              style={{
-                fontSize: '13px',
-                color: deviceSlideEnabled ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)',
-                marginRight: 8,
-              }}
-            >
-              设备弹出
-            </span>
-            <Switch
-              size="small"
-              checked={deviceSlideEnabled}
-              onChange={setDeviceSlideEnabled}
-              checkedChildren="开"
-              unCheckedChildren="关"
-            />
-          </div>
-          <Button
-            type="primary"
-            ghost
-            icon={<SettingOutlined />}
-            onClick={() => setShowTooltipConfig(true)}
-            style={{
-              borderRadius: '6px',
-              borderColor: 'rgba(255,255,255,0.3)',
-              color: 'rgba(255,255,255,0.9)',
-            }}
-            className="hover-bright"
-          >
-            显示配置
-          </Button>
-        </Space>
-      </Header>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <RackSelectorHeader
+        rooms={sortedRooms}
+        selectedRoomKey={selectedRoom}
+        selectedRack={selectedRack}
+        onRackSelect={handleRackSelect}
+        onPrevRack={handlePrevRack}
+        onNextRack={handleNextRack}
+        racksInSelectedRoom={racksInSelectedRoom}
+        deviceSlideEnabled={deviceSlideEnabled}
+        onDeviceSlideToggle={setDeviceSlideEnabled}
+        onRefresh={handleRefresh}
+        onResetView={handleResetView}
+        onOpenConfig={handleOpenConfig}
+        onBack={handleBack}
+      />
 
-      {/* Inject custom styles for glass selects */}
-      <style>{`
-        .glass-select .ant-select-selector {
-            background: rgba(255, 255, 255, 0.08) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            color: white !important;
-            border-radius: 6px !important;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 4px 12px !important;
-            height: auto !important;
-            min-height: 32px !important;
-            align-items: center !important;
-        }
-        .glass-select:hover .ant-select-selector {
-            background: rgba(255, 255, 255, 0.15) !important;
-            border-color: rgba(255, 255, 255, 0.3) !important;
-        }
-        .glass-select.ant-select-focused .ant-select-selector {
-            background: rgba(255, 255, 255, 0.12) !important;
-            border-color: #3b82f6 !important;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15), 0 0 12px rgba(59, 130, 246, 0.1) !important;
-        }
-        .glass-select .ant-select-selection-item, 
-        .glass-select .ant-select-selection-placeholder {
-            color: rgba(255, 255, 255, 0.9) !important;
-            font-size: 13px !important;
-            line-height: 1.5 !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-            position: relative !important;
-            z-index: 1 !important;
-            flex: 0 1 auto !important;
-        }
-        .glass-select.ant-select-show-search .ant-select-selection-item,
-        .glass-select.ant-select-show-search .ant-select-selection-placeholder {
-            position: absolute !important;
-            left: 0 !important;
-            top: 50% !important;
-            transform: translateY(-50%) !important;
-            width: 100% !important;
-            padding-right: 24px !important;
-        }
-        .glass-select.ant-select-show-search.ant-select-focused .ant-select-selection-item,
-        .glass-select.ant-select-show-search.ant-select-focused .ant-select-selection-placeholder {
-            display: none !important;
-        }
-        .glass-select .ant-select-selection-wrap {
-            display: flex !important;
-            flex-wrap: nowrap !important;
-            align-items: center !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            max-width: calc(100% - 24px) !important;
-        }
-        .glass-select .ant-select-selection-search {
-            position: absolute !important;
-            left: 0 !important;
-            top: 50% !important;
-            transform: translateY(-50%) !important;
-            width: 100% !important;
-            z-index: 2 !important;
-            display: flex !important;
-            align-items: center !important;
-        }
-        .glass-select .ant-select-selection-search-input {
-            width: 100% !important;
-            min-width: 0 !important;
-            color: white !important;
-            caret-color: #3b82f6 !important;
-            font-size: 13px !important;
-            background: transparent !important;
-            border: none !important;
-            outline: none !important;
-            padding: 0 !important;
-        }
-        .glass-select .ant-select-selection-search-input::placeholder {
-            color: rgba(255, 255, 255, 0.5) !important;
-        }
-        .glass-select .ant-select-arrow {
-            color: rgba(255, 255, 255, 0.6) !important;
-            transition: all 0.3s;
-            position: relative !important;
-            z-index: 1 !important;
-        }
-        .glass-select.ant-select-focused .ant-select-arrow {
-            color: #60a5fa !important;
-            transform: translateY(-50%) scale(1.1);
-        }
-        .glass-select input {
-            color: white !important;
-            caret-color: #3b82f6 !important;
-            font-size: 13px !important;
-            width: 100% !important;
-            min-width: 0 !important;
-        }
-        .glass-select input::placeholder {
-            color: rgba(255, 255, 255, 0.5) !important;
-        }
-        .glass-select.ant-select-open input {
-            caret-color: #60a5fa !important;
-        }
-        .hover-bright:hover {
-            color: white !important;
-            background: rgba(255,255,255,0.1) !important;
-        }
-      `}</style>
-
-      <Layout style={{ marginTop: 64 }}>
-
-        <Content style={{ position: 'relative', background: '#ffffff' }}>
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        <Content style={{ position: 'absolute', inset: 0, background: '#ffffff' }}>
           {loading ? (
             <div
               style={{
@@ -1382,8 +1105,8 @@ const Rack3DVisualization = () => {
             refreshTrigger={refreshTrigger}
           />
         </Content>
-      </Layout>
-    </Layout>
+      </div>
+    </div>
   );
 };
 
