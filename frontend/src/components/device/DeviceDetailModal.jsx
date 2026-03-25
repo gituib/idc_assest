@@ -283,7 +283,7 @@ const DeviceDetailModal = ({
 
       <div
         style={{
-          background: `linear-gradient(135deg, ${colors.primary.main} 0%, ${colors.primary.dark} 50%, ${colors.purple.main} 100%)`,
+          background: `linear-gradient(135deg, #10b981 0%, #34d399 50%, #6ee7b7 100%)`,
           padding: '28px 32px',
           color: '#fff',
           position: 'relative',

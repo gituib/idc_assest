@@ -854,11 +854,7 @@ const InventoryTaskExecution = () => {
               </Tooltip>
             </>
           ) : null}
-          <Button
-            type="link"
-            icon={<ScanOutlined />}
-            onClick={() => handleCheck(record)}
-          >
+          <Button type="link" onClick={() => handleCheck(record)}>
             盘点
           </Button>
         </Space>

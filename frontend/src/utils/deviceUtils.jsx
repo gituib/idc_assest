@@ -12,6 +12,7 @@ export const STATUS_MAP = {
   maintenance: { text: '维护中', color: '#faad14', badgeColor: 'orange' },
   offline: { text: '离线', color: '#8c8c8c', badgeColor: 'default' },
   fault: { text: '故障', color: '#ff4d4f', badgeColor: 'red' },
+  idle: { text: '空闲', color: '#36cfc9', badgeColor: 'cyan' },
 };
 
 export const TYPE_MAP = {
