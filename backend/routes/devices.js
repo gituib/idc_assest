@@ -16,7 +16,7 @@ const DevicePort = require('../models/DevicePort');
 const Cable = require('../models/Cable');
 const NetworkCard = require('../models/NetworkCard');
 const InventoryRecord = require('../models/InventoryRecord');
-const { logDeviceOperation } = require('../utils/operationLogger');
+const { logDeviceOperation, generateDeviceDescription, buildDeviceMetadata } = require('../utils/operationLogger');
 const { validateBody, validateQuery } = require('../middleware/validation');
 const {
   createDeviceSchema,
@@ -710,12 +710,15 @@ router.post('/', validateBody(createDeviceSchema), async (req, res) => {
       `功耗: ${device.powerConsumption}W`
     ].join('；');
 
-    await logDeviceOperation('create', `创建设备【${device.name}】`, {
+    await logDeviceOperation('create', generateDeviceDescription('创建设备', {
+      ...device.toJSON(),
+      rackName: rack?.name
+    }), {
       targetId: device.deviceId,
       targetName: device.name,
       afterState: device.toJSON(),
       req,
-      metadata: { deviceType: device.type, rackName: rack?.name, powerConsumption: device.powerConsumption }
+      metadata: buildDeviceMetadata({ ...device.toJSON(), rackName: rack?.name })
     });
 
     res.status(201).json(device);
@@ -1482,26 +1485,39 @@ router.put('/batch-status', async (req, res) => {
     };
 
     const beforeDevices = await Device.findAll({
-      where: { deviceId: { [Op.in]: deviceIds } }
+      where: { deviceId: { [Op.in]: deviceIds } },
+      include: [{ model: Rack, attributes: ['name'] }]
     });
 
-    const deviceNames = beforeDevices.map(d => d.name);
+    const deviceDetails = beforeDevices.map(d => {
+      const data = d.toJSON();
+      return {
+        deviceId: d.deviceId,
+        name: d.name,
+        type: d.type,
+        model: d.model,
+        serialNumber: d.serialNumber,
+        ipAddress: d.ipAddress,
+        rackName: data.Rack?.name || null,
+        position: d.position,
+        status: d.status
+      };
+    });
 
-    // 更新设备状态
-    const [affectedCount] = await Device.update(
-      { status },
-      { where: { deviceId: { [Op.in]: deviceIds } } }
-    );
+    const deviceNames = deviceDetails.map(d => d.name);
+    const deviceSummary = deviceDetails.map(d =>
+      `${d.name}(编号:${d.deviceId}${d.rackName ? `,机柜:${d.rackName}` : ''})`
+    ).join('、');
 
-    const statusChangeDesc = `批量变更${affectedCount}台设备状态：${deviceNames.join('、')} → ${statusText[status]}`;
+    const statusChangeDesc = `批量变更${affectedCount}台设备状态：${deviceSummary} → ${statusText[status]}`;
 
     await logDeviceOperation('status_change', statusChangeDesc, {
       targetId: deviceIds.join(','),
       targetName: `${affectedCount}台设备`,
-      beforeState: beforeDevices.map(d => ({ deviceId: d.deviceId, name: d.name, status: d.status })),
-      afterState: beforeDevices.map(d => ({ deviceId: d.deviceId, name: d.name, status })),
+      beforeState: deviceDetails.map(d => ({ deviceId: d.deviceId, name: d.name, status: d.status })),
+      afterState: deviceDetails.map(d => ({ deviceId: d.deviceId, name: d.name, status })),
       req,
-      metadata: { status, statusText: statusText[status], count: affectedCount, deviceNames }
+      metadata: { status, statusText: statusText[status], count: affectedCount, devices: deviceDetails }
     });
 
     res.json({
@@ -1534,15 +1550,31 @@ router.put('/batch-move', async (req, res) => {
 
     const devicesToMove = await Device.findAll({
       where: { deviceId: { [Op.in]: deviceIds } },
-      attributes: ['deviceId', 'name', 'rackId', 'position', 'height']
+      attributes: ['deviceId', 'name', 'type', 'model', 'serialNumber', 'ipAddress', 'rackId', 'position', 'height', 'powerConsumption']
     });
 
-    const beforeMoveState = devicesToMove.map(d => ({
+    const deviceDetails = devicesToMove.map(d => d.toJSON());
+
+    const beforeMoveState = deviceDetails.map(d => ({
       deviceId: d.deviceId,
       name: d.name,
+      type: d.type,
       rackId: d.rackId,
-      position: d.position
+      position: d.position,
+      powerConsumption: d.powerConsumption
     }));
+
+    const deviceSummary = deviceDetails.map(d =>
+      `${d.name}(编号:${d.deviceId}${d.type ? `,类型:${d.type}` : ''}${d.ipAddress ? `,IP:${d.ipAddress}` : ''})`
+    ).join('、');
+
+    const sourceRackPowerChanges = new Map();
+    devicesToMove.forEach(device => {
+      if (device.rackId) {
+        const currentChange = sourceRackPowerChanges.get(device.rackId) || 0;
+        sourceRackPowerChanges.set(device.rackId, currentChange - (device.powerConsumption || 0));
+      }
+    });
 
     const deviceHeightMap = new Map(devicesToMove.map(d => [d.deviceId, d.height || 1]));
 
@@ -1601,6 +1633,8 @@ router.put('/batch-move', async (req, res) => {
     }
 
     let movedCount = 0;
+    const targetRackPowerChange = { rackId: targetRackId, change: 0 };
+
     for (let i = 0; i < deviceIds.length; i++) {
       const deviceId = deviceIds[i];
       const position = startPosition ? startPosition + i : undefined;
@@ -1616,13 +1650,36 @@ router.put('/batch-move', async (req, res) => {
 
       if (updated) {
         movedCount++;
+        const device = devicesToMove.find(d => d.deviceId === deviceId);
+        if (device) {
+          targetRackPowerChange.change += device.powerConsumption || 0;
+        }
       }
     }
 
-    const deviceNames = devicesToMove.map(d => d.name);
+    for (const [rackId, powerChange] of sourceRackPowerChanges) {
+      if (rackId !== targetRackId) {
+        await Rack.update(
+          { currentPower: sequelize.literal(`currentPower + ${powerChange}`) },
+          { where: { rackId } }
+        );
+      }
+    }
+
+    if (sourceRackPowerChanges.has(targetRackId)) {
+      targetRackPowerChange.change += sourceRackPowerChanges.get(targetRackId);
+    }
+
+    if (targetRackPowerChange.change !== 0) {
+      await Rack.update(
+        { currentPower: sequelize.literal(`currentPower + ${targetRackPowerChange.change}`) },
+        { where: { rackId: targetRackId } }
+      );
+    }
+
     const moveDesc = startPosition
-      ? `批量移动${movedCount}台设备到机柜【${targetRack.name}】：${deviceNames.join('、')} → U${startPosition}起`
-      : `批量移动${movedCount}台设备到机柜【${targetRack.name}】：${deviceNames.join('、')}`;
+      ? `批量移动${movedCount}台设备到机柜【${targetRack.name}】：${deviceSummary} → U${startPosition}起`
+      : `批量移动${movedCount}台设备到机柜【${targetRack.name}】：${deviceSummary}`;
 
     await logDeviceOperation('move', moveDesc, {
       targetId: deviceIds.join(','),
@@ -1630,7 +1687,7 @@ router.put('/batch-move', async (req, res) => {
       beforeState: beforeMoveState,
       afterState: { targetRackId, targetRackName: targetRack.name, startPosition },
       req,
-      metadata: { count: movedCount, targetRackId, targetRackName: targetRack.name, startPosition, deviceNames }
+      metadata: { count: movedCount, targetRackId, targetRackName: targetRack.name, startPosition, devices: deviceDetails }
     });
 
     res.json({
@@ -1817,6 +1874,29 @@ router.get('/enhanced-export', async (req, res) => {
   }
 });
 
+// 检查U位是否可用
+router.get('/check-position/:rackId', async (req, res) => {
+  try {
+    const { rackId } = req.params;
+    const { position, height, excludeDeviceId } = req.query;
+
+    if (!position) {
+      return res.status(400).json({ error: '请提供位置参数' });
+    }
+
+    const result = await checkPositionAvailable(
+      rackId,
+      parseInt(position),
+      parseInt(height) || 1,
+      excludeDeviceId || null
+    );
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 获取单个设备
 router.get('/:deviceId', async (req, res) => {
   try {
@@ -1875,13 +1955,17 @@ router.put('/:deviceId/to-idle', async (req, res) => {
 
     await t.commit();
 
-    await logDeviceOperation('to_idle', `设备【${device.name}】转入空闲设备`, {
+    const deviceData = {
+      ...device.toJSON(),
+      rackName: device.rack?.name
+    };
+    await logDeviceOperation('to_idle', generateDeviceDescription('转入空闲设备', deviceData), {
       targetId: device.deviceId,
       targetName: device.name,
       beforeState: { ...device.toJSON(), isIdle: false },
       afterState: { ...device.toJSON(), isIdle: true },
       req,
-      metadata: { idleReason, type: 'device_to_idle' }
+      metadata: buildDeviceMetadata(deviceData, { idleReason, type: 'device_to_idle' })
     });
 
     res.json({
@@ -1944,17 +2028,58 @@ router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
     const beforeState = oldDevice.toJSON();
     const changedFields = {};
 
+    const newRackId = req.body.rackId !== undefined ? req.body.rackId : oldDevice.rackId;
+    const newPosition = req.body.position !== undefined ? req.body.position : oldDevice.position;
+    const newHeight = req.body.height !== undefined ? req.body.height : oldDevice.height;
+
+    if ((req.body.rackId !== undefined || req.body.position !== undefined || req.body.height !== undefined)
+        && newRackId && newPosition) {
+      const positionCheck = await checkPositionAvailable(
+        newRackId,
+        newPosition,
+        newHeight,
+        req.params.deviceId
+      );
+      if (!positionCheck.available) {
+        return res.status(400).json({ error: positionCheck.reason });
+      }
+    }
+
     const [updated] = await Device.update(req.body, {
       where: { deviceId: req.params.deviceId }
     });
 
     if (updated) {
-      const rack = await Rack.findByPk(oldDevice.rackId);
-      if (rack) {
-        const powerDiff = req.body.powerConsumption - oldDevice.powerConsumption;
-        await rack.update({
-          currentPower: rack.currentPower + powerDiff
-        });
+      const oldRackId = oldDevice.rackId;
+      const newRackId = req.body.rackId;
+      const oldPower = oldDevice.powerConsumption || 0;
+      const newPower = req.body.powerConsumption !== undefined ? req.body.powerConsumption : oldPower;
+
+      if (oldRackId === newRackId) {
+        const rack = await Rack.findByPk(oldRackId);
+        if (rack) {
+          const powerDiff = newPower - oldPower;
+          await rack.update({
+            currentPower: rack.currentPower + powerDiff
+          });
+        }
+      } else {
+        if (oldRackId) {
+          const oldRack = await Rack.findByPk(oldRackId);
+          if (oldRack) {
+            await oldRack.update({
+              currentPower: Math.max(0, oldRack.currentPower - oldPower)
+            });
+          }
+        }
+        if (newRackId) {
+          const newRack = await Rack.findByPk(newRackId);
+          if (newRack) {
+            await newRack.update({
+              currentPower: newRack.currentPower + newPower
+            });
+          }
+        }
       }
 
       const updatedDevice = await Device.findByPk(req.params.deviceId, {
@@ -1975,6 +2100,13 @@ router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
         }
       }
 
+      const deviceData = {
+        ...updatedDevice.toJSON(),
+        rackName: updatedDevice.Rack?.name,
+        roomName: updatedDevice.Rack?.Room?.name
+      };
+      delete deviceData.Rack;
+
       const changeDetails = Object.entries(changedFields).map(([field, values]) => {
         const fieldNames = {
           name: '名称', deviceId: '设备编号', type: '类型', model: '型号',
@@ -1986,17 +2118,17 @@ router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
         return `${displayName}: ${values.from ?? '空'} → ${values.to ?? '空'}`;
       }).join('；');
 
-      const operationDesc = changeDetails
-        ? `更新设备【${updatedDevice.name}】：${changeDetails}`
-        : `更新设备【${updatedDevice.name}】`;
+      const operationDesc = generateDeviceDescription('更新设备', deviceData, {
+        includePosition: false
+      }) + (changeDetails ? `，变更内容：${changeDetails}` : '');
 
       await logDeviceOperation('update', operationDesc, {
         targetId: updatedDevice.deviceId,
         targetName: updatedDevice.name,
         beforeState,
-        afterState,
+        afterState: deviceData,
         req,
-        metadata: { changedFields }
+        metadata: buildDeviceMetadata(deviceData, { changedFields })
       });
 
       res.json(updatedDevice);
@@ -2023,8 +2155,6 @@ router.post('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, res
       where: { deviceId: { [Op.in]: deviceIds } },
       transaction: t
     });
-
-    const deviceNames = devices.map(d => d.name).join(', ');
 
     // 1. 删除相关端口 (必须在网卡之前删除，因为端口依赖网卡)
     await DevicePort.destroy({
@@ -2081,12 +2211,17 @@ router.post('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, res
 
     await t.commit();
 
-    await logDeviceOperation('batch_delete', `批量删除${deletedCount}台设备：${deviceNames}`, {
+    const deviceDetails = devices.map(d => d.toJSON());
+    const deviceSummary = deviceDetails.map(d =>
+      `${d.name}(编号:${d.deviceId}${d.type ? `,类型:${d.type}` : ''}${d.serialNumber ? `,序列号:${d.serialNumber}` : ''})`
+    ).join('、');
+
+    await logDeviceOperation('batch_delete', `批量删除${deletedCount}台设备：${deviceSummary}`, {
       targetId: deviceIds.join(','),
       targetName: `${deletedCount}台设备`,
-      beforeState: devices.map(d => d.toJSON()),
+      beforeState: deviceDetails,
       req,
-      metadata: { count: deletedCount, deviceNames }
+      metadata: { count: deletedCount, devices: deviceDetails }
     });
 
     res.json({
@@ -2260,12 +2395,12 @@ router.delete('/:deviceId', async (req, res) => {
       console.log(`已删除 ${deletedCables} 条相关接线`);
     }
 
-    await logDeviceOperation('delete', `删除设备【${deviceName}】（编号：${deviceId}，类型：${device.type}，关联删除：${deletedCables}条接线、${deletedPorts}个端口、${deletedNetworkCards}张网卡）`, {
+    await logDeviceOperation('delete', `删除设备【${deviceName}】（编号:${deviceId}，类型:${device.type}，型号:${device.model || '无'}，序列号:${device.serialNumber || '无'}，IP:${device.ipAddress || '无'}），关联删除：${deletedCables}条接线、${deletedPorts}个端口、${deletedNetworkCards}张网卡`, {
       targetId: deviceId,
       targetName: deviceName,
       beforeState,
       req,
-      metadata: { deletedCables, deletedPorts, deletedNetworkCards, deviceType: device.type }
+      metadata: buildDeviceMetadata(device.toJSON(), { deletedCables, deletedPorts, deletedNetworkCards })
     });
 
     res.status(200).json({

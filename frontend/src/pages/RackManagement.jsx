@@ -417,7 +417,8 @@ function RackManagement() {
           message.success('机柜删除成功');
           fetchRacks();
         } catch (error) {
-          message.error('机柜删除失败');
+          const errorMsg = error.response?.data?.error || '机柜删除失败';
+          message.error(errorMsg);
           console.error('机柜删除失败:', error);
         }
       },
@@ -438,8 +439,16 @@ function RackManagement() {
       cancelText: '取消',
       onOk: async () => {
         try {
-          await Promise.all(selectedRackIds.map(id => axios.delete(`/api/racks/${id}`)));
-          message.success(`成功删除 ${selectedRackIds.length} 个机柜`);
+          const results = await Promise.allSettled(selectedRackIds.map(id => axios.delete(`/api/racks/${id}`)));
+          const succeeded = results.filter(r => r.status === 'fulfilled').length;
+          const failed = results.filter(r => r.status === 'rejected');
+          if (succeeded > 0) {
+            message.success(`成功删除 ${succeeded} 个机柜`);
+          }
+          if (failed.length > 0) {
+            const firstError = failed[0].reason.response?.data?.error || '部分机柜删除失败';
+            message.error(`${firstError}（${failed.length} 个失败）`);
+          }
           setSelectedRackIds([]);
           fetchRacks();
         } catch (error) {
@@ -519,13 +528,33 @@ function RackManagement() {
 
         setImportProgress(100);
         setImportPhase('导入完成');
-        setImportResult(response.data);
+
+        const resData = response.data;
+        const importResult = {
+          total: resData.total || 0,
+          successCount: resData.imported || 0,
+          duplicates: resData.duplicates || 0,
+          failedCount: 0,
+          errors: [],
+          createdRacks: resData.createdRacks || [],
+          skippedRacks: resData.skippedRacks || []
+        };
+
+        if (resData.details && Array.isArray(resData.details)) {
+          importResult.failedCount = resData.details.length;
+          importResult.errors = resData.details.map(item => ({
+            row: item.row,
+            error: item.errors.join('；')
+          }));
+        }
+
+        setImportResult(importResult);
         setIsImporting(false);
 
-        if (response.data.success) {
+        if (resData.success) {
           message.success('机柜导入成功');
         } else {
-          message.warning(response.data.message || '部分记录导入失败');
+          message.warning(resData.message || '部分记录导入失败');
         }
 
         fetchRacks();
@@ -533,8 +562,24 @@ function RackManagement() {
       } catch (error) {
         setIsImporting(false);
         setImportProgress(0);
-        message.error('机柜导入失败');
-        console.error('机柜导入失败:', error);
+
+        const errorData = error.response?.data;
+        if (errorData?.details && Array.isArray(errorData.details)) {
+          const importResult = {
+            total: errorData.total || 0,
+            successCount: 0,
+            failedCount: errorData.details.length,
+            errors: errorData.details.map(item => ({
+              row: item.row,
+              error: item.errors.join('；')
+            }))
+          };
+          setImportResult(importResult);
+          setImportPhase('导入失败');
+        } else {
+          message.error(errorData?.error || errorData?.message || '机柜导入失败');
+          console.error('机柜导入失败:', error);
+        }
         return false;
       }
     },
@@ -1380,10 +1425,60 @@ function RackManagement() {
                     ✗ 导入失败：{importResult.failedCount}
                   </p>
                 )}
+                {importResult.duplicates > 0 && (
+                  <p style={{ margin: '8px 0', color: '#faad14' }}>
+                    ⚠ 跳过（已存在）：{importResult.duplicates}
+                  </p>
+                )}
               </div>
+
+              {importResult.createdRacks && importResult.createdRacks.length > 0 && (
+                <div style={{ marginBottom: '20px' }}>
+                  <p style={{ fontWeight: '600', marginBottom: '8px', color: '#52c41a' }}>
+                    ✓ 本次新增机柜（{importResult.createdRacks.length}）：
+                  </p>
+                  <div style={{
+                    maxHeight: '150px',
+                    overflow: 'auto',
+                    background: '#f6ffed',
+                    border: '1px solid #b7eb8f',
+                    borderRadius: '8px',
+                    padding: '12px'
+                  }}>
+                    {importResult.createdRacks.map((rack, idx) => (
+                      <div key={idx} style={{ fontSize: '13px', marginBottom: '4px' }}>
+                        • {rack.rackId} - {rack.name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {importResult.skippedRacks && importResult.skippedRacks.length > 0 && (
+                <div style={{ marginBottom: '20px' }}>
+                  <p style={{ fontWeight: '600', marginBottom: '8px', color: '#faad14' }}>
+                    ⚠ 已跳过机柜（{importResult.skippedRacks.length}）：
+                  </p>
+                  <div style={{
+                    maxHeight: '150px',
+                    overflow: 'auto',
+                    background: '#fffbe6',
+                    border: '1px solid #ffe58f',
+                    borderRadius: '8px',
+                    padding: '12px'
+                  }}>
+                    {importResult.skippedRacks.map((rack, idx) => (
+                      <div key={idx} style={{ fontSize: '13px', marginBottom: '4px' }}>
+                        • {rack.rackId} - {rack.name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {importResult.errors && importResult.errors.length > 0 && (
                 <div style={{ marginBottom: '20px' }}>
-                  <p style={{ fontWeight: '600', marginBottom: '8px' }}>错误详情：</p>
+                  <p style={{ fontWeight: '600', marginBottom: '8px', color: '#ff4d4f' }}>错误详情：</p>
                   {importResult.errors.slice(0, 5).map((err, idx) => (
                     <div
                       key={idx}

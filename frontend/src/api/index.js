@@ -126,6 +126,7 @@ export const deviceAPI = {
   update: (deviceId, data) => api.put(`/devices/${deviceId}`, data),
   delete: deviceId => api.delete(`/devices/${deviceId}`),
   getTickets: (deviceId, params) => api.get(`/devices/${deviceId}/tickets`, { params }),
+  checkPosition: (rackId, params) => api.get(`/devices/check-position/${rackId}`, { params }),
 };
 
 export const ticketAPI = {

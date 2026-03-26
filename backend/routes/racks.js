@@ -572,9 +572,9 @@ router.post('/import', async (req, res) => {
       // 验证数据
       processedData.forEach((item) => {
         const errors = [];
-        
-        if (!/^RACK\d+$/.test(item.rackId)) {
-          errors.push('机柜ID格式应为RACK+数字，如RACK001');
+
+        if (!/^[a-zA-Z0-9_-]+$/.test(item.rackId)) {
+          errors.push('机柜ID只能包含字母、数字、下划线和横线');
         }
         if (!item.name || String(item.name).trim() === '') {
           errors.push('机柜名称不能为空');
@@ -582,7 +582,8 @@ router.post('/import', async (req, res) => {
         if (!item.roomName || String(item.roomName).trim() === '') {
           errors.push('所属机房名称不能为空');
         } else if (!validRoomNames.has(String(item.roomName).trim())) {
-          errors.push(`所属机房名称不存在: ${item.roomName}`);
+          const availableRooms = Array.from(validRoomNames).join('、');
+          errors.push(`所属机房"${item.roomName}"不存在，可用机房: ${availableRooms}`);
         }
         if (typeof item.height !== 'number' || item.height <= 0) {
           errors.push('高度必须是大于0的数字');
@@ -644,12 +645,17 @@ router.post('/import', async (req, res) => {
       // 提交事务
       await t.commit();
 
-      res.status(200).json({ 
-        success: true, 
+      const createdRacks = newData.map(item => ({ rackId: item.rackId, name: item.name }));
+      const skippedRacks = existingRacks.map(rack => ({ rackId: rack.rackId, name: rack.name }));
+
+      res.status(200).json({
+        success: true,
         message: '机柜导入完成',
         imported: createdCount,
         duplicates: duplicateCount,
-        total: jsonData.length
+        total: jsonData.length,
+        createdRacks,
+        skippedRacks
       });
     } finally {
       // 删除临时文件

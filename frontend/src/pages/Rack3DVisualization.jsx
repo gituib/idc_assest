@@ -1093,15 +1093,8 @@ const Rack3DVisualization = () => {
             device={selectedDevice}
             onClose={() => setSelectedDevice(null)}
             onEdit={handleEditDevice}
-            onAddNic={handleAddNic}
-            onAddPort={handleAddPort}
-            onAddCable={handleAddCable}
             tooltipFields={tooltipFields}
             cables={deviceCables}
-            onRefreshCables={() =>
-              selectedDevice && fetchDeviceCables(selectedDevice.deviceId || selectedDevice.id)
-            }
-            onDeleteCable={handleDeleteCable}
             refreshTrigger={refreshTrigger}
           />
         </Content>

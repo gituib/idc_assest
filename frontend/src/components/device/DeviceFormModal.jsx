@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, Select, InputNumber, DatePicker, Switch, Row, Col, Button, Space } from 'antd';
-import { PlusOutlined, EditOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { Modal, Form, Input, Select, InputNumber, DatePicker, Switch, Row, Col, Button, Space, Alert } from 'antd';
+import { PlusOutlined, EditOutlined, DatabaseOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { designTokens } from '../../config/theme';
 import { getFormInitialValues, prepareDeviceFormData } from '../../utils/deviceUtils.jsx';
+import { deviceAPI } from '../../api';
 
 const { Option } = Select;
 
@@ -31,6 +32,9 @@ const DeviceFormModal = ({
 }) => {
   const [form] = Form.useForm();
   const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const [selectedRackId, setSelectedRackId] = useState(null);
+  const [positionConflict, setPositionConflict] = useState(null);
+  const [checkingPosition, setCheckingPosition] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -47,22 +51,91 @@ const DeviceFormModal = ({
           const rack = racks.find((r) => r.rackId === editingDevice.rackId);
           if (rack) {
             setSelectedRoomId(rack.roomId);
+            setSelectedRackId(editingDevice.rackId);
           }
+        }
+        if (editingDevice.position) {
+          checkPositionConflict(editingDevice.rackId, editingDevice.position, editingDevice.height, editingDevice.deviceId);
         }
       } else {
         form.resetFields();
         setSelectedRoomId(null);
+        setSelectedRackId(null);
+        setPositionConflict(null);
       }
     }
   }, [visible, editingDevice, racks, form]);
 
+  const checkPositionConflict = async (rackId, position, height, deviceId = null) => {
+    if (!rackId || !position) {
+      setPositionConflict(null);
+      return;
+    }
+
+    setCheckingPosition(true);
+    try {
+      const params = {
+        position,
+        height: height || 1,
+      };
+      if (deviceId) {
+        params.excludeDeviceId = deviceId;
+      }
+      const result = await deviceAPI.checkPosition(rackId, params);
+      if (!result.available) {
+        setPositionConflict(result.reason);
+      } else {
+        setPositionConflict(null);
+      }
+    } catch (error) {
+      console.error('检查U位冲突失败:', error);
+      setPositionConflict(null);
+    } finally {
+      setCheckingPosition(false);
+    }
+  };
+
+  const handleRackChange = (value) => {
+    setSelectedRackId(value);
+    const position = form.getFieldValue('position');
+    const height = form.getFieldValue('height');
+    if (position) {
+      checkPositionConflict(value, position, height, editingDevice?.deviceId);
+    } else {
+      setPositionConflict(null);
+    }
+  };
+
+  const handlePositionChange = (value) => {
+    const height = form.getFieldValue('height');
+    if (selectedRackId && value) {
+      checkPositionConflict(selectedRackId, value, height, editingDevice?.deviceId);
+    } else {
+      setPositionConflict(null);
+    }
+  };
+
+  const handleHeightChange = (value) => {
+    const position = form.getFieldValue('position');
+    if (selectedRackId && position) {
+      checkPositionConflict(selectedRackId, position, value, editingDevice?.deviceId);
+    } else {
+      setPositionConflict(null);
+    }
+  };
+
   const handleSubmit = (values) => {
+    if (positionConflict) {
+      return;
+    }
     const deviceData = prepareDeviceFormData(values, !!editingDevice);
     onSubmit(deviceData);
   };
 
   const handleRoomChange = (value) => {
     setSelectedRoomId(value);
+    setSelectedRackId(null);
+    setPositionConflict(null);
     form.setFieldValue('rackId', undefined);
   };
 
@@ -123,7 +196,7 @@ const DeviceFormModal = ({
   };
 
   const filteredFields = deviceFields.filter(
-    (field) => field.fieldName !== 'deviceId' && field.fieldName !== 'rackId'
+    (field) => field.fieldName !== 'deviceId' && field.fieldName !== 'rackId' && field.fieldName !== 'position' && field.fieldName !== 'height'
   );
 
   const formItems = [];
@@ -219,6 +292,7 @@ const DeviceFormModal = ({
                       disabled={!selectedRoomId}
                       showSearch
                       optionFilterProp="children"
+                      onChange={handleRackChange}
                     >
                       {(selectedRoomId ? racks.filter((rack) => rack.roomId === selectedRoomId) : []).map(
                         (rack) => (
@@ -231,6 +305,61 @@ const DeviceFormModal = ({
                   </Form.Item>
                 </Col>
               </Row>
+              <Row gutter={16} style={{ marginTop: '16px' }}>
+                <Col span={12}>
+                  <Form.Item
+                    name="position"
+                    label={
+                      <span>
+                        安装位置 (U位)
+                        <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
+                      </span>
+                    }
+                    rules={[{ required: true, message: '请输入U位' }]}
+                    style={{ marginBottom: '0' }}
+                  >
+                    <InputNumber
+                      placeholder="如: 1"
+                      min={1}
+                      max={42}
+                      style={{ width: '100%', borderRadius: '8px' }}
+                      onChange={handlePositionChange}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="height"
+                    label={
+                      <span>
+                        设备高度 (U)
+                        <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
+                      </span>
+                    }
+                    rules={[{ required: true, message: '请输入设备高度' }]}
+                    initialValue={1}
+                    style={{ marginBottom: '0' }}
+                  >
+                    <InputNumber
+                      placeholder="如: 2"
+                      min={1}
+                      max={10}
+                      style={{ width: '100%', borderRadius: '8px' }}
+                      onChange={handleHeightChange}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              {positionConflict && (
+                <div style={{ marginTop: '12px' }}>
+                  <Alert
+                    message={positionConflict}
+                    type="error"
+                    showIcon
+                    icon={<ExclamationCircleOutlined />}
+                  />
+                </div>
+              )}
             </div>
           </Col>
         </React.Fragment>

@@ -161,6 +161,29 @@ router.get('/:nicId/ports', async (req, res) => {
   }
 });
 
+router.get('/find', async (req, res) => {
+  try {
+    const { deviceId, name } = req.query;
+
+    if (!deviceId || !name) {
+      return res.status(400).json({ error: '缺少设备ID或网卡名称' });
+    }
+
+    const networkCard = await NetworkCard.findOne({
+      where: { deviceId, name }
+    });
+
+    if (!networkCard) {
+      return res.json({ nicId: null });
+    }
+
+    res.json(networkCard);
+  } catch (error) {
+    console.error('查找网卡失败:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/', async (req, res) => {
   try {
     const { nicId, deviceId, name, description, slotNumber, model, manufacturer, status } = req.body;

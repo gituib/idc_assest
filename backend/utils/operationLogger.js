@@ -32,6 +32,72 @@ const getClientInfo = (req) => {
   return { ipAddress, userAgent };
 };
 
+const DEVICE_TYPE_MAP = {
+  server: '服务器',
+  switch: '交换机',
+  router: '路由器',
+  storage: '存储设备',
+  firewall: '防火墙',
+  loadbalancer: '负载均衡器',
+  other: '其他设备'
+};
+
+const generateDeviceDescription = (operation, device, options = {}) => {
+  const {
+    includeRack = true,
+    includePosition = true,
+    includeSerial = true,
+    includeIp = true,
+    includeModel = true
+  } = options;
+
+  const deviceType = DEVICE_TYPE_MAP[device.type] || device.type || '设备';
+  const parts = [`${deviceType}【${device.name}】`];
+
+  if (device.deviceId) {
+    parts.push(`编号:${device.deviceId}`);
+  }
+
+  if (includeModel && device.model) {
+    parts.push(`型号:${device.model}`);
+  }
+
+  if (includeSerial && device.serialNumber) {
+    parts.push(`序列号:${device.serialNumber}`);
+  }
+
+  if (includeIp && device.ipAddress) {
+    parts.push(`IP:${device.ipAddress}`);
+  }
+
+  if (includeRack && device.rackName) {
+    if (includePosition && device.position !== undefined) {
+      parts.push(`位置:机柜【${device.rackName}】U${device.position}`);
+    } else {
+      parts.push(`机柜【${device.rackName}】`);
+    }
+  }
+
+  return `${operation}${parts.join('，')}`;
+};
+
+const buildDeviceMetadata = (device, extra = {}) => {
+  return {
+    deviceId: device.deviceId || null,
+    deviceName: device.name || null,
+    deviceType: device.type || null,
+    deviceModel: device.model || null,
+    serialNumber: device.serialNumber || null,
+    ipAddress: device.ipAddress || null,
+    rackId: device.rackId || null,
+    rackName: device.rackName || null,
+    position: device.position !== undefined ? device.position : null,
+    roomId: device.roomId || null,
+    roomName: device.roomName || null,
+    ...extra
+  };
+};
+
 async function logOperation({
   module,
   operationType,
@@ -119,5 +185,7 @@ module.exports = {
   logOperation,
   logDeviceOperation,
   logUserOperation,
-  logRoleOperation
+  logRoleOperation,
+  generateDeviceDescription,
+  buildDeviceMetadata
 };

@@ -29,8 +29,10 @@ import {
   InboxOutlined,
   ClockCircleOutlined,
   UploadOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
+import { deviceAPI } from '../api';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -52,6 +54,8 @@ const IdleDeviceManagement = () => {
   const [rooms, setRooms] = useState([]);
   const [selectedRoomId, setSelectedRoomId] = useState(null);
   const [selectedShelveRoomId, setSelectedShelveRoomId] = useState(null);
+  const [shelvePositionConflict, setShelvePositionConflict] = useState(null);
+  const [shelveSelectedRackId, setShelveSelectedRackId] = useState(null);
 
   const fetchIdleDevices = useCallback(async () => {
     setLoading(true);
@@ -144,6 +148,8 @@ const IdleDeviceManagement = () => {
 
   const handleShelve = (record) => {
     setShelvingDevice(record);
+    setShelvePositionConflict(null);
+    setShelveSelectedRackId(null);
     let roomId = null;
     if (record.rackId) {
       const rack = racks.find(r => r.rackId === record.rackId);
@@ -164,12 +170,69 @@ const IdleDeviceManagement = () => {
       position: record.position,
       description: record.description,
     });
+    if (record.rackId) {
+      setShelveSelectedRackId(record.rackId);
+    }
     setIsShelveModalVisible(true);
+  };
+
+  const checkShelvePositionConflict = async (rackId, position, height) => {
+    if (!rackId || !position) {
+      setShelvePositionConflict(null);
+      return;
+    }
+
+    try {
+      const result = await deviceAPI.checkPosition(rackId, { position, height: height || 1 });
+      if (!result.available) {
+        setShelvePositionConflict(result.reason);
+      } else {
+        setShelvePositionConflict(null);
+      }
+    } catch (error) {
+      console.error('检查U位冲突失败:', error);
+      setShelvePositionConflict(null);
+    }
+  };
+
+  const handleShelveRackChange = (value) => {
+    setShelveSelectedRackId(value);
+    const position = shelveForm.getFieldValue('position');
+    const height = shelveForm.getFieldValue('height');
+    if (position) {
+      checkShelvePositionConflict(value, position, height);
+    } else {
+      setShelvePositionConflict(null);
+    }
+  };
+
+  const handleShelvePositionChange = (e) => {
+    const value = e.target.value ? parseInt(e.target.value) : null;
+    const height = shelveForm.getFieldValue('height');
+    if (shelveSelectedRackId && value) {
+      checkShelvePositionConflict(shelveSelectedRackId, value, height);
+    } else {
+      setShelvePositionConflict(null);
+    }
+  };
+
+  const handleShelveHeightChange = (e) => {
+    const value = e.target.value ? parseInt(e.target.value) : null;
+    const position = shelveForm.getFieldValue('position');
+    if (shelveSelectedRackId && position) {
+      checkShelvePositionConflict(shelveSelectedRackId, position, value);
+    } else {
+      setShelvePositionConflict(null);
+    }
   };
 
   const handleShelveSubmit = async () => {
     try {
       const values = await shelveForm.validateFields();
+      if (shelvePositionConflict) {
+        message.error('存在U位冲突，请重新选择上架位置');
+        return;
+      }
       const submitData = {
         name: values.name,
         type: values.type,
@@ -866,6 +929,7 @@ const IdleDeviceManagement = () => {
                     placeholder={selectedShelveRoomId ? "请选择机柜" : "请先选择机房"}
                     disabled={!selectedShelveRoomId}
                     style={{ borderRadius: '8px' }}
+                    onChange={handleShelveRackChange}
                   >
                     {racks
                       .filter((rack) => rack.roomId === selectedShelveRoomId)
@@ -879,10 +943,29 @@ const IdleDeviceManagement = () => {
               </Col>
               <Col span={8}>
                 <Form.Item name="position" label="U位">
-                  <Input type="number" placeholder="请输入U位" min={1} style={{ borderRadius: '8px' }} />
+                  <Input type="number" placeholder="请输入U位" min={1} style={{ borderRadius: '8px' }} onChange={handleShelvePositionChange} />
                 </Form.Item>
               </Col>
             </Row>
+            {shelvePositionConflict && (
+              <div style={{ marginTop: '12px' }}>
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px'
+                }}>
+                  <ExclamationCircleOutlined style={{ color: '#ef4444', fontSize: '18px', marginTop: '2px' }} />
+                  <div>
+                    <div style={{ color: '#dc2626', fontWeight: 600, marginBottom: '4px' }}>U位冲突</div>
+                    <div style={{ color: '#991b1b', fontSize: '13px' }}>{shelvePositionConflict}</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={{
