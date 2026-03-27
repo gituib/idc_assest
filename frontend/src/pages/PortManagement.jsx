@@ -2191,6 +2191,53 @@ function PortManagement() {
         ]}
       >
         <div style={{ padding: '16px 0' }}>
+          <Alert
+            message="操作说明"
+            description={
+              <div style={{ fontSize: '12px', lineHeight: '1.8' }}>
+                <div><strong>适用范围：</strong>批量导入端口适用于<span style={{ color: '#1890ff', fontWeight: 600 }}>所有设备类型</span>（交换机、服务器、路由器、存储等）</div>
+                <div style={{ marginTop: '8px' }}><strong>前置条件：</strong></div>
+                <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
+                  <div>• <strong>交换机端口：</strong>可直接导入，无需前置操作</div>
+                  <div>• <strong>服务器端口：</strong>必须先在<span style={{ color: '#1890ff', fontWeight: 600 }}>网卡管理</span>中添加网卡，服务器端口与网卡是<span style={{ color: '#ff4d4f', fontWeight: 600 }}>层级关系</span>：设备 → 网卡 → 端口</div>
+                </div>
+                <div style={{ marginTop: '8px' }}><strong>操作步骤：</strong></div>
+                <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
+                  <div>1. 点击「下载模板」获取标准Excel/CSV文件</div>
+                  <div>2. 按模板格式填写端口信息，<span style={{ color: '#ff4d4f', fontWeight: 600 }}>设备ID</span>和<span style={{ color: '#ff4d4f', fontWeight: 600 }}>端口名称</span>为必填项</div>
+                  <div>3. 服务器端口可在「网卡名称」列填写对应的网卡名称（如eth0），不填则归入「未分组端口」</div>
+                  <div>4. 点击上传区域选择文件，或直接拖拽文件到上传区域</div>
+                  <div>5. 系统自动校验数据，可预览前10条数据及错误详情</div>
+                  <div>6. 选择导入策略（跳过/更新已存在），点击「开始导入」</div>
+                </div>
+                <div style={{ marginTop: '8px' }}><strong>字段说明：</strong></div>
+                <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
+                  <div>• <strong>设备ID</strong>（必填）：设备的唯一标识，如DEV001</div>
+                  <div>• <strong>端口名称</strong>（必填）：端口的名称或标识，如eth0/1、GigabitEthernet0/0/1</div>
+                  <div>• <strong>网卡名称</strong>（选填）：服务器端口所属的网卡名称，如eth0；交换机端口留空</div>
+                  <div>• <strong>端口类型</strong>（选填）：如RJ45、LC、SC、FC、SFP+、QSFP28等</div>
+                  <div>• <strong>端口速率</strong>（选填）：如1G、10G、25G、100G、40G等</div>
+                  <div>• <strong>状态</strong>（选填）：空闲/占用/故障，默认为空闲</div>
+                  <div>• <strong>VLAN ID</strong>（选填）：端口所属的VLAN编号，如100</div>
+                  <div>• <strong>描述</strong>（选填）：备注信息</div>
+                </div>
+                <div style={{ marginTop: '8px', color: '#faad14' }}><strong>注意事项：</strong></div>
+                <div style={{ paddingLeft: '12px', marginTop: '4px', color: '#faad14' }}>
+                  <div>• 同一设备下端口名称不可重复</div>
+                  <div>• 批量导入支持最多50000条记录</div>
+                  <div>• 状态字段请使用：空闲/占用/故障，勿使用其他值</div>
+                </div>
+              </div>
+            }
+            type="info"
+            showIcon
+            style={{
+              borderRadius: designTokens.borderRadius.md,
+              background: designTokens.colors.info.bg,
+              border: `1px solid ${designTokens.colors.info.light}40`,
+              marginBottom: '16px',
+            }}
+          />
           <Upload.Dragger
             name="file"
             accept=".xlsx,.xls,.csv"
