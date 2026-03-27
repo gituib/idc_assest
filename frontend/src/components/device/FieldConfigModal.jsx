@@ -39,8 +39,8 @@ const FieldConfigModal = ({
     );
   };
 
-  const handleSubmit = async (values) => {
-    const updatedFields = deviceFields.map((field) => ({
+  const handleSubmit = async values => {
+    const updatedFields = deviceFields.map(field => ({
       fieldId: field.fieldId,
       fieldName: field.fieldName,
       displayName: field.displayName,
@@ -56,7 +56,7 @@ const FieldConfigModal = ({
     message.success('字段配置已重置为默认值');
   };
 
-  const filteredFields = deviceFields.filter((field) => field.fieldName !== 'deviceId');
+  const filteredFields = deviceFields.filter(field => field.fieldName !== 'deviceId');
 
   return (
     <Modal
@@ -95,7 +95,7 @@ const FieldConfigModal = ({
               </tr>
             </thead>
             <tbody>
-              {filteredFields.map((field) => (
+              {filteredFields.map(field => (
                 <tr key={field.fieldName} style={{ borderBottom: '1px solid #f0f0f0' }}>
                   <td style={{ padding: '8px' }}>{field.displayName}</td>
                   <td style={{ padding: '8px', textAlign: 'center' }}>

@@ -17,9 +17,8 @@ const quickStatItemStyle = {
 };
 
 const QuickStats = ({ onlineRate, powerUsage, totalMaxPower }) => {
-  const powerUsagePercent = totalMaxPower > 0
-    ? ((powerUsage / totalMaxPower) * 100).toFixed(1)
-    : '0.0';
+  const powerUsagePercent =
+    totalMaxPower > 0 ? ((powerUsage / totalMaxPower) * 100).toFixed(1) : '0.0';
 
   const quickStats = [
     {

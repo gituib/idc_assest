@@ -28,7 +28,9 @@ const DEFAULT_CONFIG = {
  * 加密敏感信息
  */
 function encrypt(text) {
-  if (!text) return '';
+  if (!text) {
+    return '';
+  }
   const algorithm = 'aes-256-cbc';
   const key = crypto.scryptSync(process.env.JWT_SECRET || 'default-secret', 'salt', 32);
   const iv = crypto.randomBytes(16);
@@ -42,7 +44,9 @@ function encrypt(text) {
  * 解密敏感信息
  */
 function decrypt(text) {
-  if (!text) return '';
+  if (!text) {
+    return '';
+  }
   try {
     const algorithm = 'aes-256-cbc';
     const key = crypto.scryptSync(process.env.JWT_SECRET || 'default-secret', 'salt', 32);
@@ -113,11 +117,11 @@ function getAllTargets() {
 function getTarget(id) {
   const config = loadConfig();
   const target = config.targets.find(t => t.id === id);
-  
+
   if (!target) {
     return null;
   }
-  
+
   return {
     ...target,
     password: target.password ? decrypt(target.password) : undefined,
@@ -133,7 +137,7 @@ function getTarget(id) {
  */
 function addTarget(targetData) {
   const config = loadConfig();
-  
+
   const newTarget = {
     id: `target_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     name: targetData.name,
@@ -142,7 +146,7 @@ function addTarget(targetData) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  
+
   switch (targetData.protocol) {
     case PROTOCOL_TYPES.FTP:
     case PROTOCOL_TYPES.SFTP:
@@ -155,7 +159,7 @@ function addTarget(targetData) {
         secure: targetData.secure,
       });
       break;
-      
+
     case PROTOCOL_TYPES.WEBDAV:
       Object.assign(newTarget, {
         url: targetData.url,
@@ -165,7 +169,7 @@ function addTarget(targetData) {
         rootPath: targetData.rootPath || '/',
       });
       break;
-      
+
     case PROTOCOL_TYPES.SMB:
       Object.assign(newTarget, {
         host: targetData.host,
@@ -176,17 +180,17 @@ function addTarget(targetData) {
         rootPath: targetData.rootPath || '/',
       });
       break;
-      
+
     default:
       throw new Error(`不支持的协议类型：${targetData.protocol}`);
   }
-  
+
   config.targets.push(newTarget);
-  
+
   if (saveConfig(config)) {
     return newTarget;
   }
-  
+
   throw new Error('保存配置失败');
 }
 
@@ -196,14 +200,14 @@ function addTarget(targetData) {
 function updateTarget(id, updates) {
   const config = loadConfig();
   const targetIndex = config.targets.findIndex(t => t.id === id);
-  
+
   if (targetIndex === -1) {
     throw new Error('目标不存在');
   }
-  
+
   const existingTarget = config.targets[targetIndex];
   const updatedTarget = { ...existingTarget, ...updates, updatedAt: new Date().toISOString() };
-  
+
   if (updates.password) {
     updatedTarget.password = encrypt(updates.password);
   }
@@ -219,13 +223,13 @@ function updateTarget(id, updates) {
   if (updates.passphrase) {
     updatedTarget.passphrase = encrypt(updates.passphrase);
   }
-  
+
   config.targets[targetIndex] = updatedTarget;
-  
+
   if (saveConfig(config)) {
     return updatedTarget;
   }
-  
+
   throw new Error('保存配置失败');
 }
 
@@ -235,16 +239,16 @@ function updateTarget(id, updates) {
 function deleteTarget(id) {
   const config = loadConfig();
   const initialLength = config.targets.length;
-  
+
   config.targets = config.targets.filter(t => t.id !== id);
-  
+
   if (config.targets.length < initialLength) {
     if (saveConfig(config)) {
       return true;
     }
     throw new Error('保存配置失败');
   }
-  
+
   return false;
 }
 
@@ -262,11 +266,11 @@ function getGlobalSettings() {
 function updateGlobalSettings(settings) {
   const config = loadConfig();
   config.globalSettings = { ...config.globalSettings, ...settings };
-  
+
   if (saveConfig(config)) {
     return config.globalSettings;
   }
-  
+
   throw new Error('保存配置失败');
 }
 

@@ -3,10 +3,10 @@
 /**
  * 命令行恢复脚本
  * 用于独立执行数据恢复，支持跨环境迁移
- * 
+ *
  * 使用方法:
  *   node scripts/restore.js <backup-file> [options]
- * 
+ *
  * 选项:
  *   --skip-users     跳过用户数据恢复
  *   --skip-files     跳过文件恢复
@@ -76,7 +76,7 @@ async function runRestore() {
   console.log('========================================\n');
 
   const backupFile = path.resolve(options.file);
-  
+
   if (!fs.existsSync(backupFile)) {
     console.error(`错误: 备份文件不存在: ${backupFile}`);
     process.exit(1);
@@ -84,7 +84,7 @@ async function runRestore() {
 
   try {
     process.chdir(path.join(__dirname, '..'));
-    
+
     const { restoreBackup, validateBackupFile } = require('../utils/backup');
     const { sequelize } = require('../db');
 
@@ -94,7 +94,7 @@ async function runRestore() {
 
     console.log('验证备份文件...');
     const validation = await validateBackupFile(backupFile);
-    
+
     if (!validation.valid) {
       console.error(`错误: 备份文件验证失败: ${validation.error}`);
       process.exit(1);
@@ -124,17 +124,17 @@ async function runRestore() {
     }
 
     console.log('开始恢复数据...\n');
-    
+
     const result = await restoreBackup(backupFile, {
       overwriteExisting: options.overwrite,
       skipTables,
       skipFiles: options.skipFiles,
       onProgress: (tableName, status, count) => {
         const statusMap = {
-          'restored': '✓ 已恢复',
-          'skipped': '○ 已跳过',
-          'empty': '- 无数据',
-          'error': '✗ 错误',
+          restored: '✓ 已恢复',
+          skipped: '○ 已跳过',
+          empty: '- 无数据',
+          error: '✗ 错误',
         };
         const statusText = statusMap[status] || status;
         const countText = count ? ` (${count} 条)` : '';
@@ -162,7 +162,7 @@ async function runRestore() {
     }
 
     console.log('\n提示: 请重启后端服务以确保所有数据生效');
-    
+
     await sequelize.close();
     process.exit(0);
   } catch (error) {

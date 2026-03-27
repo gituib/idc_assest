@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card,
@@ -58,12 +57,12 @@ const TimePicker = ({ hour, minute, onChange, disabled }) => {
     setMinuteInput(minute.toString());
   }, [hour, minute]);
 
-  const handleHourChange = (newHour) => {
+  const handleHourChange = newHour => {
     const validHour = Math.max(0, Math.min(23, newHour));
     onChange(validHour, minute);
   };
 
-  const handleMinuteChange = (newMinute) => {
+  const handleMinuteChange = newMinute => {
     const validMinute = Math.max(0, Math.min(59, newMinute));
     onChange(hour, validMinute);
   };
@@ -86,13 +85,13 @@ const TimePicker = ({ hour, minute, onChange, disabled }) => {
     }
   };
 
-  const handleHourKeyPress = (e) => {
+  const handleHourKeyPress = e => {
     if (e.key === 'Enter') {
       handleHourInputBlur();
     }
   };
 
-  const handleMinuteKeyPress = (e) => {
+  const handleMinuteKeyPress = e => {
     if (e.key === 'Enter') {
       handleMinuteInputBlur();
     }
@@ -117,23 +116,27 @@ const TimePicker = ({ hour, minute, onChange, disabled }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 14,
-        padding: '18px 24px',
-        background: disabled ? '#f5f5f5' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        borderRadius: '14px',
-        transition: 'all 0.3s ease',
-        minWidth: 280,
-      }}>
-        <div style={{
+      <div
+        style={{
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
-          gap: 5,
-        }}>
+          justifyContent: 'center',
+          gap: 14,
+          padding: '18px 24px',
+          background: disabled ? '#f5f5f5' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          borderRadius: '14px',
+          transition: 'all 0.3s ease',
+          minWidth: 280,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 5,
+          }}
+        >
           <Button
             type="text"
             icon={<UpOutlined />}
@@ -149,7 +152,7 @@ const TimePicker = ({ hour, minute, onChange, disabled }) => {
           />
           <Input
             value={hourInput}
-            onChange={(e) => setHourInput(e.target.value)}
+            onChange={e => setHourInput(e.target.value)}
             onBlur={handleHourInputBlur}
             onPressEnter={handleHourKeyPress}
             disabled={disabled}
@@ -182,31 +185,37 @@ const TimePicker = ({ hour, minute, onChange, disabled }) => {
               padding: 0,
             }}
           />
-          <Text style={{
-            fontSize: 12,
-            color: disabled ? '#bfbfbf' : 'rgba(255, 255, 255, 0.85)',
-            marginTop: 3,
-          }}>
+          <Text
+            style={{
+              fontSize: 12,
+              color: disabled ? '#bfbfbf' : 'rgba(255, 255, 255, 0.85)',
+              marginTop: 3,
+            }}
+          >
             小时
           </Text>
         </div>
 
-        <div style={{
-          fontSize: 34,
-          fontWeight: 700,
-          color: disabled ? '#bfbfbf' : '#fff',
-          fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-          marginTop: -12,
-        }}>
+        <div
+          style={{
+            fontSize: 34,
+            fontWeight: 700,
+            color: disabled ? '#bfbfbf' : '#fff',
+            fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+            marginTop: -12,
+          }}
+        >
           :
         </div>
 
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 5,
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 5,
+          }}
+        >
           <Button
             type="text"
             icon={<UpOutlined />}
@@ -222,7 +231,7 @@ const TimePicker = ({ hour, minute, onChange, disabled }) => {
           />
           <Input
             value={minuteInput}
-            onChange={(e) => setMinuteInput(e.target.value)}
+            onChange={e => setMinuteInput(e.target.value)}
             onBlur={handleMinuteInputBlur}
             onPressEnter={handleMinuteKeyPress}
             disabled={disabled}
@@ -255,33 +264,39 @@ const TimePicker = ({ hour, minute, onChange, disabled }) => {
               padding: 0,
             }}
           />
-          <Text style={{
-            fontSize: 12,
-            color: disabled ? '#bfbfbf' : 'rgba(255, 255, 255, 0.85)',
-            marginTop: 3,
-          }}>
+          <Text
+            style={{
+              fontSize: 12,
+              color: disabled ? '#bfbfbf' : 'rgba(255, 255, 255, 0.85)',
+              marginTop: 3,
+            }}
+          >
             分钟
           </Text>
         </div>
       </div>
 
       {currentPeriod && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          padding: '10px 20px',
-          background: disabled ? '#f5f5f5' : '#eff6ff',
-          borderRadius: '12px',
-          border: disabled ? '1px solid #f0f0f0' : '1px solid #dbeafe',
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: '10px 20px',
+            background: disabled ? '#f5f5f5' : '#eff6ff',
+            borderRadius: '12px',
+            border: disabled ? '1px solid #f0f0f0' : '1px solid #dbeafe',
+          }}
+        >
           <span style={{ fontSize: 22 }}>{currentPeriod.icon}</span>
-          <Text style={{
-            fontSize: 14,
-            color: disabled ? '#bfbfbf' : '#3b82f6',
-            fontWeight: 500,
-          }}>
+          <Text
+            style={{
+              fontSize: 14,
+              color: disabled ? '#bfbfbf' : '#3b82f6',
+              fontWeight: 500,
+            }}
+          >
             {currentPeriod.label}
           </Text>
         </div>
@@ -289,11 +304,11 @@ const TimePicker = ({ hour, minute, onChange, disabled }) => {
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
         {[
-            { hour: 2, minute: 0, label: '凌晨 2:00', recommended: true },
-            { hour: 3, minute: 0, label: '凌晨 3:00' },
-            { hour: 4, minute: 0, label: '凌晨 4:00', recommended: true },
-            { hour: 20, minute: 0, label: '晚上 8:00' },
-            { hour: 22, minute: 0, label: '晚上 10:00' },
+          { hour: 2, minute: 0, label: '凌晨 2:00', recommended: true },
+          { hour: 3, minute: 0, label: '凌晨 3:00' },
+          { hour: 4, minute: 0, label: '凌晨 4:00', recommended: true },
+          { hour: 20, minute: 0, label: '晚上 8:00' },
+          { hour: 22, minute: 0, label: '晚上 10:00' },
         ].map((preset, index) => (
           <Button
             key={index}
@@ -302,15 +317,22 @@ const TimePicker = ({ hour, minute, onChange, disabled }) => {
             disabled={disabled}
             style={{
               borderRadius: '8px',
-              border: hour === preset.hour && minute === preset.minute 
-                ? '1px solid #667eea' 
-                : disabled ? '1px solid #f0f0f0' : '1px solid #e5e7eb',
-              background: hour === preset.hour && minute === preset.minute 
-                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
-                : '#fff',
-              color: hour === preset.hour && minute === preset.minute 
-                ? '#fff' 
-                : disabled ? '#bfbfbf' : '#374151',
+              border:
+                hour === preset.hour && minute === preset.minute
+                  ? '1px solid #667eea'
+                  : disabled
+                    ? '1px solid #f0f0f0'
+                    : '1px solid #e5e7eb',
+              background:
+                hour === preset.hour && minute === preset.minute
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  : '#fff',
+              color:
+                hour === preset.hour && minute === preset.minute
+                  ? '#fff'
+                  : disabled
+                    ? '#bfbfbf'
+                    : '#374151',
               fontWeight: preset.recommended ? 600 : 400,
               fontSize: 13,
               height: 32,
@@ -343,7 +365,7 @@ const AutoBackupSettings = () => {
   const [modified, setModified] = useState(false);
   const isInitialMount = useRef(true);
   const isFetching = useRef(false);
-  
+
   const [logs, setLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsPagination, setLogsPagination] = useState({
@@ -368,7 +390,7 @@ const AutoBackupSettings = () => {
 
   const fetchStatus = useCallback(async () => {
     if (isFetching.current) return;
-    
+
     try {
       setLoading(true);
       isFetching.current = true;
@@ -376,12 +398,12 @@ const AutoBackupSettings = () => {
       if (response?.success) {
         const data = response.data;
         setStatus(data);
-        
+
         if (data.cronExpression) {
           const parts = data.cronExpression.split(' ');
           const minute = parseInt(parts[0]);
           const hour = parseInt(parts[1]);
-          
+
           setSettings(prev => ({
             ...prev,
             enabled: data.enabled || false,
@@ -403,29 +425,32 @@ const AutoBackupSettings = () => {
     }
   }, []);
 
-  const fetchLogs = useCallback(async (page = 1, pageSize = 10) => {
-    try {
-      setLogsLoading(true);
-      const params = { page, pageSize };
-      if (logFilter.logType) params.logType = logFilter.logType;
-      if (logFilter.status) params.status = logFilter.status;
-      
-      const response = await backupAPI.getLogs(params);
-      if (response?.success) {
-        setLogs(response.data.logs || []);
-        setLogsPagination({
-          current: response.data.page || 1,
-          pageSize: response.data.pageSize || 10,
-          total: response.data.total || 0,
-        });
+  const fetchLogs = useCallback(
+    async (page = 1, pageSize = 10) => {
+      try {
+        setLogsLoading(true);
+        const params = { page, pageSize };
+        if (logFilter.logType) params.logType = logFilter.logType;
+        if (logFilter.status) params.status = logFilter.status;
+
+        const response = await backupAPI.getLogs(params);
+        if (response?.success) {
+          setLogs(response.data.logs || []);
+          setLogsPagination({
+            current: response.data.page || 1,
+            pageSize: response.data.pageSize || 10,
+            total: response.data.total || 0,
+          });
+        }
+      } catch (error) {
+        console.error('获取备份日志失败:', error);
+        message.error('获取备份日志失败');
+      } finally {
+        setLogsLoading(false);
       }
-    } catch (error) {
-      console.error('获取备份日志失败:', error);
-      message.error('获取备份日志失败');
-    } finally {
-      setLogsLoading(false);
-    }
-  }, [logFilter]);
+    },
+    [logFilter]
+  );
 
   const handleSave = async () => {
     try {
@@ -457,15 +482,17 @@ const AutoBackupSettings = () => {
     Modal.confirm({
       title: (
         <Space>
-          <div style={{
-            width: 40,
-            height: 40,
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             <PlayCircleOutlined style={{ color: '#fff', fontSize: 20 }} />
           </div>
           <span>立即执行备份</span>
@@ -501,7 +528,7 @@ const AutoBackupSettings = () => {
     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
   };
 
-  const formatNextRun = (nextRun) => {
+  const formatNextRun = nextRun => {
     if (!nextRun) return '未知';
     return new Date(nextRun).toLocaleString('zh-CN', {
       year: 'numeric',
@@ -512,12 +539,12 @@ const AutoBackupSettings = () => {
     });
   };
 
-  const formatDateTime = (dateTime) => {
+  const formatDateTime = dateTime => {
     if (!dateTime) return '-';
     return new Date(dateTime).toLocaleString('zh-CN');
   };
 
-  const formatDuration = (ms) => {
+  const formatDuration = ms => {
     if (!ms) return '-';
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
@@ -528,7 +555,7 @@ const AutoBackupSettings = () => {
     return `${remainingSeconds}秒`;
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = bytes => {
     if (!bytes) return '-';
     const units = ['B', 'KB', 'MB', 'GB'];
     let size = bytes;
@@ -554,7 +581,7 @@ const AutoBackupSettings = () => {
     return '自动备份已禁用';
   };
 
-  const getLogStatusTag = (status) => {
+  const getLogStatusTag = status => {
     const statusMap = {
       pending: { color: 'default', text: '待执行' },
       running: { color: 'processing', text: '执行中' },
@@ -565,7 +592,7 @@ const AutoBackupSettings = () => {
     return <Tag color={info.color}>{info.text}</Tag>;
   };
 
-  const getLogTypeTag = (type) => {
+  const getLogTypeTag = type => {
     const typeMap = {
       auto: { color: 'blue', text: '自动备份' },
       manual: { color: 'green', text: '手动备份' },
@@ -582,7 +609,7 @@ const AutoBackupSettings = () => {
     setLogFilter(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleViewLogDetail = (log) => {
+  const handleViewLogDetail = log => {
     setSelectedLog(log);
     setLogDetailModal(true);
   };
@@ -592,18 +619,20 @@ const AutoBackupSettings = () => {
   };
 
   const StatusCard = ({ icon, title, value, subtitle, gradient }) => (
-    <div style={{
-      padding: '20px',
-      borderRadius: '16px',
-      background: gradient,
-      color: '#fff',
-      position: 'relative',
-      overflow: 'hidden',
-      minHeight: '120px',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'space-between',
-    }}>
+    <div
+      style={{
+        padding: '20px',
+        borderRadius: '16px',
+        background: gradient,
+        color: '#fff',
+        position: 'relative',
+        overflow: 'hidden',
+        minHeight: '120px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+      }}
+    >
       <div style={{ position: 'absolute', right: -20, top: -20, opacity: 0.1 }}>
         {React.cloneElement(icon, { style: { fontSize: 120 } })}
       </div>
@@ -616,33 +645,41 @@ const AutoBackupSettings = () => {
   );
 
   const SettingItem = ({ title, description, children, bordered = true }) => (
-    <div style={{
-      padding: '20px 0',
-      borderBottom: bordered ? '1px solid #f5f5f5' : 'none',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24 }}>
+    <div
+      style={{
+        padding: '20px 0',
+        borderBottom: bordered ? '1px solid #f5f5f5' : 'none',
+      }}
+    >
+      <div
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24 }}
+      >
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 15, color: '#1f2937', marginBottom: 6 }}>
             {title}
           </div>
           {description && (
-            <Paragraph style={{ 
-              margin: 0, 
-              fontSize: 13, 
-              color: '#6b7280', 
-              lineHeight: 1.6,
-              maxWidth: 400,
-            }}>
+            <Paragraph
+              style={{
+                margin: 0,
+                fontSize: 13,
+                color: '#6b7280',
+                lineHeight: 1.6,
+                maxWidth: 400,
+              }}
+            >
               {description}
             </Paragraph>
           )}
         </div>
-        <div style={{ 
-          flexShrink: 0, 
-          display: 'flex', 
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-        }}>
+        <div
+          style={{
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+          }}
+        >
           {children}
         </div>
       </div>
@@ -655,14 +692,14 @@ const AutoBackupSettings = () => {
       dataIndex: 'logType',
       key: 'logType',
       width: 120,
-      render: (type) => getLogTypeTag(type),
+      render: type => getLogTypeTag(type),
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
       width: 100,
-      render: (status) => getLogStatusTag(status),
+      render: status => getLogStatusTag(status),
     },
     {
       title: '描述',
@@ -675,21 +712,21 @@ const AutoBackupSettings = () => {
       dataIndex: 'fileSize',
       key: 'fileSize',
       width: 120,
-      render: (size) => formatFileSize(size),
+      render: size => formatFileSize(size),
     },
     {
       title: '执行时间',
       dataIndex: 'duration',
       key: 'duration',
       width: 120,
-      render: (duration) => formatDuration(duration),
+      render: duration => formatDuration(duration),
     },
     {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 180,
-      render: (date) => formatDateTime(date),
+      render: date => formatDateTime(date),
     },
     {
       title: '操作',
@@ -697,11 +734,7 @@ const AutoBackupSettings = () => {
       width: 100,
       render: (_, record) => (
         <Tooltip title="查看详情">
-          <Button
-            type="text"
-            icon={<EyeOutlined />}
-            onClick={() => handleViewLogDetail(record)}
-          />
+          <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewLogDetail(record)} />
         </Tooltip>
       ),
     },
@@ -709,24 +742,28 @@ const AutoBackupSettings = () => {
 
   if (loading && !status) {
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+        }}
+      >
         <Spin size="large" tip="加载设置中..." />
       </div>
     );
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-      padding: '24px',
-    }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+        padding: '24px',
+      }}
+    >
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
         <div style={{ marginBottom: 32 }}>
           <Button
@@ -736,25 +773,38 @@ const AutoBackupSettings = () => {
           >
             返回备份管理
           </Button>
-          
-          <div style={{
-            background: '#fff',
-            padding: '24px 32px',
-            borderRadius: '20px',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
-            marginBottom: 24,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+
+          <div
+            style={{
+              background: '#fff',
+              padding: '24px 32px',
+              borderRadius: '20px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
+              marginBottom: 24,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 16,
+              }}
+            >
               <div>
-                <Title level={2} style={{
-                  margin: '0 0 8px 0',
-                  fontSize: '28px',
-                  fontWeight: 700,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                }}>
+                <Title
+                  level={2}
+                  style={{
+                    margin: '0 0 8px 0',
+                    fontSize: '28px',
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
                   <SettingOutlined style={{ marginRight: 12, verticalAlign: 'middle' }} />
                   自动备份设置
                 </Title>
@@ -763,7 +813,7 @@ const AutoBackupSettings = () => {
                 </Paragraph>
               </div>
               <Space size="middle">
-                <Button 
+                <Button
                   icon={<PlayCircleOutlined />}
                   onClick={handleExecuteNow}
                   loading={loading}
@@ -779,7 +829,7 @@ const AutoBackupSettings = () => {
                 >
                   立即备份
                 </Button>
-                <Button 
+                <Button
                   icon={<SaveOutlined />}
                   type="primary"
                   onClick={handleSave}
@@ -810,9 +860,11 @@ const AutoBackupSettings = () => {
                 icon={<CheckCircleOutlined />}
                 title="当前状态"
                 value={getStatusText()}
-                gradient={status?.enabled && status.isActive ? 
-                  'linear-gradient(135deg, #10b981 0%, #34d399 100%)' : 
-                  'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)'}
+                gradient={
+                  status?.enabled && status.isActive
+                    ? 'linear-gradient(135deg, #10b981 0%, #34d399 100%)'
+                    : 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)'
+                }
               />
             </Col>
             <Col xs={24} sm={12} lg={6}>
@@ -844,25 +896,27 @@ const AutoBackupSettings = () => {
 
         <Row gutter={[24, 24]}>
           <Col xs={24} lg={12}>
-            <Card 
+            <Card
               title={
                 <Space>
-                  <div style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
                     <SettingOutlined style={{ color: '#fff', fontSize: 18 }} />
                   </div>
                   <span style={{ fontSize: 16, fontWeight: 600 }}>基本设置</span>
                 </Space>
               }
-              style={{ 
-                borderRadius: '20px', 
+              style={{
+                borderRadius: '20px',
                 boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
                 height: '100%',
               }}
@@ -873,7 +927,7 @@ const AutoBackupSettings = () => {
               >
                 <Switch
                   checked={settings.enabled}
-                  onChange={(checked) => {
+                  onChange={checked => {
                     setSettings({ ...settings, enabled: checked });
                     setModified(true);
                   }}
@@ -905,25 +959,27 @@ const AutoBackupSettings = () => {
           </Col>
 
           <Col xs={24} lg={12}>
-            <Card 
+            <Card
               title={
                 <Space>
-                  <div style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
                     <ThunderboltOutlined style={{ color: '#fff', fontSize: 18 }} />
                   </div>
                   <span style={{ fontSize: 16, fontWeight: 600 }}>高级设置</span>
                 </Space>
               }
-              style={{ 
-                borderRadius: '20px', 
+              style={{
+                borderRadius: '20px',
                 boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
                 height: '100%',
               }}
@@ -934,7 +990,7 @@ const AutoBackupSettings = () => {
               >
                 <Radio.Group
                   value={settings.backupType}
-                  onChange={(e) => {
+                  onChange={e => {
                     setSettings({ ...settings, backupType: e.target.value });
                     setModified(true);
                   }}
@@ -945,13 +1001,10 @@ const AutoBackupSettings = () => {
                 </Radio.Group>
               </SettingItem>
 
-              <SettingItem
-                title="包含文件"
-                description="备份时包含上传的文件（如用户头像等）"
-              >
+              <SettingItem title="包含文件" description="备份时包含上传的文件（如用户头像等）">
                 <Switch
                   checked={settings.includeFiles}
-                  onChange={(checked) => {
+                  onChange={checked => {
                     setSettings({ ...settings, includeFiles: checked });
                     setModified(true);
                   }}
@@ -967,7 +1020,7 @@ const AutoBackupSettings = () => {
               >
                 <Switch
                   checked={settings.compress}
-                  onChange={(checked) => {
+                  onChange={checked => {
                     setSettings({ ...settings, compress: checked });
                     setModified(true);
                   }}
@@ -985,7 +1038,7 @@ const AutoBackupSettings = () => {
                   min={1}
                   max={100}
                   value={settings.maxCount}
-                  onChange={(value) => {
+                  onChange={value => {
                     setSettings({ ...settings, maxCount: value });
                     setModified(true);
                   }}
@@ -1004,7 +1057,7 @@ const AutoBackupSettings = () => {
                   min={1}
                   max={365}
                   value={settings.maxAgeDays}
-                  onChange={(value) => {
+                  onChange={value => {
                     setSettings({ ...settings, maxAgeDays: value });
                     setModified(true);
                   }}
@@ -1017,34 +1070,32 @@ const AutoBackupSettings = () => {
           </Col>
         </Row>
 
-        <Card 
+        <Card
           title={
             <Space>
-              <div style={{
-                width: 36,
-                height: 36,
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
                 <HistoryOutlined style={{ color: '#fff', fontSize: 18 }} />
               </div>
               <span style={{ fontSize: 16, fontWeight: 600 }}>备份日志</span>
             </Space>
           }
-          style={{ 
-            borderRadius: '20px', 
+          style={{
+            borderRadius: '20px',
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
             marginTop: 24,
           }}
           extra={
-            <Button 
-              icon={<ReloadOutlined />} 
-              onClick={handleRefreshLogs}
-              loading={logsLoading}
-            >
+            <Button icon={<ReloadOutlined />} onClick={handleRefreshLogs} loading={logsLoading}>
               刷新
             </Button>
           }
@@ -1057,7 +1108,7 @@ const AutoBackupSettings = () => {
                 style={{ width: 150 }}
                 allowClear
                 value={logFilter.logType || undefined}
-                onChange={(value) => handleLogFilterChange('logType', value)}
+                onChange={value => handleLogFilterChange('logType', value)}
               >
                 <Option value="auto">自动备份</Option>
                 <Option value="manual">手动备份</Option>
@@ -1068,17 +1119,14 @@ const AutoBackupSettings = () => {
                 style={{ width: 150 }}
                 allowClear
                 value={logFilter.status || undefined}
-                onChange={(value) => handleLogFilterChange('status', value)}
+                onChange={value => handleLogFilterChange('status', value)}
               >
                 <Option value="pending">待执行</Option>
                 <Option value="running">执行中</Option>
                 <Option value="success">成功</Option>
                 <Option value="failed">失败</Option>
               </Select>
-              <Button 
-                type="primary" 
-                onClick={() => fetchLogs(1, logsPagination.pageSize)}
-              >
+              <Button type="primary" onClick={() => fetchLogs(1, logsPagination.pageSize)}>
                 筛选
               </Button>
             </Space>
@@ -1091,12 +1139,7 @@ const AutoBackupSettings = () => {
             loading={logsLoading}
             pagination={false}
             locale={{
-              emptyText: (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="暂无备份日志"
-                />
-              ),
+              emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无备份日志" />,
             }}
           />
 
@@ -1107,7 +1150,7 @@ const AutoBackupSettings = () => {
               total={logsPagination.total}
               onChange={handleLogPageChange}
               showSizeChanger
-              showTotal={(total) => `共 ${total} 条`}
+              showTotal={total => `共 ${total} 条`}
             />
           </div>
         </Card>
@@ -1124,25 +1167,33 @@ const AutoBackupSettings = () => {
               <div style={{ marginTop: 12 }}>
                 <div style={{ display: 'grid', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <CheckCircleOutlined style={{ color: '#10b981', marginTop: 2, flexShrink: 0 }} />
+                    <CheckCircleOutlined
+                      style={{ color: '#10b981', marginTop: 2, flexShrink: 0 }}
+                    />
                     <Text style={{ color: '#4b5563' }}>
                       <strong>备份时间：</strong>建议设置在凌晨 2-4 点业务低峰期，避免影响正常使用
                     </Text>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <CheckCircleOutlined style={{ color: '#10b981', marginTop: 2, flexShrink: 0 }} />
+                    <CheckCircleOutlined
+                      style={{ color: '#10b981', marginTop: 2, flexShrink: 0 }}
+                    />
                     <Text style={{ color: '#4b5563' }}>
                       <strong>保留策略：</strong>开发环境建议 7 个/7 天，生产环境建议 30 个/90 天
                     </Text>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <CheckCircleOutlined style={{ color: '#10b981', marginTop: 2, flexShrink: 0 }} />
+                    <CheckCircleOutlined
+                      style={{ color: '#10b981', marginTop: 2, flexShrink: 0 }}
+                    />
                     <Text style={{ color: '#4b5563' }}>
                       <strong>压缩备份：</strong>强烈建议开启，可显著减少磁盘空间占用
                     </Text>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <CheckCircleOutlined style={{ color: '#10b981', marginTop: 2, flexShrink: 0 }} />
+                    <CheckCircleOutlined
+                      style={{ color: '#10b981', marginTop: 2, flexShrink: 0 }}
+                    />
                     <Text style={{ color: '#4b5563' }}>
                       <strong>定期测试：</strong>每月至少手动执行一次备份，验证功能正常
                     </Text>
@@ -1152,8 +1203,8 @@ const AutoBackupSettings = () => {
             }
             type="info"
             showIcon={false}
-            style={{ 
-              borderRadius: '16px', 
+            style={{
+              borderRadius: '16px',
               border: '1px solid #dbeafe',
               background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
             }}
@@ -1171,8 +1222,8 @@ const AutoBackupSettings = () => {
             description="自动备份功能需要服务器持续运行。如果服务器重启，自动备份任务会自动恢复。请确保服务器时间设置正确。"
             type="warning"
             showIcon={false}
-            style={{ 
-              borderRadius: '16px', 
+            style={{
+              borderRadius: '16px',
               border: '1px solid #fef3c7',
               background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
             }}
@@ -1187,27 +1238,21 @@ const AutoBackupSettings = () => {
         footer={[
           <Button key="close" onClick={() => setLogDetailModal(false)}>
             关闭
-          </Button>
+          </Button>,
         ]}
         width={700}
       >
         {selectedLog && (
           <Descriptions column={1} bordered>
-            <Descriptions.Item label="类型">
-              {getLogTypeTag(selectedLog.logType)}
-            </Descriptions.Item>
+            <Descriptions.Item label="类型">{getLogTypeTag(selectedLog.logType)}</Descriptions.Item>
             <Descriptions.Item label="状态">
               {getLogStatusTag(selectedLog.status)}
             </Descriptions.Item>
-            <Descriptions.Item label="描述">
-              {selectedLog.description || '-'}
-            </Descriptions.Item>
+            <Descriptions.Item label="描述">{selectedLog.description || '-'}</Descriptions.Item>
             <Descriptions.Item label="备份类型">
               {selectedLog.backupType === 'full' ? '全量备份' : '增量备份'}
             </Descriptions.Item>
-            <Descriptions.Item label="文件名">
-              {selectedLog.filename || '-'}
-            </Descriptions.Item>
+            <Descriptions.Item label="文件名">{selectedLog.filename || '-'}</Descriptions.Item>
             <Descriptions.Item label="文件大小">
               {formatFileSize(selectedLog.fileSize)}
             </Descriptions.Item>
@@ -1239,9 +1284,7 @@ const AutoBackupSettings = () => {
                 <div>
                   {selectedLog.remoteUploads.map((upload, index) => (
                     <div key={index} style={{ marginBottom: 8 }}>
-                      <Tag color={upload.success ? 'success' : 'error'}>
-                        {upload.targetName}
-                      </Tag>
+                      <Tag color={upload.success ? 'success' : 'error'}>{upload.targetName}</Tag>
                       <Text style={{ marginLeft: 8 }}>
                         {upload.success ? '上传成功' : `失败: ${upload.error}`}
                       </Text>
@@ -1258,4 +1301,3 @@ const AutoBackupSettings = () => {
 };
 
 export default AutoBackupSettings;
-

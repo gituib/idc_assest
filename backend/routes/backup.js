@@ -23,11 +23,7 @@ const {
   updateAutoBackupSettings,
   executeBackupNow,
 } = require('../utils/autoBackupScheduler');
-const {
-  getBackupLogs,
-  getBackupLogById,
-  deleteOldLogs,
-} = require('../utils/backupLog');
+const { getBackupLogs, getBackupLogById, deleteOldLogs } = require('../utils/backupLog');
 const {
   getAllTargets,
   getTarget,
@@ -81,22 +77,27 @@ router.get('/list', async (req, res) => {
       });
     }
 
-    const files = fs.readdirSync(backupPath)
-      .filter(f => (f.startsWith('backup_') || f.startsWith('uploaded_')) && (f.endsWith('.json') || f.endsWith('.json.gz')))
+    const files = fs
+      .readdirSync(backupPath)
+      .filter(
+        f =>
+          (f.startsWith('backup_') || f.startsWith('uploaded_')) &&
+          (f.endsWith('.json') || f.endsWith('.json.gz'))
+      )
       .map(async f => {
         const filePath = path.join(backupPath, f);
         const stats = fs.statSync(filePath);
         const isCompressed = f.endsWith('.gz');
-        
+
         // 尝试从文件内容中提取元数据
-        let metadata = {
+        const metadata = {
           filename: f,
           size: stats.size,
           compressed: isCompressed,
           createdAt: stats.birthtime,
           modifiedAt: stats.mtime,
         };
-        
+
         try {
           // 读取文件头部的元数据信息
           let content;
@@ -106,9 +107,9 @@ router.get('/list', async (req, res) => {
           } else {
             content = fs.readFileSync(filePath, 'utf8');
           }
-          
+
           const backupData = JSON.parse(content);
-          
+
           // 提取关键元数据
           metadata.description = backupData.description || '';
           metadata.backupType = backupData.backupType || 'full';
@@ -117,19 +118,18 @@ router.get('/list', async (req, res) => {
           metadata.checksum = backupData.checksum;
           metadata.metadata = backupData.metadata;
           metadata.systemInfo = backupData.systemInfo;
-          
+
           // 判断是否为上传的文件（通过文件名判断）
           metadata.isUploaded = f.startsWith('uploaded_');
-          
         } catch (error) {
           // 如果读取失败，标记为无效文件
           metadata.invalid = true;
           metadata.error = '无法读取文件内容';
         }
-        
+
         return metadata;
       });
-    
+
     const resolvedFiles = await Promise.all(files);
 
     res.json({
@@ -201,7 +201,7 @@ router.get('/restore-progress/:filename', authMiddleware, async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
 
-  const sendProgress = (data) => {
+  const sendProgress = data => {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
@@ -211,16 +211,25 @@ router.get('/restore-progress/:filename', authMiddleware, async (req, res) => {
 
     const validation = await validateBackupFile(filePath);
     if (!validation.valid) {
-      sendProgress({ stage: 'error', message: `备份文件验证失败: ${validation.error}`, progress: 0 });
+      sendProgress({
+        stage: 'error',
+        message: `备份文件验证失败: ${validation.error}`,
+        progress: 0,
+      });
       res.end();
       return;
     }
 
-    sendProgress({ stage: 'validate', message: '备份文件验证通过', progress: 10, metadata: validation.metadata });
+    sendProgress({
+      stage: 'validate',
+      message: '备份文件验证通过',
+      progress: 10,
+      metadata: validation.metadata,
+    });
 
     const buffer = fs.readFileSync(filePath);
     const isCompressed = filePath.endsWith('.gz');
-    
+
     let backupData;
     if (isCompressed) {
       sendProgress({ stage: 'decompress', message: '正在解压备份文件...', progress: 15 });
@@ -243,10 +252,10 @@ router.get('/restore-progress/:filename', authMiddleware, async (req, res) => {
         processedTables++;
         const progress = 20 + Math.floor((processedTables / totalTables) * 70);
         const statusMap = {
-          'restored': '已恢复',
-          'skipped': '已跳过',
-          'empty': '无数据',
-          'error': '错误',
+          restored: '已恢复',
+          skipped: '已跳过',
+          empty: '无数据',
+          error: '错误',
         };
         sendProgress({
           stage: 'restore',
@@ -261,9 +270,9 @@ router.get('/restore-progress/:filename', authMiddleware, async (req, res) => {
       },
     });
 
-    sendProgress({ 
-      stage: 'complete', 
-      message: '恢复完成!', 
+    sendProgress({
+      stage: 'complete',
+      message: '恢复完成!',
       progress: 100,
       result: {
         tablesRestored: result.tablesRestored,
@@ -272,7 +281,7 @@ router.get('/restore-progress/:filename', authMiddleware, async (req, res) => {
         restoredAt: result.restoredAt,
         tableDetails: result.tableDetails,
         fileDetails: result.fileDetails,
-      }
+      },
     });
 
     res.end();
@@ -342,7 +351,7 @@ router.post('/upload', async (req, res) => {
     const backupFile = req.files.backup;
     const originalName = backupFile.name || '';
     const nameLower = originalName.toLowerCase();
-    
+
     // 验证文件类型
     if (!nameLower.endsWith('.json') && !nameLower.endsWith('.gz')) {
       return res.status(400).json({
@@ -350,15 +359,15 @@ router.post('/upload', async (req, res) => {
         message: '只支持 JSON 或 GZ 格式的备份文件',
       });
     }
-    
+
     const isCompressed = nameLower.endsWith('.gz');
-    
+
     console.log(`上传备份文件: ${originalName}, 压缩: ${isCompressed}, 大小: ${backupFile.size}`);
 
     // 保存到临时文件
     const tempFilename = `upload_${Date.now()}`;
     const tempPath = path.join(tempDir, tempFilename);
-    
+
     await backupFile.mv(tempPath);
 
     const validation = await validateBackupFile(tempPath, { isCompressed });
@@ -411,7 +420,7 @@ router.get('/download/:filename', (req, res) => {
       });
     }
 
-    res.download(filePath, filename, (err) => {
+    res.download(filePath, filename, err => {
       if (err) {
         console.error('下载备份文件失败:', err);
       }
@@ -463,7 +472,9 @@ router.get('/info', (req, res) => {
     let backupCount = 0;
 
     if (fs.existsSync(backupPath)) {
-      const files = fs.readdirSync(backupPath).filter(f => f.endsWith('.json') || f.endsWith('.json.gz'));
+      const files = fs
+        .readdirSync(backupPath)
+        .filter(f => f.endsWith('.json') || f.endsWith('.json.gz'));
       backupCount = files.length;
       files.forEach(f => {
         const stats = fs.statSync(path.join(backupPath, f));
@@ -491,7 +502,9 @@ router.get('/info', (req, res) => {
 });
 
 function formatBytes(bytes) {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) {
+    return '0 B';
+  }
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -565,7 +578,9 @@ router.post('/auto/settings', (req, res) => {
     } = req.body;
 
     const newSettings = {};
-    if (enabled !== undefined) newSettings.enabled = enabled;
+    if (enabled !== undefined) {
+      newSettings.enabled = enabled;
+    }
     if (hour !== undefined || minute !== undefined) {
       newSettings.hour = hour || 2;
       newSettings.minute = minute || 0;
@@ -579,12 +594,24 @@ router.post('/auto/settings', (req, res) => {
       }
       newSettings.cronExpression = cronExpression;
     }
-    if (description) newSettings.description = description;
-    if (includeFiles !== undefined) newSettings.includeFiles = includeFiles;
-    if (compress !== undefined) newSettings.compress = compress;
-    if (maxCount !== undefined) newSettings.maxCount = maxCount;
-    if (maxAgeDays !== undefined) newSettings.maxAgeDays = maxAgeDays;
-    if (backupType !== undefined) newSettings.backupType = backupType;
+    if (description) {
+      newSettings.description = description;
+    }
+    if (includeFiles !== undefined) {
+      newSettings.includeFiles = includeFiles;
+    }
+    if (compress !== undefined) {
+      newSettings.compress = compress;
+    }
+    if (maxCount !== undefined) {
+      newSettings.maxCount = maxCount;
+    }
+    if (maxAgeDays !== undefined) {
+      newSettings.maxAgeDays = maxAgeDays;
+    }
+    if (backupType !== undefined) {
+      newSettings.backupType = backupType;
+    }
 
     const success = updateAutoBackupSettings(newSettings);
     if (success) {
@@ -614,7 +641,7 @@ router.post('/auto/settings', (req, res) => {
 router.post('/auto/execute', async (req, res) => {
   try {
     const { description, includeFiles, compress, backupType } = req.body;
-    
+
     const result = await executeBackupNow({
       description: description || '手动触发备份',
       includeFiles,
@@ -648,7 +675,7 @@ router.post('/auto/execute', async (req, res) => {
 router.post('/auto/test-cron', (req, res) => {
   try {
     const { cronExpression } = req.body;
-    
+
     if (!cronExpression) {
       return res.status(400).json({
         success: false,
@@ -657,7 +684,7 @@ router.post('/auto/test-cron', (req, res) => {
     }
 
     const isValid = validateCronExpression(cronExpression);
-    
+
     res.json({
       success: isValid,
       message: isValid ? 'Cron 表达式有效' : 'Cron 表达式无效',
@@ -700,14 +727,14 @@ router.get('/remote/targets', (req, res) => {
 router.get('/remote/targets/:id', (req, res) => {
   try {
     const target = getTarget(req.params.id);
-    
+
     if (!target) {
       return res.status(404).json({
         success: false,
         message: '目标不存在',
       });
     }
-    
+
     res.json({
       success: true,
       data: { target },
@@ -726,16 +753,16 @@ router.get('/remote/targets/:id', (req, res) => {
 router.post('/remote/targets', (req, res) => {
   try {
     const targetData = req.body;
-    
+
     if (!targetData.name || !targetData.protocol) {
       return res.status(400).json({
         success: false,
         message: '请提供目标名称和协议类型',
       });
     }
-    
+
     const target = addTarget(targetData);
-    
+
     res.status(201).json({
       success: true,
       message: '远端备份目标已添加',
@@ -756,7 +783,7 @@ router.put('/remote/targets/:id', (req, res) => {
   try {
     const updates = req.body;
     const target = updateTarget(req.params.id, updates);
-    
+
     res.json({
       success: true,
       message: '远端备份目标已更新',
@@ -776,14 +803,14 @@ router.put('/remote/targets/:id', (req, res) => {
 router.delete('/remote/targets/:id', (req, res) => {
   try {
     const deleted = deleteTarget(req.params.id);
-    
+
     if (!deleted) {
       return res.status(404).json({
         success: false,
         message: '目标不存在',
       });
     }
-    
+
     res.json({
       success: true,
       message: '远端备份目标已删除',
@@ -818,7 +845,7 @@ router.post('/remote/test', async (req, res) => {
     }
 
     const result = await testRemoteConnection(config);
-    
+
     if (result.success) {
       res.json({
         success: true,
@@ -846,16 +873,16 @@ router.post('/remote/test', async (req, res) => {
 router.post('/remote/targets/:id/test', async (req, res) => {
   try {
     const target = getTarget(req.params.id);
-    
+
     if (!target) {
       return res.status(404).json({
         success: false,
         message: '目标不存在',
       });
     }
-    
+
     const result = await testRemoteConnection(target);
-    
+
     if (result.success) {
       res.json({
         success: true,
@@ -924,7 +951,7 @@ router.get('/remote/protocols', (req, res) => {
       value,
       label: PROTOCOL_LABELS[value],
     }));
-    
+
     res.json({
       success: true,
       data: { protocols },
@@ -943,45 +970,45 @@ router.get('/remote/protocols', (req, res) => {
 router.post('/remote/upload', async (req, res) => {
   try {
     const { filename, targetIds } = req.body;
-    
+
     if (!filename) {
       return res.status(400).json({
         success: false,
         message: '请提供备份文件名',
       });
     }
-    
+
     const backupPath = getBackupPath();
     const filePath = path.join(backupPath, filename);
-    
+
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
         success: false,
         message: '备份文件不存在',
       });
     }
-    
+
     const { uploadToRemote } = require('../utils/remoteBackup');
     const { getTarget } = require('../utils/remoteBackupConfig');
-    
-    const targets = targetIds 
+
+    const targets = targetIds
       ? targetIds.map(id => getTarget(id)).filter(Boolean)
       : getEnabledTargets();
-    
+
     if (targets.length === 0) {
       return res.status(400).json({
         success: false,
         message: '没有可用的远端目标',
       });
     }
-    
+
     const uploadResults = [];
-    
+
     for (const target of targets) {
       try {
         const remotePath = `${target.prefix || 'backups/'}${filename}`;
         const result = await uploadToRemote(target, filePath, remotePath);
-        
+
         uploadResults.push({
           targetId: target.id,
           targetName: target.name,
@@ -997,11 +1024,11 @@ router.post('/remote/upload', async (req, res) => {
         });
       }
     }
-    
+
     res.json({
       success: true,
       message: '上传完成',
-      data: { 
+      data: {
         filename,
         results: uploadResults,
       },
@@ -1022,14 +1049,14 @@ router.post('/remote/upload', async (req, res) => {
 router.get('/logs', async (req, res) => {
   try {
     const { page = 1, pageSize = 20, logType, status } = req.query;
-    
+
     const result = await getBackupLogs({
       page: parseInt(page),
       pageSize: parseInt(pageSize),
       logType,
       status,
     });
-    
+
     res.json({
       success: true,
       data: result,
@@ -1049,14 +1076,14 @@ router.get('/logs/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const log = await getBackupLogById(parseInt(id));
-    
+
     if (!log) {
       return res.status(404).json({
         success: false,
         message: '备份日志不存在',
       });
     }
-    
+
     res.json({
       success: true,
       data: log,
@@ -1076,7 +1103,7 @@ router.delete('/logs/clean', async (req, res) => {
   try {
     const { days = 30 } = req.body;
     const deletedCount = await deleteOldLogs(parseInt(days));
-    
+
     res.json({
       success: true,
       message: '清理完成',

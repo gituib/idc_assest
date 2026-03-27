@@ -6,10 +6,26 @@ const { Text } = Typography;
 
 const StatusLegend = ({ deviceStatusPercentages }) => {
   const legends = [
-    { color: designTokens.colors.success.main, label: '运行中', percent: deviceStatusPercentages?.running ?? 0 },
-    { color: designTokens.colors.warning.main, label: '维护中', percent: deviceStatusPercentages?.maintenance ?? 0 },
-    { color: designTokens.colors.error.main, label: '故障', percent: deviceStatusPercentages?.fault ?? 0 },
-    { color: designTokens.colors.primary.main, label: '离线', percent: deviceStatusPercentages?.offline ?? 0 },
+    {
+      color: designTokens.colors.success.main,
+      label: '运行中',
+      percent: deviceStatusPercentages?.running ?? 0,
+    },
+    {
+      color: designTokens.colors.warning.main,
+      label: '维护中',
+      percent: deviceStatusPercentages?.maintenance ?? 0,
+    },
+    {
+      color: designTokens.colors.error.main,
+      label: '故障',
+      percent: deviceStatusPercentages?.fault ?? 0,
+    },
+    {
+      color: designTokens.colors.primary.main,
+      label: '离线',
+      percent: deviceStatusPercentages?.offline ?? 0,
+    },
   ];
 
   return (

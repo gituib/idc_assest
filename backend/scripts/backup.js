@@ -3,10 +3,10 @@
 /**
  * 命令行备份脚本
  * 用于独立执行数据备份，支持环境迁移
- * 
+ *
  * 使用方法:
  *   node scripts/backup.js [options]
- * 
+ *
  * 选项:
  *   --output, -o    指定备份文件输出路径
  *   --description   备份描述
@@ -67,7 +67,7 @@ async function runBackup() {
 
   try {
     process.chdir(path.join(__dirname, '..'));
-    
+
     const { createBackup, getBackupPath } = require('../utils/backup');
     const { sequelize } = require('../db');
 
@@ -76,7 +76,7 @@ async function runBackup() {
     console.log('数据库连接成功\n');
 
     const backupPath = options.output ? path.dirname(options.output) : getBackupPath();
-    
+
     console.log('备份配置:');
     console.log(`  输出路径: ${backupPath}`);
     console.log(`  包含文件: ${options.includeFiles ? '是' : '否'}`);

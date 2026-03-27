@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-const extractNumberFromString = (str) => {
+const extractNumberFromString = str => {
   if (!str) return 0;
   const match = str.match(/\d+/);
   return match ? parseInt(match[0], 10) : 0;
@@ -13,7 +13,7 @@ const naturalSort = (a, b) => {
   return String(a).localeCompare(String(b), 'zh-CN');
 };
 
-const sortRooms = (rooms) => {
+const sortRooms = rooms => {
   return [...rooms].sort((a, b) => {
     const sortOrderA = a.sortOrder ?? a.sort_order ?? 0;
     const sortOrderB = b.sortOrder ?? b.sort_order ?? 0;
@@ -24,7 +24,7 @@ const sortRooms = (rooms) => {
   });
 };
 
-const sortRacksInRoom = (racks) => {
+const sortRacksInRoom = racks => {
   return [...racks].sort((a, b) => {
     const sortOrderA = a.sortOrder ?? a.sort_order ?? 0;
     const sortOrderB = b.sortOrder ?? b.sort_order ?? 0;
@@ -38,7 +38,7 @@ const sortRacksInRoom = (racks) => {
   });
 };
 
-export const useSortedRacks = (racks) => {
+export const useSortedRacks = racks => {
   return useMemo(() => {
     if (!racks || !Array.isArray(racks) || racks.length === 0) {
       return [];
@@ -46,7 +46,7 @@ export const useSortedRacks = (racks) => {
 
     const roomMap = new Map();
 
-    racks.forEach((rack) => {
+    racks.forEach(rack => {
       if (!rack || !rack.Room) return;
 
       const roomKey = rack.Room.roomId || rack.Room.id || rack.Room.name;
@@ -65,10 +65,13 @@ export const useSortedRacks = (racks) => {
 
     const sortedRooms = sortRooms(Array.from(roomMap.values()));
 
-    sortedRooms.forEach((room) => {
+    sortedRooms.forEach(room => {
       room.racks = sortRacksInRoom(room.racks);
       room.rackCount = room.racks.length;
-      room.totalDevices = room.racks.reduce((sum, r) => sum + (r._count?.Devices || r.deviceCount || 0), 0);
+      room.totalDevices = room.racks.reduce(
+        (sum, r) => sum + (r._count?.Devices || r.deviceCount || 0),
+        0
+      );
     });
 
     return sortedRooms;
@@ -83,11 +86,11 @@ export const filterRoomsBySearch = (rooms, searchText) => {
   const lowerSearch = searchText.toLowerCase().trim();
 
   return rooms
-    .map((room) => {
+    .map(room => {
       const roomNameMatch = room.name?.toLowerCase().includes(lowerSearch);
       const roomIdMatch = room.roomId?.toLowerCase().includes(lowerSearch);
 
-      const filteredRacks = room.racks.filter((rack) => {
+      const filteredRacks = room.racks.filter(rack => {
         const rackNameMatch = rack.name?.toLowerCase().includes(lowerSearch);
         const rackIdMatch = rack.rackId?.toLowerCase().includes(lowerSearch);
         return roomNameMatch || roomIdMatch || rackNameMatch || rackIdMatch;
@@ -103,7 +106,7 @@ export const filterRoomsBySearch = (rooms, searchText) => {
 
       return null;
     })
-    .filter((room) => room !== null);
+    .filter(room => room !== null);
 };
 
 export const getRackStats = (rack, devices = []) => {

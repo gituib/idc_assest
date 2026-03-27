@@ -8,7 +8,10 @@ const applyThemeColors = (primaryColor, secondaryColor) => {
   if (primaryColor) {
     root.style.setProperty('--primary-color', primaryColor);
     root.style.setProperty('--primary-light', `${primaryColor}20`);
-    root.style.setProperty('--primary-gradient', `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor || '#764ba2'} 100%)`);
+    root.style.setProperty(
+      '--primary-gradient',
+      `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor || '#764ba2'} 100%)`
+    );
   }
   if (secondaryColor) {
     root.style.setProperty('--secondary-color', secondaryColor);

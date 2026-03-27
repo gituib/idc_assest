@@ -1,6 +1,14 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Card, Row, Col, Typography, message } from 'antd';
-import { DatabaseOutlined, CloudServerOutlined, WarningOutlined, HomeOutlined, TeamOutlined, BarChartOutlined, DashboardOutlined } from '@ant-design/icons';
+import {
+  DatabaseOutlined,
+  CloudServerOutlined,
+  WarningOutlined,
+  HomeOutlined,
+  TeamOutlined,
+  BarChartOutlined,
+  DashboardOutlined,
+} from '@ant-design/icons';
 import api from '../api';
 import { designTokens } from '../config/theme';
 import { useFetch } from '../hooks/useSWR';
@@ -185,22 +193,33 @@ function Dashboard() {
     let currentAngle = 0;
 
     if (runningDeg > 0) {
-      gradientParts.push(`${PIE_CHART_COLORS.success} ${currentAngle}deg ${currentAngle + runningDeg}deg`);
+      gradientParts.push(
+        `${PIE_CHART_COLORS.success} ${currentAngle}deg ${currentAngle + runningDeg}deg`
+      );
       currentAngle += runningDeg;
     }
     if (maintenanceDeg > 0) {
-      gradientParts.push(`${PIE_CHART_COLORS.warning} ${currentAngle}deg ${currentAngle + maintenanceDeg}deg`);
+      gradientParts.push(
+        `${PIE_CHART_COLORS.warning} ${currentAngle}deg ${currentAngle + maintenanceDeg}deg`
+      );
       currentAngle += maintenanceDeg;
     }
     if (faultDeg > 0) {
-      gradientParts.push(`${PIE_CHART_COLORS.error} ${currentAngle}deg ${currentAngle + faultDeg}deg`);
+      gradientParts.push(
+        `${PIE_CHART_COLORS.error} ${currentAngle}deg ${currentAngle + faultDeg}deg`
+      );
       currentAngle += faultDeg;
     }
     if (offlineDeg > 0) {
-      gradientParts.push(`${PIE_CHART_COLORS.primary} ${currentAngle}deg ${currentAngle + offlineDeg}deg`);
+      gradientParts.push(
+        `${PIE_CHART_COLORS.primary} ${currentAngle}deg ${currentAngle + offlineDeg}deg`
+      );
     }
 
-    const conicGradient = gradientParts.length > 0 ? `conic-gradient(${gradientParts.join(', ')})` : 'conic-gradient(#e5e7eb 0deg 360deg)';
+    const conicGradient =
+      gradientParts.length > 0
+        ? `conic-gradient(${gradientParts.join(', ')})`
+        : 'conic-gradient(#e5e7eb 0deg 360deg)';
 
     return {
       width: '180px',
@@ -215,11 +234,11 @@ function Dashboard() {
   }, [deviceStatusPercentages]);
 
   const handleRefresh = useCallback(async () => {
-    setAnimatedKey((prev) => prev + 1);
+    setAnimatedKey(prev => prev + 1);
     await mutateStats();
   }, [mutateStats]);
 
-  const handleHover = useCallback((key) => {
+  const handleHover = useCallback(key => {
     setHoveredCard(key);
   }, []);
 
@@ -325,17 +344,14 @@ function Dashboard() {
     [stats.deviceGrowth, stats.faultTrend, stats.userGrowth, stats.ticketTrend]
   );
 
-  const deviceTrendData = useMemo(
-    () => {
-      const rawData = statsData?.deviceTrendData || [];
-      return rawData.map((item) => ({
-        label: item.label,
-        value: item.value,
-        color: designTokens.colors.primary.main
-      }));
-    },
-    [statsData?.deviceTrendData]
-  );
+  const deviceTrendData = useMemo(() => {
+    const rawData = statsData?.deviceTrendData || [];
+    return rawData.map(item => ({
+      label: item.label,
+      value: item.value,
+      color: designTokens.colors.primary.main,
+    }));
+  }, [statsData?.deviceTrendData]);
 
   const styles = `
     @keyframes fadeInDown {
@@ -375,7 +391,7 @@ function Dashboard() {
         </div>
 
         <Row gutter={[24, 24]} style={{ marginBottom: '32px' }}>
-          {statCards.map((config) => (
+          {statCards.map(config => (
             <StatCard
               key={config.statKey}
               config={config}
@@ -544,7 +560,11 @@ function Dashboard() {
                     </p>
                   </div>
 
-                  <QuickStats onlineRate={stats.onlineRate} powerUsage={stats.powerUsage} totalMaxPower={stats.totalMaxPower} />
+                  <QuickStats
+                    onlineRate={stats.onlineRate}
+                    powerUsage={stats.powerUsage}
+                    totalMaxPower={stats.totalMaxPower}
+                  />
                 </Col>
 
                 <Col xs={24} md={8}>

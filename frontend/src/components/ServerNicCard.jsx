@@ -49,7 +49,7 @@ function ServerNicCard({ server, onManage }) {
   const typeConfig = DEVICE_TYPE_CONFIG[server.type] || DEVICE_TYPE_CONFIG.other;
   const statusConfig = STATUS_CONFIG[server.status] || STATUS_CONFIG.offline;
 
-  const nicCount = server.nicCount || (server.nics?.length || 0);
+  const nicCount = server.nicCount || server.nics?.length || 0;
   const totalPortCount = server.nics?.reduce((sum, nic) => sum + (nic.portCount || 0), 0) || 0;
 
   return (
@@ -170,20 +170,26 @@ function ServerNicCard({ server, onManage }) {
           }}
         >
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: designTokens.colors.primary.main }}>
+            <div
+              style={{ fontSize: '18px', fontWeight: 700, color: designTokens.colors.primary.main }}
+            >
               {nicCount}
             </div>
-            <div style={{ fontSize: '11px', color: designTokens.colors.text.secondary }}>
-              网卡
-            </div>
+            <div style={{ fontSize: '11px', color: designTokens.colors.text.secondary }}>网卡</div>
           </div>
-          <div style={{ textAlign: 'center', borderLeft: `1px solid ${designTokens.colors.border.light}`, borderRight: `1px solid ${designTokens.colors.border.light}` }}>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: designTokens.colors.info.main }}>
+          <div
+            style={{
+              textAlign: 'center',
+              borderLeft: `1px solid ${designTokens.colors.border.light}`,
+              borderRight: `1px solid ${designTokens.colors.border.light}`,
+            }}
+          >
+            <div
+              style={{ fontSize: '18px', fontWeight: 700, color: designTokens.colors.info.main }}
+            >
               {totalPortCount}
             </div>
-            <div style={{ fontSize: '11px', color: designTokens.colors.text.secondary }}>
-              端口
-            </div>
+            <div style={{ fontSize: '11px', color: designTokens.colors.text.secondary }}>端口</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <Badge
@@ -211,7 +217,7 @@ function ServerNicCard({ server, onManage }) {
               color: designTokens.colors.primary.main,
               cursor: 'pointer',
             }}
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation();
               onManage();
             }}

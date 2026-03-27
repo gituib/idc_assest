@@ -1,5 +1,19 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Card, Row, Col, Statistic, Table, DatePicker, Select, Space, Tag, message, Button, Switch, Tooltip } from 'antd';
+import {
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Table,
+  DatePicker,
+  Select,
+  Space,
+  Tag,
+  message,
+  Button,
+  Switch,
+  Tooltip,
+} from 'antd';
 import {
   BarChartOutlined,
   PieChartOutlined,
@@ -82,26 +96,29 @@ function TicketStatistics() {
 
   const timerRef = useRef(null);
 
-  const fetchStatistics = useCallback(async (isManual = false) => {
-    try {
-      if (isManual) {
-        setLoading(true);
-      }
-      const params = {
-        startDate: dateRange[0].format('YYYY-MM-DD'),
-        endDate: dateRange[1].format('YYYY-MM-DD'),
-      };
+  const fetchStatistics = useCallback(
+    async (isManual = false) => {
+      try {
+        if (isManual) {
+          setLoading(true);
+        }
+        const params = {
+          startDate: dateRange[0].format('YYYY-MM-DD'),
+          endDate: dateRange[1].format('YYYY-MM-DD'),
+        };
 
-      const response = await axios.get('/api/tickets/stats', { params });
-      setStatistics(response.data);
-      setLastUpdateTime(new Date());
-    } catch (error) {
-      message.error('获取统计数据失败');
-      console.error('获取统计数据失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [dateRange]);
+        const response = await axios.get('/api/tickets/stats', { params });
+        setStatistics(response.data);
+        setLastUpdateTime(new Date());
+      } catch (error) {
+        message.error('获取统计数据失败');
+        console.error('获取统计数据失败:', error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [dateRange]
+  );
 
   useEffect(() => {
     fetchStatistics();
@@ -329,7 +346,13 @@ function TicketStatistics() {
         title="工单统计报表"
         extra={
           <Space>
-            <Tooltip title={lastUpdateTime ? `最后更新: ${dayjs(lastUpdateTime).format('HH:mm:ss')}` : '尚未更新'}>
+            <Tooltip
+              title={
+                lastUpdateTime
+                  ? `最后更新: ${dayjs(lastUpdateTime).format('HH:mm:ss')}`
+                  : '尚未更新'
+              }
+            >
               <span style={{ fontSize: 12, color: '#888', marginRight: 8 }}>
                 {lastUpdateTime && `更新于 ${dayjs(lastUpdateTime).format('HH:mm:ss')}`}
               </span>

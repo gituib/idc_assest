@@ -15,12 +15,12 @@ router.get('/', async (req, res) => {
     const { count, rows } = await Room.findAndCountAll({
       include: [{ model: Rack, attributes: ['rackId', 'name'] }],
       offset: offset,
-      limit: pageSize
+      limit: pageSize,
     });
 
     res.json({
       rooms: rows,
-      total: count
+      total: count,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
 router.get('/:roomId', async (req, res) => {
   try {
     const room = await Room.findByPk(req.params.roomId, {
-      include: Rack
+      include: Rack,
     });
     if (!room) {
       return res.status(404).json({ error: '机房不存在' });
@@ -56,7 +56,7 @@ router.post('/', async (req, res) => {
 router.put('/:roomId', validateBody(updateRoomSchema), async (req, res) => {
   try {
     const [updated] = await Room.update(req.body, {
-      where: { roomId: req.params.roomId }
+      where: { roomId: req.params.roomId },
     });
     if (updated) {
       const updatedRoom = await Room.findByPk(req.params.roomId);
@@ -77,9 +77,9 @@ router.delete('/:roomId', async (req, res) => {
     if (racks.length > 0) {
       return res.status(400).json({ error: '该机房下有机柜，无法删除' });
     }
-    
+
     const deleted = await Room.destroy({
-      where: { roomId: req.params.roomId }
+      where: { roomId: req.params.roomId },
     });
     if (deleted) {
       res.status(204).json();

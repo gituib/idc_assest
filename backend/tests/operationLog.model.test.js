@@ -36,7 +36,7 @@ describe('OperationLog 模型测试', () => {
         operatorId: 'user_001',
         operatorName: '测试用户',
         operatorRole: '管理员',
-        result: 'success'
+        result: 'success',
       };
 
       const log = await OperationLog.create(logData);
@@ -69,7 +69,7 @@ describe('OperationLog 模型测试', () => {
         operatorName: '测试用户',
         beforeState,
         afterState,
-        result: 'success'
+        result: 'success',
       });
 
       expect(log.beforeState).toEqual(beforeState);
@@ -80,7 +80,7 @@ describe('OperationLog 模型测试', () => {
       const metadata = {
         count: 5,
         source: 'batch_operation',
-        extraInfo: '额外信息'
+        extraInfo: '额外信息',
       };
 
       const log = await OperationLog.create({
@@ -93,7 +93,7 @@ describe('OperationLog 模型测试', () => {
         operatorId: 'user_001',
         operatorName: '测试用户',
         metadata,
-        result: 'success'
+        result: 'success',
       });
 
       expect(log.metadata).toEqual(metadata);
@@ -111,7 +111,7 @@ describe('OperationLog 模型测试', () => {
         operatorName: '管理员',
         ipAddress: '192.168.1.100',
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        result: 'success'
+        result: 'success',
       });
 
       expect(log.ipAddress).toBe('192.168.1.100');
@@ -127,7 +127,7 @@ describe('OperationLog 模型测试', () => {
         targetId: 'DEV005',
         targetName: 'TEST_DEVICE',
         operatorId: 'user_001',
-        operatorName: '测试用户'
+        operatorName: '测试用户',
       });
 
       expect(log.result).toBe('success');
@@ -142,7 +142,7 @@ describe('OperationLog 模型测试', () => {
         targetId: 'role_test',
         targetName: '测试角色',
         operatorId: 'user_001',
-        operatorName: '测试用户'
+        operatorName: '测试用户',
       });
 
       expect(log.metadata).toEqual({});
@@ -161,7 +161,7 @@ describe('OperationLog 模型测试', () => {
           targetName: '设备A',
           operatorId: 'user_001',
           operatorName: '用户A',
-          result: 'success'
+          result: 'success',
         },
         {
           recordId: 'OPLOG_QUERY_002',
@@ -172,7 +172,7 @@ describe('OperationLog 模型测试', () => {
           targetName: '设备B',
           operatorId: 'user_002',
           operatorName: '用户B',
-          result: 'success'
+          result: 'success',
         },
         {
           recordId: 'OPLOG_QUERY_003',
@@ -183,7 +183,7 @@ describe('OperationLog 模型测试', () => {
           targetName: '用户C',
           operatorId: 'user_001',
           operatorName: '用户A',
-          result: 'success'
+          result: 'success',
         },
         {
           recordId: 'OPLOG_QUERY_004',
@@ -194,35 +194,35 @@ describe('OperationLog 模型测试', () => {
           targetName: '设备D',
           operatorId: 'user_001',
           operatorName: '用户A',
-          result: 'failed'
-        }
+          result: 'failed',
+        },
       ]);
     });
 
     test('应该能够按 module 查询', async () => {
       const deviceLogs = await OperationLog.findAll({
-        where: { module: 'device' }
+        where: { module: 'device' },
       });
       expect(deviceLogs.length).toBe(3);
     });
 
     test('应该能够按 operationType 查询', async () => {
       const createLogs = await OperationLog.findAll({
-        where: { operationType: 'create' }
+        where: { operationType: 'create' },
       });
       expect(createLogs.length).toBe(2);
     });
 
     test('应该能够按 operatorId 查询', async () => {
       const user001Logs = await OperationLog.findAll({
-        where: { operatorId: 'user_001' }
+        where: { operatorId: 'user_001' },
       });
       expect(user001Logs.length).toBe(3);
     });
 
     test('应该能够按 result 查询', async () => {
       const failedLogs = await OperationLog.findAll({
-        where: { result: 'failed' }
+        where: { result: 'failed' },
       });
       expect(failedLogs.length).toBe(1);
     });
@@ -231,8 +231,8 @@ describe('OperationLog 模型测试', () => {
       const { Op } = require('sequelize');
       const logs = await OperationLog.findAll({
         where: {
-          targetId: { [Op.like]: '%DEV%' }
-        }
+          targetId: { [Op.like]: '%DEV%' },
+        },
       });
       expect(logs.length).toBe(3);
     });
@@ -241,7 +241,7 @@ describe('OperationLog 模型测试', () => {
       const { count, rows } = await OperationLog.findAndCountAll({
         limit: 2,
         offset: 0,
-        order: [['createdAt', 'DESC']]
+        order: [['createdAt', 'DESC']],
       });
       expect(count).toBe(4);
       expect(rows.length).toBe(2);

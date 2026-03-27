@@ -5,17 +5,17 @@
 
 export const API_CONFIG = {
   timeout: parseInt(import.meta.env.VITE_API_TIMEOUT, 10) || 30000,
-  
+
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  
+
   pagination: {
     defaultPageSize: 10,
     maxPageSize: 1000,
     pageSizeOptions: [10, 20, 30, 50, 100],
   },
-  
+
   debounceDelay: 300,
-  
+
   retry: {
     maxRetries: 3,
     retryDelay: 1000,

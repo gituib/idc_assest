@@ -44,7 +44,7 @@ const createTestApp = () => {
         keyword,
         startDate,
         endDate,
-        result
+        result,
       } = req.query;
 
       const offset = (parseInt(page) - 1) * parseInt(pageSize);
@@ -72,7 +72,7 @@ const createTestApp = () => {
         where[Op.or] = [
           { operationDescription: { [Op.like]: `%${keyword}%` } },
           { targetName: { [Op.like]: `%${keyword}%` } },
-          { operatorName: { [Op.like]: `%${keyword}%` } }
+          { operatorName: { [Op.like]: `%${keyword}%` } },
         ];
       }
 
@@ -96,7 +96,7 @@ const createTestApp = () => {
         where,
         order: [['createdAt', 'DESC']],
         offset,
-        limit
+        limit,
       });
 
       res.json({
@@ -105,14 +105,14 @@ const createTestApp = () => {
           total: count,
           page: parseInt(page),
           pageSize: parseInt(pageSize),
-          logs
-        }
+          logs,
+        },
       });
     } catch (error) {
       console.error('获取操作日志失败:', error);
       res.status(500).json({
         success: false,
-        message: '获取操作日志失败'
+        message: '获取操作日志失败',
       });
     }
   });
@@ -124,19 +124,19 @@ const createTestApp = () => {
       if (!log) {
         return res.status(404).json({
           success: false,
-          message: '日志记录不存在'
+          message: '日志记录不存在',
         });
       }
 
       res.json({
         success: true,
-        data: log
+        data: log,
       });
     } catch (error) {
       console.error('获取操作日志详情失败:', error);
       res.status(500).json({
         success: false,
-        message: '获取操作日志详情失败'
+        message: '获取操作日志详情失败',
       });
     }
   });
@@ -153,7 +153,7 @@ describe('OperationLogs API 路由测试', () => {
     userId: 'test_user_001',
     username: 'testuser',
     realName: '测试用户',
-    roleName: '管理员'
+    roleName: '管理员',
   };
 
   beforeAll(async () => {
@@ -181,16 +181,14 @@ describe('OperationLogs API 路由测试', () => {
       operatorId: testUser.userId,
       operatorName: testUser.realName,
       operatorRole: testUser.roleName,
-      result: 'success'
+      result: 'success',
     };
     return await OperationLog.create({ ...defaultData, ...data });
   };
 
   describe('GET /api/operation-logs', () => {
     test('未授权访问应该返回 401', async () => {
-      const response = await request(app)
-        .get('/api/operation-logs')
-        .expect(401);
+      const response = await request(app).get('/api/operation-logs').expect(401);
 
       expect(response.body.success).toBe(false);
     });
@@ -258,9 +256,21 @@ describe('OperationLogs API 路由测试', () => {
     });
 
     test('应该支持按 keyword 搜索', async () => {
-      await createTestLog({ operationDescription: '创建设备 SERVER_A', recordId: 'OPLOG_KW_1', targetName: '服务器A' });
-      await createTestLog({ operationDescription: '更新设备 SERVER_B', recordId: 'OPLOG_KW_2', targetName: '服务器B' });
-      await createTestLog({ operationDescription: '删除用户 USER_C', recordId: 'OPLOG_KW_3', targetName: '用户C' });
+      await createTestLog({
+        operationDescription: '创建设备 SERVER_A',
+        recordId: 'OPLOG_KW_1',
+        targetName: '服务器A',
+      });
+      await createTestLog({
+        operationDescription: '更新设备 SERVER_B',
+        recordId: 'OPLOG_KW_2',
+        targetName: '服务器B',
+      });
+      await createTestLog({
+        operationDescription: '删除用户 USER_C',
+        recordId: 'OPLOG_KW_3',
+        targetName: '用户C',
+      });
 
       const response = await request(app)
         .get('/api/operation-logs')
@@ -269,7 +279,9 @@ describe('OperationLogs API 路由测试', () => {
         .expect(200);
 
       expect(response.body.data.logs).toHaveLength(2);
-      expect(response.body.data.logs.every(log => log.operationDescription.includes('SERVER'))).toBe(true);
+      expect(
+        response.body.data.logs.every(log => log.operationDescription.includes('SERVER'))
+      ).toBe(true);
     });
 
     test('应该支持按 result 筛选', async () => {
@@ -291,19 +303,19 @@ describe('OperationLogs API 路由测试', () => {
         module: 'device',
         operationType: 'create',
         result: 'success',
-        recordId: 'OPLOG_COMB_1'
+        recordId: 'OPLOG_COMB_1',
       });
       await createTestLog({
         module: 'device',
         operationType: 'update',
         result: 'success',
-        recordId: 'OPLOG_COMB_2'
+        recordId: 'OPLOG_COMB_2',
       });
       await createTestLog({
         module: 'user',
         operationType: 'create',
         result: 'success',
-        recordId: 'OPLOG_COMB_3'
+        recordId: 'OPLOG_COMB_3',
       });
 
       const response = await request(app)
@@ -324,7 +336,7 @@ describe('OperationLogs API 路由测试', () => {
         recordId: 'OPLOG_DETAIL_001',
         beforeState: { name: '旧名称' },
         afterState: { name: '新名称' },
-        metadata: { customField: '自定义值' }
+        metadata: { customField: '自定义值' },
       });
 
       const response = await request(app)

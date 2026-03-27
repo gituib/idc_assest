@@ -23,15 +23,15 @@ export const TYPE_MAP = {
   other: '其他设备',
 };
 
-export const getStatusConfig = (status) => {
+export const getStatusConfig = status => {
   return STATUS_MAP[status] || { text: status, color: 'black', badgeColor: 'default' };
 };
 
-export const getTypeLabel = (type) => {
+export const getTypeLabel = type => {
   return TYPE_MAP[type] || type;
 };
 
-export const getDeviceTypeIcon = (type) => {
+export const getDeviceTypeIcon = type => {
   const iconMap = {
     server: <CloudServerOutlined style={{ color: '#1890ff' }} />,
     switch: <SwapOutlined style={{ color: '#52c41a' }} />,
@@ -80,7 +80,7 @@ export const FIXED_FIELDS = [
 
 export const SYSTEM_FIELDS = ['createdAt', 'updatedAt', 'Rack', 'Room', 'customFields'];
 
-export const processDeviceData = (device) => {
+export const processDeviceData = device => {
   const deviceWithFields = { ...device };
   if (device.customFields && typeof device.customFields === 'object') {
     Object.entries(device.customFields).forEach(([fieldName, value]) => {
@@ -98,7 +98,7 @@ export const prepareDeviceFormData = (values, isEditing) => {
     customFields: {},
   };
 
-  Object.keys(deviceData).forEach((key) => {
+  Object.keys(deviceData).forEach(key => {
     if (!FIXED_FIELDS.includes(key) && key !== 'customFields' && key !== 'roomId') {
       deviceData.customFields[key] = deviceData[key];
       delete deviceData[key];
@@ -116,7 +116,7 @@ export const getFormInitialValues = (device, racks) => {
   const deviceData = { ...device };
   const cleanDeviceData = {};
 
-  FIXED_FIELDS.forEach((field) => {
+  FIXED_FIELDS.forEach(field => {
     if (deviceData[field] !== undefined) {
       cleanDeviceData[field] = deviceData[field];
     }
@@ -141,7 +141,7 @@ export const getFormInitialValues = (device, racks) => {
   }
 
   if (device.rackId) {
-    const rack = racks.find((r) => r.rackId === device.rackId);
+    const rack = racks.find(r => r.rackId === device.rackId);
     if (rack) {
       cleanDeviceData.roomId = rack.roomId;
     }

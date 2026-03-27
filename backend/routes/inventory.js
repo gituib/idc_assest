@@ -54,25 +54,29 @@ router.get('/plans', async (req, res) => {
     if (keyword) {
       where[Op.or] = [
         { name: { [Op.like]: `%${keyword}%` } },
-        { description: { [Op.like]: `%${keyword}%` } }
+        { description: { [Op.like]: `%${keyword}%` } },
       ];
     }
 
     const { count, rows } = await InventoryPlan.findAndCountAll({
       where,
       include: [
-        { model: require('../models/User'), as: 'Creator', attributes: ['userId', 'username', 'realName'] }
+        {
+          model: require('../models/User'),
+          as: 'Creator',
+          attributes: ['userId', 'username', 'realName'],
+        },
       ],
       order: [['createdAt', 'DESC']],
       limit: parseInt(pageSize),
-      offset: parseInt(offset)
+      offset: parseInt(offset),
     });
 
     res.json({
       plans: rows,
       total: count,
       page: parseInt(page),
-      pageSize: parseInt(pageSize)
+      pageSize: parseInt(pageSize),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -83,8 +87,12 @@ router.get('/plans/:planId', async (req, res) => {
   try {
     const plan = await InventoryPlan.findByPk(req.params.planId, {
       include: [
-        { model: require('../models/User'), as: 'Creator', attributes: ['userId', 'username', 'realName'] }
-      ]
+        {
+          model: require('../models/User'),
+          as: 'Creator',
+          attributes: ['userId', 'username', 'realName'],
+        },
+      ],
     });
 
     if (!plan) {
@@ -94,9 +102,13 @@ router.get('/plans/:planId', async (req, res) => {
     const tasks = await InventoryTask.findAll({
       where: { planId: plan.planId },
       include: [
-        { model: require('../models/User'), as: 'Assignee', attributes: ['userId', 'username', 'realName'] }
+        {
+          model: require('../models/User'),
+          as: 'Assignee',
+          attributes: ['userId', 'username', 'realName'],
+        },
       ],
-      order: [['createdAt', 'ASC']]
+      order: [['createdAt', 'ASC']],
     });
 
     res.json({ plan, tasks });
@@ -118,7 +130,7 @@ router.post('/plans', async (req, res) => {
       targetRooms: targetRooms || [],
       targetRacks: targetRacks || [],
       status: 'draft',
-      createdBy: req.user?.userId
+      createdBy: req.user?.userId,
     });
 
     res.status(201).json(plan);
@@ -143,7 +155,7 @@ router.put('/plans/:planId', async (req, res) => {
       scheduledDate: scheduledDate ? new Date(scheduledDate) : plan.scheduledDate,
       targetRooms: targetRooms || plan.targetRooms,
       targetRacks: targetRacks || plan.targetRacks,
-      status: status || plan.status
+      status: status || plan.status,
     });
 
     res.json(plan);
@@ -187,16 +199,16 @@ router.post('/plans/:planId/start', async (req, res) => {
 
     if (targetRacks.length > 0) {
       allDevices = await Device.findAll({
-        where: { rackId: { [Op.in]: targetRacks } }
+        where: { rackId: { [Op.in]: targetRacks } },
       });
     } else if (targetRooms.length > 0) {
       const racksInRooms = await Rack.findAll({
         where: { roomId: { [Op.in]: targetRooms } },
-        attributes: ['rackId']
+        attributes: ['rackId'],
       });
       const rackIds = racksInRooms.map(r => r.rackId);
       allDevices = await Device.findAll({
-        where: { rackId: { [Op.in]: rackIds } }
+        where: { rackId: { [Op.in]: rackIds } },
       });
     } else {
       allDevices = await Device.findAll();
@@ -206,7 +218,7 @@ router.post('/plans/:planId/start', async (req, res) => {
     const recordsToCreate = [];
 
     const taskId = generateTaskId();
-    
+
     tasksToCreate.push({
       taskId,
       planId: plan.planId,
@@ -214,7 +226,7 @@ router.post('/plans/:planId/start', async (req, res) => {
       targetId: 'all',
       targetName: '全部设备',
       status: 'pending',
-      totalDevices: allDevices.length
+      totalDevices: allDevices.length,
     });
 
     for (let i = 0; i < allDevices.length; i++) {
@@ -229,7 +241,7 @@ router.post('/plans/:planId/start', async (req, res) => {
         serialNumber: device.serialNumber,
         rackId: device.rackId,
         position: device.position,
-        status: 'pending'
+        status: 'pending',
       });
     }
 
@@ -238,13 +250,17 @@ router.post('/plans/:planId/start', async (req, res) => {
     }
 
     if (recordsToCreate.length > 0) {
-      const now = dbDialect === 'mysql' 
-        ? new Date().toISOString().replace('T', ' ').replace('Z', '')
-        : new Date().toISOString();
-      const placeholders = recordsToCreate.map(r => 
-        `('${r.recordId}', '${r.taskId}', '${r.planId}', '${r.deviceId}', '${r.deviceName}', '${r.deviceType}', '${r.serialNumber || ''}', '${r.rackId}', ${r.position}, 'pending', '${now}', '${now}')`
-      ).join(',');
-      
+      const now =
+        dbDialect === 'mysql'
+          ? new Date().toISOString().replace('T', ' ').replace('Z', '')
+          : new Date().toISOString();
+      const placeholders = recordsToCreate
+        .map(
+          r =>
+            `('${r.recordId}', '${r.taskId}', '${r.planId}', '${r.deviceId}', '${r.deviceName}', '${r.deviceType}', '${r.serialNumber || ''}', '${r.rackId}', ${r.position}, 'pending', '${now}', '${now}')`
+        )
+        .join(',');
+
       if (placeholders) {
         await sequelize.query(`
           INSERT INTO inventory_records (recordId, taskId, planId, deviceId, deviceName, deviceType, serialNumber, rackId, position, status, createdAt, updatedAt)
@@ -259,10 +275,14 @@ router.post('/plans/:planId/start', async (req, res) => {
       checkedDevices: 0,
       normalDevices: 0,
       abnormalDevices: 0,
-      missedDevices: allDevices.length
+      missedDevices: allDevices.length,
     });
 
-    res.json({ message: '盘点任务已启动', taskCount: tasksToCreate.length, deviceCount: allDevices.length });
+    res.json({
+      message: '盘点任务已启动',
+      taskCount: tasksToCreate.length,
+      deviceCount: allDevices.length,
+    });
   } catch (error) {
     console.error('启动盘点错误:', error);
     res.status(500).json({ error: error.message });
@@ -274,8 +294,12 @@ router.get('/tasks/:taskId', async (req, res) => {
     const task = await InventoryTask.findByPk(req.params.taskId, {
       include: [
         { model: InventoryPlan, as: 'Plan', attributes: ['planId', 'name'] },
-        { model: require('../models/User'), as: 'Assignee', attributes: ['userId', 'username', 'realName'] }
-      ]
+        {
+          model: require('../models/User'),
+          as: 'Assignee',
+          attributes: ['userId', 'username', 'realName'],
+        },
+      ],
     });
 
     if (!task) {
@@ -285,15 +309,23 @@ router.get('/tasks/:taskId', async (req, res) => {
     const records = await InventoryRecord.findAll({
       where: { taskId: task.taskId },
       include: [
-        { model: Device, as: 'Device', attributes: ['deviceId', 'name', 'type', 'serialNumber', 'rackId', 'position'] },
-        { model: require('../models/User'), as: 'Checker', attributes: ['userId', 'username', 'realName'] }
-      ]
+        {
+          model: Device,
+          as: 'Device',
+          attributes: ['deviceId', 'name', 'type', 'serialNumber', 'rackId', 'position'],
+        },
+        {
+          model: require('../models/User'),
+          as: 'Checker',
+          attributes: ['userId', 'username', 'realName'],
+        },
+      ],
     });
 
     const rackIds = [...new Set(records.map(r => r.rackId).filter(Boolean))];
     const racks = await Rack.findAll({
       where: { rackId: rackIds },
-      include: [{ model: Room, as: 'Room' }]
+      include: [{ model: Room, as: 'Room' }],
     });
     const rackMap = {};
     racks.forEach(r => {
@@ -305,10 +337,12 @@ router.get('/tasks/:taskId', async (req, res) => {
       const roomName = rackInfo?.Room?.name || '';
       const rackName = rackInfo?.name || record.rackId || '';
       const position = record.position || '';
-      
+
       return {
         ...record.toJSON(),
-        displayLocation: roomName ? `${roomName} - ${rackName} - U${position}` : `${rackName} - U${position}`
+        displayLocation: roomName
+          ? `${roomName} - ${rackName} - U${position}`
+          : `${rackName} - U${position}`,
       };
     });
 
@@ -331,14 +365,14 @@ router.put('/tasks/:taskId', async (req, res) => {
     if (assignedTo !== undefined) {
       await task.update({
         assignedTo,
-        assignedAt: assignedTo ? new Date() : task.assignedAt
+        assignedAt: assignedTo ? new Date() : task.assignedAt,
       });
     }
 
     if (status) {
       await task.update({
         status,
-        completedAt: status === 'completed' ? new Date() : null
+        completedAt: status === 'completed' ? new Date() : null,
       });
     }
 
@@ -351,7 +385,7 @@ router.put('/tasks/:taskId', async (req, res) => {
 router.post('/records/:recordId/check', async (req, res) => {
   try {
     const record = await InventoryRecord.findByPk(req.params.recordId, {
-      include: [{ model: Device, as: 'Device' }]
+      include: [{ model: Device, as: 'Device' }],
     });
 
     if (!record) {
@@ -380,7 +414,7 @@ router.post('/records/:recordId/check', async (req, res) => {
       checkedBy: req.user?.userId,
       checkedAt: new Date(),
       remark: remark || null,
-      photoUrl: photoUrl || null
+      photoUrl: photoUrl || null,
     });
 
     const task = await InventoryTask.findByPk(record.taskId);
@@ -391,7 +425,7 @@ router.post('/records/:recordId/check', async (req, res) => {
       totalDevices: taskRecords.length,
       checkedDevices: taskRecords.filter(r => r.status !== 'pending').length,
       normalDevices: taskRecords.filter(r => r.status === 'normal').length,
-      abnormalDevices: taskRecords.filter(r => r.status === 'abnormal').length
+      abnormalDevices: taskRecords.filter(r => r.status === 'abnormal').length,
     };
 
     await task.update(taskStats);
@@ -402,7 +436,7 @@ router.post('/records/:recordId/check', async (req, res) => {
       checkedDevices: planRecords.filter(r => r.status !== 'pending').length,
       normalDevices: planRecords.filter(r => r.status === 'normal').length,
       abnormalDevices: planRecords.filter(r => r.status === 'abnormal').length,
-      missedDevices: planRecords.filter(r => r.status === 'pending').length
+      missedDevices: planRecords.filter(r => r.status === 'pending').length,
     };
 
     await plan.update(planStats);
@@ -419,26 +453,43 @@ router.get('/records', async (req, res) => {
     const offset = (page - 1) * pageSize;
     const where = {};
 
-    if (planId) where.planId = planId;
-    if (taskId) where.taskId = taskId;
-    if (status) where.status = status;
+    if (planId) {
+      where.planId = planId;
+    }
+    if (taskId) {
+      where.taskId = taskId;
+    }
+    if (status) {
+      where.status = status;
+    }
 
     const { count, rows } = await InventoryRecord.findAndCountAll({
       where,
       include: [
-        { model: Device, as: 'Device', attributes: ['deviceId', 'name', 'type', 'serialNumber', 'rackId', 'position'] },
-        { model: require('../models/User'), as: 'Checker', attributes: ['userId', 'username', 'realName'] }
+        {
+          model: Device,
+          as: 'Device',
+          attributes: ['deviceId', 'name', 'type', 'serialNumber', 'rackId', 'position'],
+        },
+        {
+          model: require('../models/User'),
+          as: 'Checker',
+          attributes: ['userId', 'username', 'realName'],
+        },
       ],
-      order: [['checkedAt', 'DESC'], ['createdAt', 'DESC']],
+      order: [
+        ['checkedAt', 'DESC'],
+        ['createdAt', 'DESC'],
+      ],
       limit: parseInt(pageSize),
-      offset: parseInt(offset)
+      offset: parseInt(offset),
     });
 
     res.json({
       records: rows,
       total: count,
       page: parseInt(page),
-      pageSize: parseInt(pageSize)
+      pageSize: parseInt(pageSize),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -466,7 +517,7 @@ router.post('/plans/:planId/complete', async (req, res) => {
       checkedDevices: finalRecords.filter(r => r.status !== 'pending').length,
       normalDevices: finalRecords.filter(r => r.status === 'normal').length,
       abnormalDevices: finalRecords.filter(r => r.status === 'abnormal').length,
-      missedDevices: finalRecords.filter(r => r.status === 'missed').length
+      missedDevices: finalRecords.filter(r => r.status === 'missed').length,
     });
 
     await InventoryTask.update(
@@ -495,8 +546,12 @@ router.get('/stats/dashboard', async (req, res) => {
       limit: 5,
       order: [['createdAt', 'DESC']],
       include: [
-        { model: require('../models/User'), as: 'Creator', attributes: ['userId', 'username', 'realName'] }
-      ]
+        {
+          model: require('../models/User'),
+          as: 'Creator',
+          attributes: ['userId', 'username', 'realName'],
+        },
+      ],
     });
 
     res.json({
@@ -507,9 +562,12 @@ router.get('/stats/dashboard', async (req, res) => {
       normalRecords,
       abnormalRecords,
       pendingRecords,
-      completionRate: totalRecords > 0 ? ((normalRecords + abnormalRecords) / totalRecords * 100).toFixed(1) : 0,
-      abnormalRate: totalRecords > 0 ? (abnormalRecords / totalRecords * 100).toFixed(1) : 0,
-      recentPlans
+      completionRate:
+        totalRecords > 0
+          ? (((normalRecords + abnormalRecords) / totalRecords) * 100).toFixed(1)
+          : 0,
+      abnormalRate: totalRecords > 0 ? ((abnormalRecords / totalRecords) * 100).toFixed(1) : 0,
+      recentPlans,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -518,18 +576,18 @@ router.get('/stats/dashboard', async (req, res) => {
 
 router.post('/quick-add-device', async (req, res) => {
   try {
-    const { 
-      taskId, 
-      planId, 
+    const {
+      taskId,
+      planId,
       serialNumber,
       SN,
       deviceName,
       name,
       deviceType,
       type,
-      roomId, 
-      rackId, 
-      position, 
+      roomId,
+      rackId,
+      position,
       model,
       brand,
       height,
@@ -558,22 +616,27 @@ router.post('/quick-add-device', async (req, res) => {
 
     const existingDevice = await Device.findOne({ where: { serialNumber: finalSerialNumber } });
     if (existingDevice) {
-      return res.status(400).json({ error: '该序列号的设备已存在于设备管理中', deviceId: existingDevice.deviceId });
+      return res
+        .status(400)
+        .json({ error: '该序列号的设备已存在于设备管理中', deviceId: existingDevice.deviceId });
     }
 
-    const existingPending = await PendingDevice.findOne({ 
-      where: { serialNumber: finalSerialNumber, status: 'pending' } 
+    const existingPending = await PendingDevice.findOne({
+      where: { serialNumber: finalSerialNumber, status: 'pending' },
     });
     if (existingPending) {
-      return res.status(400).json({ error: '该序列号的设备已在暂存列表中', pendingId: existingPending.pendingId });
+      return res
+        .status(400)
+        .json({ error: '该序列号的设备已在暂存列表中', pendingId: existingPending.pendingId });
     }
 
     const pendingId = `PEND${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
     // 只有当用户没有填写设备名称时，才使用默认名称
-    const finalName = finalDeviceName && finalDeviceName.trim() !== '' 
-      ? finalDeviceName.trim() 
-      : `新设备-${finalSerialNumber.slice(-6)}`;
+    const finalName =
+      finalDeviceName && finalDeviceName.trim() !== ''
+        ? finalDeviceName.trim()
+        : `新设备-${finalSerialNumber.slice(-6)}`;
 
     const pendingDevice = await PendingDevice.create({
       pendingId,
@@ -596,12 +659,12 @@ router.post('/quick-add-device', async (req, res) => {
       taskId: taskId || null,
       createdBy: req.user?.userId,
       status: 'pending',
-      remark: remark || '盘点时快速添加'
+      remark: remark || '盘点时快速添加',
     });
 
     res.status(201).json({
       message: '设备已暂存，请前往暂存设备页面完善信息后同步',
-      pendingDevice
+      pendingDevice,
     });
   } catch (error) {
     console.error('快速添加设备错误:', error);
@@ -611,7 +674,14 @@ router.post('/quick-add-device', async (req, res) => {
 
 router.get('/pending-devices', async (req, res) => {
   try {
-    const { status, planId, roomId, keyword, page = 1, pageSize = PAGINATION.DEFAULT_PAGE_SIZE } = req.query;
+    const {
+      status,
+      planId,
+      roomId,
+      keyword,
+      page = 1,
+      pageSize = PAGINATION.DEFAULT_PAGE_SIZE,
+    } = req.query;
     const offset = (page - 1) * pageSize;
     const where = {};
 
@@ -627,7 +697,7 @@ router.get('/pending-devices', async (req, res) => {
     if (keyword) {
       where[Op.or] = [
         { serialNumber: { [Op.like]: `%${keyword}%` } },
-        { deviceName: { [Op.like]: `%${keyword}%` } }
+        { deviceName: { [Op.like]: `%${keyword}%` } },
       ];
     }
 
@@ -638,18 +708,18 @@ router.get('/pending-devices', async (req, res) => {
         { model: User, as: 'Syncer', attributes: ['userId', 'username', 'realName'] },
         { model: InventoryPlan, as: 'Plan', attributes: ['planId', 'name'] },
         { model: Room, as: 'Room', attributes: ['roomId', 'name'] },
-        { model: Rack, as: 'Rack', attributes: ['rackId', 'name'] }
+        { model: Rack, as: 'Rack', attributes: ['rackId', 'name'] },
       ],
       order: [['createdAt', 'DESC']],
       limit: parseInt(pageSize),
-      offset: parseInt(offset)
+      offset: parseInt(offset),
     });
 
     res.json({
       pendingDevices: rows,
       total: count,
       page: parseInt(page),
-      pageSize: parseInt(pageSize)
+      pageSize: parseInt(pageSize),
     });
   } catch (error) {
     console.error('获取暂存设备列表错误:', error);
@@ -677,8 +747,8 @@ router.get('/pending-devices/:pendingId', async (req, res) => {
         { model: User, as: 'Syncer', attributes: ['userId', 'username', 'realName'] },
         { model: InventoryPlan, as: 'Plan', attributes: ['planId', 'name'] },
         { model: Room, as: 'Room', attributes: ['roomId', 'name'] },
-        { model: Rack, as: 'Rack', attributes: ['rackId', 'name'] }
-      ]
+        { model: Rack, as: 'Rack', attributes: ['rackId', 'name'] },
+      ],
     });
 
     if (!pendingDevice) {
@@ -702,7 +772,23 @@ router.put('/pending-devices/:pendingId', async (req, res) => {
       return res.status(400).json({ error: '已同步的设备无法修改' });
     }
 
-    const { deviceName, deviceType, roomId, rackId, position, model, brand, height, powerConsumption, ipAddress, purchaseDate, warrantyExpiry, description, remark, ...restFields } = req.body;
+    const {
+      deviceName,
+      deviceType,
+      roomId,
+      rackId,
+      position,
+      model,
+      brand,
+      height,
+      powerConsumption,
+      ipAddress,
+      purchaseDate,
+      warrantyExpiry,
+      description,
+      remark,
+      ...restFields
+    } = req.body;
 
     const updateData = {
       deviceName: deviceName !== undefined ? deviceName : pendingDevice.deviceName,
@@ -713,12 +799,23 @@ router.put('/pending-devices/:pendingId', async (req, res) => {
       model: model !== undefined ? model : pendingDevice.model,
       brand: brand !== undefined ? brand : pendingDevice.brand,
       height: height !== undefined ? height : pendingDevice.height,
-      powerConsumption: powerConsumption !== undefined ? powerConsumption : pendingDevice.powerConsumption,
+      powerConsumption:
+        powerConsumption !== undefined ? powerConsumption : pendingDevice.powerConsumption,
       ipAddress: ipAddress !== undefined ? ipAddress : pendingDevice.ipAddress,
-      purchaseDate: purchaseDate !== undefined ? (purchaseDate ? new Date(purchaseDate) : null) : pendingDevice.purchaseDate,
-      warrantyExpiry: warrantyExpiry !== undefined ? (warrantyExpiry ? new Date(warrantyExpiry) : null) : pendingDevice.warrantyExpiry,
+      purchaseDate:
+        purchaseDate !== undefined
+          ? purchaseDate
+            ? new Date(purchaseDate)
+            : null
+          : pendingDevice.purchaseDate,
+      warrantyExpiry:
+        warrantyExpiry !== undefined
+          ? warrantyExpiry
+            ? new Date(warrantyExpiry)
+            : null
+          : pendingDevice.warrantyExpiry,
       description: description !== undefined ? description : pendingDevice.description,
-      remark: remark !== undefined ? remark : pendingDevice.remark
+      remark: remark !== undefined ? remark : pendingDevice.remark,
     };
 
     if (Object.keys(restFields).length > 0) {
@@ -759,7 +856,9 @@ router.post('/pending-devices/:pendingId/sync', async (req, res) => {
       return res.status(400).json({ error: '该设备已同步' });
     }
 
-    const existingDevice = await Device.findOne({ where: { serialNumber: pendingDevice.serialNumber } });
+    const existingDevice = await Device.findOne({
+      where: { serialNumber: pendingDevice.serialNumber },
+    });
     if (existingDevice) {
       return res.status(400).json({ error: '该序列号的设备已存在于设备管理中' });
     }
@@ -770,7 +869,9 @@ router.post('/pending-devices/:pendingId/sync', async (req, res) => {
       const match = device.deviceId.match(/^DEV(\d+)$/);
       if (match) {
         const num = parseInt(match[1], 10);
-        if (num > maxNumber) maxNumber = num;
+        if (num > maxNumber) {
+          maxNumber = num;
+        }
       }
     });
     const deviceId = `DEV${String(maxNumber + 1).padStart(3, '0')}`;
@@ -790,20 +891,20 @@ router.post('/pending-devices/:pendingId/sync', async (req, res) => {
       purchaseDate: pendingDevice.purchaseDate,
       warrantyExpiry: pendingDevice.warrantyExpiry,
       customFields: pendingDevice.customFields,
-      status: 'running'
+      status: 'running',
     });
 
     await pendingDevice.update({
       status: 'synced',
       syncedAt: new Date(),
       syncedBy: req.user?.userId,
-      syncedDeviceId: newDevice.deviceId
+      syncedDeviceId: newDevice.deviceId,
     });
 
     res.json({
       message: '同步成功',
       device: newDevice,
-      pendingDevice
+      pendingDevice,
     });
   } catch (error) {
     console.error('同步设备错误:', error);
@@ -821,8 +922,8 @@ router.post('/pending-devices/batch-sync', async (req, res) => {
     const pendingDevices = await PendingDevice.findAll({
       where: {
         pendingId: { [Op.in]: pendingIds },
-        status: 'pending'
-      }
+        status: 'pending',
+      },
     });
 
     if (pendingDevices.length === 0) {
@@ -835,7 +936,9 @@ router.post('/pending-devices/batch-sync', async (req, res) => {
       const match = device.deviceId.match(/^DEV(\d+)$/);
       if (match) {
         const num = parseInt(match[1], 10);
-        if (num > maxNumber) maxNumber = num;
+        if (num > maxNumber) {
+          maxNumber = num;
+        }
       }
     });
 
@@ -844,9 +947,15 @@ router.post('/pending-devices/batch-sync', async (req, res) => {
 
     for (const pending of pendingDevices) {
       try {
-        const existingDevice = await Device.findOne({ where: { serialNumber: pending.serialNumber } });
+        const existingDevice = await Device.findOne({
+          where: { serialNumber: pending.serialNumber },
+        });
         if (existingDevice) {
-          errors.push({ pendingId: pending.pendingId, serialNumber: pending.serialNumber, error: '序列号已存在' });
+          errors.push({
+            pendingId: pending.pendingId,
+            serialNumber: pending.serialNumber,
+            error: '序列号已存在',
+          });
           continue;
         }
 
@@ -868,14 +977,14 @@ router.post('/pending-devices/batch-sync', async (req, res) => {
           purchaseDate: pending.purchaseDate,
           warrantyExpiry: pending.warrantyExpiry,
           customFields: pending.customFields,
-          status: 'running'
+          status: 'running',
         });
 
         await pending.update({
           status: 'synced',
           syncedAt: new Date(),
           syncedBy: req.user?.userId,
-          syncedDeviceId: newDevice.deviceId
+          syncedDeviceId: newDevice.deviceId,
         });
 
         results.push({ pendingId: pending.pendingId, deviceId: newDevice.deviceId });
@@ -889,7 +998,7 @@ router.post('/pending-devices/batch-sync', async (req, res) => {
       successCount: results.length,
       errorCount: errors.length,
       results,
-      errors
+      errors,
     });
   } catch (error) {
     console.error('批量同步设备错误:', error);

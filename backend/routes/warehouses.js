@@ -8,8 +8,8 @@ const { logDeviceOperation } = require('../utils/operationLogger');
 async function generateWarehouseId() {
   const warehouses = await Warehouse.findAll({
     where: {
-      warehouseId: { [Op.like]: 'WH%' }
-    }
+      warehouseId: { [Op.like]: 'WH%' },
+    },
   });
 
   let maxNumber = 0;
@@ -38,7 +38,7 @@ router.get('/', async (req, res) => {
       where[Op.or] = [
         { warehouseId: { [Op.like]: `%${keyword}%` } },
         { name: { [Op.like]: `%${keyword}%` } },
-        { location: { [Op.like]: `%${keyword}%` } }
+        { location: { [Op.like]: `%${keyword}%` } },
       ];
     }
 
@@ -50,17 +50,17 @@ router.get('/', async (req, res) => {
       where,
       offset: parseInt(offset),
       limit: parseInt(pageSize),
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
     });
 
     const warehousesWithCount = await Promise.all(
-      rows.map(async (warehouse) => {
+      rows.map(async warehouse => {
         const deviceCount = await Device.count({
-          where: { warehouseId: warehouse.warehouseId, isIdle: true }
+          where: { warehouseId: warehouse.warehouseId, isIdle: true },
         });
         return {
           ...warehouse.toJSON(),
-          deviceCount
+          deviceCount,
         };
       })
     );
@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
       total: count,
       warehouses: warehousesWithCount,
       page: parseInt(page),
-      pageSize: parseInt(pageSize)
+      pageSize: parseInt(pageSize),
     });
   } catch (error) {
     console.error('获取库房列表失败:', error);
@@ -85,12 +85,12 @@ router.get('/:warehouseId', async (req, res) => {
     }
 
     const deviceCount = await Device.count({
-      where: { warehouseId: warehouse.warehouseId, isIdle: true }
+      where: { warehouseId: warehouse.warehouseId, isIdle: true },
     });
 
     res.json({
       ...warehouse.toJSON(),
-      deviceCount
+      deviceCount,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -111,14 +111,14 @@ router.get('/:warehouseId/devices', async (req, res) => {
       where: { warehouseId: req.params.warehouseId, isIdle: true },
       offset: parseInt(offset),
       limit: parseInt(pageSize),
-      order: [['idleDate', 'DESC']]
+      order: [['idleDate', 'DESC']],
     });
 
     res.json({
       total: count,
       devices: rows,
       page: parseInt(page),
-      pageSize: parseInt(pageSize)
+      pageSize: parseInt(pageSize),
     });
   } catch (error) {
     console.error('获取库房设备失败:', error);
@@ -142,7 +142,7 @@ router.post('/', async (req, res) => {
       location: location || '',
       capacity: capacity || 100,
       status: 'active',
-      description: description || ''
+      description: description || '',
     });
 
     await logDeviceOperation('create', `创建库房【${name}】`, {
@@ -150,7 +150,7 @@ router.post('/', async (req, res) => {
       targetName: name,
       afterState: warehouse.toJSON(),
       req,
-      metadata: { type: 'warehouse_create' }
+      metadata: { type: 'warehouse_create' },
     });
 
     res.status(201).json(warehouse);
@@ -169,11 +169,21 @@ router.put('/:warehouseId', async (req, res) => {
     const beforeState = warehouse.toJSON();
     const { name, location, capacity, status, description } = req.body;
 
-    if (name) warehouse.name = name;
-    if (location !== undefined) warehouse.location = location;
-    if (capacity !== undefined) warehouse.capacity = capacity;
-    if (status) warehouse.status = status;
-    if (description !== undefined) warehouse.description = description;
+    if (name) {
+      warehouse.name = name;
+    }
+    if (location !== undefined) {
+      warehouse.location = location;
+    }
+    if (capacity !== undefined) {
+      warehouse.capacity = capacity;
+    }
+    if (status) {
+      warehouse.status = status;
+    }
+    if (description !== undefined) {
+      warehouse.description = description;
+    }
 
     await warehouse.save();
 
@@ -183,7 +193,7 @@ router.put('/:warehouseId', async (req, res) => {
       beforeState,
       afterState: warehouse.toJSON(),
       req,
-      metadata: { type: 'warehouse_update' }
+      metadata: { type: 'warehouse_update' },
     });
 
     res.json(warehouse);
@@ -200,12 +210,12 @@ router.delete('/:warehouseId', async (req, res) => {
     }
 
     const idleDeviceCount = await Device.count({
-      where: { warehouseId: req.params.warehouseId, isIdle: true }
+      where: { warehouseId: req.params.warehouseId, isIdle: true },
     });
 
     if (idleDeviceCount > 0) {
       return res.status(400).json({
-        error: `库房中还有 ${idleDeviceCount} 台空闲设备，请先处理后再删除`
+        error: `库房中还有 ${idleDeviceCount} 台空闲设备，请先处理后再删除`,
       });
     }
 
@@ -216,7 +226,7 @@ router.delete('/:warehouseId', async (req, res) => {
       targetId: req.params.warehouseId,
       targetName: warehouseName,
       req,
-      metadata: { type: 'warehouse_delete' }
+      metadata: { type: 'warehouse_delete' },
     });
 
     res.json({ message: '库房删除成功' });

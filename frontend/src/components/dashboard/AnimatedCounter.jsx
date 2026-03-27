@@ -6,7 +6,7 @@ const AnimatedCounter = ({ value, duration = 1500 }) => {
   const startTimeRef = useRef(null);
 
   useEffect(() => {
-    const animate = (currentTime) => {
+    const animate = currentTime => {
       if (!startTimeRef.current) {
         startTimeRef.current = currentTime;
       }

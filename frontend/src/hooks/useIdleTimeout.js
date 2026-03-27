@@ -119,15 +119,7 @@ const useIdleTimeout = ({
     }
 
     // 定义需要监听的事件
-    const events = [
-      'mousedown',
-      'mousemove',
-      'keydown',
-      'scroll',
-      'touchstart',
-      'click',
-      'wheel',
-    ];
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'wheel'];
 
     // 事件处理函数
     const handleActivity = () => {

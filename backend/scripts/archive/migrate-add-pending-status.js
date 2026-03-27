@@ -16,61 +16,61 @@ async function migrate() {
         userId: {
           type: sequelize.Sequelize.STRING,
           primaryKey: true,
-          allowNull: false
+          allowNull: false,
         },
         username: {
           type: sequelize.Sequelize.STRING,
           allowNull: false,
-          unique: true
+          unique: true,
         },
         password: {
           type: sequelize.Sequelize.STRING,
-          allowNull: false
+          allowNull: false,
         },
         email: {
           type: sequelize.Sequelize.STRING,
-          allowNull: true
+          allowNull: true,
         },
         phone: {
           type: sequelize.Sequelize.STRING,
-          allowNull: true
+          allowNull: true,
         },
         realName: {
           type: sequelize.Sequelize.STRING,
-          allowNull: true
+          allowNull: true,
         },
         avatar: {
           type: sequelize.Sequelize.STRING,
-          allowNull: true
+          allowNull: true,
         },
         status: {
           type: sequelize.Sequelize.ENUM('active', 'inactive', 'locked', 'pending'),
-          defaultValue: 'active'
+          defaultValue: 'active',
         },
         lastLoginTime: {
           type: sequelize.Sequelize.DATE,
-          allowNull: true
+          allowNull: true,
         },
         lastLoginIp: {
           type: sequelize.Sequelize.STRING,
-          allowNull: true
+          allowNull: true,
         },
         loginCount: {
           type: sequelize.Sequelize.INTEGER,
-          defaultValue: 0
+          defaultValue: 0,
         },
         remark: {
           type: sequelize.Sequelize.TEXT,
-          allowNull: true
+          allowNull: true,
         },
         createdAt: {
           type: sequelize.Sequelize.DATE,
-          allowNull: false
+          allowNull: false,
         },
         updatedAt: {
           type: sequelize.Sequelize.DATE,
-          allowNull: false
-        }
+          allowNull: false,
+        },
       });
 
       // 2. 复制数据

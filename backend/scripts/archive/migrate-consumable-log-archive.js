@@ -104,14 +104,12 @@ async function migrateSQLite() {
       { name: 'idx_archive_consumable_id', fields: 'consumableId' },
       { name: 'idx_archive_archive_id', fields: 'archiveId' },
       { name: 'idx_archive_deleted_at', fields: 'deletedAt' },
-      { name: 'idx_archive_consumable_deleted', fields: 'consumableId, deletedAt' }
+      { name: 'idx_archive_consumable_deleted', fields: 'consumableId, deletedAt' },
     ];
 
     for (const idx of indexes) {
       try {
-        await sequelize.query(
-          `CREATE INDEX ${idx.name} ON consumable_log_archives(${idx.fields})`
-        );
+        await sequelize.query(`CREATE INDEX ${idx.name} ON consumable_log_archives(${idx.fields})`);
         console.log(`✓ 创建索引: ${idx.name}`);
       } catch (err) {
         console.log(`! 创建索引失败: ${idx.name}`, err.message);

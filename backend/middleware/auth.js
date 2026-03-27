@@ -8,20 +8,20 @@ function getJwtSecret() {
     if (!envSecret) {
       throw new Error(
         '[致命错误] 生产环境未设置 JWT_SECRET 环境变量！\n' +
-        '请在服务器环境变量中设置强密钥（至少32位随机字符）。\n' +
-        '生成命令（PowerShell）：-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 64 | ForEach-Object { [char]$_ })'
+          '请在服务器环境变量中设置强密钥（至少32位随机字符）。\n' +
+          '生成命令（PowerShell）：-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 64 | ForEach-Object { [char]$_ })'
       );
     }
     if (envSecret.length < 32) {
-      throw new Error('[致命错误] 生产环境 JWT_SECRET 长度必须至少32位！当前长度：' + envSecret.length);
+      throw new Error(
+        '[致命错误] 生产环境 JWT_SECRET 长度必须至少32位！当前长度：' + envSecret.length
+      );
     }
     return envSecret;
   }
 
   if (!envSecret) {
-    throw new Error(
-      '[错误] JWT_SECRET 未配置，请检查 initConfig.js 是否正确执行'
-    );
+    throw new Error('[错误] JWT_SECRET 未配置，请检查 initConfig.js 是否正确执行');
   }
 
   return envSecret;
@@ -30,14 +30,16 @@ function getJwtSecret() {
 const JWT_SECRET = getJwtSecret();
 const TOKEN_EXPIRY = process.env.TOKEN_EXPIRY || '24h';
 
-const getBrowserInfo = (userAgent) => {
+const getBrowserInfo = userAgent => {
   let device = 'Desktop';
   let browser = 'Unknown';
   let os = 'Unknown';
 
   if (/Mobile|Android|iPhone|iPad|iPod/i.test(userAgent)) {
     device = 'Mobile';
-    if (/iPad/i.test(userAgent)) device = 'Tablet';
+    if (/iPad/i.test(userAgent)) {
+      device = 'Tablet';
+    }
   }
 
   if (/Firefox/i.test(userAgent)) {
@@ -67,19 +69,19 @@ const getBrowserInfo = (userAgent) => {
   return { device, browser, os };
 };
 
-const generateToken = (user) => {
+const generateToken = user => {
   return jwt.sign(
     {
       userId: user.userId,
       username: user.username,
-      roleId: user.roleId
+      roleId: user.roleId,
     },
     JWT_SECRET,
     { expiresIn: TOKEN_EXPIRY }
   );
 };
 
-const verifyToken = (token) => {
+const verifyToken = token => {
   try {
     return jwt.verify(token, JWT_SECRET);
   } catch (error) {
@@ -90,20 +92,20 @@ const verifyToken = (token) => {
 const authMiddleware = async (req, res, next) => {
   try {
     let token = null;
-    
+
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       token = authHeader.substring(7);
     }
-    
+
     if (!token && req.query.token) {
       token = req.query.token;
     }
-    
+
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: '未提供认证令牌'
+        message: '未提供认证令牌',
       });
     }
 
@@ -112,7 +114,7 @@ const authMiddleware = async (req, res, next) => {
     if (!decoded) {
       return res.status(401).json({
         success: false,
-        message: '令牌无效或已过期'
+        message: '令牌无效或已过期',
       });
     }
 
@@ -126,23 +128,23 @@ const authMiddleware = async (req, res, next) => {
         userId: decoded.userId,
         error: dbError.message,
         stack: dbError.stack,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
       return res.status(500).json({
         success: false,
-        message: '数据库查询失败，请稍后重试'
+        message: '数据库查询失败，请稍后重试',
       });
     }
-    
+
     if (!user) {
       console.warn('[认证中间件] 用户不存在:', {
         userId: decoded.userId,
         username: decoded.username,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
       return res.status(401).json({
         success: false,
-        message: '用户不存在'
+        message: '用户不存在',
       });
     }
 
@@ -150,11 +152,11 @@ const authMiddleware = async (req, res, next) => {
       console.warn('[认证中间件] 账户已被锁定:', {
         userId: user.userId,
         username: user.username,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
       return res.status(403).json({
         success: false,
-        message: '账户已被锁定'
+        message: '账户已被锁定',
       });
     }
 
@@ -162,11 +164,11 @@ const authMiddleware = async (req, res, next) => {
       console.warn('[认证中间件] 账户已禁用:', {
         userId: user.userId,
         username: user.username,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
       return res.status(403).json({
         success: false,
-        message: '账户已禁用'
+        message: '账户已禁用',
       });
     }
 
@@ -181,11 +183,11 @@ const authMiddleware = async (req, res, next) => {
       url: req?.url,
       method: req?.method,
       ip: req?.ip,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
     return res.status(500).json({
       success: false,
-      message: '认证失败，请稍后重试'
+      message: '认证失败，请稍后重试',
     });
   }
 };
@@ -193,11 +195,11 @@ const authMiddleware = async (req, res, next) => {
 const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       const decoded = verifyToken(token);
-      
+
       if (decoded) {
         let user;
         try {
@@ -207,27 +209,27 @@ const optionalAuth = async (req, res, next) => {
           console.warn('[可选认证] 数据库查询失败:', {
             userId: decoded.userId,
             error: dbError.message,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           });
           // 继续执行，不设置用户信息
           next();
           return;
         }
-        
+
         if (user && user.status === 'active') {
           req.user = decoded;
           req.userModel = user;
         }
       }
     }
-    
+
     next();
   } catch (error) {
     // 可选认证失败不影响主流程，仅记录日志
     console.warn('[可选认证] 认证失败（已忽略）:', {
       error: error.message,
       url: req?.url,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
     next();
   }
@@ -239,5 +241,5 @@ module.exports = {
   authMiddleware,
   optionalAuth,
   JWT_SECRET,
-  TOKEN_EXPIRY
+  TOKEN_EXPIRY,
 };

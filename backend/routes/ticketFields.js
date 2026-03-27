@@ -5,7 +5,7 @@ const TicketField = require('../models/TicketField');
 router.get('/', async (req, res) => {
   try {
     const fields = await TicketField.findAll({
-      order: [['order', 'ASC']]
+      order: [['order', 'ASC']],
     });
     res.json(fields);
   } catch (error) {
@@ -37,7 +37,7 @@ router.post('/', async (req, res) => {
 router.put('/:fieldId', async (req, res) => {
   try {
     const [updated] = await TicketField.update(req.body, {
-      where: { fieldId: req.params.fieldId }
+      where: { fieldId: req.params.fieldId },
     });
     if (updated) {
       const updatedField = await TicketField.findByPk(req.params.fieldId);
@@ -53,7 +53,7 @@ router.put('/:fieldId', async (req, res) => {
 router.delete('/:fieldId', async (req, res) => {
   try {
     const deleted = await TicketField.destroy({
-      where: { fieldId: req.params.fieldId }
+      where: { fieldId: req.params.fieldId },
     });
     if (deleted) {
       res.status(204).json();
@@ -68,24 +68,24 @@ router.delete('/:fieldId', async (req, res) => {
 router.post('/config', async (req, res) => {
   try {
     const fieldConfigs = req.body;
-    
+
     if (!Array.isArray(fieldConfigs)) {
       return res.status(400).json({ error: '输入必须是数组' });
     }
-    
+
     const updatedFields = [];
     for (const config of fieldConfigs) {
       const [updated] = await TicketField.update(
         { visible: config.visible },
         { where: { fieldName: config.fieldName } }
       );
-      
+
       if (updated) {
         const updatedField = await TicketField.findOne({ where: { fieldName: config.fieldName } });
         updatedFields.push(updatedField);
       }
     }
-    
+
     res.json(updatedFields);
   } catch (error) {
     res.status(500).json({ error: error.message });

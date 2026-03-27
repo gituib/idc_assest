@@ -360,11 +360,13 @@ function TicketManagement() {
       const response = await axios.get('/api/ticket-fields');
       const dbFields = response.data.sort((a, b) => a.order - b.order);
 
-      const isValidOptions = (opts) => {
+      const isValidOptions = opts => {
         if (!opts) return false;
         if (!Array.isArray(opts)) return false;
         if (opts.length === 0) return false;
-        return opts.some(opt => opt && opt.value !== undefined && opt.value !== null && opt.value !== '');
+        return opts.some(
+          opt => opt && opt.value !== undefined && opt.value !== null && opt.value !== ''
+        );
       };
 
       const mergedFields = DEFAULT_TICKET_FIELDS.map(defaultField => {
@@ -468,7 +470,11 @@ function TicketManagement() {
           break;
         case 'textarea':
           formItem = (
-            <Input.TextArea rows={3} placeholder={placeholder || `请输入${displayName}`} showCount />
+            <Input.TextArea
+              rows={3}
+              placeholder={placeholder || `请输入${displayName}`}
+              showCount
+            />
           );
           break;
         case 'boolean':
@@ -1131,17 +1137,19 @@ function TicketManagement() {
       <Modal
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontSize: 16,
-            }}>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontSize: 16,
+              }}
+            >
               <PlusOutlined />
             </div>
             <span style={{ fontWeight: 600, fontSize: 18 }}>
@@ -1166,32 +1174,38 @@ function TicketManagement() {
           style={{ marginBottom: 16 }}
         >
           {!editingTicket && (
-            <div style={{
-              background: 'linear-gradient(135deg, #f0f4ff 0%, #fafbff 100%)',
-              border: '1px solid #e8eaff',
-              borderRadius: 12,
-              padding: '12px 16px',
-              marginBottom: 20,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-            }}>
-              <div style={{
-                width: 40,
-                height: 40,
-                borderRadius: 8,
-                background: '#667eea',
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #f0f4ff 0%, #fafbff 100%)',
+                border: '1px solid #e8eaff',
+                borderRadius: 12,
+                padding: '12px 16px',
+                marginBottom: 20,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontSize: 14,
-                fontWeight: 600,
-              }}>
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 8,
+                  background: '#667eea',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
                 TKT
               </div>
               <div>
-                <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>工单编号（自动生成）</div>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>
+                  工单编号（自动生成）
+                </div>
                 <Form.Item name="ticketId" noStyle>
                   <Input
                     disabled
@@ -1209,28 +1223,34 @@ function TicketManagement() {
             </div>
           )}
 
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '0 24px',
-          }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '0 24px',
+            }}
+          >
             <div style={{ gridColumn: '1 / -1', marginBottom: 8 }}>
-              <div style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#333',
-                marginBottom: 12,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}>
-                <span style={{
-                  width: 4,
-                  height: 16,
-                  background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
-                  borderRadius: 2,
-                  display: 'inline-block',
-                }} />
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#333',
+                  marginBottom: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <span
+                  style={{
+                    width: 4,
+                    height: 16,
+                    background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
+                    borderRadius: 2,
+                    display: 'inline-block',
+                  }}
+                />
                 设备信息
               </div>
             </div>
@@ -1264,7 +1284,11 @@ function TicketManagement() {
                       <div>
                         <Form.Item
                           name="serialNumber"
-                          label={<span style={{ fontWeight: 500 }}>设备序列号 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                          label={
+                            <span style={{ fontWeight: 500 }}>
+                              设备序列号 <span style={{ color: '#ff4d4f' }}>*</span>
+                            </span>
+                          }
                           rules={[{ required: true, message: '请输入设备序列号' }]}
                         >
                           <Input placeholder="请输入设备序列号" size="large" />
@@ -1283,7 +1307,11 @@ function TicketManagement() {
                     <div style={{ gridColumn: '1 / -1' }}>
                       <Form.Item
                         name="deviceId"
-                        label={<span style={{ fontWeight: 500 }}>关联设备 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                        label={
+                          <span style={{ fontWeight: 500 }}>
+                            关联设备 <span style={{ color: '#ff4d4f' }}>*</span>
+                          </span>
+                        }
                         rules={[{ required: true, message: '请选择关联设备' }]}
                       >
                         <Select
@@ -1317,11 +1345,7 @@ function TicketManagement() {
                 return renderDeviceSection();
               } else if (hasDeviceNameField) {
                 if (!ticketFields.some(f => f.fieldName === 'deviceId')) {
-                  return (
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      {renderDeviceSection()}
-                    </div>
-                  );
+                  return <div style={{ gridColumn: '1 / -1' }}>{renderDeviceSection()}</div>;
                 }
               } else {
                 return renderDeviceSection();
@@ -1330,38 +1354,56 @@ function TicketManagement() {
             })()}
 
             <div style={{ gridColumn: '1 / -1', marginBottom: 8, marginTop: 8 }}>
-              <div style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#333',
-                marginBottom: 12,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}>
-                <span style={{
-                  width: 4,
-                  height: 16,
-                  background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
-                  borderRadius: 2,
-                  display: 'inline-block',
-                }} />
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#333',
+                  marginBottom: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <span
+                  style={{
+                    width: 4,
+                    height: 16,
+                    background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
+                    borderRadius: 2,
+                    display: 'inline-block',
+                  }}
+                />
                 工单信息
               </div>
             </div>
 
-            {ticketFields.filter(f =>
-              !['ticketId', 'deviceId', 'deviceName', 'serialNumber', 'expectedCompletionDate', 'resolution', 'notes', 'description'].includes(f.fieldName)
-            ).map(field => (
-              <div key={field.fieldName}>
-                {renderFormItem(field)}
-              </div>
-            ))}
+            {ticketFields
+              .filter(
+                f =>
+                  ![
+                    'ticketId',
+                    'deviceId',
+                    'deviceName',
+                    'serialNumber',
+                    'expectedCompletionDate',
+                    'resolution',
+                    'notes',
+                    'description',
+                  ].includes(f.fieldName)
+              )
+              .map(field => (
+                <div key={field.fieldName}>{renderFormItem(field)}</div>
+              ))}
 
             <div style={{ gridColumn: '1 / -1' }}>
               <Form.Item
                 name="title"
-                label={<span style={{ fontWeight: 500 }}>工单标题 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                label={
+                  <span style={{ fontWeight: 500 }}>
+                    工单标题 <span style={{ color: '#ff4d4f' }}>*</span>
+                  </span>
+                }
                 rules={[{ required: true, message: '请输入工单标题' }]}
               >
                 <Input placeholder="请输入工单标题" size="large" />
@@ -1371,7 +1413,11 @@ function TicketManagement() {
             <div>
               <Form.Item
                 name="faultCategory"
-                label={<span style={{ fontWeight: 500 }}>故障分类 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                label={
+                  <span style={{ fontWeight: 500 }}>
+                    故障分类 <span style={{ color: '#ff4d4f' }}>*</span>
+                  </span>
+                }
                 rules={[{ required: true, message: '请选择故障分类' }]}
               >
                 <Select placeholder="请选择故障分类" size="large">
@@ -1387,22 +1433,34 @@ function TicketManagement() {
             <div>
               <Form.Item
                 name="priority"
-                label={<span style={{ fontWeight: 500 }}>优先级 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                label={
+                  <span style={{ fontWeight: 500 }}>
+                    优先级 <span style={{ color: '#ff4d4f' }}>*</span>
+                  </span>
+                }
                 rules={[{ required: true, message: '请选择优先级' }]}
                 initialValue="medium"
               >
                 <Select placeholder="请选择优先级" size="large">
                   <Option value="low">
-                    <Tag color="green" style={{ margin: 0 }}>低</Tag>
+                    <Tag color="green" style={{ margin: 0 }}>
+                      低
+                    </Tag>
                   </Option>
                   <Option value="medium">
-                    <Tag color="orange" style={{ margin: 0 }}>中</Tag>
+                    <Tag color="orange" style={{ margin: 0 }}>
+                      中
+                    </Tag>
                   </Option>
                   <Option value="high">
-                    <Tag color="red" style={{ margin: 0 }}>高</Tag>
+                    <Tag color="red" style={{ margin: 0 }}>
+                      高
+                    </Tag>
                   </Option>
                   <Option value="urgent">
-                    <Tag color="magenta" style={{ margin: 0 }}>紧急</Tag>
+                    <Tag color="magenta" style={{ margin: 0 }}>
+                      紧急
+                    </Tag>
                   </Option>
                 </Select>
               </Form.Item>
@@ -1426,7 +1484,11 @@ function TicketManagement() {
             <div style={{ gridColumn: '1 / -1' }}>
               <Form.Item
                 name="description"
-                label={<span style={{ fontWeight: 500 }}>故障描述 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                label={
+                  <span style={{ fontWeight: 500 }}>
+                    故障描述 <span style={{ color: '#ff4d4f' }}>*</span>
+                  </span>
+                }
                 rules={[{ required: true, message: '请输入故障描述' }]}
               >
                 <TextArea
@@ -1439,10 +1501,7 @@ function TicketManagement() {
             </div>
 
             <div style={{ gridColumn: '1 / -1', marginTop: 8 }}>
-              <Form.Item
-                name="notes"
-                label={<span style={{ fontWeight: 500 }}>备注信息</span>}
-              >
+              <Form.Item name="notes" label={<span style={{ fontWeight: 500 }}>备注信息</span>}>
                 <TextArea
                   rows={2}
                   placeholder="补充说明或其他相关信息（选填）"
@@ -1453,14 +1512,16 @@ function TicketManagement() {
             </div>
           </div>
 
-          <div style={{
-            borderTop: '1px solid #f0f0f0',
-            marginTop: 24,
-            paddingTop: 20,
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 12,
-          }}>
+          <div
+            style={{
+              borderTop: '1px solid #f0f0f0',
+              marginTop: 24,
+              paddingTop: 20,
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 12,
+            }}
+          >
             <Button onClick={handleCancel} size="large" style={{ minWidth: 100 }}>
               取消
             </Button>
@@ -1706,15 +1767,19 @@ function TicketManagement() {
                     <Row gutter={[24, 16]}>
                       <Col span={12}>
                         <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>购买日期</div>
-                        <div>{selectedTicket.Device.purchaseDate
-                          ? dayjs(selectedTicket.Device.purchaseDate).format('YYYY-MM-DD')
-                          : '-'}</div>
+                        <div>
+                          {selectedTicket.Device.purchaseDate
+                            ? dayjs(selectedTicket.Device.purchaseDate).format('YYYY-MM-DD')
+                            : '-'}
+                        </div>
                       </Col>
                       <Col span={12}>
                         <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>保修到期</div>
-                        <div>{selectedTicket.Device.warrantyExpiry
-                          ? dayjs(selectedTicket.Device.warrantyExpiry).format('YYYY-MM-DD')
-                          : '-'}</div>
+                        <div>
+                          {selectedTicket.Device.warrantyExpiry
+                            ? dayjs(selectedTicket.Device.warrantyExpiry).format('YYYY-MM-DD')
+                            : '-'}
+                        </div>
                       </Col>
                     </Row>
                   </Card>
@@ -1722,28 +1787,35 @@ function TicketManagement() {
                   {/* 描述信息 */}
                   {selectedTicket.Device.description && (
                     <Card title="描述" style={{ marginBottom: 16 }} size="small">
-                      <div style={{ whiteSpace: 'pre-wrap' }}>{selectedTicket.Device.description}</div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>
+                        {selectedTicket.Device.description}
+                      </div>
                     </Card>
                   )}
 
                   {/* 自定义字段卡片 */}
-                  {selectedTicket.Device.customFields && Object.keys(selectedTicket.Device.customFields).length > 0 && (
-                    <Card title="自定义字段" size="small">
-                      <Row gutter={[24, 16]}>
-                        {Object.entries(selectedTicket.Device.customFields).map(([key, value]) => {
-                          // 从 deviceFields 中查找对应的中文显示名称
-                          const fieldConfig = deviceFields.find(f => f.fieldName === key);
-                          const displayName = fieldConfig?.displayName || key;
-                          return (
-                            <Col span={8} key={key}>
-                              <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>{displayName}</div>
-                              <div style={{ fontWeight: 500 }}>{String(value)}</div>
-                            </Col>
-                          );
-                        })}
-                      </Row>
-                    </Card>
-                  )}
+                  {selectedTicket.Device.customFields &&
+                    Object.keys(selectedTicket.Device.customFields).length > 0 && (
+                      <Card title="自定义字段" size="small">
+                        <Row gutter={[24, 16]}>
+                          {Object.entries(selectedTicket.Device.customFields).map(
+                            ([key, value]) => {
+                              // 从 deviceFields 中查找对应的中文显示名称
+                              const fieldConfig = deviceFields.find(f => f.fieldName === key);
+                              const displayName = fieldConfig?.displayName || key;
+                              return (
+                                <Col span={8} key={key}>
+                                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>
+                                    {displayName}
+                                  </div>
+                                  <div style={{ fontWeight: 500 }}>{String(value)}</div>
+                                </Col>
+                              );
+                            }
+                          )}
+                        </Row>
+                      </Card>
+                    )}
                 </div>
               </TabPane>
             )}
@@ -1851,9 +1923,7 @@ function TicketManagement() {
                             </div>
                             <div style={{ marginBottom: '4px' }}>
                               <span style={{ color: '#666' }}>操作人：</span>
-                              <span style={{ fontWeight: 500 }}>
-                                {record.operatorName || '-'}
-                              </span>
+                              <span style={{ fontWeight: 500 }}>{record.operatorName || '-'}</span>
                             </div>
                             {record.operationDescription && (
                               <div

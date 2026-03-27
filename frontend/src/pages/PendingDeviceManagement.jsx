@@ -42,7 +42,7 @@ const api = axios.create({
   baseURL: '/api',
 });
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -64,13 +64,13 @@ const PendingDeviceManagement = () => {
   const [currentDevice, setCurrentDevice] = useState(null);
   const [form] = Form.useForm();
   const [selectedRoomId, setSelectedRoomId] = useState(null);
-  
+
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 20,
     total: 0,
   });
-  
+
   const [filters, setFilters] = useState({
     status: null,
     planId: null,
@@ -79,27 +79,133 @@ const PendingDeviceManagement = () => {
   });
 
   const defaultDeviceFields = [
-    { fieldName: 'deviceName', displayName: '设备名称', fieldType: 'string', required: true, visible: true, order: 1 },
-    { fieldName: 'deviceType', displayName: '设备类型', fieldType: 'select', required: true, visible: true, order: 2, options: [
-      { value: 'server', label: '服务器' },
-      { value: 'switch', label: '交换机' },
-      { value: 'router', label: '路由器' },
-      { value: 'storage', label: '存储设备' },
-      { value: 'other', label: '其他' },
-    ]},
-    { fieldName: 'model', displayName: '型号', fieldType: 'string', required: false, visible: true, order: 3 },
-    { fieldName: 'serialNumber', displayName: '序列号', fieldType: 'string', required: true, visible: true, order: 4 },
-    { fieldName: 'roomId', displayName: '所属机房', fieldType: 'select', required: false, visible: true, order: 5 },
-    { fieldName: 'rackId', displayName: '所属机柜', fieldType: 'select', required: false, visible: true, order: 6 },
-    { fieldName: 'position', displayName: '位置(U)', fieldType: 'number', required: false, visible: true, order: 7 },
-    { fieldName: 'height', displayName: '高度(U)', fieldType: 'number', required: false, visible: true, order: 8 },
-    { fieldName: 'powerConsumption', displayName: '功率(W)', fieldType: 'number', required: false, visible: true, order: 9 },
-    { fieldName: 'purchaseDate', displayName: '购买日期', fieldType: 'date', required: false, visible: true, order: 10 },
-    { fieldName: 'warrantyExpiry', displayName: '保修到期', fieldType: 'date', required: false, visible: true, order: 11 },
-    { fieldName: 'ipAddress', displayName: 'IP地址', fieldType: 'string', required: false, visible: true, order: 12 },
-    { fieldName: 'brand', displayName: '品牌', fieldType: 'string', required: false, visible: true, order: 13 },
-    { fieldName: 'description', displayName: '描述', fieldType: 'textarea', required: false, visible: true, order: 14 },
-    { fieldName: 'remark', displayName: '备注', fieldType: 'textarea', required: false, visible: true, order: 15 },
+    {
+      fieldName: 'deviceName',
+      displayName: '设备名称',
+      fieldType: 'string',
+      required: true,
+      visible: true,
+      order: 1,
+    },
+    {
+      fieldName: 'deviceType',
+      displayName: '设备类型',
+      fieldType: 'select',
+      required: true,
+      visible: true,
+      order: 2,
+      options: [
+        { value: 'server', label: '服务器' },
+        { value: 'switch', label: '交换机' },
+        { value: 'router', label: '路由器' },
+        { value: 'storage', label: '存储设备' },
+        { value: 'other', label: '其他' },
+      ],
+    },
+    {
+      fieldName: 'model',
+      displayName: '型号',
+      fieldType: 'string',
+      required: false,
+      visible: true,
+      order: 3,
+    },
+    {
+      fieldName: 'serialNumber',
+      displayName: '序列号',
+      fieldType: 'string',
+      required: true,
+      visible: true,
+      order: 4,
+    },
+    {
+      fieldName: 'roomId',
+      displayName: '所属机房',
+      fieldType: 'select',
+      required: false,
+      visible: true,
+      order: 5,
+    },
+    {
+      fieldName: 'rackId',
+      displayName: '所属机柜',
+      fieldType: 'select',
+      required: false,
+      visible: true,
+      order: 6,
+    },
+    {
+      fieldName: 'position',
+      displayName: '位置(U)',
+      fieldType: 'number',
+      required: false,
+      visible: true,
+      order: 7,
+    },
+    {
+      fieldName: 'height',
+      displayName: '高度(U)',
+      fieldType: 'number',
+      required: false,
+      visible: true,
+      order: 8,
+    },
+    {
+      fieldName: 'powerConsumption',
+      displayName: '功率(W)',
+      fieldType: 'number',
+      required: false,
+      visible: true,
+      order: 9,
+    },
+    {
+      fieldName: 'purchaseDate',
+      displayName: '购买日期',
+      fieldType: 'date',
+      required: false,
+      visible: true,
+      order: 10,
+    },
+    {
+      fieldName: 'warrantyExpiry',
+      displayName: '保修到期',
+      fieldType: 'date',
+      required: false,
+      visible: true,
+      order: 11,
+    },
+    {
+      fieldName: 'ipAddress',
+      displayName: 'IP地址',
+      fieldType: 'string',
+      required: false,
+      visible: true,
+      order: 12,
+    },
+    {
+      fieldName: 'brand',
+      displayName: '品牌',
+      fieldType: 'string',
+      required: false,
+      visible: true,
+      order: 13,
+    },
+    {
+      fieldName: 'description',
+      displayName: '描述',
+      fieldType: 'textarea',
+      required: false,
+      visible: true,
+      order: 14,
+    },
+    {
+      fieldName: 'remark',
+      displayName: '备注',
+      fieldType: 'textarea',
+      required: false,
+      visible: true,
+      order: 15,
+    },
   ];
 
   const fetchDeviceFields = async () => {
@@ -185,11 +291,11 @@ const PendingDeviceManagement = () => {
     fetchDeviceFields();
   }, []);
 
-  const filteredRacks = selectedRoomId 
+  const filteredRacks = selectedRoomId
     ? racks.filter(rack => rack.roomId === selectedRoomId)
     : racks;
 
-  const handleSync = async (pendingId) => {
+  const handleSync = async pendingId => {
     try {
       const res = await api.post(`/inventory/pending-devices/${pendingId}/sync`);
       message.success(res.data.message);
@@ -205,7 +311,7 @@ const PendingDeviceManagement = () => {
       message.warning('请先选择要同步的设备');
       return;
     }
-    
+
     try {
       const res = await api.post('/inventory/pending-devices/batch-sync', {
         pendingIds: selectedRowKeys,
@@ -219,27 +325,27 @@ const PendingDeviceManagement = () => {
     }
   };
 
-  const handleEdit = (record) => {
+  const handleEdit = record => {
     setCurrentDevice(record);
     setSelectedRoomId(record.roomId);
-    
+
     // 字段名映射：数据库字段名 -> PendingDevice 模型字段名
     const fieldMapping = {
-      'name': 'deviceName',
-      'type': 'deviceType',
-      'SN': 'serialNumber',
+      name: 'deviceName',
+      type: 'deviceType',
+      SN: 'serialNumber',
     };
-    
+
     // 确保使用 deviceFields 中定义的字段名来设置表单值
     const formValues = {
       serialNumber: record.serialNumber,
       roomId: record.roomId,
       rackId: record.rackId,
     };
-    
+
     // 使用已加载的字段配置或默认配置
     const fields = deviceFields || defaultDeviceFields;
-    
+
     // 遍历字段，将 record 中对应的值设置到表单
     fields.forEach(field => {
       const fieldName = field.fieldName;
@@ -249,7 +355,7 @@ const PendingDeviceManagement = () => {
         formValues[fieldName] = record[recordFieldName];
       }
     });
-    
+
     // 处理自定义字段
     if (record.customFields) {
       Object.entries(record.customFields).forEach(([key, value]) => {
@@ -258,21 +364,21 @@ const PendingDeviceManagement = () => {
         }
       });
     }
-    
+
     form.setFieldsValue(formValues);
     setEditModalVisible(true);
   };
 
-  const handleEditSubmit = async (values) => {
+  const handleEditSubmit = async values => {
     try {
       const { purchaseDate, warrantyExpiry, ...otherValues } = values;
-      
+
       const payload = {
         ...otherValues,
         purchaseDate: purchaseDate ? dayjs(purchaseDate).toISOString() : null,
-        warrantyExpiry: warrantyExpiry ? dayjs(warrantyExpiry).toISOString() : null
+        warrantyExpiry: warrantyExpiry ? dayjs(warrantyExpiry).toISOString() : null,
       };
-      
+
       await api.put(`/inventory/pending-devices/${currentDevice.pendingId}`, payload);
       message.success('更新成功');
       setEditModalVisible(false);
@@ -283,7 +389,7 @@ const PendingDeviceManagement = () => {
     }
   };
 
-  const handleDelete = async (pendingId) => {
+  const handleDelete = async pendingId => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个待同步设备吗？此操作不可恢复！',
@@ -303,16 +409,20 @@ const PendingDeviceManagement = () => {
     });
   };
 
-  const getStatusTag = (status) => {
+  const getStatusTag = status => {
     const statusMap = {
       pending: { color: 'processing', text: '待同步', icon: <SyncOutlined spin /> },
       synced: { color: 'success', text: '已同步', icon: <CheckCircleOutlined /> },
     };
     const config = statusMap[status] || statusMap.pending;
-    return <Tag color={config.color} icon={config.icon}>{config.text}</Tag>;
+    return (
+      <Tag color={config.color} icon={config.icon}>
+        {config.text}
+      </Tag>
+    );
   };
 
-  const getTypeLabel = (type) => {
+  const getTypeLabel = type => {
     const typeMap = {
       server: '服务器',
       switch: '交换机',
@@ -323,7 +433,7 @@ const PendingDeviceManagement = () => {
     return typeMap[type] || type;
   };
 
-  const renderFormField = (field) => {
+  const renderFormField = field => {
     const { fieldName, displayName, fieldType, required, options } = field;
 
     if (fieldName === 'roomId') {
@@ -334,12 +444,12 @@ const PendingDeviceManagement = () => {
           label={displayName}
           rules={required ? [{ required: true, message: `请选择${displayName}` }] : []}
         >
-          <Select 
-            placeholder={`请选择${displayName}`} 
-            allowClear 
-            showSearch 
+          <Select
+            placeholder={`请选择${displayName}`}
+            allowClear
+            showSearch
             optionFilterProp="children"
-            onChange={(value) => {
+            onChange={value => {
               setSelectedRoomId(value);
               form.setFieldsValue({ rackId: undefined });
             }}
@@ -351,7 +461,9 @@ const PendingDeviceManagement = () => {
                 </Select.Option>
               ))
             ) : (
-              <Select.Option value="" disabled>暂无机房数据</Select.Option>
+              <Select.Option value="" disabled>
+                暂无机房数据
+              </Select.Option>
             )}
           </Select>
         </Form.Item>
@@ -367,10 +479,10 @@ const PendingDeviceManagement = () => {
           label={displayName}
           rules={required ? [{ required: true, message: `请选择${displayName}` }] : []}
         >
-          <Select 
-            placeholder={selectedRoomId ? `请选择${displayName}` : "请先选择机房"} 
-            allowClear 
-            showSearch 
+          <Select
+            placeholder={selectedRoomId ? `请选择${displayName}` : '请先选择机房'}
+            allowClear
+            showSearch
             optionFilterProp="children"
             disabled={!selectedRoomId}
           >
@@ -382,10 +494,14 @@ const PendingDeviceManagement = () => {
                   </Select.Option>
                 ))
               ) : (
-                <Select.Option value="" disabled>该机房下无机柜</Select.Option>
+                <Select.Option value="" disabled>
+                  该机房下无机柜
+                </Select.Option>
               )
             ) : (
-              <Select.Option value="" disabled>请先选择机房</Select.Option>
+              <Select.Option value="" disabled>
+                请先选择机房
+              </Select.Option>
             )}
           </Select>
         </Form.Item>
@@ -401,13 +517,16 @@ const PendingDeviceManagement = () => {
           rules={required ? [{ required: true, message: `请选择${displayName}` }] : []}
         >
           <Select placeholder={`请选择${displayName}`}>
-            {(Array.isArray(options) ? options : [
-              { value: 'server', label: '服务器' },
-              { value: 'switch', label: '交换机' },
-              { value: 'router', label: '路由器' },
-              { value: 'storage', label: '存储设备' },
-              { value: 'other', label: '其他' },
-            ]).map(opt => (
+            {(Array.isArray(options)
+              ? options
+              : [
+                  { value: 'server', label: '服务器' },
+                  { value: 'switch', label: '交换机' },
+                  { value: 'router', label: '路由器' },
+                  { value: 'storage', label: '存储设备' },
+                  { value: 'other', label: '其他' },
+                ]
+            ).map(opt => (
               <Select.Option key={opt.value} value={opt.value}>
                 {opt.label}
               </Select.Option>
@@ -490,11 +609,11 @@ const PendingDeviceManagement = () => {
   const renderFormFields = () => {
     // 如果字段配置未加载，使用默认配置
     const fields = deviceFields || defaultDeviceFields;
-    
+
     // 排除机房和机柜字段（已在Modal中单独渲染）
     const textFields = []; // 描述、备注等全文本字段
     const otherFields = []; // 其他字段
-    
+
     fields.forEach(field => {
       // 排除 roomId 和 rackId
       if (field.fieldName === 'roomId' || field.fieldName === 'rackId') {
@@ -514,15 +633,11 @@ const PendingDeviceManagement = () => {
         {/* 其他字段两列布局 */}
         {otherFields.length > 0 && (
           <Row gutter={16}>
-            <Col span={12}>
-              {otherFields.filter((_, i) => i % 2 === 0).map(renderFormField)}
-            </Col>
-            <Col span={12}>
-              {otherFields.filter((_, i) => i % 2 === 1).map(renderFormField)}
-            </Col>
+            <Col span={12}>{otherFields.filter((_, i) => i % 2 === 0).map(renderFormField)}</Col>
+            <Col span={12}>{otherFields.filter((_, i) => i % 2 === 1).map(renderFormField)}</Col>
           </Row>
         )}
-        
+
         {/* 文本字段全文本显示 */}
         {textFields.map(renderFormField)}
       </>
@@ -548,7 +663,7 @@ const PendingDeviceManagement = () => {
       dataIndex: 'deviceType',
       key: 'deviceType',
       width: 100,
-      render: (type) => getTypeLabel(type),
+      render: type => getTypeLabel(type),
     },
     {
       title: '位置',
@@ -556,8 +671,8 @@ const PendingDeviceManagement = () => {
       width: 180,
       render: (_, record) => (
         <span>
-          {record.Room?.name || '-'} 
-          {record.Rack ? ` / ${record.Rack.name}` : ''} 
+          {record.Room?.name || '-'}
+          {record.Rack ? ` / ${record.Rack.name}` : ''}
           {record.position ? ` / U${record.position}` : ''}
         </span>
       ),
@@ -567,35 +682,35 @@ const PendingDeviceManagement = () => {
       dataIndex: ['Plan', 'name'],
       key: 'planName',
       width: 150,
-      render: (name) => name || '-',
+      render: name => name || '-',
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
       width: 100,
-      render: (status) => getStatusTag(status),
+      render: status => getStatusTag(status),
     },
     {
       title: '创建人',
       dataIndex: ['Creator', 'realName'],
       key: 'creator',
       width: 100,
-      render: (name) => name || '-',
+      render: name => name || '-',
     },
     {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 140,
-      render: (date) => date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-',
+      render: date => (date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-'),
     },
     {
       title: '同步时间',
       dataIndex: 'syncedAt',
       key: 'syncedAt',
       width: 140,
-      render: (date) => date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-',
+      render: date => (date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-'),
     },
     {
       title: '操作',
@@ -641,11 +756,7 @@ const PendingDeviceManagement = () => {
             cancelText="取消"
           >
             <Tooltip title="删除">
-              <Button
-                type="text"
-                icon={<DeleteOutlined />}
-                style={{ color: '#ff4d4f' }}
-              />
+              <Button type="text" icon={<DeleteOutlined />} style={{ color: '#ff4d4f' }} />
             </Tooltip>
           </Popconfirm>
         </Space>
@@ -654,15 +765,17 @@ const PendingDeviceManagement = () => {
   ];
 
   return (
-    <div style={{ padding: 24, background: designTokens.colors.background.secondary, minHeight: '100vh' }}>
+    <div
+      style={{
+        padding: 24,
+        background: designTokens.colors.background.secondary,
+        minHeight: '100vh',
+      }}
+    >
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={6}>
           <Card bordered={false} style={{ borderRadius: 12, height: '100%', minHeight: 100 }}>
-            <Statistic
-              title="暂存设备总数"
-              value={stats.total}
-              prefix={<InboxOutlined />}
-            />
+            <Statistic title="暂存设备总数" value={stats.total} prefix={<InboxOutlined />} />
           </Card>
         </Col>
         <Col span={6}>
@@ -692,8 +805,8 @@ const PendingDeviceManagement = () => {
               value={stats.total > 0 ? Math.round((stats.synced / stats.total) * 100) : 0}
               suffix="%"
             />
-            <Progress 
-              percent={stats.total > 0 ? Math.round((stats.synced / stats.total) * 100) : 0} 
+            <Progress
+              percent={stats.total > 0 ? Math.round((stats.synced / stats.total) * 100) : 0}
               showInfo={false}
               strokeColor="#52c41a"
             />
@@ -702,14 +815,23 @@ const PendingDeviceManagement = () => {
       </Row>
 
       <Card bordered={false} style={{ borderRadius: 12 }}>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div
+          style={{
+            marginBottom: 16,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}
+        >
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <Input
               placeholder="搜索序列号/设备名称"
               prefix={<SearchOutlined />}
               style={{ width: 200 }}
               value={filters.keyword}
-              onChange={(e) => setFilters(prev => ({ ...prev, keyword: e.target.value }))}
+              onChange={e => setFilters(prev => ({ ...prev, keyword: e.target.value }))}
               onPressEnter={() => setPagination(prev => ({ ...prev, current: 1 }))}
             />
             <Select
@@ -717,7 +839,7 @@ const PendingDeviceManagement = () => {
               style={{ width: 120 }}
               allowClear
               value={filters.status}
-              onChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
+              onChange={value => setFilters(prev => ({ ...prev, status: value }))}
             >
               <Select.Option value="pending">待同步</Select.Option>
               <Select.Option value="synced">已同步</Select.Option>
@@ -729,7 +851,7 @@ const PendingDeviceManagement = () => {
               showSearch
               optionFilterProp="children"
               value={filters.planId}
-              onChange={(value) => setFilters(prev => ({ ...prev, planId: value }))}
+              onChange={value => setFilters(prev => ({ ...prev, planId: value }))}
             >
               {plans.map(plan => (
                 <Select.Option key={plan.planId} value={plan.planId}>
@@ -762,7 +884,7 @@ const PendingDeviceManagement = () => {
           rowSelection={{
             selectedRowKeys,
             onChange: setSelectedRowKeys,
-            getCheckboxProps: (record) => ({
+            getCheckboxProps: record => ({
               disabled: record.status !== 'pending',
             }),
           }}
@@ -774,7 +896,7 @@ const PendingDeviceManagement = () => {
             ...pagination,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 条`,
+            showTotal: total => `共 ${total} 条`,
             onChange: (page, pageSize) => {
               setPagination(prev => ({ ...prev, current: page, pageSize }));
             },
@@ -797,11 +919,7 @@ const PendingDeviceManagement = () => {
         footer={null}
         width={600}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleEditSubmit}
-        >
+        <Form form={form} layout="vertical" onFinish={handleEditSubmit}>
           <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
             <Descriptions.Item label="序列号">
               <code>{currentDevice?.serialNumber}</code>
@@ -814,16 +932,13 @@ const PendingDeviceManagement = () => {
           {/* 机房机柜选择 - 始终显示 */}
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item
-                name="roomId"
-                label="所属机房"
-              >
-                <Select 
-                  placeholder="请选择机房" 
-                  allowClear 
-                  showSearch 
+              <Form.Item name="roomId" label="所属机房">
+                <Select
+                  placeholder="请选择机房"
+                  allowClear
+                  showSearch
                   optionFilterProp="children"
-                  onChange={(value) => {
+                  onChange={value => {
                     setSelectedRoomId(value);
                     form.setFieldsValue({ rackId: undefined });
                   }}
@@ -835,20 +950,19 @@ const PendingDeviceManagement = () => {
                       </Select.Option>
                     ))
                   ) : (
-                    <Select.Option value="" disabled>暂无机房数据</Select.Option>
+                    <Select.Option value="" disabled>
+                      暂无机房数据
+                    </Select.Option>
                   )}
                 </Select>
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item
-                name="rackId"
-                label="所属机柜"
-              >
-                <Select 
-                  placeholder={selectedRoomId ? "请选择机柜" : "请先选择机房"} 
-                  allowClear 
-                  showSearch 
+              <Form.Item name="rackId" label="所属机柜">
+                <Select
+                  placeholder={selectedRoomId ? '请选择机柜' : '请先选择机房'}
+                  allowClear
+                  showSearch
                   optionFilterProp="children"
                   disabled={!selectedRoomId}
                 >
@@ -860,10 +974,14 @@ const PendingDeviceManagement = () => {
                         </Select.Option>
                       ))
                     ) : (
-                      <Select.Option value="" disabled>该机房下无机柜</Select.Option>
+                      <Select.Option value="" disabled>
+                        该机房下无机柜
+                      </Select.Option>
                     )
                   ) : (
-                    <Select.Option value="" disabled>请先选择机房</Select.Option>
+                    <Select.Option value="" disabled>
+                      请先选择机房
+                    </Select.Option>
                   )}
                 </Select>
               </Form.Item>
@@ -874,10 +992,14 @@ const PendingDeviceManagement = () => {
 
           <Form.Item style={{ marginBottom: 0, textAlign: 'right', marginTop: 16 }}>
             <Space>
-              <Button onClick={() => {
-                setEditModalVisible(false);
-                setSelectedRoomId(null);
-              }}>取消</Button>
+              <Button
+                onClick={() => {
+                  setEditModalVisible(false);
+                  setSelectedRoomId(null);
+                }}
+              >
+                取消
+              </Button>
               <Button type="primary" htmlType="submit">
                 保存
               </Button>

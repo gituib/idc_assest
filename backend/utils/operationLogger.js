@@ -4,26 +4,27 @@ const generateRecordId = () => {
   return `OPLOG_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 9)}`;
 };
 
-const getOperatorInfo = (req) => {
+const getOperatorInfo = req => {
   if (!req || !req.user) {
     return {
       operatorId: 'system',
       operatorName: '系统',
-      operatorRole: null
+      operatorRole: null,
     };
   }
   return {
     operatorId: req.user.userId || req.user.id || 'unknown',
     operatorName: req.user.realName || req.user.username || '未知用户',
-    operatorRole: req.user.roleName || req.user.role || null
+    operatorRole: req.user.roleName || req.user.role || null,
   };
 };
 
-const getClientInfo = (req) => {
+const getClientInfo = req => {
   if (!req) {
     return { ipAddress: null, userAgent: null };
   }
-  const ipAddress = req.headers['x-forwarded-for'] ||
+  const ipAddress =
+    req.headers['x-forwarded-for'] ||
     req.headers['x-real-ip'] ||
     req.connection?.remoteAddress ||
     req.ip ||
@@ -39,7 +40,7 @@ const DEVICE_TYPE_MAP = {
   storage: '存储设备',
   firewall: '防火墙',
   loadbalancer: '负载均衡器',
-  other: '其他设备'
+  other: '其他设备',
 };
 
 const generateDeviceDescription = (operation, device, options = {}) => {
@@ -48,7 +49,7 @@ const generateDeviceDescription = (operation, device, options = {}) => {
     includePosition = true,
     includeSerial = true,
     includeIp = true,
-    includeModel = true
+    includeModel = true,
   } = options;
 
   const deviceType = DEVICE_TYPE_MAP[device.type] || device.type || '设备';
@@ -94,7 +95,7 @@ const buildDeviceMetadata = (device, extra = {}) => {
     position: device.position !== undefined ? device.position : null,
     roomId: device.roomId || null,
     roomName: device.roomName || null,
-    ...extra
+    ...extra,
   };
 };
 
@@ -108,7 +109,7 @@ async function logOperation({
   afterState,
   result = 'success',
   req,
-  metadata = {}
+  metadata = {},
 }) {
   try {
     const operatorInfo = getOperatorInfo(req);
@@ -129,14 +130,18 @@ async function logOperation({
       result,
       ipAddress: clientInfo.ipAddress,
       userAgent: clientInfo.userAgent,
-      metadata
+      metadata,
     });
   } catch (error) {
     console.error('记录操作日志失败:', error);
   }
 }
 
-async function logDeviceOperation(operationType, operationDescription, { targetId, targetName, beforeState, afterState, result, req, metadata = {} }) {
+async function logDeviceOperation(
+  operationType,
+  operationDescription,
+  { targetId, targetName, beforeState, afterState, result, req, metadata = {} }
+) {
   return logOperation({
     module: 'device',
     operationType,
@@ -147,11 +152,15 @@ async function logDeviceOperation(operationType, operationDescription, { targetI
     afterState,
     result,
     req,
-    metadata
+    metadata,
   });
 }
 
-async function logUserOperation(operationType, operationDescription, { targetId, targetName, beforeState, afterState, result, req, metadata = {} }) {
+async function logUserOperation(
+  operationType,
+  operationDescription,
+  { targetId, targetName, beforeState, afterState, result, req, metadata = {} }
+) {
   return logOperation({
     module: 'user',
     operationType,
@@ -162,11 +171,15 @@ async function logUserOperation(operationType, operationDescription, { targetId,
     afterState,
     result,
     req,
-    metadata
+    metadata,
   });
 }
 
-async function logRoleOperation(operationType, operationDescription, { targetId, targetName, beforeState, afterState, result, req, metadata = {} }) {
+async function logRoleOperation(
+  operationType,
+  operationDescription,
+  { targetId, targetName, beforeState, afterState, result, req, metadata = {} }
+) {
   return logOperation({
     module: 'role',
     operationType,
@@ -177,7 +190,7 @@ async function logRoleOperation(operationType, operationDescription, { targetId,
     afterState,
     result,
     req,
-    metadata
+    metadata,
   });
 }
 
@@ -187,5 +200,5 @@ module.exports = {
   logUserOperation,
   logRoleOperation,
   generateDeviceDescription,
-  buildDeviceMetadata
+  buildDeviceMetadata,
 };

@@ -10,25 +10,30 @@ const ensureLogDir = () => {
   }
 };
 
-const formatLogEntry = (entry) => {
+const formatLogEntry = entry => {
   const timestamp = new Date().toISOString();
-  return JSON.stringify({
-    timestamp,
-    ...entry,
-  }) + '\n';
+  return (
+    JSON.stringify({
+      timestamp,
+      ...entry,
+    }) + '\n'
+  );
 };
 
-const logDangerousOperation = async (req, {
-  operationType,
-  operationName,
-  targetType,
-  targetId,
-  targetName,
-  beforeState,
-  metadata = {},
-  success = true,
-  errorMessage = null,
-}) => {
+const logDangerousOperation = async (
+  req,
+  {
+    operationType,
+    operationName,
+    targetType,
+    targetId,
+    targetName,
+    beforeState,
+    metadata = {},
+    success = true,
+    errorMessage = null,
+  }
+) => {
   ensureLogDir();
 
   const clientIp = req?.ip || req?.connection?.remoteAddress || 'unknown';
@@ -57,7 +62,9 @@ const logDangerousOperation = async (req, {
 
   try {
     fs.appendFileSync(DANGEROUS_OPERATIONS_LOG, formatLogEntry(logEntry));
-    console.log(`[DANGEROUS-OP] ${logEntry.operationName} by ${logEntry.username} - ${success ? 'SUCCESS' : 'FAILED'}`);
+    console.log(
+      `[DANGEROUS-OP] ${logEntry.operationName} by ${logEntry.username} - ${success ? 'SUCCESS' : 'FAILED'}`
+    );
   } catch (error) {
     console.error('Failed to write dangerous operation log:', error);
   }
@@ -74,13 +81,15 @@ const getDangerousOperationsLogs = (filters = {}) => {
     const content = fs.readFileSync(DANGEROUS_OPERATIONS_LOG, 'utf-8');
     const lines = content.split('\n').filter(line => line.trim());
 
-    let logs = lines.map(line => {
-      try {
-        return JSON.parse(line);
-      } catch {
-        return null;
-      }
-    }).filter(log => log !== null);
+    let logs = lines
+      .map(line => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(log => log !== null);
 
     if (filters.operationType) {
       logs = logs.filter(log => log.operationType === filters.operationType);
@@ -103,7 +112,9 @@ const getDangerousOperationsLogs = (filters = {}) => {
     }
 
     if (filters.username) {
-      logs = logs.filter(log => log.username?.toLowerCase().includes(filters.username.toLowerCase()));
+      logs = logs.filter(log =>
+        log.username?.toLowerCase().includes(filters.username.toLowerCase())
+      );
     }
 
     if (filters.riskLevel) {

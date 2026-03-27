@@ -120,7 +120,17 @@ async function updateExistingLogs() {
 
   try {
     const consumables = await Consumable.findAll({
-      attributes: ['consumableId', 'category', 'unit', 'unitPrice', 'supplier', 'location', 'minStock', 'maxStock', 'status']
+      attributes: [
+        'consumableId',
+        'category',
+        'unit',
+        'unitPrice',
+        'supplier',
+        'location',
+        'minStock',
+        'maxStock',
+        'status',
+      ],
     });
 
     const consumableMap = new Map();
@@ -133,14 +143,14 @@ async function updateExistingLogs() {
         location: c.location,
         minStock: c.minStock,
         maxStock: c.maxStock,
-        status: c.status
+        status: c.status,
       });
     });
 
     const logs = await ConsumableLog.findAll({
       where: {
-        consumableSnapshot: null
-      }
+        consumableSnapshot: null,
+      },
     });
 
     let updatedCount = 0;
@@ -155,10 +165,9 @@ async function updateExistingLogs() {
     console.log(`✓ 更新了 ${updatedCount} 条日志的快照信息`);
 
     const deletedLogsCount = await ConsumableLog.count({
-      where: { operationType: 'delete' }
+      where: { operationType: 'delete' },
     });
     console.log(`✓ 当前有 ${deletedLogsCount} 条删除类型日志`);
-
   } catch (error) {
     console.log('! 更新现有日志数据时出错:', error.message);
   }

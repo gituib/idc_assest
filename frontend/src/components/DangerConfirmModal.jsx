@@ -135,10 +135,17 @@ export const DangerConfirmModal = ({
           }
           description={
             <Paragraph style={{ marginBottom: 0, marginTop: 8 }}>
-              {description || `确定要${operationLabel} ${itemCount > 1 ? `${itemCount} 个` : '该'}${entityLabel}吗？`}
+              {description ||
+                `确定要${operationLabel} ${itemCount > 1 ? `${itemCount} 个` : '该'}${entityLabel}吗？`}
             </Paragraph>
           }
-          type={riskLevel === RISK_LEVEL.EXTREME ? 'error' : riskLevel === RISK_LEVEL.HIGH ? 'warning' : 'info'}
+          type={
+            riskLevel === RISK_LEVEL.EXTREME
+              ? 'error'
+              : riskLevel === RISK_LEVEL.HIGH
+                ? 'warning'
+                : 'info'
+          }
           style={{
             backgroundColor: config.bgColor,
             borderColor: config.borderColor,
@@ -177,7 +184,7 @@ export const DangerConfirmModal = ({
             <Input
               ref={inputRef}
               value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
+              onChange={e => setKeyword(e.target.value)}
               placeholder={`请输入 ${config.keyword}`}
               status={keyword && !isKeywordValid ? 'error' : undefined}
               onPressEnter={handleOk}
@@ -202,9 +209,7 @@ export const DangerConfirmModal = ({
                   {typeof item === 'string' ? item : item.name || item.label || item}
                 </Text>
               ))}
-              {itemCount > 5 && (
-                <Text type="secondary">...还有 {itemCount - 5} 项</Text>
-              )}
+              {itemCount > 5 && <Text type="secondary">...还有 {itemCount - 5} 项</Text>}
             </div>
           </div>
         )}
@@ -217,9 +222,7 @@ export const DangerConfirmModal = ({
       title={
         <Space>
           <WarningOutlined style={{ color: config.color }} />
-          <span style={{ color: config.color }}>
-            {title || `${operationLabel}确认`}
-          </span>
+          <span style={{ color: config.color }}>{title || `${operationLabel}确认`}</span>
         </Space>
       }
       open={open}

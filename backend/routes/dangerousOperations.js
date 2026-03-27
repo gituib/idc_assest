@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { logDangerousOperation, getDangerousOperationsLogs, cleanOldLogs, DANGEROUS_OPERATION_TYPES, RISK_LEVELS, calculateRiskLevel } = require('../utils/dangerousOperationLogger');
+const {
+  logDangerousOperation,
+  getDangerousOperationsLogs,
+  cleanOldLogs,
+  DANGEROUS_OPERATION_TYPES,
+  RISK_LEVELS,
+  calculateRiskLevel,
+} = require('../utils/dangerousOperationLogger');
 
 router.post('/log', async (req, res) => {
   try {
@@ -20,10 +27,12 @@ router.post('/log', async (req, res) => {
       return res.status(400).json({ error: '缺少必需参数 operationType 或 operationName' });
     }
 
-    const riskLevel = metadata.riskLevel || calculateRiskLevel(operationType, metadata.itemCount || 1, {
-      hasRelatedData: metadata.relatedDataCount > 0,
-      isSystemLevel: metadata.isSystemLevel,
-    });
+    const riskLevel =
+      metadata.riskLevel ||
+      calculateRiskLevel(operationType, metadata.itemCount || 1, {
+        hasRelatedData: metadata.relatedDataCount > 0,
+        isSystemLevel: metadata.isSystemLevel,
+      });
 
     await logDangerousOperation(req, {
       operationType,
@@ -49,7 +58,17 @@ router.post('/log', async (req, res) => {
 
 router.get('/logs', async (req, res) => {
   try {
-    const { operationType, targetType, success, startDate, endDate, username, riskLevel, page = 1, pageSize = 50 } = req.query;
+    const {
+      operationType,
+      targetType,
+      success,
+      startDate,
+      endDate,
+      username,
+      riskLevel,
+      page = 1,
+      pageSize = 50,
+    } = req.query;
 
     const filters = {
       operationType,
@@ -121,14 +140,10 @@ router.get('/risk-assessment', async (req, res) => {
   try {
     const { operationType, itemCount, hasRelatedData, isSystemLevel } = req.query;
 
-    const riskLevel = calculateRiskLevel(
-      operationType,
-      parseInt(itemCount) || 1,
-      {
-        hasRelatedData: hasRelatedData === 'true',
-        isSystemLevel: isSystemLevel === 'true',
-      }
-    );
+    const riskLevel = calculateRiskLevel(operationType, parseInt(itemCount) || 1, {
+      hasRelatedData: hasRelatedData === 'true',
+      isSystemLevel: isSystemLevel === 'true',
+    });
 
     const riskDescriptions = {
       [RISK_LEVELS.EXTREME]: '极高风险操作，需要输入确认关键词才能执行',
@@ -141,7 +156,12 @@ router.get('/risk-assessment', async (req, res) => {
       riskLevel,
       description: riskDescriptions[riskLevel],
       requiresKeyword: riskLevel === RISK_LEVELS.EXTREME,
-      confirmationLevel: riskLevel === RISK_LEVELS.EXTREME ? 'KEYWORD' : riskLevel === RISK_LEVELS.HIGH ? 'ENHANCED' : 'STANDARD',
+      confirmationLevel:
+        riskLevel === RISK_LEVELS.EXTREME
+          ? 'KEYWORD'
+          : riskLevel === RISK_LEVELS.HIGH
+            ? 'ENHANCED'
+            : 'STANDARD',
     });
   } catch (error) {
     console.error('Failed to assess risk:', error);

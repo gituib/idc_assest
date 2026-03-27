@@ -1,6 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, Select, InputNumber, DatePicker, Switch, Row, Col, Button, Space, Alert } from 'antd';
-import { PlusOutlined, EditOutlined, DatabaseOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import {
+  Modal,
+  Form,
+  Input,
+  Select,
+  InputNumber,
+  DatePicker,
+  Switch,
+  Row,
+  Col,
+  Button,
+  Space,
+  Alert,
+} from 'antd';
+import {
+  PlusOutlined,
+  EditOutlined,
+  DatabaseOutlined,
+  ExclamationCircleOutlined,
+} from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { designTokens } from '../../config/theme';
 import { getFormInitialValues, prepareDeviceFormData } from '../../utils/deviceUtils.jsx';
@@ -48,14 +66,19 @@ const DeviceFormModal = ({
         }
         form.setFieldsValue(initialValues);
         if (editingDevice.rackId) {
-          const rack = racks.find((r) => r.rackId === editingDevice.rackId);
+          const rack = racks.find(r => r.rackId === editingDevice.rackId);
           if (rack) {
             setSelectedRoomId(rack.roomId);
             setSelectedRackId(editingDevice.rackId);
           }
         }
         if (editingDevice.position) {
-          checkPositionConflict(editingDevice.rackId, editingDevice.position, editingDevice.height, editingDevice.deviceId);
+          checkPositionConflict(
+            editingDevice.rackId,
+            editingDevice.position,
+            editingDevice.height,
+            editingDevice.deviceId
+          );
         }
       } else {
         form.resetFields();
@@ -95,7 +118,7 @@ const DeviceFormModal = ({
     }
   };
 
-  const handleRackChange = (value) => {
+  const handleRackChange = value => {
     setSelectedRackId(value);
     const position = form.getFieldValue('position');
     const height = form.getFieldValue('height');
@@ -106,7 +129,7 @@ const DeviceFormModal = ({
     }
   };
 
-  const handlePositionChange = (value) => {
+  const handlePositionChange = value => {
     const height = form.getFieldValue('height');
     if (selectedRackId && value) {
       checkPositionConflict(selectedRackId, value, height, editingDevice?.deviceId);
@@ -115,7 +138,7 @@ const DeviceFormModal = ({
     }
   };
 
-  const handleHeightChange = (value) => {
+  const handleHeightChange = value => {
     const position = form.getFieldValue('position');
     if (selectedRackId && position) {
       checkPositionConflict(selectedRackId, position, value, editingDevice?.deviceId);
@@ -124,7 +147,7 @@ const DeviceFormModal = ({
     }
   };
 
-  const handleSubmit = (values) => {
+  const handleSubmit = values => {
     if (positionConflict) {
       return;
     }
@@ -132,14 +155,14 @@ const DeviceFormModal = ({
     onSubmit(deviceData);
   };
 
-  const handleRoomChange = (value) => {
+  const handleRoomChange = value => {
     setSelectedRoomId(value);
     setSelectedRackId(null);
     setPositionConflict(null);
     form.setFieldValue('rackId', undefined);
   };
 
-  const renderFieldControl = (field) => {
+  const renderFieldControl = field => {
     switch (field.fieldType) {
       case 'number':
         return (
@@ -177,7 +200,7 @@ const DeviceFormModal = ({
             className="form-input-enhanced"
           >
             {Array.isArray(field.options) &&
-              field.options.map((option) => (
+              field.options.map(option => (
                 <Option key={option.value} value={option.value}>
                   {option.label}
                 </Option>
@@ -196,11 +219,15 @@ const DeviceFormModal = ({
   };
 
   const filteredFields = deviceFields.filter(
-    (field) => field.fieldName !== 'deviceId' && field.fieldName !== 'rackId' && field.fieldName !== 'position' && field.fieldName !== 'height'
+    field =>
+      field.fieldName !== 'deviceId' &&
+      field.fieldName !== 'rackId' &&
+      field.fieldName !== 'position' &&
+      field.fieldName !== 'height'
   );
 
   const formItems = [];
-  filteredFields.forEach((field) => {
+  filteredFields.forEach(field => {
     if (field.fieldName === 'serialNumber') {
       formItems.push(
         <React.Fragment key={field.fieldName}>
@@ -210,9 +237,7 @@ const DeviceFormModal = ({
               label={
                 <span>
                   {field.displayName}
-                  {field.required && (
-                    <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
-                  )}
+                  {field.required && <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>}
                 </span>
               }
               rules={
@@ -266,7 +291,7 @@ const DeviceFormModal = ({
                       optionFilterProp="children"
                       onChange={handleRoomChange}
                     >
-                      {rooms.map((room) => (
+                      {rooms.map(room => (
                         <Option key={room.roomId} value={room.roomId}>
                           {room.name}
                         </Option>
@@ -294,13 +319,14 @@ const DeviceFormModal = ({
                       optionFilterProp="children"
                       onChange={handleRackChange}
                     >
-                      {(selectedRoomId ? racks.filter((rack) => rack.roomId === selectedRoomId) : []).map(
-                        (rack) => (
-                          <Option key={rack.rackId} value={rack.rackId}>
-                            {rack.name} ({rack.rackId})
-                          </Option>
-                        )
-                      )}
+                      {(selectedRoomId
+                        ? racks.filter(rack => rack.roomId === selectedRoomId)
+                        : []
+                      ).map(rack => (
+                        <Option key={rack.rackId} value={rack.rackId}>
+                          {rack.name} ({rack.rackId})
+                        </Option>
+                      ))}
                     </Select>
                   </Form.Item>
                 </Col>
@@ -372,9 +398,7 @@ const DeviceFormModal = ({
             label={
               <span>
                 {field.displayName}
-                {field.required && (
-                  <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
-                )}
+                {field.required && <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>}
               </span>
             }
             rules={
@@ -393,9 +417,7 @@ const DeviceFormModal = ({
             label={
               <span>
                 {field.displayName}
-                {field.required && (
-                  <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
-                )}
+                {field.required && <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>}
               </span>
             }
             rules={

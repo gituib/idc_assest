@@ -334,26 +334,56 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
           message="操作说明"
           description={
             <div style={{ fontSize: '12px', lineHeight: '1.8' }}>
-              <div><strong>适用范围：</strong>批量导入网卡仅适用于<span style={{ color: '#1890ff', fontWeight: 600 }}>服务器设备</span>，交换机设备请直接在端口管理中导入端口</div>
-              <div style={{ marginTop: '8px' }}><strong>前置条件：</strong>请先在<span style={{ color: '#1890ff', fontWeight: 600 }}>设备管理</span>中添加目标服务器，确保设备ID已存在</div>
-              <div style={{ marginTop: '8px' }}><strong>操作步骤：</strong></div>
+              <div>
+                <strong>适用范围：</strong>批量导入网卡仅适用于
+                <span style={{ color: '#1890ff', fontWeight: 600 }}>服务器设备</span>
+                ，交换机设备请直接在端口管理中导入端口
+              </div>
+              <div style={{ marginTop: '8px' }}>
+                <strong>前置条件：</strong>请先在
+                <span style={{ color: '#1890ff', fontWeight: 600 }}>设备管理</span>
+                中添加目标服务器，确保设备ID已存在
+              </div>
+              <div style={{ marginTop: '8px' }}>
+                <strong>操作步骤：</strong>
+              </div>
               <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
                 <div>1. 点击「下载模板」获取标准Excel/CSV文件</div>
-                <div>2. 按模板格式填写网卡信息，<span style={{ color: '#ff4d4f', fontWeight: 600 }}>设备ID</span>和<span style={{ color: '#ff4d4f', fontWeight: 600 }}>网卡名称</span>为必填项</div>
+                <div>
+                  2. 按模板格式填写网卡信息，
+                  <span style={{ color: '#ff4d4f', fontWeight: 600 }}>设备ID</span>和
+                  <span style={{ color: '#ff4d4f', fontWeight: 600 }}>网卡名称</span>为必填项
+                </div>
                 <div>3. 点击上传区域选择文件，或直接拖拽文件到上传区域</div>
                 <div>4. 系统自动校验数据，可预览前10条数据及错误详情</div>
                 <div>5. 选择导入策略（跳过/更新已存在），点击「开始导入」</div>
               </div>
-              <div style={{ marginTop: '8px' }}><strong>字段说明：</strong></div>
-              <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
-                <div>• <strong>设备ID</strong>（必填）：服务器的唯一标识，如DEV001</div>
-                <div>• <strong>网卡名称</strong>（必填）：网卡的名称或标识，如eth0、网卡1</div>
-                <div>• <strong>插槽编号</strong>（选填）：网卡所在的插槽位置，必须为数字</div>
-                <div>• <strong>网卡型号</strong>（选填）：如Intel X710、BCM57414</div>
-                <div>• <strong>制造商</strong>（选填）：如Intel、Mellanox</div>
-                <div>• <strong>描述</strong>（选填）：备注信息</div>
+              <div style={{ marginTop: '8px' }}>
+                <strong>字段说明：</strong>
               </div>
-              <div style={{ marginTop: '8px', color: '#faad14' }}><strong>注意事项：</strong></div>
+              <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
+                <div>
+                  • <strong>设备ID</strong>（必填）：服务器的唯一标识，如DEV001
+                </div>
+                <div>
+                  • <strong>网卡名称</strong>（必填）：网卡的名称或标识，如eth0、网卡1
+                </div>
+                <div>
+                  • <strong>插槽编号</strong>（选填）：网卡所在的插槽位置，必须为数字
+                </div>
+                <div>
+                  • <strong>网卡型号</strong>（选填）：如Intel X710、BCM57414
+                </div>
+                <div>
+                  • <strong>制造商</strong>（选填）：如Intel、Mellanox
+                </div>
+                <div>
+                  • <strong>描述</strong>（选填）：备注信息
+                </div>
+              </div>
+              <div style={{ marginTop: '8px', color: '#faad14' }}>
+                <strong>注意事项：</strong>
+              </div>
               <div style={{ paddingLeft: '12px', marginTop: '4px', color: '#faad14' }}>
                 <div>• 同一设备下网卡名称不可重复</div>
                 <div>• 导入后需在网卡管理中为网卡添加端口</div>
@@ -387,7 +417,10 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
           <p className="ant-upload-drag-icon">
             <UploadOutlined style={{ fontSize: '48px', color: designTokens.colors.primary.main }} />
           </p>
-          <p className="ant-upload-text" style={{ fontSize: '16px', color: designTokens.colors.neutral[700] }}>
+          <p
+            className="ant-upload-text"
+            style={{ fontSize: '16px', color: designTokens.colors.neutral[700] }}
+          >
             点击或拖拽文件到此处上传
           </p>
           <p className="ant-upload-hint" style={{ color: designTokens.colors.neutral[500] }}>
@@ -493,7 +526,13 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
               showIcon
               style={{ marginBottom: '16px', borderRadius: designTokens.borderRadius.md }}
             />
-            <div style={{ marginBottom: '8px', fontWeight: 500, color: designTokens.colors.neutral[700] }}>
+            <div
+              style={{
+                marginBottom: '8px',
+                fontWeight: 500,
+                color: designTokens.colors.neutral[700],
+              }}
+            >
               数据预览（前10条）
             </div>
             <Table
@@ -513,7 +552,13 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
               style={{ borderRadius: designTokens.borderRadius.md }}
             />
             {importPreview.length > 10 && (
-              <div style={{ textAlign: 'center', marginTop: '12px', color: designTokens.colors.neutral[500] }}>
+              <div
+                style={{
+                  textAlign: 'center',
+                  marginTop: '12px',
+                  color: designTokens.colors.neutral[500],
+                }}
+              >
                 仅显示前10条数据，共 {importPreview.length} 条
               </div>
             )}

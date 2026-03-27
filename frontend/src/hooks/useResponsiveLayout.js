@@ -16,7 +16,7 @@ export const SCREEN_SIZES = {
   xl: 'xl',
 };
 
-const getScreenSize = (width) => {
+const getScreenSize = width => {
   if (width >= BREAKPOINTS.xl) return SCREEN_SIZES.xl;
   if (width >= BREAKPOINTS.lg) return SCREEN_SIZES.lg;
   if (width >= BREAKPOINTS.md) return SCREEN_SIZES.md;
@@ -24,7 +24,7 @@ const getScreenSize = (width) => {
   return SCREEN_SIZES.xs;
 };
 
-const getScreenSizeConfig = (screenSize) => {
+const getScreenSizeConfig = screenSize => {
   const configs = {
     xs: {
       showFullButtonLabels: false,

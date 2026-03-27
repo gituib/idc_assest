@@ -54,7 +54,7 @@ const RackSelectorHeader = ({
   const { screenSize, config, isMobile } = useResponsiveLayout();
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = event => {
       if (selectorRef.current && !selectorRef.current.contains(event.target)) {
         setSelectorVisible(false);
       }
@@ -77,40 +77,35 @@ const RackSelectorHeader = ({
     [onRackSelect]
   );
 
-  const handleKeyDown = useCallback(
-    (e) => {
-      if (e.key === 'Escape') {
-        setSelectorVisible(false);
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        setSelectorVisible((prev) => !prev);
-      }
-    },
-    []
-  );
+  const handleKeyDown = useCallback(e => {
+    if (e.key === 'Escape') {
+      setSelectorVisible(false);
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      setSelectorVisible(prev => !prev);
+    }
+  }, []);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  const selectedRoom = rooms.find((r) => r.key === selectedRoomKey);
+  const selectedRoom = rooms.find(r => r.key === selectedRoomKey);
   const displayText = selectedRack
     ? `${selectedRoom?.name || ''} / ${selectedRack.name}`
     : '选择机房 / 机柜';
 
-  const canNavigatePrev =
-    racksInSelectedRoom && racksInSelectedRoom.length > 1 && selectedRack;
-  const canNavigateNext =
-    racksInSelectedRoom && racksInSelectedRoom.length > 1 && selectedRack;
+  const canNavigatePrev = racksInSelectedRoom && racksInSelectedRoom.length > 1 && selectedRack;
+  const canNavigateNext = racksInSelectedRoom && racksInSelectedRoom.length > 1 && selectedRack;
 
   const getCurrentRackIndex = () => {
     if (!selectedRack || !racksInSelectedRoom) return -1;
-    return racksInSelectedRoom.findIndex((r) => r.rackId === selectedRack.rackId);
+    return racksInSelectedRoom.findIndex(r => r.rackId === selectedRack.rackId);
   };
 
-  const dropdownMenuItems = ACTION_BUTTONS_CONFIG.map((btn) => ({
+  const dropdownMenuItems = ACTION_BUTTONS_CONFIG.map(btn => ({
     key: btn.key,
     label: (
       <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -190,13 +185,11 @@ const RackSelectorHeader = ({
         }}
       >
         <div
-          onClick={() => setSelectorVisible((prev) => !prev)}
+          onClick={() => setSelectorVisible(prev => !prev)}
           style={{
             display: 'flex',
             alignItems: 'center',
-            background: selectorVisible
-              ? 'rgba(59, 130, 246, 0.15)'
-              : 'rgba(255, 255, 255, 0.08)',
+            background: selectorVisible ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.08)',
             border: selectorVisible
               ? '1px solid rgba(59, 130, 246, 0.5)'
               : '1px solid rgba(255, 255, 255, 0.12)',
@@ -247,7 +240,7 @@ const RackSelectorHeader = ({
           >
             {canNavigatePrev && (
               <div
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation();
                   onPrevRack();
                 }}
@@ -262,10 +255,10 @@ const RackSelectorHeader = ({
                   fontSize: 12,
                   transition: 'all 0.15s',
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={e => {
                   e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={e => {
                   e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
                 }}
               >
@@ -274,7 +267,7 @@ const RackSelectorHeader = ({
             )}
             {canNavigateNext && (
               <div
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation();
                   onNextRack();
                 }}
@@ -289,10 +282,10 @@ const RackSelectorHeader = ({
                   fontSize: 12,
                   transition: 'all 0.15s',
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={e => {
                   e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={e => {
                   e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
                 }}
               >
@@ -420,11 +413,7 @@ const RackSelectorHeader = ({
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {renderDeviceSlideToggle()}
-          <Dropdown
-            menu={{ items: dropdownMenuItems }}
-            trigger={['click']}
-            placement="bottomRight"
-          >
+          <Dropdown menu={{ items: dropdownMenuItems }} trigger={['click']} placement="bottomRight">
             <Button
               type="text"
               icon={<MenuOutlined style={{ color: 'rgba(255,255,255,0.8)' }} />}

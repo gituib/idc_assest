@@ -185,10 +185,34 @@ const RemoteBackupSettings = () => {
   const [testing, setTesting] = useState(false);
 
   const protocolsList = [
-    { value: 'sftp', label: 'SFTP', icon: <LockOutlined />, category: 'server', description: 'SSH 安全文件传输协议' },
-    { value: 'ftp', label: 'FTP/FTPS', icon: <GlobalOutlined />, category: 'server', description: '传统文件传输协议（支持 FTPS）' },
-    { value: 'webdav', label: 'WebDAV', icon: <ApiOutlined />, category: 'server', description: '基于 HTTP 的文件传输协议' },
-    { value: 'smb', label: 'SMB/CIFS', icon: <DatabaseOutlined />, category: 'server', description: 'Windows 网络共享文件夹' },
+    {
+      value: 'sftp',
+      label: 'SFTP',
+      icon: <LockOutlined />,
+      category: 'server',
+      description: 'SSH 安全文件传输协议',
+    },
+    {
+      value: 'ftp',
+      label: 'FTP/FTPS',
+      icon: <GlobalOutlined />,
+      category: 'server',
+      description: '传统文件传输协议（支持 FTPS）',
+    },
+    {
+      value: 'webdav',
+      label: 'WebDAV',
+      icon: <ApiOutlined />,
+      category: 'server',
+      description: '基于 HTTP 的文件传输协议',
+    },
+    {
+      value: 'smb',
+      label: 'SMB/CIFS',
+      icon: <DatabaseOutlined />,
+      category: 'server',
+      description: 'Windows 网络共享文件夹',
+    },
   ];
 
   useEffect(() => {
@@ -198,11 +222,7 @@ const RemoteBackupSettings = () => {
   const loadInitialData = async () => {
     try {
       setInitialLoading(true);
-      await Promise.all([
-        fetchTargets(),
-        fetchGlobalSettings(),
-        fetchProtocols(),
-      ]);
+      await Promise.all([fetchTargets(), fetchGlobalSettings(), fetchProtocols()]);
     } finally {
       setInitialLoading(false);
     }
@@ -250,7 +270,7 @@ const RemoteBackupSettings = () => {
     setModalVisible(true);
   };
 
-  const handleEdit = (record) => {
+  const handleEdit = record => {
     setEditingTarget(record);
     setCurrentStep(1);
     setTestStatus(null);
@@ -258,7 +278,7 @@ const RemoteBackupSettings = () => {
     setModalVisible(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async id => {
     try {
       setLoading(true);
       const response = await api.delete(`/backup/remote/targets/${id}`);
@@ -273,7 +293,7 @@ const RemoteBackupSettings = () => {
     }
   };
 
-  const handleTest = async (record) => {
+  const handleTest = async record => {
     try {
       setTesting(true);
       const response = await api.post(`/backup/remote/targets/${record.id}/test`);
@@ -297,7 +317,7 @@ const RemoteBackupSettings = () => {
       await form.validateFields();
       const values = form.getFieldsValue(true);
       const response = await api.post('/backup/remote/test', values);
-      
+
       if (response?.success) {
         setTestStatus('success');
         message.success('连接测试成功！');
@@ -321,7 +341,7 @@ const RemoteBackupSettings = () => {
     try {
       setLoading(true);
       const values = await form.validateFields();
-      
+
       if (editingTarget) {
         const response = await api.put(`/backup/remote/targets/${editingTarget.id}`, values);
         if (response?.success) {
@@ -359,17 +379,17 @@ const RemoteBackupSettings = () => {
     }
   };
 
-  const getProtocolLabel = (protocol) => {
+  const getProtocolLabel = protocol => {
     const proto = protocolsList.find(p => p.value === protocol);
     return proto ? proto.label : protocol;
   };
 
-  const getProtocolIcon = (protocol) => {
+  const getProtocolIcon = protocol => {
     const proto = protocolsList.find(p => p.value === protocol);
     return proto?.icon || <CloudOutlined />;
   };
 
-  const getStatusColor = (enabled) => enabled ? 'success' : 'default';
+  const getStatusColor = enabled => (enabled ? 'success' : 'default');
 
   const columns = [
     {
@@ -384,20 +404,26 @@ const RemoteBackupSettings = () => {
       width: 200,
       render: (text, record) => (
         <Space>
-          <div style={{
-            width: 36,
-            height: 36,
-            borderRadius: designTokens.borderRadius.sm,
-            background: designTokens.colors.primary.gradient,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: designTokens.shadows.sm,
-          }}>
-            {React.cloneElement(getProtocolIcon(record.protocol), { style: { color: '#fff', fontSize: 18 } })}
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: designTokens.borderRadius.sm,
+              background: designTokens.colors.primary.gradient,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: designTokens.shadows.sm,
+            }}
+          >
+            {React.cloneElement(getProtocolIcon(record.protocol), {
+              style: { color: '#fff', fontSize: 18 },
+            })}
           </div>
           <div>
-            <Text strong style={{ display: 'block' }}>{text}</Text>
+            <Text strong style={{ display: 'block' }}>
+              {text}
+            </Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
               {getProtocolLabel(record.protocol)}
             </Text>
@@ -418,24 +444,30 @@ const RemoteBackupSettings = () => {
         if (record.protocol === 'webdav') {
           return (
             <Tooltip title={record.url}>
-              <Text code style={{ 
-                fontSize: 12,
-                background: designTokens.colors.background.accent,
-                padding: '4px 8px',
-                borderRadius: designTokens.borderRadius.sm,
-              }}>
+              <Text
+                code
+                style={{
+                  fontSize: 12,
+                  background: designTokens.colors.background.accent,
+                  padding: '4px 8px',
+                  borderRadius: designTokens.borderRadius.sm,
+                }}
+              >
                 {record.url?.length > 30 ? `${record.url.substring(0, 30)}...` : record.url}
               </Text>
             </Tooltip>
           );
         }
         return (
-          <Text code style={{ 
-            fontSize: 12,
-            background: designTokens.colors.background.accent,
-            padding: '4px 8px',
-            borderRadius: designTokens.borderRadius.sm,
-          }}>
+          <Text
+            code
+            style={{
+              fontSize: 12,
+              background: designTokens.colors.background.accent,
+              padding: '4px 8px',
+              borderRadius: designTokens.borderRadius.sm,
+            }}
+          >
             {record.host}:{record.port || (record.protocol === 'ftp' ? 21 : 22)}
           </Text>
         );
@@ -451,8 +483,8 @@ const RemoteBackupSettings = () => {
       key: 'path',
       width: 140,
       render: (_, record) => (
-        <Tag 
-          style={{ 
+        <Tag
+          style={{
             borderRadius: designTokens.borderRadius.sm,
             background: designTokens.colors.background.accent,
             border: `1px solid ${designTokens.colors.border.light}`,
@@ -463,18 +495,14 @@ const RemoteBackupSettings = () => {
       ),
     },
     {
-      title: (
-        <span style={{ fontWeight: 600, color: designTokens.colors.text.primary }}>
-          状态
-        </span>
-      ),
+      title: <span style={{ fontWeight: 600, color: designTokens.colors.text.primary }}>状态</span>,
       dataIndex: 'enabled',
       key: 'enabled',
       width: 100,
-      render: (enabled) => (
-        <Tag 
+      render: enabled => (
+        <Tag
           color={enabled ? 'success' : 'default'}
-          style={{ 
+          style={{
             borderRadius: designTokens.borderRadius.sm,
             fontWeight: 500,
           }}
@@ -484,11 +512,7 @@ const RemoteBackupSettings = () => {
       ),
     },
     {
-      title: (
-        <span style={{ fontWeight: 600, color: designTokens.colors.text.primary }}>
-          操作
-        </span>
-      ),
+      title: <span style={{ fontWeight: 600, color: designTokens.colors.text.primary }}>操作</span>,
       key: 'action',
       width: 200,
       fixed: 'right',
@@ -554,14 +578,9 @@ const RemoteBackupSettings = () => {
     },
   ];
 
-  const renderProtocolFields = (protocol) => {
+  const renderProtocolFields = protocol => {
     if (!protocol) {
-      return (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="请先选择协议类型"
-        />
-      );
+      return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请先选择协议类型" />;
     }
 
     const fieldsMap = {
@@ -581,9 +600,9 @@ const RemoteBackupSettings = () => {
                   ]}
                   tooltip="支持 IP 地址或域名"
                 >
-                  <Input 
+                  <Input
                     prefix={<GlobalOutlined />}
-                    placeholder="例如：192.168.1.100 或 ftp.example.com" 
+                    placeholder="例如：192.168.1.100 或 ftp.example.com"
                   />
                 </Form.Item>
               </Col>
@@ -688,11 +707,7 @@ const RemoteBackupSettings = () => {
                 </Form.Item>
               </Col>
             </Row>
-            <Form.Item
-              name="rootPath"
-              label="根路径"
-              initialValue="/"
-            >
+            <Form.Item name="rootPath" label="根路径" initialValue="/">
               <Input placeholder="例如：/backups" />
             </Form.Item>
           </>
@@ -733,11 +748,7 @@ const RemoteBackupSettings = () => {
                 </Form.Item>
               </Col>
             </Row>
-            <Form.Item
-              name="rootPath"
-              label="根路径"
-              initialValue="/"
-            >
+            <Form.Item name="rootPath" label="根路径" initialValue="/">
               <Input placeholder="例如：/backups" />
             </Form.Item>
           </>
@@ -762,10 +773,7 @@ const RemoteBackupSettings = () => {
             >
               <Input placeholder="例如：Backups" />
             </Form.Item>
-            <Form.Item
-              name="domain"
-              label="域（可选）"
-            >
+            <Form.Item name="domain" label="域（可选）">
               <Input placeholder="WORKGROUP 或域名" />
             </Form.Item>
             <Row gutter={16}>
@@ -788,11 +796,7 @@ const RemoteBackupSettings = () => {
                 </Form.Item>
               </Col>
             </Row>
-            <Form.Item
-              name="rootPath"
-              label="根路径"
-              initialValue="/"
-            >
+            <Form.Item name="rootPath" label="根路径" initialValue="/">
               <Input placeholder="例如：/backups" />
             </Form.Item>
           </>
@@ -804,8 +808,8 @@ const RemoteBackupSettings = () => {
     if (!config) return null;
 
     return (
-      <Card 
-        size="small" 
+      <Card
+        size="small"
         title={
           <Space>
             {config.icon}
@@ -824,11 +828,8 @@ const RemoteBackupSettings = () => {
       <Paragraph type="secondary" style={{ marginBottom: 16 }}>
         选择适合你的远端存储类型，支持 FTP/SFTP、WebDAV、SMB 等多种协议
       </Paragraph>
-      
-      <Form.Item
-        name="protocol"
-        rules={[{ required: true, message: '请选择协议类型' }]}
-      >
+
+      <Form.Item name="protocol" rules={[{ required: true, message: '请选择协议类型' }]}>
         <Select
           placeholder="选择协议类型"
           size="large"
@@ -918,9 +919,7 @@ const RemoteBackupSettings = () => {
   if (initialLoading) {
     return (
       <div style={containerStyle}>
-        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-          {renderSkeleton()}
-        </div>
+        <div style={{ maxWidth: 1400, margin: '0 auto' }}>{renderSkeleton()}</div>
       </div>
     );
   }
@@ -944,35 +943,44 @@ const RemoteBackupSettings = () => {
           </Button>
 
           <Card style={headerCardStyle} styles={{ body: { padding: '24px 32px' } }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              flexWrap: 'wrap', 
-              gap: 16 
-            }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 16,
+              }}
+            >
               <div>
-                <Title level={2} style={{
-                  margin: '0 0 8px 0',
-                  fontSize: 'clamp(24px, 4vw, 32px)',
-                  fontWeight: 700,
-                  background: designTokens.colors.primary.gradient,
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}>
-                  <CloudOutlined style={{ 
-                    marginRight: 12, 
-                    fontSize: 32,
+                <Title
+                  level={2}
+                  style={{
+                    margin: '0 0 8px 0',
+                    fontSize: 'clamp(24px, 4vw, 32px)',
+                    fontWeight: 700,
                     background: designTokens.colors.primary.gradient,
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
-                  }} />
+                    backgroundClip: 'text',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <CloudOutlined
+                    style={{
+                      marginRight: 12,
+                      fontSize: 32,
+                      background: designTokens.colors.primary.gradient,
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                    }}
+                  />
                   远端备份配置
                 </Title>
-                <Paragraph style={{ margin: 0, fontSize: 14, color: designTokens.colors.text.secondary }}>
+                <Paragraph
+                  style={{ margin: 0, fontSize: 14, color: designTokens.colors.text.secondary }}
+                >
                   配置多个远端存储目标，实现备份数据异地容灾
                 </Paragraph>
               </div>
@@ -1010,24 +1018,34 @@ const RemoteBackupSettings = () => {
         {/* 统计概览 */}
         <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
           <Col xs={24} sm={12} lg={6}>
-            <Card 
-              style={{ 
+            <Card
+              style={{
                 borderRadius: designTokens.borderRadius.lg,
                 border: 'none',
-                background: globalSettings.enabled 
+                background: globalSettings.enabled
                   ? designTokens.colors.success.gradient
                   : `linear-gradient(135deg, ${designTokens.colors.text.muted} 0%, #9ca3af 100%)`,
                 color: '#fff',
                 height: '100%',
                 minHeight: 130,
-                boxShadow: globalSettings.enabled 
+                boxShadow: globalSettings.enabled
                   ? '0 8px 24px rgba(16, 185, 129, 0.25)'
                   : designTokens.shadows.md,
                 transition: `all ${designTokens.transitions.normal}`,
               }}
-              styles={{ body: { padding: '20px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' } }}
+              styles={{
+                body: {
+                  padding: '20px',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                },
+              }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
                 <div>
                   <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 500 }}>
                     远端备份状态
@@ -1038,48 +1056,73 @@ const RemoteBackupSettings = () => {
                 </div>
                 <Switch
                   checked={globalSettings.enabled}
-                  onChange={(checked) => handleUpdateGlobalSettings('enabled', checked)}
+                  onChange={checked => handleUpdateGlobalSettings('enabled', checked)}
                   checkedChildren="开"
                   unCheckedChildren="关"
-                  style={{ 
-                    background: globalSettings.enabled ? 'rgba(255,255,255,0.3)' : undefined 
+                  style={{
+                    background: globalSettings.enabled ? 'rgba(255,255,255,0.3)' : undefined,
                   }}
                 />
               </div>
             </Card>
           </Col>
           <Col xs={24} sm={12} lg={6}>
-            <Card 
-              style={{ 
-                ...cardStyle, 
-                height: '100%', 
+            <Card
+              style={{
+                ...cardStyle,
+                height: '100%',
                 minHeight: 130,
               }}
-              styles={{ body: { padding: '20px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } }}
+              styles={{
+                body: {
+                  padding: '20px',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                },
+              }}
             >
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <div style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: designTokens.borderRadius.sm,
-                    background: designTokens.colors.primary.gradient,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: designTokens.borderRadius.sm,
+                      background: designTokens.colors.primary.gradient,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
                     <CloudOutlined style={{ color: '#fff', fontSize: 16 }} />
                   </div>
-                  <Text type="secondary" style={{ fontSize: 13 }}>远端目标</Text>
+                  <Text type="secondary" style={{ fontSize: 13 }}>
+                    远端目标
+                  </Text>
                 </div>
-                <div style={{ fontSize: 32, fontWeight: 700, color: designTokens.colors.text.primary }}>
+                <div
+                  style={{ fontSize: 32, fontWeight: 700, color: designTokens.colors.text.primary }}
+                >
                   {targets.length}
-                  <span style={{ fontSize: 16, fontWeight: 500, marginLeft: 4, color: designTokens.colors.text.secondary }}>个</span>
+                  <span
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 500,
+                      marginLeft: 4,
+                      color: designTokens.colors.text.secondary,
+                    }}
+                  >
+                    个
+                  </span>
                 </div>
               </div>
               <div>
-                <Progress 
-                  percent={(targets.filter(t => t.enabled).length / Math.max(targets.length, 1)) * 100}
+                <Progress
+                  percent={
+                    (targets.filter(t => t.enabled).length / Math.max(targets.length, 1)) * 100
+                  }
                   showInfo={false}
                   strokeColor={designTokens.colors.primary.main}
                   size="small"
@@ -1092,45 +1135,66 @@ const RemoteBackupSettings = () => {
             </Card>
           </Col>
           <Col xs={24} sm={12} lg={6}>
-            <Card 
-              style={{ 
-                ...cardStyle, 
-                height: '100%', 
+            <Card
+              style={{
+                ...cardStyle,
+                height: '100%',
                 minHeight: 130,
               }}
-              styles={{ body: { padding: '20px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } }}
+              styles={{
+                body: {
+                  padding: '20px',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                },
+              }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <div style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: designTokens.borderRadius.sm,
-                  background: globalSettings.uploadAfterBackup 
-                    ? designTokens.colors.success.gradient 
-                    : designTokens.colors.background.accent,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <CloudUploadOutlined style={{ 
-                    color: globalSettings.uploadAfterBackup ? '#fff' : designTokens.colors.text.muted, 
-                    fontSize: 16 
-                  }} />
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: designTokens.borderRadius.sm,
+                    background: globalSettings.uploadAfterBackup
+                      ? designTokens.colors.success.gradient
+                      : designTokens.colors.background.accent,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <CloudUploadOutlined
+                    style={{
+                      color: globalSettings.uploadAfterBackup
+                        ? '#fff'
+                        : designTokens.colors.text.muted,
+                      fontSize: 16,
+                    }}
+                  />
                 </div>
-                <Text type="secondary" style={{ fontSize: 13 }}>自动上传</Text>
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  自动上传
+                </Text>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text strong style={{ 
-                  fontSize: 16,
-                  color: globalSettings.uploadAfterBackup 
-                    ? designTokens.colors.success.main 
-                    : designTokens.colors.text.secondary 
-                }}>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <Text
+                  strong
+                  style={{
+                    fontSize: 16,
+                    color: globalSettings.uploadAfterBackup
+                      ? designTokens.colors.success.main
+                      : designTokens.colors.text.secondary,
+                  }}
+                >
                   {globalSettings.uploadAfterBackup ? '已开启' : '已关闭'}
                 </Text>
                 <Switch
                   checked={globalSettings.uploadAfterBackup}
-                  onChange={(checked) => handleUpdateGlobalSettings('uploadAfterBackup', checked)}
+                  onChange={checked => handleUpdateGlobalSettings('uploadAfterBackup', checked)}
                   disabled={!globalSettings.enabled}
                   checkedChildren="开"
                   unCheckedChildren="关"
@@ -1139,45 +1203,68 @@ const RemoteBackupSettings = () => {
             </Card>
           </Col>
           <Col xs={24} sm={12} lg={6}>
-            <Card 
-              style={{ 
-                ...cardStyle, 
-                height: '100%', 
+            <Card
+              style={{
+                ...cardStyle,
+                height: '100%',
                 minHeight: 130,
               }}
-              styles={{ body: { padding: '20px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } }}
+              styles={{
+                body: {
+                  padding: '20px',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                },
+              }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <div style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: designTokens.borderRadius.sm,
-                  background: globalSettings.deleteLocalAfterUpload 
-                    ? designTokens.colors.warning.gradient 
-                    : designTokens.colors.background.accent,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <SafetyOutlined style={{ 
-                    color: globalSettings.deleteLocalAfterUpload ? '#fff' : designTokens.colors.text.muted, 
-                    fontSize: 16 
-                  }} />
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: designTokens.borderRadius.sm,
+                    background: globalSettings.deleteLocalAfterUpload
+                      ? designTokens.colors.warning.gradient
+                      : designTokens.colors.background.accent,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <SafetyOutlined
+                    style={{
+                      color: globalSettings.deleteLocalAfterUpload
+                        ? '#fff'
+                        : designTokens.colors.text.muted,
+                      fontSize: 16,
+                    }}
+                  />
                 </div>
-                <Text type="secondary" style={{ fontSize: 13 }}>删除本地文件</Text>
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  删除本地文件
+                </Text>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text strong style={{ 
-                  fontSize: 16,
-                  color: globalSettings.deleteLocalAfterUpload 
-                    ? designTokens.colors.warning.main 
-                    : designTokens.colors.text.secondary 
-                }}>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <Text
+                  strong
+                  style={{
+                    fontSize: 16,
+                    color: globalSettings.deleteLocalAfterUpload
+                      ? designTokens.colors.warning.main
+                      : designTokens.colors.text.secondary,
+                  }}
+                >
                   {globalSettings.deleteLocalAfterUpload ? '已开启' : '已关闭'}
                 </Text>
                 <Switch
                   checked={globalSettings.deleteLocalAfterUpload}
-                  onChange={(checked) => handleUpdateGlobalSettings('deleteLocalAfterUpload', checked)}
+                  onChange={checked =>
+                    handleUpdateGlobalSettings('deleteLocalAfterUpload', checked)
+                  }
                   disabled={!globalSettings.enabled}
                   checkedChildren="开"
                   unCheckedChildren="关"
@@ -1188,40 +1275,44 @@ const RemoteBackupSettings = () => {
         </Row>
 
         {/* 远端目标列表 */}
-        <Card 
-          style={{ 
-            ...cardStyle, 
+        <Card
+          style={{
+            ...cardStyle,
             marginBottom: 24,
           }}
-          styles={{ 
+          styles={{
             body: { padding: '24px' },
-            header: { 
+            header: {
               padding: '20px 24px',
               borderBottom: `1px solid ${designTokens.colors.border.light}`,
             },
           }}
           title={
             <Space>
-              <div style={{
-                width: 36,
-                height: 36,
-                borderRadius: designTokens.borderRadius.sm,
-                background: designTokens.colors.primary.gradient,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: designTokens.borderRadius.sm,
+                  background: designTokens.colors.primary.gradient,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
                 <CloudUploadOutlined style={{ color: '#fff', fontSize: 18 }} />
               </div>
-              <span style={{ fontWeight: 600, fontSize: 16, color: designTokens.colors.text.primary }}>
+              <span
+                style={{ fontWeight: 600, fontSize: 16, color: designTokens.colors.text.primary }}
+              >
                 远端备份目标列表
               </span>
             </Space>
           }
           extra={
             <Space>
-              <Tag 
-                style={{ 
+              <Tag
+                style={{
                   borderRadius: designTokens.borderRadius.sm,
                   background: designTokens.colors.background.accent,
                   border: 'none',
@@ -1238,11 +1329,11 @@ const RemoteBackupSettings = () => {
             dataSource={targets}
             rowKey="id"
             loading={loading}
-            pagination={{ 
+            pagination={{
               pageSize: 10,
               showSizeChanger: true,
               showQuickJumper: true,
-              showTotal: (total) => `共 ${total} 个目标`,
+              showTotal: total => `共 ${total} 个目标`,
             }}
             scroll={{ x: 1100 }}
             locale={{
@@ -1251,21 +1342,27 @@ const RemoteBackupSettings = () => {
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
                   description={
                     <Space direction="vertical" size={8}>
-                      <div style={{
-                        width: 64,
-                        height: 64,
-                        margin: '0 auto',
-                        borderRadius: '50%',
-                        background: designTokens.colors.background.accent,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}>
-                        <CloudOutlined style={{ fontSize: 28, color: designTokens.colors.text.muted }} />
+                      <div
+                        style={{
+                          width: 64,
+                          height: 64,
+                          margin: '0 auto',
+                          borderRadius: '50%',
+                          background: designTokens.colors.background.accent,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <CloudOutlined
+                          style={{ fontSize: 28, color: designTokens.colors.text.muted }}
+                        />
                       </div>
                       <Text style={{ fontSize: 15, fontWeight: 500 }}>暂无远端备份目标</Text>
-                      <Text type="secondary" style={{ fontSize: 13 }}>点击下方按钮添加您的第一个远端备份目标</Text>
-                      <Button 
+                      <Text type="secondary" style={{ fontSize: 13 }}>
+                        点击下方按钮添加您的第一个远端备份目标
+                      </Text>
+                      <Button
                         type="primary"
                         icon={<PlusOutlined />}
                         onClick={handleAdd}
@@ -1286,35 +1383,39 @@ const RemoteBackupSettings = () => {
         </Card>
 
         {/* 帮助文档 */}
-        <Collapse 
-          accordion 
-          style={{ 
-            borderRadius: designTokens.borderRadius.lg, 
+        <Collapse
+          accordion
+          style={{
+            borderRadius: designTokens.borderRadius.lg,
             marginBottom: 24,
             border: 'none',
             boxShadow: designTokens.shadows.sm,
           }}
           bordered={false}
         >
-          <Panel 
+          <Panel
             header={
               <Space>
-                <div style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: designTokens.borderRadius.sm,
-                  background: designTokens.colors.info.gradient,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: designTokens.borderRadius.sm,
+                    background: designTokens.colors.info.gradient,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   <QuestionCircleOutlined style={{ color: '#fff', fontSize: 16 }} />
                 </div>
-                <span style={{ fontWeight: 600, color: designTokens.colors.text.primary }}>使用帮助与最佳实践</span>
+                <span style={{ fontWeight: 600, color: designTokens.colors.text.primary }}>
+                  使用帮助与最佳实践
+                </span>
               </Space>
             }
             key="help"
-            style={{ 
+            style={{
               border: 'none',
               background: designTokens.colors.background.secondary,
               borderRadius: designTokens.borderRadius.lg,
@@ -1322,41 +1423,59 @@ const RemoteBackupSettings = () => {
           >
             <Row gutter={[16, 16]}>
               <Col xs={24} md={12}>
-                <Card 
-                  size="small" 
+                <Card
+                  size="small"
                   title={
                     <Space>
                       <span style={{ fontSize: 16 }}>🎯</span>
                       <span>推荐配置</span>
                     </Space>
                   }
-                  style={{ 
+                  style={{
                     borderRadius: designTokens.borderRadius.md,
                     border: `1px solid ${designTokens.colors.border.light}`,
                   }}
                 >
-                  <ul style={{ paddingLeft: 20, margin: 0, color: designTokens.colors.text.secondary }}>
-                    <li><strong>多地备份：</strong>配置至少 2 个不同地理位置的目标</li>
-                    <li><strong>加密传输：</strong>敏感数据使用 SFTP 或 HTTPS 协议</li>
-                    <li><strong>定期测试：</strong>每月至少测试一次连接</li>
+                  <ul
+                    style={{
+                      paddingLeft: 20,
+                      margin: 0,
+                      color: designTokens.colors.text.secondary,
+                    }}
+                  >
+                    <li>
+                      <strong>多地备份：</strong>配置至少 2 个不同地理位置的目标
+                    </li>
+                    <li>
+                      <strong>加密传输：</strong>敏感数据使用 SFTP 或 HTTPS 协议
+                    </li>
+                    <li>
+                      <strong>定期测试：</strong>每月至少测试一次连接
+                    </li>
                   </ul>
                 </Card>
               </Col>
               <Col xs={24} md={12}>
-                <Card 
-                  size="small" 
+                <Card
+                  size="small"
                   title={
                     <Space>
                       <span style={{ fontSize: 16 }}>⚠️</span>
                       <span>注意事项</span>
                     </Space>
                   }
-                  style={{ 
+                  style={{
                     borderRadius: designTokens.borderRadius.md,
                     border: `1px solid ${designTokens.colors.border.light}`,
                   }}
                 >
-                  <ul style={{ paddingLeft: 20, margin: 0, color: designTokens.colors.text.secondary }}>
+                  <ul
+                    style={{
+                      paddingLeft: 20,
+                      margin: 0,
+                      color: designTokens.colors.text.secondary,
+                    }}
+                  >
                     <li>首次使用前请先测试连接</li>
                     <li>密码等敏感信息已加密存储</li>
                     <li>启用"删除本地文件"前请确保远端上传成功</li>
@@ -1383,38 +1502,24 @@ const RemoteBackupSettings = () => {
         }}
       >
         <div style={{ padding: '8px 0' }}>
-          <Title level={4} style={{ 
-            marginBottom: 24,
-            fontWeight: 600,
-            color: designTokens.colors.text.primary,
-          }}>
+          <Title
+            level={4}
+            style={{
+              marginBottom: 24,
+              fontWeight: 600,
+              color: designTokens.colors.text.primary,
+            }}
+          >
             {editingTarget ? '编辑远端备份目标' : '添加远端备份目标'}
           </Title>
 
-          <Steps
-            current={currentStep}
-            onChange={setCurrentStep}
-            style={{ marginBottom: 24 }}
-          >
-            <Steps.Step 
-              title="基本信息" 
-              icon={<SettingOutlined />}
-            />
-            <Steps.Step 
-              title="协议配置" 
-              icon={<CloudOutlined />}
-            />
-            <Steps.Step 
-              title="测试保存" 
-              icon={<CheckCircleOutlined />}
-            />
+          <Steps current={currentStep} onChange={setCurrentStep} style={{ marginBottom: 24 }}>
+            <Steps.Step title="基本信息" icon={<SettingOutlined />} />
+            <Steps.Step title="协议配置" icon={<CloudOutlined />} />
+            <Steps.Step title="测试保存" icon={<CheckCircleOutlined />} />
           </Steps>
 
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleSubmit}
-          >
+          <Form form={form} layout="vertical" onFinish={handleSubmit}>
             {/* 步骤 1: 基本信息 */}
             {currentStep === 0 && (
               <div>
@@ -1426,10 +1531,7 @@ const RemoteBackupSettings = () => {
                     { max: 50, message: '名称不能超过 50 个字符' },
                   ]}
                 >
-                  <Input 
-                    placeholder="例如：SFTP 备份服务器" 
-                    size="large"
-                  />
+                  <Input placeholder="例如：SFTP 备份服务器" size="large" />
                 </Form.Item>
 
                 {renderProtocolSelector()}
@@ -1440,15 +1542,12 @@ const RemoteBackupSettings = () => {
                   valuePropName="checked"
                   initialValue={true}
                 >
-                  <Switch 
-                    checkedChildren="启用" 
-                    unCheckedChildren="禁用" 
-                  />
+                  <Switch checkedChildren="启用" unCheckedChildren="禁用" />
                 </Form.Item>
 
                 <div style={{ marginTop: 24, textAlign: 'right' }}>
-                  <Button 
-                    type="primary" 
+                  <Button
+                    type="primary"
                     onClick={() => {
                       form.validateFields(['name', 'protocol']).then(() => {
                         setCurrentStep(1);
@@ -1469,18 +1568,16 @@ const RemoteBackupSettings = () => {
                 </Form.Item>
 
                 <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between' }}>
-                  <Button onClick={() => setCurrentStep(0)}>
-                    上一步
-                  </Button>
+                  <Button onClick={() => setCurrentStep(0)}>上一步</Button>
                   <Space>
-                    <Button 
+                    <Button
                       icon={<ThunderboltOutlined />}
                       onClick={handleTestConnection}
                       loading={testing}
                     >
                       测试连接
                     </Button>
-                    <Button 
+                    <Button
                       type="primary"
                       onClick={() => {
                         form.validateFields().then(() => {
@@ -1536,14 +1633,10 @@ const RemoteBackupSettings = () => {
                 )}
 
                 <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between' }}>
-                  <Button onClick={() => setCurrentStep(1)}>
-                    上一步
-                  </Button>
+                  <Button onClick={() => setCurrentStep(1)}>上一步</Button>
                   <Space>
-                    <Button onClick={() => setModalVisible(false)}>
-                      取消
-                    </Button>
-                    <Button 
+                    <Button onClick={() => setModalVisible(false)}>取消</Button>
+                    <Button
                       type="primary"
                       onClick={handleSubmit}
                       loading={loading}

@@ -6,7 +6,7 @@ const DeviceField = require('../models/DeviceField');
 router.get('/', async (req, res) => {
   try {
     const fields = await DeviceField.findAll({
-      order: [['order', 'ASC']]
+      order: [['order', 'ASC']],
     });
     res.json(fields);
   } catch (error) {
@@ -41,7 +41,7 @@ router.post('/', async (req, res) => {
 router.put('/:fieldId', async (req, res) => {
   try {
     const [updated] = await DeviceField.update(req.body, {
-      where: { fieldId: req.params.fieldId }
+      where: { fieldId: req.params.fieldId },
     });
     if (updated) {
       const updatedField = await DeviceField.findByPk(req.params.fieldId);
@@ -59,20 +59,20 @@ router.delete('/:fieldId', async (req, res) => {
   try {
     // 先查询字段信息
     const field = await DeviceField.findByPk(req.params.fieldId);
-    
+
     if (!field) {
       return res.status(404).json({ error: '字段不存在' });
     }
-    
+
     // 检查是否为系统字段
     if (field.isSystem) {
       return res.status(403).json({ error: '系统字段不可删除' });
     }
-    
+
     const deleted = await DeviceField.destroy({
-      where: { fieldId: req.params.fieldId }
+      where: { fieldId: req.params.fieldId },
     });
-    
+
     if (deleted) {
       res.status(204).json();
     } else {
@@ -87,17 +87,17 @@ router.delete('/:fieldId', async (req, res) => {
 router.post('/config', async (req, res) => {
   try {
     const fieldConfigs = req.body;
-    
+
     if (!Array.isArray(fieldConfigs)) {
       return res.status(400).json({ error: '输入必须是数组' });
     }
-    
+
     const updatedFields = [];
     for (const config of fieldConfigs) {
       const existingField = await DeviceField.findOne({ where: { fieldName: config.fieldName } });
-      
+
       if (existingField) {
-        await existingField.update({ 
+        await existingField.update({
           visible: config.visible !== undefined ? config.visible : existingField.visible,
           required: config.required !== undefined ? config.required : existingField.required,
           displayName: config.displayName || existingField.displayName,
@@ -115,7 +115,7 @@ router.post('/config', async (req, res) => {
         updatedFields.push(newField);
       }
     }
-    
+
     res.json(updatedFields);
   } catch (error) {
     res.status(500).json({ error: error.message });

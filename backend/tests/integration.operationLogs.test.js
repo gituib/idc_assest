@@ -28,14 +28,14 @@ describe('设备/用户/角色操作日志集成测试', () => {
       username: 'admin',
       password: '$2a$10$test',
       realName: '管理员',
-      status: 'active'
+      status: 'active',
     });
 
     testRoom = await Room.create({
       roomId: 'ROOM_INT_TEST',
       name: '测试机房',
       location: '测试位置',
-      status: 'active'
+      status: 'active',
     });
 
     testRack = await Rack.create({
@@ -46,12 +46,17 @@ describe('设备/用户/角色操作日志集成测试', () => {
       currentPower: 0,
       totalUnits: 48,
       usedUnits: 0,
-      status: 'active'
+      status: 'active',
     });
 
     app = createTestApp();
     authToken = jwt.sign(
-      { userId: adminUser.userId, username: adminUser.username, realName: adminUser.realName, roleName: '管理员' },
+      {
+        userId: adminUser.userId,
+        username: adminUser.username,
+        realName: adminUser.realName,
+        roleName: '管理员',
+      },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -101,7 +106,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         position: 1,
         height: 2,
         powerConsumption: 500,
-        status: 'running'
+        status: 'running',
       };
 
       const response = await request(app)
@@ -116,8 +121,8 @@ describe('设备/用户/角色操作日志集成测试', () => {
         where: {
           module: 'device',
           operationType: 'create',
-          targetId: response.body.deviceId
-        }
+          targetId: response.body.deviceId,
+        },
       });
 
       expect(logs.length).toBe(1);
@@ -135,7 +140,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         position: 5,
         height: 2,
         powerConsumption: 500,
-        status: 'offline'
+        status: 'offline',
       });
 
       const response = await request(app)
@@ -150,8 +155,8 @@ describe('设备/用户/角色操作日志集成测试', () => {
         where: {
           module: 'device',
           operationType: 'update',
-          targetId: device.deviceId
-        }
+          targetId: device.deviceId,
+        },
       });
 
       expect(logs.length).toBe(1);
@@ -168,7 +173,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         position: 10,
         height: 2,
         powerConsumption: 500,
-        status: 'running'
+        status: 'running',
       });
 
       await request(app)
@@ -180,8 +185,8 @@ describe('设备/用户/角色操作日志集成测试', () => {
         where: {
           module: 'device',
           operationType: 'delete',
-          targetId: device.deviceId
-        }
+          targetId: device.deviceId,
+        },
       });
 
       expect(logs.length).toBe(1);
@@ -197,7 +202,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         position: 15,
         height: 2,
         powerConsumption: 500,
-        status: 'running'
+        status: 'running',
       });
 
       const device2 = await Device.create({
@@ -208,7 +213,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         position: 20,
         height: 2,
         powerConsumption: 500,
-        status: 'running'
+        status: 'running',
       });
 
       const response = await request(app)
@@ -218,7 +223,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         .expect(200);
 
       const logs = await OperationLog.findAll({
-        where: { operationType: 'batch_delete' }
+        where: { operationType: 'batch_delete' },
       });
 
       expect(logs.length).toBe(1);
@@ -234,7 +239,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         position: 25,
         height: 2,
         powerConsumption: 500,
-        status: 'offline'
+        status: 'offline',
       });
 
       const device2 = await Device.create({
@@ -245,7 +250,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         position: 30,
         height: 2,
         powerConsumption: 500,
-        status: 'offline'
+        status: 'offline',
       });
 
       const response = await request(app)
@@ -255,7 +260,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         .expect(200);
 
       const logs = await OperationLog.findAll({
-        where: { operationType: 'status_change' }
+        where: { operationType: 'status_change' },
       });
 
       expect(logs.length).toBe(1);
@@ -273,7 +278,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         roleName: '测试角色',
         roleCode: `test_role_${Date.now()}`,
         permissions: ['read', 'write'],
-        status: 'active'
+        status: 'active',
       });
     });
 
@@ -283,7 +288,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         password: 'Password123!',
         realName: '集成测试用户',
         email: `test_${Date.now()}@example.com`,
-        roleIds: [testRole.roleId]
+        roleIds: [testRole.roleId],
       };
 
       const response = await request(app)
@@ -296,8 +301,8 @@ describe('设备/用户/角色操作日志集成测试', () => {
         where: {
           module: 'user',
           operationType: 'create',
-          targetName: userData.username
-        }
+          targetName: userData.username,
+        },
       });
 
       expect(logs.length).toBe(1);
@@ -314,7 +319,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         password: 'Password123!',
         realName: '旧名称用户',
         email: `old_${Date.now()}@example.com`,
-        status: 'active'
+        status: 'active',
       });
 
       const response = await request(app)
@@ -327,8 +332,8 @@ describe('设备/用户/角色操作日志集成测试', () => {
         where: {
           module: 'user',
           operationType: 'update',
-          targetId: user.userId
-        }
+          targetId: user.userId,
+        },
       });
 
       expect(logs.length).toBe(1);
@@ -345,7 +350,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         password: 'Password123!',
         realName: '角色测试用户',
         email: `role_${Date.now()}@example.com`,
-        status: 'active'
+        status: 'active',
       });
 
       const newRole = await Role.create({
@@ -353,12 +358,12 @@ describe('设备/用户/角色操作日志集成测试', () => {
         roleName: '新测试角色',
         roleCode: `new_role_${Date.now()}`,
         permissions: ['admin'],
-        status: 'active'
+        status: 'active',
       });
 
       await UserRole.create({
         UserId: user.userId,
-        RoleId: testRole.roleId
+        RoleId: testRole.roleId,
       });
 
       const response = await request(app)
@@ -371,8 +376,8 @@ describe('设备/用户/角色操作日志集成测试', () => {
         where: {
           module: 'user',
           operationType: 'permission_change',
-          targetId: user.userId
-        }
+          targetId: user.userId,
+        },
       });
 
       expect(logs.length).toBe(1);
@@ -391,7 +396,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         password: 'Password123!',
         realName: '删除测试用户',
         email: `del_${Date.now()}@example.com`,
-        status: 'active'
+        status: 'active',
       });
 
       await request(app)
@@ -403,8 +408,8 @@ describe('设备/用户/角色操作日志集成测试', () => {
         where: {
           module: 'user',
           operationType: 'delete',
-          targetId: user.userId
-        }
+          targetId: user.userId,
+        },
       });
 
       expect(logs.length).toBe(1);
@@ -419,7 +424,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         roleCode: `int_test_role_${Date.now()}`,
         description: '集成测试用角色',
         permissions: ['read', 'write'],
-        status: 'active'
+        status: 'active',
       };
 
       const response = await request(app)
@@ -432,8 +437,8 @@ describe('设备/用户/角色操作日志集成测试', () => {
         where: {
           module: 'role',
           operationType: 'create',
-          targetId: response.body.roleId
-        }
+          targetId: response.body.roleId,
+        },
       });
 
       expect(logs.length).toBe(1);
@@ -450,7 +455,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         roleCode: `old_role_${Date.now()}`,
         description: '旧描述',
         permissions: ['read'],
-        status: 'active'
+        status: 'active',
       });
 
       const response = await request(app)
@@ -458,7 +463,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           roleName: `新角色名_${Date.now()}`,
-          permissions: ['read', 'write', 'delete']
+          permissions: ['read', 'write', 'delete'],
         })
         .expect(200);
 
@@ -466,8 +471,8 @@ describe('设备/用户/角色操作日志集成测试', () => {
         where: {
           module: 'role',
           operationType: 'update',
-          targetId: role.roleId
-        }
+          targetId: role.roleId,
+        },
       });
 
       expect(logs.length).toBe(1);
@@ -484,7 +489,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         roleCode: `del_role_${Date.now()}`,
         description: '待删除',
         permissions: ['read'],
-        status: 'active'
+        status: 'active',
       });
 
       await request(app)
@@ -496,8 +501,8 @@ describe('设备/用户/角色操作日志集成测试', () => {
         where: {
           module: 'role',
           operationType: 'delete',
-          targetId: role.roleId
-        }
+          targetId: role.roleId,
+        },
       });
 
       expect(logs.length).toBe(1);
@@ -515,7 +520,7 @@ describe('设备/用户/角色操作日志集成测试', () => {
         position: 40,
         height: 2,
         powerConsumption: 500,
-        status: 'running'
+        status: 'running',
       });
 
       await request(app)
@@ -533,8 +538,8 @@ describe('设备/用户/角色操作日志集成测试', () => {
         where: {
           module: 'device',
           operationType: 'update',
-          targetId: device.deviceId
-        }
+          targetId: device.deviceId,
+        },
       });
 
       expect(logs.length).toBe(1);

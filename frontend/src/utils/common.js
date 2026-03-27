@@ -30,7 +30,7 @@ export const getUserFromStorage = () => {
   }
 };
 
-export const formatFileSize = (bytes) => {
+export const formatFileSize = bytes => {
   if (bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -42,6 +42,6 @@ export const generateId = (prefix = '') => {
   return `${prefix}${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
 };
 
-export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+export const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 export const clamp = (value, min, max) => Math.min(Math.max(value, min), max);

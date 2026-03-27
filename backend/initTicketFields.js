@@ -8,7 +8,7 @@ const defaultTicketFields = [
     fieldType: 'string',
     required: true,
     order: 1,
-    visible: true
+    visible: true,
   },
   {
     fieldName: 'title',
@@ -16,7 +16,7 @@ const defaultTicketFields = [
     fieldType: 'string',
     required: true,
     order: 2,
-    visible: true
+    visible: true,
   },
   {
     fieldName: 'deviceName',
@@ -24,7 +24,7 @@ const defaultTicketFields = [
     fieldType: 'string',
     required: false,
     order: 3,
-    visible: true
+    visible: true,
   },
   {
     fieldName: 'serialNumber',
@@ -32,7 +32,7 @@ const defaultTicketFields = [
     fieldType: 'string',
     required: false,
     order: 4,
-    visible: true
+    visible: true,
   },
   {
     fieldName: 'faultCategory',
@@ -41,7 +41,7 @@ const defaultTicketFields = [
     required: true,
     order: 5,
     visible: true,
-    options: []
+    options: [],
   },
   {
     fieldName: 'priority',
@@ -54,8 +54,8 @@ const defaultTicketFields = [
       { value: 'low', label: '低' },
       { value: 'medium', label: '中' },
       { value: 'high', label: '高' },
-      { value: 'urgent', label: '紧急' }
-    ]
+      { value: 'urgent', label: '紧急' },
+    ],
   },
   {
     fieldName: 'status',
@@ -68,8 +68,8 @@ const defaultTicketFields = [
       { value: 'pending', label: '待处理' },
       { value: 'in_progress', label: '处理中' },
       { value: 'completed', label: '已完成' },
-      { value: 'closed', label: '已关闭' }
-    ]
+      { value: 'closed', label: '已关闭' },
+    ],
   },
   {
     fieldName: 'reporterName',
@@ -77,7 +77,7 @@ const defaultTicketFields = [
     fieldType: 'string',
     required: false,
     order: 8,
-    visible: true
+    visible: true,
   },
   {
     fieldName: 'createdAt',
@@ -85,7 +85,7 @@ const defaultTicketFields = [
     fieldType: 'datetime',
     required: false,
     order: 9,
-    visible: true
+    visible: true,
   },
   {
     fieldName: 'expectedCompletionDate',
@@ -93,7 +93,7 @@ const defaultTicketFields = [
     fieldType: 'datetime',
     required: false,
     order: 10,
-    visible: true
+    visible: true,
   },
   {
     fieldName: 'completionDate',
@@ -101,7 +101,7 @@ const defaultTicketFields = [
     fieldType: 'datetime',
     required: false,
     order: 11,
-    visible: true
+    visible: true,
   },
   {
     fieldName: 'description',
@@ -110,7 +110,7 @@ const defaultTicketFields = [
     required: false,
     order: 12,
     visible: true,
-    placeholder: '请详细描述故障情况'
+    placeholder: '请详细描述故障情况',
   },
   {
     fieldName: 'resolution',
@@ -119,7 +119,7 @@ const defaultTicketFields = [
     required: false,
     order: 13,
     visible: true,
-    placeholder: '请输入解决方案'
+    placeholder: '请输入解决方案',
   },
   {
     fieldName: 'location',
@@ -127,8 +127,8 @@ const defaultTicketFields = [
     fieldType: 'string',
     required: false,
     order: 14,
-    visible: false
-  }
+    visible: false,
+  },
 ];
 
 async function initializeTicketFields() {

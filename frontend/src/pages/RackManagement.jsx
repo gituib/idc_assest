@@ -439,7 +439,9 @@ function RackManagement() {
       cancelText: '取消',
       onOk: async () => {
         try {
-          const results = await Promise.allSettled(selectedRackIds.map(id => axios.delete(`/api/racks/${id}`)));
+          const results = await Promise.allSettled(
+            selectedRackIds.map(id => axios.delete(`/api/racks/${id}`))
+          );
           const succeeded = results.filter(r => r.status === 'fulfilled').length;
           const failed = results.filter(r => r.status === 'rejected');
           if (succeeded > 0) {
@@ -537,14 +539,14 @@ function RackManagement() {
           failedCount: 0,
           errors: [],
           createdRacks: resData.createdRacks || [],
-          skippedRacks: resData.skippedRacks || []
+          skippedRacks: resData.skippedRacks || [],
         };
 
         if (resData.details && Array.isArray(resData.details)) {
           importResult.failedCount = resData.details.length;
           importResult.errors = resData.details.map(item => ({
             row: item.row,
-            error: item.errors.join('；')
+            error: item.errors.join('；'),
           }));
         }
 
@@ -571,8 +573,8 @@ function RackManagement() {
             failedCount: errorData.details.length,
             errors: errorData.details.map(item => ({
               row: item.row,
-              error: item.errors.join('；')
-            }))
+              error: item.errors.join('；'),
+            })),
           };
           setImportResult(importResult);
           setImportPhase('导入失败');
@@ -654,7 +656,9 @@ function RackManagement() {
           </Text>
         );
       },
-      sorter: (a, b) => (a.Devices?.reduce((sum, d) => sum + (d.height || 1), 0) || 0) - (b.Devices?.reduce((sum, d) => sum + (d.height || 1), 0) || 0),
+      sorter: (a, b) =>
+        (a.Devices?.reduce((sum, d) => sum + (d.height || 1), 0) || 0) -
+        (b.Devices?.reduce((sum, d) => sum + (d.height || 1), 0) || 0),
     },
     {
       title: '功率使用',
@@ -1437,14 +1441,16 @@ function RackManagement() {
                   <p style={{ fontWeight: '600', marginBottom: '8px', color: '#52c41a' }}>
                     ✓ 本次新增机柜（{importResult.createdRacks.length}）：
                   </p>
-                  <div style={{
-                    maxHeight: '150px',
-                    overflow: 'auto',
-                    background: '#f6ffed',
-                    border: '1px solid #b7eb8f',
-                    borderRadius: '8px',
-                    padding: '12px'
-                  }}>
+                  <div
+                    style={{
+                      maxHeight: '150px',
+                      overflow: 'auto',
+                      background: '#f6ffed',
+                      border: '1px solid #b7eb8f',
+                      borderRadius: '8px',
+                      padding: '12px',
+                    }}
+                  >
                     {importResult.createdRacks.map((rack, idx) => (
                       <div key={idx} style={{ fontSize: '13px', marginBottom: '4px' }}>
                         • {rack.rackId} - {rack.name}
@@ -1459,14 +1465,16 @@ function RackManagement() {
                   <p style={{ fontWeight: '600', marginBottom: '8px', color: '#faad14' }}>
                     ⚠ 已跳过机柜（{importResult.skippedRacks.length}）：
                   </p>
-                  <div style={{
-                    maxHeight: '150px',
-                    overflow: 'auto',
-                    background: '#fffbe6',
-                    border: '1px solid #ffe58f',
-                    borderRadius: '8px',
-                    padding: '12px'
-                  }}>
+                  <div
+                    style={{
+                      maxHeight: '150px',
+                      overflow: 'auto',
+                      background: '#fffbe6',
+                      border: '1px solid #ffe58f',
+                      borderRadius: '8px',
+                      padding: '12px',
+                    }}
+                  >
                     {importResult.skippedRacks.map((rack, idx) => (
                       <div key={idx} style={{ fontSize: '13px', marginBottom: '4px' }}>
                         • {rack.rackId} - {rack.name}
@@ -1478,7 +1486,9 @@ function RackManagement() {
 
               {importResult.errors && importResult.errors.length > 0 && (
                 <div style={{ marginBottom: '20px' }}>
-                  <p style={{ fontWeight: '600', marginBottom: '8px', color: '#ff4d4f' }}>错误详情：</p>
+                  <p style={{ fontWeight: '600', marginBottom: '8px', color: '#ff4d4f' }}>
+                    错误详情：
+                  </p>
                   {importResult.errors.slice(0, 5).map((err, idx) => (
                     <div
                       key={idx}

@@ -48,7 +48,7 @@ import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 
-const formatBytes = (bytes) => {
+const formatBytes = bytes => {
   if (bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
@@ -56,7 +56,7 @@ const formatBytes = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-const formatDateTime = (dateStr) => {
+const formatDateTime = dateStr => {
   if (!dateStr) return '-';
   return new Date(dateStr).toLocaleString('zh-CN');
 };
@@ -181,17 +181,19 @@ const BackupManagement = () => {
         message.error(response.data?.message || '备份创建失败');
       }
     } catch (error) {
-      message.error('备份创建失败: ' + (error.response?.data?.message || error.message || '未知错误'));
+      message.error(
+        '备份创建失败: ' + (error.response?.data?.message || error.message || '未知错误')
+      );
     } finally {
       setBackupLoading(false);
     }
   };
 
-  const handleDownload = (filename) => {
+  const handleDownload = filename => {
     window.open(`/api/backup/download/${filename}`, '_blank');
   };
 
-  const handleValidate = async (filename) => {
+  const handleValidate = async filename => {
     try {
       const response = await api.get(`/backup/validate/${filename}`);
       if (response?.success && response.data?.valid) {
@@ -199,15 +201,17 @@ const BackupManagement = () => {
         Modal.info({
           title: (
             <Space>
-              <div style={{
-                width: 40,
-                height: 40,
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
                 <CheckCircleOutlined style={{ color: '#fff', fontSize: 24 }} />
               </div>
               <span style={{ fontSize: '20px', fontWeight: 700 }}>备份文件验证通过</span>
@@ -217,14 +221,16 @@ const BackupManagement = () => {
           content: (
             <div style={{ marginTop: 16 }}>
               {/* 基本信息 */}
-              <div style={{ 
-                padding: '16px', 
-                background: designTokens.colors.background.accent,
-                borderRadius: designTokens.borderRadius.md,
-                marginBottom: 16,
-              }}>
-                <Descriptions 
-                  column={2} 
+              <div
+                style={{
+                  padding: '16px',
+                  background: designTokens.colors.background.accent,
+                  borderRadius: designTokens.borderRadius.md,
+                  marginBottom: 16,
+                }}
+              >
+                <Descriptions
+                  column={2}
                   size="small"
                   colon={false}
                   labelStyle={{ fontWeight: 600, color: designTokens.colors.text.muted }}
@@ -234,13 +240,11 @@ const BackupManagement = () => {
                   <Descriptions.Item label="类型">
                     <Tag color="blue">{data.backupType === 'full' ? '完整备份' : '部分备份'}</Tag>
                   </Descriptions.Item>
-                  <Descriptions.Item label="创建时间">{formatDateTime(data.timestamp)}</Descriptions.Item>
+                  <Descriptions.Item label="创建时间">
+                    {formatDateTime(data.timestamp)}
+                  </Descriptions.Item>
                   <Descriptions.Item label="压缩">
-                    {data.compressed ? (
-                      <Tag color="green">是</Tag>
-                    ) : (
-                      <Tag>否</Tag>
-                    )}
+                    {data.compressed ? <Tag color="green">是</Tag> : <Tag>否</Tag>}
                   </Descriptions.Item>
                   {data.description && (
                     <Descriptions.Item label="描述" span={2}>
@@ -252,67 +256,92 @@ const BackupManagement = () => {
 
               {/* 系统信息 */}
               {data.systemInfo && (
-                <div style={{ 
-                  padding: '16px', 
-                  background: designTokens.colors.background.accent,
-                  borderRadius: designTokens.borderRadius.md,
-                  marginBottom: 16,
-                }}>
-                  <p style={{ 
-                    margin: '0 0 12px 0', 
-                    fontWeight: 600, 
-                    color: designTokens.colors.text.primary,
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}>
+                <div
+                  style={{
+                    padding: '16px',
+                    background: designTokens.colors.background.accent,
+                    borderRadius: designTokens.borderRadius.md,
+                    marginBottom: 16,
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: '0 0 12px 0',
+                      fontWeight: 600,
+                      color: designTokens.colors.text.primary,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
                     <DatabaseOutlined style={{ marginRight: 8 }} />
                     系统环境信息
                   </p>
-                  <Descriptions 
-                    column={2} 
+                  <Descriptions
+                    column={2}
                     size="small"
                     colon={false}
-                    labelStyle={{ fontWeight: 500, color: designTokens.colors.text.muted, fontSize: 12 }}
-                    contentStyle={{ fontWeight: 500, color: designTokens.colors.text.secondary, fontSize: 13 }}
+                    labelStyle={{
+                      fontWeight: 500,
+                      color: designTokens.colors.text.muted,
+                      fontSize: 12,
+                    }}
+                    contentStyle={{
+                      fontWeight: 500,
+                      color: designTokens.colors.text.secondary,
+                      fontSize: 13,
+                    }}
                   >
-                    <Descriptions.Item label="Node.js 版本">{data.systemInfo.nodeVersion}</Descriptions.Item>
-                    <Descriptions.Item label="操作系统">{data.systemInfo.platform}</Descriptions.Item>
+                    <Descriptions.Item label="Node.js 版本">
+                      {data.systemInfo.nodeVersion}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="操作系统">
+                      {data.systemInfo.platform}
+                    </Descriptions.Item>
                     <Descriptions.Item label="系统架构">{data.systemInfo.arch}</Descriptions.Item>
-                    <Descriptions.Item label="数据库类型">{data.systemInfo.dbType}</Descriptions.Item>
+                    <Descriptions.Item label="数据库类型">
+                      {data.systemInfo.dbType}
+                    </Descriptions.Item>
                   </Descriptions>
                 </div>
               )}
 
               {/* 数据表统计 */}
-              <div style={{ 
-                padding: '16px', 
-                background: designTokens.colors.background.accent,
-                borderRadius: designTokens.borderRadius.md,
-                marginBottom: 16,
-              }}>
-                <p style={{ 
-                  margin: '0 0 12px 0', 
-                  fontWeight: 600, 
-                  color: designTokens.colors.text.primary,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}>
+              <div
+                style={{
+                  padding: '16px',
+                  background: designTokens.colors.background.accent,
+                  borderRadius: designTokens.borderRadius.md,
+                  marginBottom: 16,
+                }}
+              >
+                <p
+                  style={{
+                    margin: '0 0 12px 0',
+                    fontWeight: 600,
+                    color: designTokens.colors.text.primary,
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
                   <DatabaseOutlined style={{ marginRight: 8 }} />
-                  数据表详情（共 {data.metadata?.tableCount} 个表，{data.metadata?.totalRecords} 条记录）
+                  数据表详情（共 {data.metadata?.tableCount} 个表，{data.metadata?.totalRecords}{' '}
+                  条记录）
                 </p>
                 {data.details?.tables && (
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(2, 1fr)', 
-                    gap: '8px',
-                    maxHeight: '300px',
-                    overflowY: 'auto',
-                    padding: '8px',
-                    background: designTokens.colors.background.secondary,
-                    borderRadius: designTokens.borderRadius.sm,
-                  }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(2, 1fr)',
+                      gap: '8px',
+                      maxHeight: '300px',
+                      overflowY: 'auto',
+                      padding: '8px',
+                      background: designTokens.colors.background.secondary,
+                      borderRadius: designTokens.borderRadius.sm,
+                    }}
+                  >
                     {Object.entries(data.details.tables).map(([tableName, tableInfo]) => (
-                      <div 
+                      <div
                         key={tableName}
                         style={{
                           padding: '10px 12px',
@@ -325,23 +354,30 @@ const BackupManagement = () => {
                         }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <span style={{ 
-                            fontWeight: 600, 
-                            color: designTokens.colors.text.primary,
-                            fontSize: 14,
-                          }}>
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              color: designTokens.colors.text.primary,
+                              fontSize: 14,
+                            }}
+                          >
                             {tableInfo.displayName || tableName}
                           </span>
                           {tableInfo.displayName !== tableName && (
-                            <span style={{ 
-                              fontSize: 11, 
-                              color: designTokens.colors.text.muted,
-                            }}>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: designTokens.colors.text.muted,
+                              }}
+                            >
                               {tableName}
                             </span>
                           )}
                         </div>
-                        <Tag color={tableInfo.hasData ? 'green' : 'default'} style={{ borderRadius: '4px' }}>
+                        <Tag
+                          color={tableInfo.hasData ? 'green' : 'default'}
+                          style={{ borderRadius: '4px' }}
+                        >
                           {tableInfo.recordCount} 条
                         </Tag>
                       </div>
@@ -352,47 +388,51 @@ const BackupManagement = () => {
 
               {/* 文件备份详情 */}
               {data.details?.files && data.details.files.total > 0 && (
-                <div style={{ 
-                  padding: '16px', 
-                  background: designTokens.colors.background.accent,
-                  borderRadius: designTokens.borderRadius.md,
-                  marginBottom: 16,
-                }}>
-                  <p style={{ 
-                    margin: '0 0 12px 0', 
-                    fontWeight: 600, 
-                    color: designTokens.colors.text.primary,
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}>
+                <div
+                  style={{
+                    padding: '16px',
+                    background: designTokens.colors.background.accent,
+                    borderRadius: designTokens.borderRadius.md,
+                    marginBottom: 16,
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: '0 0 12px 0',
+                      fontWeight: 600,
+                      color: designTokens.colors.text.primary,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
                     <FileTextOutlined style={{ marginRight: 8 }} />
                     备份文件详情（共 {data.details.files.total} 个文件）
                   </p>
-                  
+
                   {data.details.files.avatars > 0 && (
                     <div style={{ marginBottom: 12 }}>
-                      <p style={{ 
-                        margin: '0 0 8px 0', 
-                        fontSize: 13, 
-                        fontWeight: 500,
-                        color: designTokens.colors.text.secondary,
-                      }}>
+                      <p
+                        style={{
+                          margin: '0 0 8px 0',
+                          fontSize: 13,
+                          fontWeight: 500,
+                          color: designTokens.colors.text.secondary,
+                        }}
+                      >
                         头像文件 ({data.details.files.avatars} 个):
                       </p>
-                      <div style={{ 
-                        display: 'flex', 
-                        flexWrap: 'wrap', 
-                        gap: '6px',
-                        padding: '8px',
-                        background: designTokens.colors.background.secondary,
-                        borderRadius: designTokens.borderRadius.sm,
-                      }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '6px',
+                          padding: '8px',
+                          background: designTokens.colors.background.secondary,
+                          borderRadius: designTokens.borderRadius.sm,
+                        }}
+                      >
                         {data.details.files.avatarList.map((file, index) => (
-                          <Tag 
-                            key={index} 
-                            color="blue"
-                            style={{ borderRadius: '4px', margin: 0 }}
-                          >
+                          <Tag key={index} color="blue" style={{ borderRadius: '4px', margin: 0 }}>
                             <FileTextOutlined style={{ marginRight: 4 }} />
                             {file.filename} ({formatBytes(file.size)})
                           </Tag>
@@ -400,28 +440,32 @@ const BackupManagement = () => {
                       </div>
                     </div>
                   )}
-                  
+
                   {data.details.files.others > 0 && (
                     <div>
-                      <p style={{ 
-                        margin: '0 0 8px 0', 
-                        fontSize: 13, 
-                        fontWeight: 500,
-                        color: designTokens.colors.text.secondary,
-                      }}>
+                      <p
+                        style={{
+                          margin: '0 0 8px 0',
+                          fontSize: 13,
+                          fontWeight: 500,
+                          color: designTokens.colors.text.secondary,
+                        }}
+                      >
                         其他文件 ({data.details.files.others} 个):
                       </p>
-                      <div style={{ 
-                        display: 'flex', 
-                        flexWrap: 'wrap', 
-                        gap: '6px',
-                        padding: '8px',
-                        background: designTokens.colors.background.secondary,
-                        borderRadius: designTokens.borderRadius.sm,
-                      }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '6px',
+                          padding: '8px',
+                          background: designTokens.colors.background.secondary,
+                          borderRadius: designTokens.borderRadius.sm,
+                        }}
+                      >
                         {data.details.files.otherList.map((file, index) => (
-                          <Tag 
-                            key={index} 
+                          <Tag
+                            key={index}
                             color="purple"
                             style={{ borderRadius: '4px', margin: 0 }}
                           >
@@ -436,85 +480,101 @@ const BackupManagement = () => {
               )}
 
               {/* 汇总信息 */}
-              <div style={{ 
-                padding: '16px', 
-                background: designTokens.colors.primary.main + '08',
-                borderRadius: designTokens.borderRadius.md,
-                border: `1px solid ${designTokens.colors.primary.main}20`,
-              }}>
-                <p style={{ 
-                  margin: '0 0 12px 0', 
-                  fontWeight: 600, 
-                  color: designTokens.colors.text.primary,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}>
+              <div
+                style={{
+                  padding: '16px',
+                  background: designTokens.colors.primary.main + '08',
+                  borderRadius: designTokens.borderRadius.md,
+                  border: `1px solid ${designTokens.colors.primary.main}20`,
+                }}
+              >
+                <p
+                  style={{
+                    margin: '0 0 12px 0',
+                    fontWeight: 600,
+                    color: designTokens.colors.text.primary,
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
                   <InfoCircleOutlined style={{ marginRight: 8 }} />
                   备份汇总
                 </p>
                 <Row gutter={[16, 16]}>
                   <Col span={8}>
                     <div style={{ textAlign: 'center' }}>
-                      <p style={{ 
-                        margin: 0, 
-                        fontSize: '24px', 
-                        fontWeight: 700,
-                        background: designTokens.colors.primary.gradient,
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                      }}>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: '24px',
+                          fontWeight: 700,
+                          background: designTokens.colors.primary.gradient,
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          backgroundClip: 'text',
+                        }}
+                      >
                         {data.metadata?.tableCount}
                       </p>
-                      <p style={{ 
-                        margin: '4px 0 0 0', 
-                        fontSize: 12, 
-                        color: designTokens.colors.text.muted 
-                      }}>
+                      <p
+                        style={{
+                          margin: '4px 0 0 0',
+                          fontSize: 12,
+                          color: designTokens.colors.text.muted,
+                        }}
+                      >
                         数据表
                       </p>
                     </div>
                   </Col>
                   <Col span={8}>
                     <div style={{ textAlign: 'center' }}>
-                      <p style={{ 
-                        margin: 0, 
-                        fontSize: '24px', 
-                        fontWeight: 700,
-                        background: designTokens.colors.success.gradient,
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                      }}>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: '24px',
+                          fontWeight: 700,
+                          background: designTokens.colors.success.gradient,
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          backgroundClip: 'text',
+                        }}
+                      >
                         {data.metadata?.totalRecords}
                       </p>
-                      <p style={{ 
-                        margin: '4px 0 0 0', 
-                        fontSize: 12, 
-                        color: designTokens.colors.text.muted 
-                      }}>
+                      <p
+                        style={{
+                          margin: '4px 0 0 0',
+                          fontSize: 12,
+                          color: designTokens.colors.text.muted,
+                        }}
+                      >
                         记录数
                       </p>
                     </div>
                   </Col>
                   <Col span={8}>
                     <div style={{ textAlign: 'center' }}>
-                      <p style={{ 
-                        margin: 0, 
-                        fontSize: '24px', 
-                        fontWeight: 700,
-                        background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                      }}>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: '24px',
+                          fontWeight: 700,
+                          background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          backgroundClip: 'text',
+                        }}
+                      >
                         {data.metadata?.fileCount}
                       </p>
-                      <p style={{ 
-                        margin: '4px 0 0 0', 
-                        fontSize: 12, 
-                        color: designTokens.colors.text.muted 
-                      }}>
+                      <p
+                        style={{
+                          margin: '4px 0 0 0',
+                          fontSize: 12,
+                          color: designTokens.colors.text.muted,
+                        }}
+                      >
                         文件数
                       </p>
                     </div>
@@ -540,7 +600,7 @@ const BackupManagement = () => {
     }
   };
 
-  const handleRestore = async (filename) => {
+  const handleRestore = async filename => {
     setRestoreLoading(true);
     setRestoreProgress(0);
     setRestoreStatus('正在初始化...');
@@ -550,28 +610,28 @@ const BackupManagement = () => {
       overwriteExisting: true,
       skipFiles: false,
     };
-    
+
     const eventSource = new EventSource(
       `/api/backup/restore-progress/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}&options=${encodeURIComponent(JSON.stringify(options))}`
     );
 
     let resultData = null;
 
-    eventSource.onmessage = (event) => {
+    eventSource.onmessage = event => {
       try {
         const data = JSON.parse(event.data);
-        
+
         setRestoreProgress(data.progress);
         setRestoreStatus(data.message);
 
         if (data.stage === 'complete') {
           resultData = data.result;
           eventSource.close();
-          
+
           setTimeout(() => {
             setRestoreVisible(false);
             setRestoreLoading(false);
-            
+
             const successIconStyle = {
               width: 56,
               height: 56,
@@ -659,217 +719,277 @@ const BackupManagement = () => {
                       animation: shimmer 2s infinite linear;
                     }
                   `}</style>
-                  
-                  <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    alignItems: 'center',
-                    marginBottom: 24,
-                    animation: 'slideUp 0.5s ease forwards',
-                  }}>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      marginBottom: 24,
+                      animation: 'slideUp 0.5s ease forwards',
+                    }}
+                  >
                     <div style={successIconStyle}>
                       <CheckCircleOutlined style={{ color: '#fff', fontSize: 28 }} />
                     </div>
-                    <h2 style={{ 
-                      margin: '16px 0 4px 0', 
-                      fontSize: '24px', 
-                      fontWeight: 700,
-                      color: '#1e293b',
-                    }}>
+                    <h2
+                      style={{
+                        margin: '16px 0 4px 0',
+                        fontSize: '24px',
+                        fontWeight: 700,
+                        color: '#1e293b',
+                      }}
+                    >
                       数据恢复成功
                     </h2>
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      background: '#ecfdf5',
-                      border: '1px solid #a7f3d0',
-                    }}>
-                      <span style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        background: '#10b981',
-                      }} />
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        background: '#ecfdf5',
+                        border: '1px solid #a7f3d0',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: '#10b981',
+                        }}
+                      />
                       <span style={{ fontSize: 12, color: '#059669', fontWeight: 500 }}>
                         所有数据已安全恢复
                       </span>
                     </div>
                   </div>
 
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(4, 1fr)', 
-                    gap: 12,
-                    marginBottom: 20,
-                    animation: 'slideUp 0.5s ease 0.1s forwards',
-                    opacity: 0,
-                  }}>
-                    <div className="stat-card" style={statCardStyle(
-                      'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                      'rgba(99, 102, 241, 0.25)'
-                    )}>
-                      <DatabaseOutlined style={{ fontSize: 20, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }} />
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(4, 1fr)',
+                      gap: 12,
+                      marginBottom: 20,
+                      animation: 'slideUp 0.5s ease 0.1s forwards',
+                      opacity: 0,
+                    }}
+                  >
+                    <div
+                      className="stat-card"
+                      style={statCardStyle(
+                        'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                        'rgba(99, 102, 241, 0.25)'
+                      )}
+                    >
+                      <DatabaseOutlined
+                        style={{ fontSize: 20, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }}
+                      />
                       <p style={statValueStyle}>{resultData?.tablesRestored || 0}</p>
                       <p style={statLabelStyle}>恢复表数</p>
                     </div>
-                    
-                    <div className="stat-card" style={statCardStyle(
-                      'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      'rgba(16, 185, 129, 0.25)'
-                    )}>
-                      <TableOutlined style={{ fontSize: 20, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }} />
+
+                    <div
+                      className="stat-card"
+                      style={statCardStyle(
+                        'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        'rgba(16, 185, 129, 0.25)'
+                      )}
+                    >
+                      <TableOutlined
+                        style={{ fontSize: 20, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }}
+                      />
                       <p style={statValueStyle}>{resultData?.recordsRestored || 0}</p>
                       <p style={statLabelStyle}>恢复记录</p>
                     </div>
-                    
-                    <div className="stat-card" style={statCardStyle(
-                      'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                      'rgba(245, 158, 11, 0.25)'
-                    )}>
-                      <FileTextOutlined style={{ fontSize: 20, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }} />
+
+                    <div
+                      className="stat-card"
+                      style={statCardStyle(
+                        'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        'rgba(245, 158, 11, 0.25)'
+                      )}
+                    >
+                      <FileTextOutlined
+                        style={{ fontSize: 20, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }}
+                      />
                       <p style={statValueStyle}>{resultData?.filesRestored || 0}</p>
                       <p style={statLabelStyle}>恢复文件</p>
                     </div>
-                    
-                    <div className="stat-card" style={statCardStyle(
-                      'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                      'rgba(139, 92, 246, 0.25)'
-                    )}>
-                      <ClockCircleOutlined style={{ fontSize: 20, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }} />
-                      <p style={{...statValueStyle, fontSize: '18px'}}>{formatDateTime(resultData?.restoredAt)}</p>
+
+                    <div
+                      className="stat-card"
+                      style={statCardStyle(
+                        'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                        'rgba(139, 92, 246, 0.25)'
+                      )}
+                    >
+                      <ClockCircleOutlined
+                        style={{ fontSize: 20, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }}
+                      />
+                      <p style={{ ...statValueStyle, fontSize: '18px' }}>
+                        {formatDateTime(resultData?.restoredAt)}
+                      </p>
                       <p style={statLabelStyle}>恢复时间</p>
                     </div>
                   </div>
 
                   {resultData?.tableDetails && Object.keys(resultData.tableDetails).length > 0 && (
-                    <div style={{ 
-                      padding: '16px', 
-                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                      borderRadius: '16px',
-                      border: '1px solid #e2e8f0',
-                      marginBottom: 16,
-                      animation: 'slideUp 0.5s ease 0.2s forwards',
-                      opacity: 0,
-                    }}>
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'space-between',
-                        marginBottom: 12,
-                      }}>
+                    <div
+                      style={{
+                        padding: '16px',
+                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                        borderRadius: '16px',
+                        border: '1px solid #e2e8f0',
+                        marginBottom: 16,
+                        animation: 'slideUp 0.5s ease 0.2s forwards',
+                        opacity: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: 12,
+                        }}
+                      >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: '8px',
-                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}>
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: '8px',
+                              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
                             <DatabaseOutlined style={{ color: '#fff', fontSize: 16 }} />
                           </div>
                           <span style={{ fontWeight: 600, color: '#1e293b', fontSize: 15 }}>
                             数据表恢复详情
                           </span>
                         </div>
-                        <Tag style={{
-                          background: '#eef2ff',
-                          border: '1px solid #c7d2fe',
-                          color: '#4f46e5',
-                          borderRadius: '6px',
-                          padding: '2px 8px',
-                        }}>
+                        <Tag
+                          style={{
+                            background: '#eef2ff',
+                            border: '1px solid #c7d2fe',
+                            color: '#4f46e5',
+                            borderRadius: '6px',
+                            padding: '2px 8px',
+                          }}
+                        >
                           共 {Object.keys(resultData.tableDetails).length} 个表
                         </Tag>
                       </div>
-                      
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(2, 1fr)', 
-                        gap: 8,
-                        maxHeight: '240px',
-                        overflowY: 'auto',
-                        padding: '4px',
-                      }}>
-                        {Object.entries(resultData.tableDetails).map(([tableName, tableInfo], index) => (
-                          <div 
-                            key={tableName}
-                            className="table-card"
-                            style={{
-                              ...tableCardStyle,
-                              animationDelay: `${index * 0.03}s`,
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <div style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: '50%',
-                                background: tableInfo.success ? '#10b981' : '#94a3b8',
-                                boxShadow: tableInfo.success ? '0 0 8px rgba(16, 185, 129, 0.5)' : 'none',
-                              }} />
-                              <span style={{ 
-                                fontWeight: 600, 
-                                color: '#334155',
-                                fontSize: 13,
-                              }}>
-                                {tableInfo.displayName || tableName}
-                              </span>
+
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(2, 1fr)',
+                          gap: 8,
+                          maxHeight: '240px',
+                          overflowY: 'auto',
+                          padding: '4px',
+                        }}
+                      >
+                        {Object.entries(resultData.tableDetails).map(
+                          ([tableName, tableInfo], index) => (
+                            <div
+                              key={tableName}
+                              className="table-card"
+                              style={{
+                                ...tableCardStyle,
+                                animationDelay: `${index * 0.03}s`,
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div
+                                  style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: '50%',
+                                    background: tableInfo.success ? '#10b981' : '#94a3b8',
+                                    boxShadow: tableInfo.success
+                                      ? '0 0 8px rgba(16, 185, 129, 0.5)'
+                                      : 'none',
+                                  }}
+                                />
+                                <span
+                                  style={{
+                                    fontWeight: 600,
+                                    color: '#334155',
+                                    fontSize: 13,
+                                  }}
+                                >
+                                  {tableInfo.displayName || tableName}
+                                </span>
+                              </div>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  background: tableInfo.success ? '#ecfdf5' : '#f1f5f9',
+                                  border: `1px solid ${tableInfo.success ? '#a7f3d0' : '#e2e8f0'}`,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    color: tableInfo.success ? '#059669' : '#64748b',
+                                  }}
+                                >
+                                  {tableInfo.recordCount}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    color: tableInfo.success ? '#10b981' : '#94a3b8',
+                                  }}
+                                >
+                                  条
+                                </span>
+                              </div>
                             </div>
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              background: tableInfo.success ? '#ecfdf5' : '#f1f5f9',
-                              border: `1px solid ${tableInfo.success ? '#a7f3d0' : '#e2e8f0'}`,
-                            }}>
-                              <span style={{ 
-                                fontSize: 13, 
-                                fontWeight: 600,
-                                color: tableInfo.success ? '#059669' : '#64748b',
-                              }}>
-                                {tableInfo.recordCount}
-                              </span>
-                              <span style={{ 
-                                fontSize: 11, 
-                                color: tableInfo.success ? '#10b981' : '#94a3b8',
-                              }}>
-                                条
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                          )
+                        )}
                       </div>
                     </div>
                   )}
 
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '14px 16px',
-                    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                    borderRadius: '12px',
-                    border: '1px solid #bfdbfe',
-                    animation: 'slideUp 0.5s ease 0.3s forwards',
-                    opacity: 0,
-                  }}>
-                    <div style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '10px',
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  <div
+                    style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}>
+                      gap: 12,
+                      padding: '14px 16px',
+                      background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                      borderRadius: '12px',
+                      border: '1px solid #bfdbfe',
+                      animation: 'slideUp 0.5s ease 0.3s forwards',
+                      opacity: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '10px',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
                       <InfoCircleOutlined style={{ color: '#fff', fontSize: 18 }} />
                     </div>
                     <div>
@@ -916,7 +1036,7 @@ const BackupManagement = () => {
       }
     };
 
-    eventSource.onerror = (error) => {
+    eventSource.onerror = error => {
       console.error('SSE 连接错误:', error);
       eventSource.close();
       setRestoreLoading(false);
@@ -927,7 +1047,7 @@ const BackupManagement = () => {
     };
   };
 
-  const handleDelete = async (filename) => {
+  const handleDelete = async filename => {
     try {
       const response = await api.delete(`/backup/${filename}`);
       if (response?.success) {
@@ -942,7 +1062,7 @@ const BackupManagement = () => {
     }
   };
 
-  const handleUpload = async (options) => {
+  const handleUpload = async options => {
     const { file, onSuccess, onError } = options;
     const formData = new FormData();
     formData.append('backup', file);
@@ -983,14 +1103,22 @@ const BackupManagement = () => {
             width: 500,
             content: (
               <div style={{ marginTop: 16 }}>
-                <p>将删除 <strong>{data.deletedCount}</strong> 个旧备份文件</p>
-                <p>将保留 <strong>{data.keptCount}</strong> 个备份文件</p>
-                <p>预计释放空间: <strong>{data.freedSizeFormatted}</strong></p>
+                <p>
+                  将删除 <strong>{data.deletedCount}</strong> 个旧备份文件
+                </p>
+                <p>
+                  将保留 <strong>{data.keptCount}</strong> 个备份文件
+                </p>
+                <p>
+                  预计释放空间: <strong>{data.freedSizeFormatted}</strong>
+                </p>
                 {data.deleted.length > 0 && (
                   <div style={{ marginTop: 16 }}>
                     <Text type="secondary">待删除文件:</Text>
                     <ul style={{ margin: '8px 0', paddingLeft: 20 }}>
-                      {data.deleted.slice(0, 5).map(f => <li key={f}>{f}</li>)}
+                      {data.deleted.slice(0, 5).map(f => (
+                        <li key={f}>{f}</li>
+                      ))}
                       {data.deleted.length > 5 && <li>... 还有 {data.deleted.length - 5} 个</li>}
                     </ul>
                   </div>
@@ -1010,7 +1138,7 @@ const BackupManagement = () => {
     }
   };
 
-  const showRestoreConfirm = (record) => {
+  const showRestoreConfirm = record => {
     setSelectedBackup(record);
     setRestoreVisible(true);
   };
@@ -1028,28 +1156,36 @@ const BackupManagement = () => {
       width: 280,
       render: (text, record) => (
         <Space>
-          <div style={{
-            width: 32,
-            height: 32,
-            borderRadius: '8px',
-            background: record.compressed ? designTokens.colors.success.gradient : designTokens.colors.primary.gradient,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '8px',
+              background: record.compressed
+                ? designTokens.colors.success.gradient
+                : designTokens.colors.primary.gradient,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             <FileTextOutlined style={{ color: '#fff', fontSize: 16 }} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <Text copyable={{ text }} style={{ fontWeight: 500, display: 'block' }}>{text}</Text>
+            <Text copyable={{ text }} style={{ fontWeight: 500, display: 'block' }}>
+              {text}
+            </Text>
             {record.description && (
-              <div style={{ 
-                fontSize: 12, 
-                color: designTokens.colors.text.muted,
-                marginTop: 4,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: designTokens.colors.text.muted,
+                  marginTop: 4,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
                 {record.description}
               </div>
             )}
@@ -1068,16 +1204,20 @@ const BackupManagement = () => {
       ),
     },
     {
-      title: <span style={{ fontWeight: 600, color: designTokens.colors.text.primary }}>文件大小</span>,
+      title: (
+        <span style={{ fontWeight: 600, color: designTokens.colors.text.primary }}>文件大小</span>
+      ),
       dataIndex: 'size',
       key: 'size',
       width: 140,
-      render: (size) => (
-        <span style={{ 
-          fontFamily: 'monospace', 
-          fontWeight: 500,
-          color: designTokens.colors.text.secondary 
-        }}>
+      render: size => (
+        <span
+          style={{
+            fontFamily: 'monospace',
+            fontWeight: 500,
+            color: designTokens.colors.text.secondary,
+          }}
+        >
           {formatBytes(size)}
         </span>
       ),
@@ -1123,7 +1263,9 @@ const BackupManagement = () => {
                 padding: '4px 12px',
                 height: '32px',
                 fontSize: '13px',
-                background: record.invalid ? designTokens.colors.text.muted : designTokens.colors.success.gradient,
+                background: record.invalid
+                  ? designTokens.colors.text.muted
+                  : designTokens.colors.success.gradient,
               }}
               disabled={record.invalid}
             >
@@ -1156,7 +1298,9 @@ const BackupManagement = () => {
                 padding: '4px 12px',
                 height: '32px',
                 fontSize: '13px',
-                background: record.invalid ? designTokens.colors.text.muted : designTokens.colors.warning.gradient,
+                background: record.invalid
+                  ? designTokens.colors.text.muted
+                  : designTokens.colors.warning.gradient,
               }}
               disabled={record.invalid}
             >
@@ -1379,15 +1523,17 @@ const BackupManagement = () => {
             <DatabaseOutlined style={{ marginRight: 12, verticalAlign: 'middle' }} />
             数据备份管理
           </h1>
-          <p style={{ 
-            margin: '8px 0 0 0', 
-            color: designTokens.colors.text.secondary,
-            fontSize: '14px',
-          }}>
+          <p
+            style={{
+              margin: '8px 0 0 0',
+              color: designTokens.colors.text.secondary,
+              fontSize: '14px',
+            }}
+          >
             管理系统备份，确保数据安全与可恢复性
           </p>
         </div>
-        
+
         <div style={buttonGroupStyle}>
           <Space size="middle" wrap>
             <Dropdown
@@ -1409,22 +1555,22 @@ const BackupManagement = () => {
               }}
               placement="bottomRight"
             >
-              <Button 
-                icon={<SettingOutlined />}
-                style={secondaryButtonStyle}
-              >
+              <Button icon={<SettingOutlined />} style={secondaryButtonStyle}>
                 设置
               </Button>
             </Dropdown>
-            
-            <Button 
-              icon={<ReloadOutlined />} 
-              onClick={() => { fetchBackups(); fetchBackupInfo(); }}
+
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => {
+                fetchBackups();
+                fetchBackupInfo();
+              }}
               style={secondaryButtonStyle}
             >
               刷新
             </Button>
-            
+
             <Dropdown
               menu={{
                 items: [
@@ -1454,27 +1600,17 @@ const BackupManagement = () => {
               }}
               placement="bottomRight"
             >
-              <Button 
-                icon={<ClearOutlined />}
-                style={secondaryButtonStyle}
-              >
+              <Button icon={<ClearOutlined />} style={secondaryButtonStyle}>
                 清理
               </Button>
             </Dropdown>
-            
-            <Upload
-              customRequest={handleUpload}
-              showUploadList={false}
-              accept=".json,.gz,.json.gz"
-            >
-              <Button 
-                icon={<UploadOutlined />}
-                style={secondaryButtonStyle}
-              >
+
+            <Upload customRequest={handleUpload} showUploadList={false} accept=".json,.gz,.json.gz">
+              <Button icon={<UploadOutlined />} style={secondaryButtonStyle}>
                 上传备份
               </Button>
             </Upload>
-            
+
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -1492,46 +1628,54 @@ const BackupManagement = () => {
         <Row gutter={[24, 24]} style={{ marginBottom: 32 }}>
           <Col xs={24} sm={8}>
             <Card style={statCardStyle}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                minHeight: '120px',
-              }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  minHeight: '120px',
+                }}
+              >
                 <div style={{ flex: 1 }}>
-                  <p style={{ 
-                    margin: 0, 
-                    color: designTokens.colors.text.muted,
-                    fontSize: '14px',
-                    fontWeight: 500,
-                  }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      color: designTokens.colors.text.muted,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                    }}
+                  >
                     备份文件数量
                   </p>
-                  <p style={{ 
-                    margin: '8px 0 0 0', 
-                    fontSize: '32px', 
-                    fontWeight: '700',
-                    background: designTokens.colors.primary.gradient,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                    lineHeight: 1.2,
-                  }}>
+                  <p
+                    style={{
+                      margin: '8px 0 0 0',
+                      fontSize: '32px',
+                      fontWeight: '700',
+                      background: designTokens.colors.primary.gradient,
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                      lineHeight: 1.2,
+                    }}
+                  >
                     {backupInfo.backupCount}
                     <span style={{ fontSize: '16px', marginLeft: 4 }}>个</span>
                   </p>
                 </div>
-                <div style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: '16px',
-                  background: designTokens.colors.primary.gradient,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: designTokens.shadows.lg,
-                  flexShrink: 0,
-                }}>
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: '16px',
+                    background: designTokens.colors.primary.gradient,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: designTokens.shadows.lg,
+                    flexShrink: 0,
+                  }}
+                >
                   <DatabaseOutlined style={{ color: '#fff', fontSize: 32 }} />
                 </div>
               </div>
@@ -1539,45 +1683,53 @@ const BackupManagement = () => {
           </Col>
           <Col xs={24} sm={8}>
             <Card style={statCardStyle}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                minHeight: '120px',
-              }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  minHeight: '120px',
+                }}
+              >
                 <div style={{ flex: 1 }}>
-                  <p style={{ 
-                    margin: 0, 
-                    color: designTokens.colors.text.muted,
-                    fontSize: '14px',
-                    fontWeight: 500,
-                  }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      color: designTokens.colors.text.muted,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                    }}
+                  >
                     备份总大小
                   </p>
-                  <p style={{ 
-                    margin: '8px 0 0 0', 
-                    fontSize: '32px', 
-                    fontWeight: '700',
-                    background: designTokens.colors.success.gradient,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                    lineHeight: 1.2,
-                  }}>
+                  <p
+                    style={{
+                      margin: '8px 0 0 0',
+                      fontSize: '32px',
+                      fontWeight: '700',
+                      background: designTokens.colors.success.gradient,
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                      lineHeight: 1.2,
+                    }}
+                  >
                     {backupInfo.totalSizeFormatted}
                   </p>
                 </div>
-                <div style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: '16px',
-                  background: designTokens.colors.success.gradient,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: designTokens.shadows.lg,
-                  flexShrink: 0,
-                }}>
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: '16px',
+                    background: designTokens.colors.success.gradient,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: designTokens.shadows.lg,
+                    flexShrink: 0,
+                  }}
+                >
                   <FileTextOutlined style={{ color: '#fff', fontSize: 32 }} />
                 </div>
               </div>
@@ -1585,48 +1737,56 @@ const BackupManagement = () => {
           </Col>
           <Col xs={24} sm={8}>
             <Card style={statCardStyle}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                minHeight: '120px',
-              }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  minHeight: '120px',
+                }}
+              >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ 
-                    margin: 0, 
-                    color: designTokens.colors.text.muted,
-                    fontSize: '14px',
-                    fontWeight: 500,
-                  }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      color: designTokens.colors.text.muted,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                    }}
+                  >
                     备份存储路径
                   </p>
-                  <p style={{ 
-                    margin: '8px 0 0 0', 
-                    fontSize: '13px', 
-                    fontWeight: 500,
-                    color: designTokens.colors.text.secondary,
-                    wordBreak: 'break-all',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    lineHeight: 1.4,
-                  }}>
+                  <p
+                    style={{
+                      margin: '8px 0 0 0',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      color: designTokens.colors.text.secondary,
+                      wordBreak: 'break-all',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      lineHeight: 1.4,
+                    }}
+                  >
                     {backupInfo.backupPath}
                   </p>
                 </div>
-                <div style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: designTokens.shadows.lg,
-                  flexShrink: 0,
-                }}>
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: '16px',
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: designTokens.shadows.lg,
+                    flexShrink: 0,
+                  }}
+                >
                   <InfoCircleOutlined style={{ color: '#fff', fontSize: 32 }} />
                 </div>
               </div>
@@ -1661,7 +1821,7 @@ const BackupManagement = () => {
           }
           type="info"
           showIcon
-          style={{ 
+          style={{
             marginBottom: 24,
             borderRadius: designTokens.borderRadius.md,
             border: `1px solid ${designTokens.colors.text.muted}20`,
@@ -1677,47 +1837,57 @@ const BackupManagement = () => {
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 个备份文件`,
+            showTotal: total => `共 ${total} 个备份文件`,
             pageSizeOptions: ['10', '20', '50', '100'],
           }}
           locale={{
             emptyText: (
-              <div style={{ 
-                padding: '60px 0', 
-                textAlign: 'center',
-              }}>
-                <div style={{
-                  width: 80,
-                  height: 80,
-                  margin: '0 auto 16px',
-                  borderRadius: '50%',
-                  background: designTokens.colors.background.accent,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <DatabaseOutlined style={{ fontSize: 40, color: designTokens.colors.text.muted }} />
+              <div
+                style={{
+                  padding: '60px 0',
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    width: 80,
+                    height: 80,
+                    margin: '0 auto 16px',
+                    borderRadius: '50%',
+                    background: designTokens.colors.background.accent,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <DatabaseOutlined
+                    style={{ fontSize: 40, color: designTokens.colors.text.muted }}
+                  />
                 </div>
-                <p style={{ 
-                  margin: 0, 
-                  fontSize: 16, 
-                  fontWeight: 500,
-                  color: designTokens.colors.text.primary,
-                }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 16,
+                    fontWeight: 500,
+                    color: designTokens.colors.text.primary,
+                  }}
+                >
                   暂无备份文件
                 </p>
-                <p style={{ 
-                  margin: '8px 0 0 0', 
-                  fontSize: 14, 
-                  color: designTokens.colors.text.muted,
-                }}>
+                <p
+                  style={{
+                    margin: '8px 0 0 0',
+                    fontSize: 14,
+                    color: designTokens.colors.text.muted,
+                  }}
+                >
                   点击"创建备份"按钮开始备份
                 </p>
               </div>
             ),
           }}
-          rowClassName={(record, index) => index % 2 === 0 ? 'table-row-light' : 'table-row-dark'}
-          style={{ 
+          rowClassName={(record, index) => (index % 2 === 0 ? 'table-row-light' : 'table-row-dark')}
+          style={{
             borderRadius: designTokens.borderRadius.md,
             overflow: 'hidden',
           }}
@@ -1727,22 +1897,26 @@ const BackupManagement = () => {
       <Modal
         title={
           <Space>
-            <div style={{
-              width: 40,
-              height: 40,
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <ExclamationCircleOutlined style={{ color: '#fff', fontSize: 24 }} />
             </div>
-            <span style={{ 
-              fontSize: '20px', 
-              fontWeight: 700,
-              color: designTokens.colors.text.primary,
-            }}>
+            <span
+              style={{
+                fontSize: '20px',
+                fontWeight: 700,
+                color: designTokens.colors.text.primary,
+              }}
+            >
               确认恢复数据
             </span>
           </Space>
@@ -1759,39 +1933,48 @@ const BackupManagement = () => {
         maskClosable={false}
         styles={{
           body: { padding: '24px' },
-          header: { padding: '20px 24px', borderBottom: `1px solid ${designTokens.colors.text.muted}20` },
+          header: {
+            padding: '20px 24px',
+            borderBottom: `1px solid ${designTokens.colors.text.muted}20`,
+          },
         }}
       >
         <div style={{ marginTop: 8 }}>
           {restoreLoading ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
-              <div style={{
-                width: 80,
-                height: 80,
-                margin: '0 auto 24px',
-                borderRadius: '50%',
-                background: designTokens.colors.background.accent,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <CloudUploadOutlined style={{ fontSize: 40, color: designTokens.colors.primary.main }} />
+              <div
+                style={{
+                  width: 80,
+                  height: 80,
+                  margin: '0 auto 24px',
+                  borderRadius: '50%',
+                  background: designTokens.colors.background.accent,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <CloudUploadOutlined
+                  style={{ fontSize: 40, color: designTokens.colors.primary.main }}
+                />
               </div>
-              <Progress 
-                percent={restoreProgress} 
-                status="active" 
+              <Progress
+                percent={restoreProgress}
+                status="active"
                 strokeColor={{
                   '0%': '#667eea',
                   '100%': '#764ba2',
                 }}
                 trailColor={designTokens.colors.background.accent}
               />
-              <Text style={{ 
-                marginTop: 16, 
-                display: 'block', 
-                fontSize: 14,
-                color: designTokens.colors.text.secondary,
-              }}>
+              <Text
+                style={{
+                  marginTop: 16,
+                  display: 'block',
+                  fontSize: 14,
+                  color: designTokens.colors.text.secondary,
+                }}
+              >
                 {restoreStatus}
               </Text>
             </div>
@@ -1807,7 +1990,7 @@ const BackupManagement = () => {
                 description="此操作不可撤销，建议先创建当前数据的备份"
                 type="warning"
                 showIcon
-                style={{ 
+                style={{
                   marginBottom: 20,
                   borderRadius: designTokens.borderRadius.md,
                   border: `1px solid ${designTokens.colors.warning.main}30`,
@@ -1816,23 +1999,25 @@ const BackupManagement = () => {
               />
 
               {selectedBackup && (
-                <div style={{
-                  background: designTokens.colors.background.accent,
-                  borderRadius: designTokens.borderRadius.md,
-                  padding: '16px',
-                  marginBottom: 20,
-                }}>
-                  <Descriptions 
-                    column={1} 
+                <div
+                  style={{
+                    background: designTokens.colors.background.accent,
+                    borderRadius: designTokens.borderRadius.md,
+                    padding: '16px',
+                    marginBottom: 20,
+                  }}
+                >
+                  <Descriptions
+                    column={1}
                     size="small"
                     colon={false}
-                    labelStyle={{ 
-                      fontWeight: 600, 
+                    labelStyle={{
+                      fontWeight: 600,
                       color: designTokens.colors.text.muted,
                       marginBottom: 8,
                     }}
-                    contentStyle={{ 
-                      fontWeight: 500, 
+                    contentStyle={{
+                      fontWeight: 500,
                       color: designTokens.colors.text.primary,
                     }}
                   >
@@ -1843,7 +2028,9 @@ const BackupManagement = () => {
                       </Space>
                     </Descriptions.Item>
                     <Descriptions.Item label="文件大小">
-                      <span style={{ fontFamily: 'monospace', color: designTokens.colors.success.main }}>
+                      <span
+                        style={{ fontFamily: 'monospace', color: designTokens.colors.success.main }}
+                      >
                         {formatBytes(selectedBackup.size)}
                       </span>
                     </Descriptions.Item>
@@ -1859,13 +2046,15 @@ const BackupManagement = () => {
 
               <Divider style={{ margin: '20px 0' }} />
 
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'flex-end', 
-                gap: '12px',
-                marginTop: '8px',
-              }}>
-                <Button 
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '12px',
+                  marginTop: '8px',
+                }}
+              >
+                <Button
                   onClick={() => setRestoreVisible(false)}
                   style={secondaryButtonStyle}
                   disabled={restoreLoading}

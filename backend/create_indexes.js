@@ -59,7 +59,6 @@ const createIndexes = async () => {
     console.log('  ✓ rooms 表索引创建完成');
 
     console.log('\n✅ 所有索引创建完成！');
-
   } catch (error) {
     console.error('创建索引失败:', error.message);
     throw error;
@@ -69,8 +68,13 @@ const createIndexes = async () => {
 const checkIndexes = async () => {
   const queryInterface = sequelize.getQueryInterface();
   const tables = [
-    'devices', 'users', 'consumables', 'consumable_records',
-    'consumable_logs', 'racks', 'rooms'
+    'devices',
+    'users',
+    'consumables',
+    'consumable_records',
+    'consumable_logs',
+    'racks',
+    'rooms',
   ];
 
   console.log('\n检查现有索引...');
@@ -94,13 +98,19 @@ const dropIndexes = async () => {
 
   try {
     const indexDefinitions = [
-      { table: 'devices', indexes: ['status', 'type', 'rackId', 'createdAt', 'status_type', 'name'] },
+      {
+        table: 'devices',
+        indexes: ['status', 'type', 'rackId', 'createdAt', 'status_type', 'name'],
+      },
       { table: 'users', indexes: ['status', 'username', 'email'] },
       { table: 'consumables', indexes: ['category', 'status', 'category_status'] },
       { table: 'consumable_records', indexes: ['consumableId', 'type', 'createdAt'] },
-      { table: 'consumable_logs', indexes: ['consumableId', 'operationType', 'createdAt', 'consumableId_createdAt'] },
+      {
+        table: 'consumable_logs',
+        indexes: ['consumableId', 'operationType', 'createdAt', 'consumableId_createdAt'],
+      },
       { table: 'racks', indexes: ['roomId', 'status', 'roomId_status'] },
-      { table: 'rooms', indexes: ['status', 'name'] }
+      { table: 'rooms', indexes: ['status', 'name'] },
     ];
 
     for (const def of indexDefinitions) {
@@ -126,7 +136,8 @@ module.exports = { createIndexes, checkIndexes, dropIndexes };
 if (require.main === module) {
   const command = process.argv[2] || 'create';
 
-  sequelize.authenticate()
+  sequelize
+    .authenticate()
     .then(async () => {
       console.log('数据库连接成功\n');
       if (command === 'check') {

@@ -14,49 +14,49 @@ router.get('/', async (req, res) => {
   try {
     const { deviceId, status, portType, portSpeed, page = 1, pageSize = 10 } = req.query;
     const offset = (page - 1) * pageSize;
-    
+
     const where = {};
-    
+
     if (deviceId) {
       where.deviceId = deviceId;
     }
-    
+
     if (status && status !== 'all') {
       where.status = status;
     }
-    
+
     if (portType && portType !== 'all') {
       where.portType = portType;
     }
-    
+
     if (portSpeed && portSpeed !== 'all') {
       where.portSpeed = portSpeed;
     }
-    
+
     const { count, rows } = await DevicePort.findAndCountAll({
       where,
       include: [
         {
           model: Device,
           as: 'device',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
         },
         {
           model: NetworkCard,
           as: 'networkCard',
-          attributes: ['nicId', 'name']
-        }
+          attributes: ['nicId', 'name'],
+        },
       ],
       offset,
       limit: parseInt(pageSize),
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
     });
-    
+
     res.json({
       total: count,
       ports: rows,
       page: parseInt(page),
-      pageSize: parseInt(pageSize)
+      pageSize: parseInt(pageSize),
     });
   } catch (error) {
     console.error('获取端口列表失败:', error);
@@ -68,24 +68,24 @@ router.get('/', async (req, res) => {
 router.get('/device/:deviceId', async (req, res) => {
   try {
     const { deviceId } = req.params;
-    
+
     const ports = await DevicePort.findAll({
       where: { deviceId },
       include: [
         {
           model: Device,
           as: 'device',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
         },
         {
           model: NetworkCard,
           as: 'networkCard',
-          attributes: ['nicId', 'name']
-        }
+          attributes: ['nicId', 'name'],
+        },
       ],
-      order: [['portName', 'ASC']]
+      order: [['portName', 'ASC']],
     });
-    
+
     res.json(ports);
   } catch (error) {
     console.error('获取设备端口失败:', error);
@@ -95,22 +95,23 @@ router.get('/device/:deviceId', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { portId, deviceId, nicId, portName, portType, portSpeed, status, vlanId, description } = req.body;
-    
+    const { portId, deviceId, nicId, portName, portType, portSpeed, status, vlanId, description } =
+      req.body;
+
     if (!deviceId || !portName) {
       return res.status(400).json({ error: '缺少必填字段' });
     }
-    
+
     const existingPort = await DevicePort.findOne({
-      where: { deviceId, portName }
+      where: { deviceId, portName },
     });
-    
+
     if (existingPort) {
       return res.status(400).json({ error: '该设备的端口名称已存在' });
     }
-    
+
     const autoPortId = portId || `PORT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-    
+
     const port = await DevicePort.create({
       portId: autoPortId,
       deviceId,
@@ -120,19 +121,19 @@ router.post('/', async (req, res) => {
       portSpeed: portSpeed || '1G',
       status: status || 'free',
       vlanId,
-      description
+      description,
     });
-    
+
     const createdPort = await DevicePort.findByPk(port.portId, {
       include: [
         {
           model: Device,
           as: 'device',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
-        }
-      ]
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
+        },
+      ],
     });
-    
+
     res.status(201).json(createdPort);
   } catch (error) {
     console.error('创建端口失败:', error);
@@ -154,7 +155,7 @@ router.post('/batch', async (req, res) => {
       failed: 0,
       skipped: 0,
       updated: 0,
-      errors: []
+      errors: [],
     };
 
     const transaction = await DevicePort.sequelize.transaction();
@@ -177,7 +178,9 @@ router.post('/batch', async (req, res) => {
 
           if (isServer) {
             if (!portData.nicId && !portData.网卡名称) {
-              throw new Error(`服务器 ${portData.deviceId} 的端口必须关联网卡，请先在网卡管理中添加网卡`);
+              throw new Error(
+                `服务器 ${portData.deviceId} 的端口必须关联网卡，请先在网卡管理中添加网卡`
+              );
             }
 
             let nicId = portData.nicId;
@@ -185,10 +188,12 @@ router.post('/batch', async (req, res) => {
             if (!nicId && portData.网卡名称) {
               const networkCard = await NetworkCard.findOne({
                 where: { deviceId: portData.deviceId, name: portData.网卡名称 },
-                transaction
+                transaction,
               });
               if (!networkCard) {
-                throw new Error(`服务器 ${portData.deviceId} 的网卡"${portData.网卡名称}"不存在，请先在网卡管理中添加该网卡`);
+                throw new Error(
+                  `服务器 ${portData.deviceId} 的网卡"${portData.网卡名称}"不存在，请先在网卡管理中添加该网卡`
+                );
               }
               nicId = networkCard.nicId;
             }
@@ -212,7 +217,7 @@ router.post('/batch', async (req, res) => {
 
           const existingPort = await DevicePort.findOne({
             where: { deviceId: portData.deviceId, portName: portData.portName },
-            transaction
+            transaction,
           });
 
           if (existingPort) {
@@ -221,17 +226,23 @@ router.post('/batch', async (req, res) => {
               continue;
             }
             if (updateExisting) {
-              await DevicePort.update({
-                portType: portData.portType || existingPort.portType,
-                portSpeed: portData.portSpeed || existingPort.portSpeed,
-                status: portData.status || existingPort.status,
-                vlanId: portData.vlanId !== undefined ? portData.vlanId : existingPort.vlanId,
-                description: portData.description !== undefined ? portData.description : existingPort.description,
-                nicId: portData.nicId !== undefined ? portData.nicId : existingPort.nicId
-              }, {
-                where: { portId: existingPort.portId },
-                transaction
-              });
+              await DevicePort.update(
+                {
+                  portType: portData.portType || existingPort.portType,
+                  portSpeed: portData.portSpeed || existingPort.portSpeed,
+                  status: portData.status || existingPort.status,
+                  vlanId: portData.vlanId !== undefined ? portData.vlanId : existingPort.vlanId,
+                  description:
+                    portData.description !== undefined
+                      ? portData.description
+                      : existingPort.description,
+                  nicId: portData.nicId !== undefined ? portData.nicId : existingPort.nicId,
+                },
+                {
+                  where: { portId: existingPort.portId },
+                  transaction,
+                }
+              );
               results.updated++;
               results.success++;
               continue;
@@ -239,17 +250,20 @@ router.post('/batch', async (req, res) => {
             throw new Error('该设备的端口名称已存在');
           }
 
-          await DevicePort.create({
-            portId: portData.portId,
-            deviceId: portData.deviceId,
-            nicId: portData.nicId || null,
-            portName: portData.portName,
-            portType: portData.portType || 'RJ45',
-            portSpeed: portData.portSpeed || '1G',
-            status: portData.status || 'free',
-            vlanId: portData.vlanId,
-            description: portData.description
-          }, { transaction });
+          await DevicePort.create(
+            {
+              portId: portData.portId,
+              deviceId: portData.deviceId,
+              nicId: portData.nicId || null,
+              portName: portData.portName,
+              portType: portData.portType || 'RJ45',
+              portSpeed: portData.portSpeed || '1G',
+              status: portData.status || 'free',
+              vlanId: portData.vlanId,
+              description: portData.description,
+            },
+            { transaction }
+          );
 
           results.success++;
         } catch (error) {
@@ -259,7 +273,7 @@ router.post('/batch', async (req, res) => {
             portId: portData.portId,
             deviceId: portData.deviceId,
             portName: portData.portName,
-            error: error.message
+            error: error.message,
           });
         }
       }
@@ -279,18 +293,18 @@ router.post('/batch', async (req, res) => {
 router.put('/:portId', async (req, res) => {
   try {
     const [updated] = await DevicePort.update(req.body, {
-      where: { portId: req.params.portId }
+      where: { portId: req.params.portId },
     });
-    
+
     if (updated) {
       const port = await DevicePort.findByPk(req.params.portId, {
         include: [
           {
             model: Device,
             as: 'device',
-            attributes: ['deviceId', 'name', 'type', 'rackId']
-          }
-        ]
+            attributes: ['deviceId', 'name', 'type', 'rackId'],
+          },
+        ],
       });
       res.json(port);
     } else {
@@ -313,9 +327,9 @@ router.delete('/:portId', async (req, res) => {
       where: {
         [Op.or]: [
           { sourceDeviceId: port.deviceId, sourcePort: port.portName },
-          { targetDeviceId: port.deviceId, targetPort: port.portName }
-        ]
-      }
+          { targetDeviceId: port.deviceId, targetPort: port.portName },
+        ],
+      },
     });
 
     if (relatedCables.length > 0) {
@@ -326,13 +340,13 @@ router.delete('/:portId', async (req, res) => {
           sourceDeviceId: c.sourceDeviceId,
           sourcePort: c.sourcePort,
           targetDeviceId: c.targetDeviceId,
-          targetPort: c.targetPort
-        }))
+          targetPort: c.targetPort,
+        })),
       });
     }
 
     await DevicePort.destroy({
-      where: { portId: req.params.portId }
+      where: { portId: req.params.portId },
     });
 
     res.status(204).json();
@@ -351,12 +365,12 @@ router.delete('/batch', async (req, res) => {
     }
 
     const deletedCount = await DevicePort.destroy({
-      where: { portId: { [Op.in]: portIds } }
+      where: { portId: { [Op.in]: portIds } },
     });
 
     res.json({
       message: `批量删除成功，已删除 ${deletedCount} 个端口`,
-      deletedCount
+      deletedCount,
     });
   } catch (error) {
     console.error('批量删除端口失败:', error);
@@ -373,12 +387,12 @@ router.post('/batch-delete', async (req, res) => {
     }
 
     const deletedCount = await DevicePort.destroy({
-      where: { portId: { [Op.in]: portIds } }
+      where: { portId: { [Op.in]: portIds } },
     });
 
     res.json({
       message: `批量删除成功，已删除 ${deletedCount} 个端口`,
-      deletedCount
+      deletedCount,
     });
   } catch (error) {
     console.error('批量删除端口失败:', error);
@@ -393,9 +407,9 @@ router.get('/:portId', async (req, res) => {
         {
           model: Device,
           as: 'device',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
-        }
-      ]
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
+        },
+      ],
     });
 
     if (!port) {
@@ -457,24 +471,24 @@ router.get('/export/all', async (req, res) => {
                   {
                     model: require('../models/Room'),
                     as: 'room',
-                    attributes: ['roomId', 'name']
-                  }
-                ]
-              }
-            ]
+                    attributes: ['roomId', 'name'],
+                  },
+                ],
+              },
+            ],
           },
           {
             model: NetworkCard,
             as: 'networkCard',
-            attributes: ['nicId', 'name']
-          }
+            attributes: ['nicId', 'name'],
+          },
         ],
         order: [['createdAt', 'DESC']],
         limit: parsedPageSize,
         offset: offset,
-        subQuery: false
+        subQuery: false,
       }),
-      timeoutPromise
+      timeoutPromise,
     ]);
 
     const ports = countResult;
@@ -482,7 +496,7 @@ router.get('/export/all', async (req, res) => {
     const statusMap = {
       free: '空闲',
       occupied: '占用',
-      fault: '故障'
+      fault: '故障',
     };
 
     const exportData = ports.map(port => ({
@@ -499,17 +513,18 @@ router.get('/export/all', async (req, res) => {
       状态: statusMap[port.status] || port.status,
       VLAN_ID: port.vlanId || '-',
       描述: port.description || '-',
-      创建时间: port.createdAt ? new Date(port.createdAt).toLocaleString('zh-CN') : '-'
+      创建时间: port.createdAt ? new Date(port.createdAt).toLocaleString('zh-CN') : '-',
     }));
 
     let filteredExportData = exportData;
     if (keyword) {
       const searchLower = keyword.toLowerCase();
-      filteredExportData = exportData.filter(item =>
-        item.端口名称?.toLowerCase().includes(searchLower) ||
-        item.端口类型?.toLowerCase().includes(searchLower) ||
-        item.设备名称?.toLowerCase().includes(searchLower) ||
-        item.描述?.toLowerCase().includes(searchLower)
+      filteredExportData = exportData.filter(
+        item =>
+          item.端口名称?.toLowerCase().includes(searchLower) ||
+          item.端口类型?.toLowerCase().includes(searchLower) ||
+          item.设备名称?.toLowerCase().includes(searchLower) ||
+          item.描述?.toLowerCase().includes(searchLower)
       );
     }
 
@@ -517,7 +532,7 @@ router.get('/export/all', async (req, res) => {
       page: parsedPage,
       pageSize: parsedPageSize,
       total: filteredExportData.length,
-      ports: filteredExportData
+      ports: filteredExportData,
     });
   } catch (error) {
     console.error('导出端口失败:', error);

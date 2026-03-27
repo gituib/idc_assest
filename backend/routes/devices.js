@@ -16,7 +16,11 @@ const DevicePort = require('../models/DevicePort');
 const Cable = require('../models/Cable');
 const NetworkCard = require('../models/NetworkCard');
 const InventoryRecord = require('../models/InventoryRecord');
-const { logDeviceOperation, generateDeviceDescription, buildDeviceMetadata } = require('../utils/operationLogger');
+const {
+  logDeviceOperation,
+  generateDeviceDescription,
+  buildDeviceMetadata,
+} = require('../utils/operationLogger');
 const { validateBody, validateQuery } = require('../middleware/validation');
 const {
   createDeviceSchema,
@@ -24,7 +28,7 @@ const {
   batchDeviceIdsSchema,
   batchStatusSchema,
   batchMoveSchema,
-  queryDeviceSchema
+  queryDeviceSchema,
 } = require('../validation/deviceSchema');
 
 Device.belongsTo(Rack, { foreignKey: 'rackId' });
@@ -34,7 +38,13 @@ Room.hasMany(Rack, { foreignKey: 'roomId' });
 
 const PREVIEW_COUNT = 20;
 
-async function checkPositionAvailable(rackId, position, height, excludeDeviceId = null, transaction = null) {
+async function checkPositionAvailable(
+  rackId,
+  position,
+  height,
+  excludeDeviceId = null,
+  transaction = null
+) {
   if (!position || position <= 0) {
     return { available: true, reason: null };
   }
@@ -46,9 +56,9 @@ async function checkPositionAvailable(rackId, position, height, excludeDeviceId 
   const queryOptions = {
     where: {
       rackId: rackId,
-      position: { [Op.ne]: null }
+      position: { [Op.ne]: null },
     },
-    attributes: ['deviceId', 'position', 'height']
+    attributes: ['deviceId', 'position', 'height'],
   };
 
   if (transaction) {
@@ -68,7 +78,7 @@ async function checkPositionAvailable(rackId, position, height, excludeDeviceId 
     if (!(endU < existStart || startU > existEnd)) {
       return {
         available: false,
-        reason: `U位冲突：机柜中已有设备 ${device.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}，与当前位置范围 U${startU}-U${endU} 冲突`
+        reason: `U位冲突：机柜中已有设备 ${device.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}，与当前位置范围 U${startU}-U${endU} 冲突`,
       };
     }
   }
@@ -82,20 +92,26 @@ async function checkBatchPositions(rackId, devices, excludeDeviceIds = [], trans
 
   for (let i = 0; i < sortedDevices.length; i++) {
     const device = sortedDevices[i];
-    if (!device.position || device.position <= 0) continue;
+    if (!device.position || device.position <= 0) {
+      continue;
+    }
 
     const startU = device.position;
     const endU = device.position + (device.height || 1) - 1;
 
     for (let j = i + 1; j < sortedDevices.length; j++) {
       const other = sortedDevices[j];
-      if (!other.position || other.position <= 0) continue;
+      if (!other.position || other.position <= 0) {
+        continue;
+      }
 
       const otherStart = other.position;
       const otherEnd = other.position + (other.height || 1) - 1;
 
       if (!(endU < otherStart || startU > otherEnd)) {
-        conflicts.push(`导入数据内部冲突：设备 ${device.deviceId || '新设备'}(U${startU}-U${endU}) 与 设备 ${other.deviceId || '新设备'}(U${otherStart}-U${otherEnd}) U位重叠`);
+        conflicts.push(
+          `导入数据内部冲突：设备 ${device.deviceId || '新设备'}(U${startU}-U${endU}) 与 设备 ${other.deviceId || '新设备'}(U${otherStart}-U${otherEnd}) U位重叠`
+        );
       }
     }
   }
@@ -103,9 +119,9 @@ async function checkBatchPositions(rackId, devices, excludeDeviceIds = [], trans
   const queryOptions = {
     where: {
       rackId: rackId,
-      position: { [Op.ne]: null }
+      position: { [Op.ne]: null },
     },
-    attributes: ['deviceId', 'position', 'height']
+    attributes: ['deviceId', 'position', 'height'],
   };
 
   if (transaction) {
@@ -115,19 +131,25 @@ async function checkBatchPositions(rackId, devices, excludeDeviceIds = [], trans
   const existingDevices = await Device.findAll(queryOptions);
 
   for (const existing of existingDevices) {
-    if (excludeDeviceIds.includes(existing.deviceId)) continue;
+    if (excludeDeviceIds.includes(existing.deviceId)) {
+      continue;
+    }
 
     const existStart = existing.position;
     const existEnd = existing.position + (existing.height || 1) - 1;
 
     for (const device of devices) {
-      if (!device.position || device.position <= 0) continue;
+      if (!device.position || device.position <= 0) {
+        continue;
+      }
 
       const startU = device.position;
       const endU = device.position + (device.height || 1) - 1;
 
       if (!(endU < existStart || startU > existEnd)) {
-        conflicts.push(`与已有设备冲突：机柜中已有设备 ${existing.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}，与导入设备 ${device.deviceId || '新设备'}(U${startU}-U${endU}) 冲突`);
+        conflicts.push(
+          `与已有设备冲突：机柜中已有设备 ${existing.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}，与导入设备 ${device.deviceId || '新设备'}(U${startU}-U${endU}) 冲突`
+        );
       }
     }
   }
@@ -152,12 +174,11 @@ router.post('/import-preview', async (req, res) => {
     await csvFile.mv(filePath);
 
     const results = [];
-    const stream = fs.createReadStream(filePath)
-      .pipe(iconv.decodeStream('gbk'))
-      .pipe(csv());
+    const stream = fs.createReadStream(filePath).pipe(iconv.decodeStream('gbk')).pipe(csv());
 
     await new Promise((resolve, reject) => {
-      stream.on('data', (data) => results.push(data))
+      stream
+        .on('data', data => results.push(data))
         .on('end', resolve)
         .on('error', reject);
     });
@@ -167,11 +188,13 @@ router.post('/import-preview', async (req, res) => {
     const [rooms, racks, deviceFields] = await Promise.all([
       Room.findAll(),
       Rack.findAll({ include: [{ model: Room }] }),
-      DeviceField.findAll({ order: [['order', 'ASC']] })
+      DeviceField.findAll({ order: [['order', 'ASC']] }),
     ]);
 
     const roomNameToIdMap = new Map(rooms.map(room => [room.name, room.roomId]));
-    const rackLocationMap = new Map(racks.map(rack => [`${rack.Room?.name || ''}_${rack.name}`, rack.rackId]));
+    const rackLocationMap = new Map(
+      racks.map(rack => [`${rack.Room?.name || ''}_${rack.name}`, rack.rackId])
+    );
     const fieldMapping = {};
     const fieldNameToDisplayName = {};
     deviceFields.forEach(field => {
@@ -179,14 +202,29 @@ router.post('/import-preview', async (req, res) => {
       fieldNameToDisplayName[field.fieldName] = field.displayName;
     });
 
-    const extractFieldName = (fieldNameWithFormat) => {
+    const extractFieldName = fieldNameWithFormat => {
       const match = fieldNameWithFormat.match(/^(.+?)(\(必填\)|\(可选\)|\([a-zA-Z0-9\-\/]+\))$/);
       return match ? match[1].trim() : fieldNameWithFormat;
     };
 
     const validTypes = ['server', 'switch', 'router', 'storage', 'other'];
     const validStatuses = ['running', 'maintenance', 'offline', 'fault'];
-    const baseFieldNames = ['deviceId', 'name', 'type', 'model', 'serialNumber', 'rackId', 'position', 'height', 'powerConsumption', 'ipAddress', 'status', 'purchaseDate', 'warrantyExpiry', 'description'];
+    const baseFieldNames = [
+      'deviceId',
+      'name',
+      'type',
+      'model',
+      'serialNumber',
+      'rackId',
+      'position',
+      'height',
+      'powerConsumption',
+      'ipAddress',
+      'status',
+      'purchaseDate',
+      'warrantyExpiry',
+      'description',
+    ];
 
     const previewData = [];
     const allDeviceIds = new Set();
@@ -209,21 +247,25 @@ router.post('/import-preview', async (req, res) => {
           fieldValueMap[displayName] = value;
         });
 
-        const getFieldValue = (fieldName) => {
+        const getFieldValue = fieldName => {
           const displayName = fieldNameToDisplayName[fieldName];
           return displayName ? fieldValueMap[displayName] : undefined;
         };
 
         const trulyRequiredFields = [];
         deviceFields.forEach(field => {
-          if (field.fieldName === 'deviceId') return;
+          if (field.fieldName === 'deviceId') {
+            return;
+          }
           if (field.fieldName === 'rackId') {
             if (field.required) {
               trulyRequiredFields.push('所在机房名称', '所在机柜名称');
             }
             return;
           }
-          if (field.required) trulyRequiredFields.push(field.displayName);
+          if (field.required) {
+            trulyRequiredFields.push(field.displayName);
+          }
         });
 
         const missingFields = trulyRequiredFields.filter(fieldName => {
@@ -240,7 +282,7 @@ router.post('/import-preview', async (req, res) => {
           rowErrors.push(`设备类型无效：${deviceType}`);
         }
 
-        let deviceId = getFieldValue('deviceId');
+        const deviceId = getFieldValue('deviceId');
         if (deviceId && deviceId.trim() !== '') {
           if (allDeviceIds.has(deviceId)) {
             rowErrors.push(`设备ID重复：${deviceId}`);
@@ -284,7 +326,11 @@ router.post('/import-preview', async (req, res) => {
         if (height !== undefined && height !== '' && isNaN(Number(height))) {
           rowErrors.push(`高度必须是数字：${height}`);
         }
-        if (powerConsumption !== undefined && powerConsumption !== '' && isNaN(Number(powerConsumption))) {
+        if (
+          powerConsumption !== undefined &&
+          powerConsumption !== '' &&
+          isNaN(Number(powerConsumption))
+        ) {
           rowErrors.push(`功率必须是数字：${powerConsumption}`);
         }
 
@@ -339,7 +385,7 @@ router.post('/import-preview', async (req, res) => {
               rowNum,
               deviceId: getFieldValue('deviceId') || null,
               position: posNum,
-              height: heightNum
+              height: heightNum,
             });
           }
         } else {
@@ -352,7 +398,6 @@ router.post('/import-preview', async (req, res) => {
         if (previewData.length < PREVIEW_COUNT) {
           previewData.push(parsedRow);
         }
-
       } catch (error) {
         stats.invalid++;
         const errorMsg = error.message || '未知错误';
@@ -367,7 +412,7 @@ router.post('/import-preview', async (req, res) => {
             serialNumber: row['序列号'] || '',
             roomName: row['所在机房名称'] || '',
             rackName: row['所在机柜名称'] || '',
-            status: row['状态'] || ''
+            status: row['状态'] || '',
           });
         }
       }
@@ -378,7 +423,7 @@ router.post('/import-preview', async (req, res) => {
     for (const [rackId, devices] of rackDevicesMap) {
       const existingDevices = await Device.findAll({
         where: { rackId, position: { [Op.ne]: null } },
-        attributes: ['deviceId', 'position', 'height']
+        attributes: ['deviceId', 'position', 'height'],
       });
 
       for (const newDevice of devices) {
@@ -400,7 +445,9 @@ router.post('/import-preview', async (req, res) => {
 
         if (!hasConflict) {
           for (const otherDevice of devices) {
-            if (otherDevice === newDevice) continue;
+            if (otherDevice === newDevice) {
+              continue;
+            }
 
             const otherStart = otherDevice.position;
             const otherEnd = otherDevice.position + otherDevice.height - 1;
@@ -441,7 +488,7 @@ router.post('/import-preview', async (req, res) => {
         fieldName: field.fieldName,
         displayName: field.displayName,
         fieldType: field.fieldType,
-        required: field.required
+        required: field.required,
       }));
 
     res.json({
@@ -453,17 +500,16 @@ router.post('/import-preview', async (req, res) => {
         statistics: {
           total: stats.total,
           valid: stats.valid,
-          invalid: stats.invalid
+          invalid: stats.invalid,
         },
         errors: stats.errors.slice(0, 50),
-        fieldList
-      }
+        fieldList,
+      },
     });
-
   } catch (error) {
     console.error('预览设备数据失败:', error);
     res.status(500).json({
-      error: error.message || '预览过程中发生未知错误'
+      error: error.message || '预览过程中发生未知错误',
     });
   }
 });
@@ -480,10 +526,10 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
     if (keyword) {
       console.log('搜索关键词:', keyword);
       console.log('数据库类型:', dbDialect);
-      
+
       // 转义关键词中的特殊字符，防止SQL注入
       const escapedKeyword = keyword.replace(/'/g, "''");
-      
+
       // 基础字段搜索条件（只包含文本类型字段）
       const searchConditions = [
         { deviceId: { [Op.like]: `%${escapedKeyword}%` } },
@@ -492,18 +538,21 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
         { model: { [Op.like]: `%${escapedKeyword}%` } },
         { serialNumber: { [Op.like]: `%${escapedKeyword}%` } },
         { ipAddress: { [Op.like]: `%${escapedKeyword}%` } },
-        { description: { [Op.like]: `%${escapedKeyword}%` } }
+        { description: { [Op.like]: `%${escapedKeyword}%` } },
       ];
 
       // 动态获取文本类型的自定义字段
       const customFields = await DeviceField.findAll({
         where: {
           isSystem: false,
-          fieldType: { [Op.in]: ['string', 'textarea'] }
-        }
+          fieldType: { [Op.in]: ['string', 'textarea'] },
+        },
       });
-      
-      console.log('找到的自定义字段:', customFields.map(f => f.fieldName));
+
+      console.log(
+        '找到的自定义字段:',
+        customFields.map(f => f.fieldName)
+      );
 
       // 构建自定义字段搜索条件（使用原始SQL，兼容SQLite和MySQL）
       if (customFields.length > 0) {
@@ -512,9 +561,13 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
           const fieldName = field.fieldName;
           // 使用 sequelize.literal 构建原始SQL条件
           if (dbDialect === 'mysql') {
-            return sequelize.literal(`JSON_EXTRACT(customFields, '$."${fieldName}"') LIKE '%${escapedKeyword}%'`);
+            return sequelize.literal(
+              `JSON_EXTRACT(customFields, '$."${fieldName}"') LIKE '%${escapedKeyword}%'`
+            );
           } else {
-            return sequelize.literal(`json_extract(customFields, '$.${fieldName}') LIKE '%${escapedKeyword}%'`);
+            return sequelize.literal(
+              `json_extract(customFields, '$.${fieldName}') LIKE '%${escapedKeyword}%'`
+            );
           }
         });
         searchConditions.push(...jsonConditions);
@@ -536,13 +589,22 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
     }
 
     // 机柜筛选（用于机柜可视化功能）
-    if (rackId) {
+    if (rackId && rackId !== 'all') {
       where.rackId = rackId;
     }
 
     // 机房筛选 - 通过机柜关联查询
-    if (roomId && roomId !== 'all') {
-      where['$Rack.roomId$'] = roomId;
+    // 注意：使用 include 中嵌套 where 而不是 $Rack.roomId$ 语法
+
+    // 调试日志
+    if (process.env.NODE_ENV === 'development') {
+      console.log('=== 设备查询调试 ===');
+      console.log('接收参数 - roomId:', roomId, 'rackId:', rackId);
+      console.log('查询条件 - where:', JSON.stringify(where));
+      console.log(
+        '机房筛选条件 - Rack.where:',
+        roomId && roomId !== 'all' ? { roomId: roomId } : undefined
+      );
     }
 
     // 空闲设备筛选
@@ -556,23 +618,22 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
       include: [
         {
           model: Rack,
-          include: [
-            { model: Room }
-          ],
-          separate: false  // 强制使用 JOIN 而不是单独查询
-        }
+          where: roomId && roomId !== 'all' ? { roomId: roomId } : undefined,
+          include: [{ model: Room }],
+          separate: false, // 强制使用 JOIN 而不是单独查询
+        },
       ],
       offset,
       limit: parseInt(pageSize),
-      distinct: true,      // 避免 count 不准确
-      subQuery: false      // 避免子查询导致的性能问题
+      distinct: true, // 避免 count 不准确
+      subQuery: false, // 避免子查询导致的性能问题
     });
 
     res.json({
       total: count,
       devices: rows,
       page: parseInt(page),
-      pageSize: parseInt(pageSize)
+      pageSize: parseInt(pageSize),
     });
   } catch (error) {
     console.error('搜索设备失败:', error);
@@ -600,7 +661,7 @@ router.get('/all', async (req, res) => {
         { type: { [Op.like]: `%${escapedKeyword}%` } },
         { model: { [Op.like]: `%${escapedKeyword}%` } },
         { serialNumber: { [Op.like]: `%${escapedKeyword}%` } },
-        { ipAddress: { [Op.like]: `%${escapedKeyword}%` } }
+        { ipAddress: { [Op.like]: `%${escapedKeyword}%` } },
       ];
     }
 
@@ -612,32 +673,31 @@ router.get('/all', async (req, res) => {
       where.type = type;
     }
 
-    if (rackId) {
+    if (rackId && rackId !== 'all') {
       where.rackId = rackId;
     }
 
-    if (roomId && roomId !== 'all') {
-      where['$Rack.roomId$'] = roomId;
-    }
+    // 注意：使用 include 中嵌套 where 而不是 $Rack.roomId$ 语法
 
     const devices = await Device.findAll({
       where,
       include: [
         {
           model: Rack,
+          where: roomId && roomId !== 'all' ? { roomId: roomId } : undefined,
           include: [{ model: Room }],
-          separate: false
-        }
+          separate: false,
+        },
       ],
       limit: MAX_EXPORT_SIZE,
       order: [['createdAt', 'DESC']],
       distinct: true,
-      subQuery: false
+      subQuery: false,
     });
 
     res.json({
       devices,
-      total: devices.length
+      total: devices.length,
     });
   } catch (error) {
     console.error('获取设备列表失败:', error);
@@ -651,11 +711,11 @@ async function generateDeviceId() {
   const devices = await Device.findAll({
     where: {
       deviceId: {
-        [require('sequelize').Op.like]: 'DEV%'
-      }
-    }
+        [require('sequelize').Op.like]: 'DEV%',
+      },
+    },
   });
-  
+
   let maxNumber = 0;
   devices.forEach(device => {
     const match = device.deviceId.match(/^DEV(\d+)$/);
@@ -666,7 +726,7 @@ async function generateDeviceId() {
       }
     }
   });
-  
+
   // 生成新的设备ID，序号+1，至少3位数字
   const newNumber = maxNumber + 1;
   return `DEV${String(newNumber).padStart(3, '0')}`;
@@ -676,11 +736,11 @@ async function generateDeviceId() {
 router.post('/', validateBody(createDeviceSchema), async (req, res) => {
   try {
     const deviceData = { ...req.body };
-    
+
     if (!deviceData.deviceId || deviceData.deviceId.trim() === '') {
       deviceData.deviceId = await generateDeviceId();
     }
-    
+
     if (deviceData.rackId && deviceData.position) {
       const positionCheck = await checkPositionAvailable(
         deviceData.rackId,
@@ -691,13 +751,13 @@ router.post('/', validateBody(createDeviceSchema), async (req, res) => {
         return res.status(400).json({ error: positionCheck.reason });
       }
     }
-    
+
     const device = await Device.create(deviceData);
 
     const rack = await Rack.findByPk(deviceData.rackId);
     if (rack) {
       await rack.update({
-        currentPower: rack.currentPower + deviceData.powerConsumption
+        currentPower: rack.currentPower + deviceData.powerConsumption,
       });
     }
 
@@ -707,19 +767,23 @@ router.post('/', validateBody(createDeviceSchema), async (req, res) => {
       `设备类型: ${device.type}`,
       `所属机柜: ${rack ? rack.name : '未分配'}`,
       `安装位置: U${device.position}`,
-      `功耗: ${device.powerConsumption}W`
+      `功耗: ${device.powerConsumption}W`,
     ].join('；');
 
-    await logDeviceOperation('create', generateDeviceDescription('创建设备', {
-      ...device.toJSON(),
-      rackName: rack?.name
-    }), {
-      targetId: device.deviceId,
-      targetName: device.name,
-      afterState: device.toJSON(),
-      req,
-      metadata: buildDeviceMetadata({ ...device.toJSON(), rackName: rack?.name })
-    });
+    await logDeviceOperation(
+      'create',
+      generateDeviceDescription('创建设备', {
+        ...device.toJSON(),
+        rackName: rack?.name,
+      }),
+      {
+        targetId: device.deviceId,
+        targetName: device.name,
+        afterState: device.toJSON(),
+        req,
+        metadata: buildDeviceMetadata({ ...device.toJSON(), rackName: rack?.name }),
+      }
+    );
 
     res.status(201).json(device);
   } catch (error) {
@@ -732,9 +796,9 @@ router.get('/import-template', async (req, res) => {
   try {
     // 查询设备字段配置
     const deviceFields = await DeviceField.findAll({
-      order: [['order', 'ASC']]
+      order: [['order', 'ASC']],
     });
-    
+
     // 根据字段配置动态生成CSV标题（排除设备ID，由系统自动生成）
     // 将rackId字段替换为机房名称+机柜名称，以便唯一定位
     // 注意：导入模板包含所有字段（不论visible状态），确保数据完整性
@@ -744,21 +808,21 @@ router.get('/import-template', async (req, res) => {
       .forEach(field => {
         // 如果是机柜字段，拆分为机房名称和机柜名称两列
         if (field.fieldName === 'rackId') {
-          headers.push({ 
-            id: '所在机房名称', 
-            title: '所在机房名称' 
+          headers.push({
+            id: '所在机房名称',
+            title: '所在机房名称',
           });
-          headers.push({ 
-            id: '所在机柜名称', 
-            title: '所在机柜名称' 
+          headers.push({
+            id: '所在机柜名称',
+            title: '所在机柜名称',
           });
           return;
         }
-        
+
         // 直接使用displayName作为列名，不添加任何后缀
         headers.push({ id: field.displayName, title: field.displayName });
       });
-    
+
     // 准备示例数据（根据字段配置生成，排除设备ID）
     // 注意：包含所有字段（不论visible状态）
     const exampleData = {};
@@ -771,7 +835,7 @@ router.get('/import-template', async (req, res) => {
           exampleData['所在机柜名称'] = 'A01';
           return;
         }
-        
+
         switch (field.fieldName) {
           case 'name':
             exampleData[field.displayName] = '测试服务器001';
@@ -824,37 +888,39 @@ router.get('/import-template', async (req, res) => {
             }
         }
       });
-    
+
     const templateData = [exampleData];
-    
+
     // 确保temp目录存在
     const tempDir = path.join(__dirname, '../temp');
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
-    
+
     const csvWriter = createObjectCsvWriter({
       path: path.join(tempDir, 'import_template.csv'),
-      header: headers
+      header: headers,
     });
-    
+
     // 写入CSV文件
     await csvWriter.writeRecords(templateData);
-    
+
     // 读取文件并转换为GBK编码
     const csvContent = fs.readFileSync(path.join(tempDir, 'import_template.csv'), 'utf8');
     const gbkContent = iconv.encode(csvContent, 'gbk');
-    
+
     // 设置响应头
     res.setHeader('Content-Type', 'text/csv; charset=gbk');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent('设备导入模板.csv')}`);
-    
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent('设备导入模板.csv')}`
+    );
+
     // 发送CSV数据
     res.send(gbkContent);
-    
+
     // 删除临时文件
     fs.unlinkSync(path.join(tempDir, 'import_template.csv'));
-    
   } catch (error) {
     console.error('生成导入模板失败:', error);
     res.status(500).json({ error: '生成导入模板失败' });
@@ -865,7 +931,7 @@ router.get('/import-template', async (req, res) => {
 router.get('/export', async (req, res) => {
   try {
     const { deviceIds } = req.query;
-    
+
     // 查询条件
     const where = {};
     if (deviceIds) {
@@ -873,40 +939,38 @@ router.get('/export', async (req, res) => {
       const ids = Array.isArray(deviceIds) ? deviceIds : [deviceIds];
       where.deviceId = { [Op.in]: ids };
     }
-    
+
     // 查询设备字段配置
     const deviceFields = await DeviceField.findAll({
-      order: [['order', 'ASC']]
+      order: [['order', 'ASC']],
     });
-    
+
     // 查询设备数据
     const devices = await Device.findAll({
       where,
       include: [
         {
           model: Rack,
-          include: [
-            { model: Room }
-          ]
-        }
-      ]
+          include: [{ model: Room }],
+        },
+      ],
     });
-    
+
     // 如果没有找到设备
     if (devices.length === 0) {
       return res.status(404).json({ error: '未找到指定的设备' });
     }
-    
+
     // 创建字段名到displayName的映射
     const fieldNameToDisplayName = {};
     deviceFields.forEach(field => {
       fieldNameToDisplayName[field.fieldName] = field.displayName;
     });
-    
+
     // 准备CSV数据 - 根据字段配置动态生成，与导入模板保持一致
     const csvData = devices.map(device => {
       const deviceData = {};
-      
+
       // 根据字段配置生成数据（排除deviceId）
       deviceFields
         .filter(field => field.visible && field.fieldName !== 'deviceId')
@@ -917,10 +981,10 @@ router.get('/export', async (req, res) => {
             deviceData['所在机柜名称'] = device.Rack?.name || '';
             return;
           }
-          
+
           // 其他字段使用displayName作为列名
           const value = device[field.fieldName];
-          
+
           // 日期格式处理
           if (field.fieldType === 'date' && value) {
             deviceData[field.displayName] = new Date(value).toLocaleDateString();
@@ -928,7 +992,7 @@ router.get('/export', async (req, res) => {
             deviceData[field.displayName] = value !== undefined && value !== null ? value : '';
           }
         });
-      
+
       // 添加自定义字段
       if (device.customFields) {
         Object.entries(device.customFields).forEach(([fieldName, value]) => {
@@ -938,10 +1002,10 @@ router.get('/export', async (req, res) => {
           }
         });
       }
-      
+
       return deviceData;
     });
-    
+
     // 设置CSV标题 - 与导入模板保持一致
     const headers = [];
     deviceFields
@@ -953,35 +1017,35 @@ router.get('/export', async (req, res) => {
           headers.push({ id: '所在机柜名称', title: '所在机柜名称' });
           return;
         }
-        
+
         headers.push({ id: field.displayName, title: field.displayName });
       });
-    
+
     const csvWriter = createObjectCsvWriter({
       path: path.join(__dirname, '../temp/devices.csv'),
       header: headers,
-      encoding: 'utf8'
+      encoding: 'utf8',
     });
-    
+
     // 确保temp目录存在
     if (!fs.existsSync(path.join(__dirname, '../temp'))) {
       fs.mkdirSync(path.join(__dirname, '../temp'));
     }
-    
+
     // 写入CSV文件
     await csvWriter.writeRecords(csvData);
-    
+
     // 读取文件并转换为GBK编码
     const csvContent = fs.readFileSync(path.join(__dirname, '../temp/devices.csv'), 'utf8');
     const gbkContent = iconv.encode(csvContent, 'gbk');
-    
+
     // 设置响应头
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=devices.csv');
-    
+
     // 发送CSV数据
     res.send(gbkContent);
-    
+
     // 删除临时文件
     fs.unlinkSync(path.join(__dirname, '../temp/devices.csv'));
   } catch (error) {
@@ -993,40 +1057,39 @@ router.get('/export', async (req, res) => {
 // 导入设备数据从CSV - 优化版：使用事务+批量插入
 router.post('/import', async (req, res) => {
   const t = await sequelize.transaction();
-  
+
   try {
     if (!req.files || !req.files.csvFile) {
       await t.rollback();
       return res.status(400).json({ error: '请上传CSV文件' });
     }
-    
+
     const csvFile = req.files.csvFile;
     const stats = { total: 0, success: 0, failed: 0, errors: [] };
-    
+
     // 确保temp目录存在
     if (!fs.existsSync(path.join(__dirname, '../temp'))) {
       fs.mkdirSync(path.join(__dirname, '../temp'));
     }
-    
+
     // 保存上传的文件
     const filePath = path.join(__dirname, '../temp', csvFile.name);
     await csvFile.mv(filePath);
-    
+
     // 读取并解析CSV文件（GBK编码）
     const results = [];
-    const stream = fs.createReadStream(filePath)
-      .pipe(iconv.decodeStream('gbk'))
-      .pipe(csv());
-    
+    const stream = fs.createReadStream(filePath).pipe(iconv.decodeStream('gbk')).pipe(csv());
+
     await new Promise((resolve, reject) => {
-      stream.on('data', (data) => {
-        stats.total++;
-        results.push(data);
-      })
-      .on('end', resolve)
-      .on('error', reject);
+      stream
+        .on('data', data => {
+          stats.total++;
+          results.push(data);
+        })
+        .on('end', resolve)
+        .on('error', reject);
     });
-    
+
     // 【优化1】批量查询所有必要数据（单次查询）
     const [rooms, racks, deviceFields, maxDeviceResult] = await Promise.all([
       Room.findAll({ transaction: t }),
@@ -1034,49 +1097,74 @@ router.post('/import', async (req, res) => {
       DeviceField.findAll({ transaction: t }),
       // 查询最大设备ID序号
       Device.findOne({
-        attributes: [[sequelize.fn('MAX', sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('deviceId'), 4), 'INTEGER')), 'maxNum']],
+        attributes: [
+          [
+            sequelize.fn(
+              'MAX',
+              sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('deviceId'), 4), 'INTEGER')
+            ),
+            'maxNum',
+          ],
+        ],
         where: { deviceId: { [Op.like]: 'DEV%' } },
-        transaction: t
-      })
+        transaction: t,
+      }),
     ]);
-    
+
     // 创建查找映射
     const roomNameToIdMap = new Map(rooms.map(room => [room.name, room.roomId]));
-    const rackLocationMap = new Map(racks.map(rack => [`${rack.Room?.name || ''}_${rack.name}`, rack.rackId]));
+    const rackLocationMap = new Map(
+      racks.map(rack => [`${rack.Room?.name || ''}_${rack.name}`, rack.rackId])
+    );
     const fieldMapping = {};
     const fieldNameToDisplayName = {};
     deviceFields.forEach(field => {
       fieldMapping[field.displayName] = field;
       fieldNameToDisplayName[field.fieldName] = field.displayName;
     });
-    
+
     // 设备ID生成器
     let maxDeviceNum = maxDeviceResult?.get('maxNum') || 0;
     const generateDeviceId = () => {
       maxDeviceNum++;
       return `DEV${String(maxDeviceNum).padStart(3, '0')}`;
     };
-    
+
     // 辅助函数：提取字段名
-    const extractFieldName = (fieldNameWithFormat) => {
+    const extractFieldName = fieldNameWithFormat => {
       const match = fieldNameWithFormat.match(/^(.+?)(\(必填\)|\(可选\)|\([a-zA-Z0-9\-\/]+\))$/);
       return match ? match[1].trim() : fieldNameWithFormat;
     };
-    
+
     // 【优化2】收集所有需要验证的唯一键
     const allDeviceIds = new Set();
     const allSerialNumbers = new Set();
     const validTypes = ['server', 'switch', 'router', 'storage', 'other'];
     const validStatuses = ['running', 'maintenance', 'offline', 'fault'];
-    const baseFieldNames = ['deviceId', 'name', 'type', 'model', 'serialNumber', 'rackId', 'position', 'height', 'powerConsumption', 'ipAddress', 'status', 'purchaseDate', 'warrantyExpiry', 'description'];
-    
+    const baseFieldNames = [
+      'deviceId',
+      'name',
+      'type',
+      'model',
+      'serialNumber',
+      'rackId',
+      'position',
+      'height',
+      'powerConsumption',
+      'ipAddress',
+      'status',
+      'purchaseDate',
+      'warrantyExpiry',
+      'description',
+    ];
+
     // 第一遍：验证和收集数据
     const validDevices = [];
-    
+
     for (let i = 0; i < results.length; i++) {
       const row = results[i];
       const rowNum = i + 2;
-      
+
       try {
         // 解析字段值
         const fieldValueMap = {};
@@ -1085,40 +1173,44 @@ router.post('/import', async (req, res) => {
           fieldValueMap[originalFieldName] = value;
           fieldValueMap[displayName] = value;
         });
-        
-        const getFieldValue = (fieldName) => {
+
+        const getFieldValue = fieldName => {
           const displayName = fieldNameToDisplayName[fieldName];
           return displayName ? fieldValueMap[displayName] : undefined;
         };
-        
+
         // 验证必填字段
         const trulyRequiredFields = [];
         deviceFields.forEach(field => {
-          if (field.fieldName === 'deviceId') return;
+          if (field.fieldName === 'deviceId') {
+            return;
+          }
           if (field.fieldName === 'rackId') {
             if (field.required) {
               trulyRequiredFields.push('所在机房名称', '所在机柜名称');
             }
             return;
           }
-          if (field.required) trulyRequiredFields.push(field.displayName);
+          if (field.required) {
+            trulyRequiredFields.push(field.displayName);
+          }
         });
-        
+
         const missingFields = trulyRequiredFields.filter(fieldName => {
           const value = fieldValueMap[fieldName];
           return !value || (typeof value === 'string' && value.trim() === '');
         });
-        
+
         if (missingFields.length > 0) {
           throw new Error(`缺少必填字段：${missingFields.join('、')}`);
         }
-        
+
         // 验证设备类型
         const deviceType = getFieldValue('type');
         if (!validTypes.includes(deviceType)) {
           throw new Error(`设备类型无效：${deviceType}`);
         }
-        
+
         // 处理设备ID
         let deviceId = getFieldValue('deviceId');
         if (!deviceId || deviceId.trim() === '') {
@@ -1127,62 +1219,81 @@ router.post('/import', async (req, res) => {
           throw new Error(`设备ID重复：${deviceId}`);
         }
         allDeviceIds.add(deviceId);
-        
+
         // 验证序列号
         const serialNumber = getFieldValue('serialNumber');
-        if (!serialNumber) throw new Error('序列号不能为空');
+        if (!serialNumber) {
+          throw new Error('序列号不能为空');
+        }
         if (allSerialNumbers.has(serialNumber)) {
           throw new Error(`序列号重复：${serialNumber}`);
         }
         allSerialNumbers.add(serialNumber);
-        
+
         // 验证机房和机柜
         const roomName = fieldValueMap['所在机房名称'];
         const rackName = fieldValueMap['所在机柜名称'];
-        if (!roomName?.trim()) throw new Error('所在机房名称不能为空');
-        if (!rackName?.trim()) throw new Error('所在机柜名称不能为空');
-        
+        if (!roomName?.trim()) {
+          throw new Error('所在机房名称不能为空');
+        }
+        if (!rackName?.trim()) {
+          throw new Error('所在机柜名称不能为空');
+        }
+
         const roomId = roomNameToIdMap.get(roomName.trim());
-        if (!roomId) throw new Error(`机房不存在：${roomName}`);
-        
+        if (!roomId) {
+          throw new Error(`机房不存在：${roomName}`);
+        }
+
         const locationKey = `${roomName.trim()}_${rackName.trim()}`;
         let rackId = rackLocationMap.get(locationKey);
-        
+
         // 机柜不存在则自动创建
         if (!rackId) {
           const maxRackResult = await Rack.findOne({
-            attributes: [[sequelize.fn('MAX', sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('rackId'), 5), 'INTEGER')), 'maxNum']],
+            attributes: [
+              [
+                sequelize.fn(
+                  'MAX',
+                  sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('rackId'), 5), 'INTEGER')
+                ),
+                'maxNum',
+              ],
+            ],
             where: { rackId: { [Op.like]: 'RACK%' } },
-            transaction: t
+            transaction: t,
           });
           let maxRackNum = maxRackResult?.get('maxNum') || 0;
           maxRackNum++;
-          
-          const newRack = await Rack.create({
-            rackId: `RACK${String(maxRackNum).padStart(3, '0')}`,
-            name: rackName.trim(),
-            height: 42,
-            maxPower: 10000,
-            currentPower: 0,
-            status: 'active',
-            roomId: roomId
-          }, { transaction: t });
-          
+
+          const newRack = await Rack.create(
+            {
+              rackId: `RACK${String(maxRackNum).padStart(3, '0')}`,
+              name: rackName.trim(),
+              height: 42,
+              maxPower: 10000,
+              currentPower: 0,
+              status: 'active',
+              roomId: roomId,
+            },
+            { transaction: t }
+          );
+
           rackId = newRack.rackId;
           rackLocationMap.set(locationKey, rackId);
         }
-        
+
         // 验证状态
         const status = getFieldValue('status');
         if (!validStatuses.includes(status)) {
           throw new Error(`状态值无效：${status}`);
         }
-        
+
         // 验证数字字段
         const position = getFieldValue('position');
         const height = getFieldValue('height');
         const powerConsumption = getFieldValue('powerConsumption');
-        
+
         if (position !== undefined && isNaN(Number(position))) {
           throw new Error(`位置必须是数字：${position}`);
         }
@@ -1192,13 +1303,13 @@ router.post('/import', async (req, res) => {
         if (powerConsumption !== undefined && isNaN(Number(powerConsumption))) {
           throw new Error(`功率必须是数字：${powerConsumption}`);
         }
-        
+
         // 验证日期
         const purchaseDateValue = getFieldValue('purchaseDate');
         const warrantyExpiryValue = getFieldValue('warrantyExpiry');
         const purchaseDate = purchaseDateValue ? new Date(purchaseDateValue) : null;
         const warrantyExpiry = warrantyExpiryValue ? new Date(warrantyExpiryValue) : null;
-        
+
         if (purchaseDateValue && isNaN(purchaseDate.getTime())) {
           throw new Error(`购买日期格式无效：${purchaseDateValue}`);
         }
@@ -1208,26 +1319,28 @@ router.post('/import', async (req, res) => {
         if (purchaseDate && warrantyExpiry && warrantyExpiry <= purchaseDate) {
           throw new Error(`保修日期必须晚于购买日期`);
         }
-        
+
         // 处理自定义字段
         const customFields = {};
         Object.entries(row).forEach(([displayName, value]) => {
           const originalDisplayName = extractFieldName(displayName);
           const fieldConfig = fieldMapping[originalDisplayName];
-          
+
           if (fieldConfig && !baseFieldNames.includes(fieldConfig.fieldName)) {
             let processedValue = value;
             if (fieldConfig.fieldType === 'number') {
               processedValue = value ? parseFloat(value) : null;
             } else if (fieldConfig.fieldType === 'boolean') {
-              processedValue = value ? (value.toLowerCase() === 'true' || value === '1' || value.toLowerCase() === '是') : false;
+              processedValue = value
+                ? value.toLowerCase() === 'true' || value === '1' || value.toLowerCase() === '是'
+                : false;
             } else if (fieldConfig.fieldType === 'date') {
               processedValue = value ? new Date(value) : null;
             }
             customFields[fieldConfig.fieldName] = processedValue;
           }
         });
-        
+
         // 收集有效设备数据
         validDevices.push({
           deviceId,
@@ -1244,9 +1357,8 @@ router.post('/import', async (req, res) => {
           purchaseDate,
           warrantyExpiry,
           description: getFieldValue('description') || '',
-          customFields: Object.keys(customFields).length > 0 ? customFields : null
+          customFields: Object.keys(customFields).length > 0 ? customFields : null,
         });
-        
       } catch (error) {
         stats.failed++;
         stats.errors.push({ row: rowNum, error: error.message, data: row });
@@ -1268,7 +1380,7 @@ router.post('/import', async (req, res) => {
         const existingDevices = await Device.findAll({
           where: { rackId, position: { [Op.ne]: null } },
           attributes: ['deviceId', 'position', 'height'],
-          transaction: t
+          transaction: t,
         });
 
         for (const newDevice of devices) {
@@ -1286,7 +1398,7 @@ router.post('/import', async (req, res) => {
               stats.errors.push({
                 row: 0,
                 error: `U位冲突：机柜中已有设备 ${existing.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}，与导入设备 ${newDevice.deviceId}(U${startU}-U${endU}) 冲突`,
-                data: { deviceId: newDevice.deviceId }
+                data: { deviceId: newDevice.deviceId },
               });
               hasConflict = true;
               break;
@@ -1295,7 +1407,9 @@ router.post('/import', async (req, res) => {
 
           if (!hasConflict) {
             for (const otherDevice of devices) {
-              if (otherDevice === newDevice) continue;
+              if (otherDevice === newDevice) {
+                continue;
+              }
 
               const otherStart = otherDevice.position;
               const otherEnd = otherDevice.position + otherDevice.height - 1;
@@ -1305,7 +1419,7 @@ router.post('/import', async (req, res) => {
                 stats.errors.push({
                   row: 0,
                   error: `U位冲突：导入数据内部冲突，设备 ${newDevice.deviceId}(U${startU}-U${endU}) 与设备 ${otherDevice.deviceId}(U${otherStart}-U${otherEnd}) U位重叠`,
-                  data: { deviceId: newDevice.deviceId }
+                  data: { deviceId: newDevice.deviceId },
                 });
                 hasConflict = true;
                 break;
@@ -1315,28 +1429,30 @@ router.post('/import', async (req, res) => {
 
           if (hasConflict) {
             const idx = validDevices.indexOf(newDevice);
-            if (idx > -1) validDevices.splice(idx, 1);
+            if (idx > -1) {
+              validDevices.splice(idx, 1);
+            }
           }
         }
       }
     }
-    
+
     // 【优化3】批量查询已存在的设备ID和序列号（单次查询）
     if (validDevices.length > 0) {
       const existingDevices = await Device.findAll({
         where: {
           [Op.or]: [
             { deviceId: validDevices.map(d => d.deviceId) },
-            { serialNumber: validDevices.map(d => d.serialNumber) }
-          ]
+            { serialNumber: validDevices.map(d => d.serialNumber) },
+          ],
         },
         attributes: ['deviceId', 'serialNumber'],
-        transaction: t
+        transaction: t,
       });
-      
+
       const existingDeviceIds = new Set(existingDevices.map(d => d.deviceId));
       const existingSerialNumbers = new Set(existingDevices.map(d => d.serialNumber));
-      
+
       // 过滤掉已存在的设备
       const newDevices = validDevices.filter(device => {
         if (existingDeviceIds.has(device.deviceId)) {
@@ -1351,19 +1467,19 @@ router.post('/import', async (req, res) => {
         }
         return true;
       });
-      
+
       // 【优化4】批量创建设备
       if (newDevices.length > 0) {
         await Device.bulkCreate(newDevices, { transaction: t });
         stats.success = newDevices.length;
-        
+
         // 【优化5】批量更新机柜功率
         const rackPowerMap = new Map();
         newDevices.forEach(device => {
           const current = rackPowerMap.get(device.rackId) || 0;
           rackPowerMap.set(device.rackId, current + device.powerConsumption);
         });
-        
+
         for (const [rackId, powerToAdd] of rackPowerMap) {
           await Rack.update(
             { currentPower: sequelize.literal(`currentPower + ${powerToAdd}`) },
@@ -1372,17 +1488,16 @@ router.post('/import', async (req, res) => {
         }
       }
     }
-    
+
     // 提交事务
     await t.commit();
-    
+
     fs.unlinkSync(filePath);
     res.json({ statistics: stats });
-    
   } catch (error) {
     await t.rollback();
     console.error('导入设备数据失败:', error);
-    
+
     // 清理临时文件
     try {
       if (filePath && fs.existsSync(filePath)) {
@@ -1391,9 +1506,9 @@ router.post('/import', async (req, res) => {
     } catch (fileErr) {
       console.error('删除临时文件失败:', fileErr);
     }
-    
-    res.status(500).json({ 
-      errors: [{ row: 0, error: error.message || '导入过程中发生未知错误' }] 
+
+    res.status(500).json({
+      errors: [{ row: 0, error: error.message || '导入过程中发生未知错误' }],
     });
   }
 });
@@ -1402,20 +1517,20 @@ router.post('/import', async (req, res) => {
 router.put('/batch-online', validateBody(batchDeviceIdsSchema), async (req, res) => {
   try {
     const { deviceIds } = req.body;
-    
+
     if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
       return res.status(400).json({ error: '请提供有效的设备ID列表' });
     }
-    
+
     // 更新设备状态为运行中
     const [affectedCount] = await Device.update(
       { status: 'running' },
       { where: { deviceId: { [Op.in]: deviceIds } } }
     );
-    
+
     res.json({
       message: `批量上线成功，已更新 ${affectedCount} 个设备`,
-      affectedCount
+      affectedCount,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1426,20 +1541,20 @@ router.put('/batch-online', validateBody(batchDeviceIdsSchema), async (req, res)
 router.put('/batch-offline', validateBody(batchDeviceIdsSchema), async (req, res) => {
   try {
     const { deviceIds } = req.body;
-    
+
     if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
       return res.status(400).json({ error: '请提供有效的设备ID列表' });
     }
-    
+
     // 更新设备状态为离线
     const [affectedCount] = await Device.update(
       { status: 'offline' },
       { where: { deviceId: { [Op.in]: deviceIds } } }
     );
-    
+
     res.json({
       message: `批量下线成功，已更新 ${affectedCount} 个设备`,
-      affectedCount
+      affectedCount,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1458,7 +1573,7 @@ router.put('/batch-status', async (req, res) => {
     // 检查数据库中是否存在这些设备
     const existingDevices = await Device.findAll({
       where: { deviceId: { [Op.in]: deviceIds } },
-      attributes: ['deviceId']
+      attributes: ['deviceId'],
     });
 
     // 检查是否有不存在的设备
@@ -1472,7 +1587,7 @@ router.put('/batch-status', async (req, res) => {
     const validStatus = ['running', 'maintenance', 'offline', 'fault'];
     if (!validStatus.includes(status)) {
       return res.status(400).json({
-        error: `状态值无效，有效值为：${validStatus.join('、')}`
+        error: `状态值无效，有效值为：${validStatus.join('、')}`,
       });
     }
 
@@ -1481,12 +1596,12 @@ router.put('/batch-status', async (req, res) => {
       running: '运行中',
       maintenance: '维护中',
       offline: '离线',
-      fault: '故障'
+      fault: '故障',
     };
 
     const beforeDevices = await Device.findAll({
       where: { deviceId: { [Op.in]: deviceIds } },
-      include: [{ model: Rack, attributes: ['name'] }]
+      include: [{ model: Rack, attributes: ['name'] }],
     });
 
     const deviceDetails = beforeDevices.map(d => {
@@ -1500,30 +1615,39 @@ router.put('/batch-status', async (req, res) => {
         ipAddress: d.ipAddress,
         rackName: data.Rack?.name || null,
         position: d.position,
-        status: d.status
+        status: d.status,
       };
     });
 
     const deviceNames = deviceDetails.map(d => d.name);
-    const deviceSummary = deviceDetails.map(d =>
-      `${d.name}(编号:${d.deviceId}${d.rackName ? `,机柜:${d.rackName}` : ''})`
-    ).join('、');
+    const deviceSummary = deviceDetails
+      .map(d => `${d.name}(编号:${d.deviceId}${d.rackName ? `,机柜:${d.rackName}` : ''})`)
+      .join('、');
 
     const statusChangeDesc = `批量变更${affectedCount}台设备状态：${deviceSummary} → ${statusText[status]}`;
 
     await logDeviceOperation('status_change', statusChangeDesc, {
       targetId: deviceIds.join(','),
       targetName: `${affectedCount}台设备`,
-      beforeState: deviceDetails.map(d => ({ deviceId: d.deviceId, name: d.name, status: d.status })),
+      beforeState: deviceDetails.map(d => ({
+        deviceId: d.deviceId,
+        name: d.name,
+        status: d.status,
+      })),
       afterState: deviceDetails.map(d => ({ deviceId: d.deviceId, name: d.name, status })),
       req,
-      metadata: { status, statusText: statusText[status], count: affectedCount, devices: deviceDetails }
+      metadata: {
+        status,
+        statusText: statusText[status],
+        count: affectedCount,
+        devices: deviceDetails,
+      },
     });
 
     res.json({
       message: `批量状态变更成功，已将 ${affectedCount} 个设备状态变更为"${statusText[status]}"`,
       affectedCount,
-      newStatus: status
+      newStatus: status,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1550,7 +1674,18 @@ router.put('/batch-move', async (req, res) => {
 
     const devicesToMove = await Device.findAll({
       where: { deviceId: { [Op.in]: deviceIds } },
-      attributes: ['deviceId', 'name', 'type', 'model', 'serialNumber', 'ipAddress', 'rackId', 'position', 'height', 'powerConsumption']
+      attributes: [
+        'deviceId',
+        'name',
+        'type',
+        'model',
+        'serialNumber',
+        'ipAddress',
+        'rackId',
+        'position',
+        'height',
+        'powerConsumption',
+      ],
     });
 
     const deviceDetails = devicesToMove.map(d => d.toJSON());
@@ -1561,12 +1696,15 @@ router.put('/batch-move', async (req, res) => {
       type: d.type,
       rackId: d.rackId,
       position: d.position,
-      powerConsumption: d.powerConsumption
+      powerConsumption: d.powerConsumption,
     }));
 
-    const deviceSummary = deviceDetails.map(d =>
-      `${d.name}(编号:${d.deviceId}${d.type ? `,类型:${d.type}` : ''}${d.ipAddress ? `,IP:${d.ipAddress}` : ''})`
-    ).join('、');
+    const deviceSummary = deviceDetails
+      .map(
+        d =>
+          `${d.name}(编号:${d.deviceId}${d.type ? `,类型:${d.type}` : ''}${d.ipAddress ? `,IP:${d.ipAddress}` : ''})`
+      )
+      .join('、');
 
     const sourceRackPowerChanges = new Map();
     devicesToMove.forEach(device => {
@@ -1586,16 +1724,16 @@ router.put('/batch-move', async (req, res) => {
         devicesToCheck.push({
           deviceId,
           position: startPosition + i,
-          height
+          height,
         });
       }
 
       const existingDevices = await Device.findAll({
         where: {
           rackId: targetRackId,
-          position: { [Op.ne]: null }
+          position: { [Op.ne]: null },
         },
-        attributes: ['deviceId', 'position', 'height']
+        attributes: ['deviceId', 'position', 'height'],
       });
 
       for (const newDevice of devicesToCheck) {
@@ -1612,20 +1750,22 @@ router.put('/batch-move', async (req, res) => {
 
           if (!(endU < existStart || startU > existEnd)) {
             return res.status(400).json({
-              error: `U位冲突：机柜中已有设备 ${existing.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}，与移动设备 ${newDevice.deviceId}(U${startU}-U${endU}) 冲突`
+              error: `U位冲突：机柜中已有设备 ${existing.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}，与移动设备 ${newDevice.deviceId}(U${startU}-U${endU}) 冲突`,
             });
           }
         }
 
         for (const other of devicesToCheck) {
-          if (other === newDevice) continue;
+          if (other === newDevice) {
+            continue;
+          }
 
           const otherStart = other.position;
           const otherEnd = other.position + other.height - 1;
 
           if (!(endU < otherStart || startU > otherEnd)) {
             return res.status(400).json({
-              error: `U位冲突：移动设备 ${newDevice.deviceId}(U${startU}-U${endU}) 与设备 ${other.deviceId}(U${otherStart}-U${otherEnd}) U位重叠`
+              error: `U位冲突：移动设备 ${newDevice.deviceId}(U${startU}-U${endU}) 与设备 ${other.deviceId}(U${otherStart}-U${otherEnd}) U位重叠`,
             });
           }
         }
@@ -1645,7 +1785,7 @@ router.put('/batch-move', async (req, res) => {
       }
 
       const [updated] = await Device.update(updateData, {
-        where: { deviceId }
+        where: { deviceId },
       });
 
       if (updated) {
@@ -1687,12 +1827,18 @@ router.put('/batch-move', async (req, res) => {
       beforeState: beforeMoveState,
       afterState: { targetRackId, targetRackName: targetRack.name, startPosition },
       req,
-      metadata: { count: movedCount, targetRackId, targetRackName: targetRack.name, startPosition, devices: deviceDetails }
+      metadata: {
+        count: movedCount,
+        targetRackId,
+        targetRackName: targetRack.name,
+        startPosition,
+        devices: deviceDetails,
+      },
     });
 
     res.json({
       message: `批量移动成功，已将 ${movedCount} 个设备移动到机柜 ${targetRackId}`,
-      movedCount
+      movedCount,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1706,7 +1852,7 @@ router.get('/enhanced-export', async (req, res) => {
 
     // 从数据库读取所有字段配置（不过滤 visible，以导出所有信息）
     const allFields = await DeviceField.findAll({
-      order: [['order', 'ASC']]
+      order: [['order', 'ASC']],
     });
 
     // 构建字段映射表
@@ -1730,9 +1876,9 @@ router.get('/enhanced-export', async (req, res) => {
       include: [
         {
           model: Rack,
-          include: [{ model: Room }]
-        }
-      ]
+          include: [{ model: Room }],
+        },
+      ],
     });
 
     if (devices.length === 0) {
@@ -1744,14 +1890,14 @@ router.get('/enhanced-export', async (req, res) => {
       running: '运行中',
       maintenance: '维护中',
       offline: '离线',
-      fault: '故障'
+      fault: '故障',
     };
     const typeMap = {
       server: '服务器',
       switch: '交换机',
       router: '路由器',
       storage: '存储设备',
-      other: '其他设备'
+      other: '其他设备',
     };
 
     // 准备导出数据 - 遍历所有设备
@@ -1780,11 +1926,17 @@ router.get('/enhanced-export', async (req, res) => {
           } else if (fieldName === 'type') {
             data[label] = typeMap[device.type] || device.type || '';
           } else if (fieldName === 'purchaseDate' || fieldName === 'warrantyExpiry') {
-            data[label] = device[fieldName] ? new Date(device[fieldName]).toLocaleDateString('zh-CN') : '';
+            data[label] = device[fieldName]
+              ? new Date(device[fieldName]).toLocaleDateString('zh-CN')
+              : '';
           } else {
             data[label] = device[fieldName];
           }
-        } else if (device.customFields && typeof device.customFields === 'object' && device.customFields[fieldName] !== undefined) {
+        } else if (
+          device.customFields &&
+          typeof device.customFields === 'object' &&
+          device.customFields[fieldName] !== undefined
+        ) {
           data[label] = device.customFields[fieldName];
         } else {
           // 设备表中没有该字段且 customFields 中也没有，设为空字符串
@@ -1840,7 +1992,7 @@ router.get('/enhanced-export', async (req, res) => {
       const csvWriter = createObjectCsvWriter({
         path: path.join(__dirname, '../temp/enhanced_export.csv'),
         header: headers,
-        encoding: 'utf8'
+        encoding: 'utf8',
       });
 
       if (!fs.existsSync(path.join(__dirname, '../temp'))) {
@@ -1849,7 +2001,10 @@ router.get('/enhanced-export', async (req, res) => {
 
       await csvWriter.writeRecords(exportData);
 
-      const csvContent = fs.readFileSync(path.join(__dirname, '../temp/enhanced_export.csv'), 'utf8');
+      const csvContent = fs.readFileSync(
+        path.join(__dirname, '../temp/enhanced_export.csv'),
+        'utf8'
+      );
       const gbkContent = iconv.encode(csvContent, 'gbk');
 
       res.setHeader('Content-Type', 'text/csv');
@@ -1865,7 +2020,7 @@ router.get('/enhanced-export', async (req, res) => {
         exportTime: new Date().toISOString(),
         totalCount: devices.length,
         fields: Object.values(fieldLabels),
-        devices: exportData
+        devices: exportData,
       });
     }
   } catch (error) {
@@ -1904,11 +2059,9 @@ router.get('/:deviceId', async (req, res) => {
       include: [
         {
           model: Rack,
-          include: [
-            { model: Room }
-          ]
-        }
-      ]
+          include: [{ model: Room }],
+        },
+      ],
     });
     if (!device) {
       return res.status(404).json({ error: '设备不存在' });
@@ -1937,19 +2090,25 @@ router.put('/:deviceId/to-idle', async (req, res) => {
       return res.status(400).json({ error: '设备已经标记为空闲设备' });
     }
 
-    await device.update({
-      isIdle: true,
-      status: 'idle',
-      idleDate: new Date(),
-      idleReason: idleReason || `从设备管理转入`
-    }, { transaction: t });
+    await device.update(
+      {
+        isIdle: true,
+        status: 'idle',
+        idleDate: new Date(),
+        idleReason: idleReason || `从设备管理转入`,
+      },
+      { transaction: t }
+    );
 
     if (device.rackId) {
       const rack = await Rack.findByPk(device.rackId, { transaction: t });
       if (rack) {
-        await rack.update({
-          currentPower: Math.max(0, rack.currentPower - (device.powerConsumption || 0))
-        }, { transaction: t });
+        await rack.update(
+          {
+            currentPower: Math.max(0, rack.currentPower - (device.powerConsumption || 0)),
+          },
+          { transaction: t }
+        );
       }
     }
 
@@ -1957,7 +2116,7 @@ router.put('/:deviceId/to-idle', async (req, res) => {
 
     const deviceData = {
       ...device.toJSON(),
-      rackName: device.rack?.name
+      rackName: device.rack?.name,
     };
     await logDeviceOperation('to_idle', generateDeviceDescription('转入空闲设备', deviceData), {
       targetId: device.deviceId,
@@ -1965,12 +2124,12 @@ router.put('/:deviceId/to-idle', async (req, res) => {
       beforeState: { ...device.toJSON(), isIdle: false },
       afterState: { ...device.toJSON(), isIdle: true },
       req,
-      metadata: buildDeviceMetadata(deviceData, { idleReason, type: 'device_to_idle' })
+      metadata: buildDeviceMetadata(deviceData, { idleReason, type: 'device_to_idle' }),
     });
 
     res.json({
       message: '设备已转入空闲设备',
-      device: device.toJSON()
+      device: device.toJSON(),
     });
   } catch (error) {
     await t.rollback();
@@ -2003,14 +2162,14 @@ router.get('/:deviceId/tickets', async (req, res) => {
       where,
       order: [['createdAt', 'DESC']],
       offset: parseInt(offset),
-      limit: parseInt(pageSize)
+      limit: parseInt(pageSize),
     });
 
     res.json({
       data: tickets,
       total: count,
       page: parseInt(page),
-      pageSize: parseInt(pageSize)
+      pageSize: parseInt(pageSize),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -2032,8 +2191,13 @@ router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
     const newPosition = req.body.position !== undefined ? req.body.position : oldDevice.position;
     const newHeight = req.body.height !== undefined ? req.body.height : oldDevice.height;
 
-    if ((req.body.rackId !== undefined || req.body.position !== undefined || req.body.height !== undefined)
-        && newRackId && newPosition) {
+    if (
+      (req.body.rackId !== undefined ||
+        req.body.position !== undefined ||
+        req.body.height !== undefined) &&
+      newRackId &&
+      newPosition
+    ) {
       const positionCheck = await checkPositionAvailable(
         newRackId,
         newPosition,
@@ -2046,21 +2210,22 @@ router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
     }
 
     const [updated] = await Device.update(req.body, {
-      where: { deviceId: req.params.deviceId }
+      where: { deviceId: req.params.deviceId },
     });
 
     if (updated) {
       const oldRackId = oldDevice.rackId;
       const newRackId = req.body.rackId;
       const oldPower = oldDevice.powerConsumption || 0;
-      const newPower = req.body.powerConsumption !== undefined ? req.body.powerConsumption : oldPower;
+      const newPower =
+        req.body.powerConsumption !== undefined ? req.body.powerConsumption : oldPower;
 
       if (oldRackId === newRackId) {
         const rack = await Rack.findByPk(oldRackId);
         if (rack) {
           const powerDiff = newPower - oldPower;
           await rack.update({
-            currentPower: rack.currentPower + powerDiff
+            currentPower: rack.currentPower + powerDiff,
           });
         }
       } else {
@@ -2068,7 +2233,7 @@ router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
           const oldRack = await Rack.findByPk(oldRackId);
           if (oldRack) {
             await oldRack.update({
-              currentPower: Math.max(0, oldRack.currentPower - oldPower)
+              currentPower: Math.max(0, oldRack.currentPower - oldPower),
             });
           }
         }
@@ -2076,7 +2241,7 @@ router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
           const newRack = await Rack.findByPk(newRackId);
           if (newRack) {
             await newRack.update({
-              currentPower: newRack.currentPower + newPower
+              currentPower: newRack.currentPower + newPower,
             });
           }
         }
@@ -2086,11 +2251,9 @@ router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
         include: [
           {
             model: Rack,
-            include: [
-              { model: Room }
-            ]
-          }
-        ]
+            include: [{ model: Room }],
+          },
+        ],
       });
 
       const afterState = updatedDevice.toJSON();
@@ -2103,24 +2266,36 @@ router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
       const deviceData = {
         ...updatedDevice.toJSON(),
         rackName: updatedDevice.Rack?.name,
-        roomName: updatedDevice.Rack?.Room?.name
+        roomName: updatedDevice.Rack?.Room?.name,
       };
       delete deviceData.Rack;
 
-      const changeDetails = Object.entries(changedFields).map(([field, values]) => {
-        const fieldNames = {
-          name: '名称', deviceId: '设备编号', type: '类型', model: '型号',
-          manufacturer: '制造商', serialNumber: '序列号', status: '状态',
-          position: '安装位置(U)', height: '占用高度(U)', powerConsumption: '功耗(W)',
-          ipAddress: 'IP地址', macAddress: 'MAC地址', managementIp: '管理IP'
-        };
-        const displayName = fieldNames[field] || field;
-        return `${displayName}: ${values.from ?? '空'} → ${values.to ?? '空'}`;
-      }).join('；');
+      const changeDetails = Object.entries(changedFields)
+        .map(([field, values]) => {
+          const fieldNames = {
+            name: '名称',
+            deviceId: '设备编号',
+            type: '类型',
+            model: '型号',
+            manufacturer: '制造商',
+            serialNumber: '序列号',
+            status: '状态',
+            position: '安装位置(U)',
+            height: '占用高度(U)',
+            powerConsumption: '功耗(W)',
+            ipAddress: 'IP地址',
+            macAddress: 'MAC地址',
+            managementIp: '管理IP',
+          };
+          const displayName = fieldNames[field] || field;
+          return `${displayName}: ${values.from ?? '空'} → ${values.to ?? '空'}`;
+        })
+        .join('；');
 
-      const operationDesc = generateDeviceDescription('更新设备', deviceData, {
-        includePosition: false
-      }) + (changeDetails ? `，变更内容：${changeDetails}` : '');
+      const operationDesc =
+        generateDeviceDescription('更新设备', deviceData, {
+          includePosition: false,
+        }) + (changeDetails ? `，变更内容：${changeDetails}` : '');
 
       await logDeviceOperation('update', operationDesc, {
         targetId: updatedDevice.deviceId,
@@ -2128,7 +2303,7 @@ router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
         beforeState,
         afterState: deviceData,
         req,
-        metadata: buildDeviceMetadata(deviceData, { changedFields })
+        metadata: buildDeviceMetadata(deviceData, { changedFields }),
       });
 
       res.json(updatedDevice);
@@ -2153,19 +2328,19 @@ router.post('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, res
 
     const devices = await Device.findAll({
       where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
+      transaction: t,
     });
 
     // 1. 删除相关端口 (必须在网卡之前删除，因为端口依赖网卡)
     await DevicePort.destroy({
       where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
+      transaction: t,
     });
 
     // 2. 删除相关网卡
     await NetworkCard.destroy({
       where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
+      transaction: t,
     });
 
     // 3. 删除相关接线
@@ -2173,10 +2348,10 @@ router.post('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, res
       where: {
         [Op.or]: [
           { sourceDeviceId: { [Op.in]: deviceIds } },
-          { targetDeviceId: { [Op.in]: deviceIds } }
-        ]
+          { targetDeviceId: { [Op.in]: deviceIds } },
+        ],
       },
-      transaction: t
+      transaction: t,
     });
 
     // 4. 解除工单关联
@@ -2188,7 +2363,7 @@ router.post('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, res
     // 5. 删除盘点记录
     await InventoryRecord.destroy({
       where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
+      transaction: t,
     });
 
     // 6. 更新机柜功率
@@ -2196,9 +2371,12 @@ router.post('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, res
       if (device.rackId) {
         const rack = await Rack.findByPk(device.rackId, { transaction: t });
         if (rack) {
-          await rack.update({
-            currentPower: Math.max(0, rack.currentPower - device.powerConsumption)
-          }, { transaction: t });
+          await rack.update(
+            {
+              currentPower: Math.max(0, rack.currentPower - device.powerConsumption),
+            },
+            { transaction: t }
+          );
         }
       }
     }
@@ -2206,27 +2384,30 @@ router.post('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, res
     // 7. 删除设备
     const deletedCount = await Device.destroy({
       where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
+      transaction: t,
     });
 
     await t.commit();
 
     const deviceDetails = devices.map(d => d.toJSON());
-    const deviceSummary = deviceDetails.map(d =>
-      `${d.name}(编号:${d.deviceId}${d.type ? `,类型:${d.type}` : ''}${d.serialNumber ? `,序列号:${d.serialNumber}` : ''})`
-    ).join('、');
+    const deviceSummary = deviceDetails
+      .map(
+        d =>
+          `${d.name}(编号:${d.deviceId}${d.type ? `,类型:${d.type}` : ''}${d.serialNumber ? `,序列号:${d.serialNumber}` : ''})`
+      )
+      .join('、');
 
     await logDeviceOperation('batch_delete', `批量删除${deletedCount}台设备：${deviceSummary}`, {
       targetId: deviceIds.join(','),
       targetName: `${deletedCount}台设备`,
       beforeState: deviceDetails,
       req,
-      metadata: { count: deletedCount, devices: deviceDetails }
+      metadata: { count: deletedCount, devices: deviceDetails },
     });
 
     res.json({
       message: `批量删除成功，已删除 ${deletedCount} 个设备`,
-      deletedCount
+      deletedCount,
     });
   } catch (error) {
     await t.rollback();
@@ -2241,72 +2422,75 @@ router.delete('/delete-all', async (req, res) => {
   try {
     // 获取所有设备
     const allDevices = await Device.findAll({ transaction: t });
-    
+
     if (allDevices.length === 0) {
       await t.rollback();
       return res.json({ message: '没有设备需要删除', deletedCount: 0 });
     }
-    
+
     const deviceIds = allDevices.map(d => d.deviceId);
-    
+
     // 1. 删除相关端口
     await DevicePort.destroy({
       where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
+      transaction: t,
     });
-    
+
     // 2. 删除相关网卡
     await NetworkCard.destroy({
       where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
+      transaction: t,
     });
-    
+
     // 3. 删除相关接线
     await Cable.destroy({
       where: {
         [Op.or]: [
           { sourceDeviceId: { [Op.in]: deviceIds } },
-          { targetDeviceId: { [Op.in]: deviceIds } }
-        ]
+          { targetDeviceId: { [Op.in]: deviceIds } },
+        ],
       },
-      transaction: t
+      transaction: t,
     });
-    
+
     // 4. 解除工单关联
     await Ticket.update(
       { deviceId: null },
       { where: { deviceId: { [Op.in]: deviceIds } }, transaction: t }
     );
-    
+
     // 5. 删除盘点记录
     await InventoryRecord.destroy({
       where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
+      transaction: t,
     });
-    
+
     // 6. 更新机柜功率
     for (const device of allDevices) {
       if (device.rackId) {
         const rack = await Rack.findByPk(device.rackId, { transaction: t });
         if (rack) {
-          await rack.update({
-            currentPower: Math.max(0, rack.currentPower - device.powerConsumption)
-          }, { transaction: t });
+          await rack.update(
+            {
+              currentPower: Math.max(0, rack.currentPower - device.powerConsumption),
+            },
+            { transaction: t }
+          );
         }
       }
     }
-    
+
     // 7. 删除所有设备
     const deletedCount = await Device.destroy({
       where: {},
-      transaction: t
+      transaction: t,
     });
-    
+
     await t.commit();
-    
+
     res.json({
       message: `成功删除所有设备，共删除 ${deletedCount} 个设备`,
-      deletedCount
+      deletedCount,
     });
   } catch (error) {
     await t.rollback();
@@ -2334,37 +2518,31 @@ router.delete('/:deviceId', async (req, res) => {
     // 1. 删除相关端口 (必须在网卡之前删除，因为端口依赖网卡)
     const deletedPorts = await DevicePort.destroy({
       where: { deviceId: deviceId },
-      transaction: t
+      transaction: t,
     });
 
     // 2. 删除相关网卡
     const deletedNetworkCards = await NetworkCard.destroy({
       where: { deviceId: deviceId },
-      transaction: t
+      transaction: t,
     });
 
     // 3. 删除相关接线
     // 必须在删除设备之前删除，否则可能触发外键约束错误
     const deletedCables = await Cable.destroy({
       where: {
-        [Op.or]: [
-          { sourceDeviceId: deviceId },
-          { targetDeviceId: deviceId }
-        ]
+        [Op.or]: [{ sourceDeviceId: deviceId }, { targetDeviceId: deviceId }],
       },
-      transaction: t
+      transaction: t,
     });
 
     // 4. 解除工单关联 (Unlink Tickets)
-    await Ticket.update(
-      { deviceId: null },
-      { where: { deviceId: deviceId }, transaction: t }
-    );
+    await Ticket.update({ deviceId: null }, { where: { deviceId: deviceId }, transaction: t });
 
     // 5. 删除盘点记录
     await InventoryRecord.destroy({
       where: { deviceId: deviceId },
-      transaction: t
+      transaction: t,
     });
 
     // 6. 更新机柜功率 (必须在删除设备之前)
@@ -2372,9 +2550,12 @@ router.delete('/:deviceId', async (req, res) => {
       try {
         const rack = await Rack.findByPk(device.rackId, { transaction: t });
         if (rack) {
-          await rack.update({
-            currentPower: Math.max(0, rack.currentPower - device.powerConsumption)
-          }, { transaction: t });
+          await rack.update(
+            {
+              currentPower: Math.max(0, rack.currentPower - device.powerConsumption),
+            },
+            { transaction: t }
+          );
         }
       } catch (err) {
         console.error('更新机柜功率失败:', err);
@@ -2385,7 +2566,7 @@ router.delete('/:deviceId', async (req, res) => {
     // 7. 删除设备 (Delete Device)
     await Device.destroy({
       where: { deviceId: deviceId },
-      transaction: t
+      transaction: t,
     });
 
     // 提交事务
@@ -2395,19 +2576,27 @@ router.delete('/:deviceId', async (req, res) => {
       console.log(`已删除 ${deletedCables} 条相关接线`);
     }
 
-    await logDeviceOperation('delete', `删除设备【${deviceName}】（编号:${deviceId}，类型:${device.type}，型号:${device.model || '无'}，序列号:${device.serialNumber || '无'}，IP:${device.ipAddress || '无'}），关联删除：${deletedCables}条接线、${deletedPorts}个端口、${deletedNetworkCards}张网卡`, {
-      targetId: deviceId,
-      targetName: deviceName,
-      beforeState,
-      req,
-      metadata: buildDeviceMetadata(device.toJSON(), { deletedCables, deletedPorts, deletedNetworkCards })
-    });
+    await logDeviceOperation(
+      'delete',
+      `删除设备【${deviceName}】（编号:${deviceId}，类型:${device.type}，型号:${device.model || '无'}，序列号:${device.serialNumber || '无'}，IP:${device.ipAddress || '无'}），关联删除：${deletedCables}条接线、${deletedPorts}个端口、${deletedNetworkCards}张网卡`,
+      {
+        targetId: deviceId,
+        targetName: deviceName,
+        beforeState,
+        req,
+        metadata: buildDeviceMetadata(device.toJSON(), {
+          deletedCables,
+          deletedPorts,
+          deletedNetworkCards,
+        }),
+      }
+    );
 
     res.status(200).json({
       message: '删除成功',
       deviceId: deviceId,
       deletedCablesCount: deletedCables,
-      deletedPortsCount: deletedPorts
+      deletedPortsCount: deletedPorts,
     });
   } catch (error) {
     await t.rollback();

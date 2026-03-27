@@ -55,10 +55,9 @@ async function removeSQLiteForeignKey() {
   console.log('SQLite 不支持直接删除外键，需要重建表');
 
   // 检查外键是否存在
-  const fks = await sequelize.query(
-    `PRAGMA foreign_key_list(consumable_logs);`,
-    { type: sequelize.QueryTypes.SELECT }
-  );
+  const fks = await sequelize.query(`PRAGMA foreign_key_list(consumable_logs);`, {
+    type: sequelize.QueryTypes.SELECT,
+  });
 
   if (!fks || fks.length === 0) {
     console.log('✓ 没有外键约束需要移除');
@@ -68,17 +67,21 @@ async function removeSQLiteForeignKey() {
   console.log('发现外键约束:', fks);
 
   // SQLite 不支持 ALTER TABLE DROP FOREIGN KEY，需要重建表
-  await sequelize.transaction(async (transaction) => {
+  await sequelize.transaction(async transaction => {
     // 获取表结构
-    const columns = await sequelize.query(
-      `PRAGMA table_info(consumable_logs);`,
-      { type: sequelize.QueryTypes.SELECT, transaction }
+    const columns = await sequelize.query(`PRAGMA table_info(consumable_logs);`, {
+      type: sequelize.QueryTypes.SELECT,
+      transaction,
+    });
+
+    console.log(
+      '\n当前表列:',
+      columns.map(c => c.name)
     );
 
-    console.log('\n当前表列:', columns.map(c => c.name));
-
     // 创建新表（不包含外键约束）
-    await sequelize.query(`
+    await sequelize.query(
+      `
       CREATE TABLE consumable_logs_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         consumableId VARCHAR(255) NOT NULL,
@@ -101,20 +104,25 @@ async function removeSQLiteForeignKey() {
         isConsumableDeleted BOOLEAN DEFAULT 0,
         consumableSnapshot TEXT
       )
-    `, { transaction });
+    `,
+      { transaction }
+    );
 
     console.log('✓ 创建新表成功');
 
     // 复制数据
-    await sequelize.query(`
+    await sequelize.query(
+      `
       INSERT INTO consumable_logs_new 
       SELECT * FROM consumable_logs
-    `, { transaction });
-
-    const countResult = await sequelize.query(
-      `SELECT COUNT(*) as count FROM consumable_logs_new`,
-      { type: sequelize.QueryTypes.SELECT, transaction }
+    `,
+      { transaction }
     );
+
+    const countResult = await sequelize.query(`SELECT COUNT(*) as count FROM consumable_logs_new`, {
+      type: sequelize.QueryTypes.SELECT,
+      transaction,
+    });
     console.log(`✓ 复制了 ${countResult[0].count} 条数据`);
 
     // 删除旧表
@@ -122,7 +130,9 @@ async function removeSQLiteForeignKey() {
     console.log('✓ 删除旧表成功');
 
     // 重命名新表
-    await sequelize.query(`ALTER TABLE consumable_logs_new RENAME TO consumable_logs`, { transaction });
+    await sequelize.query(`ALTER TABLE consumable_logs_new RENAME TO consumable_logs`, {
+      transaction,
+    });
     console.log('✓ 重命名新表成功');
 
     // 创建索引
@@ -133,7 +143,7 @@ async function removeSQLiteForeignKey() {
       { name: 'consumable_logs_consumable_id_created_at', fields: ['consumableId', 'createdAt'] },
       { name: 'consumable_logs_original_log_id', fields: ['originalLogId'] },
       { name: 'consumable_logs_is_editable', fields: ['isEditable'] },
-      { name: 'idx_consumable_logs_is_deleted', fields: ['isConsumableDeleted'] }
+      { name: 'idx_consumable_logs_is_deleted', fields: ['isConsumableDeleted'] },
     ];
 
     for (const idx of indexes) {

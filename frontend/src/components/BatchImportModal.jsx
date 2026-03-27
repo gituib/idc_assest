@@ -66,7 +66,9 @@ function BatchImportModal({ visible, onClose, onImportNetworkCard, onImportPort 
             }}
           >
             <div style={{ fontSize: '16px', fontWeight: 600 }}>批量导入网卡</div>
-            <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], fontWeight: 400 }}>
+            <div
+              style={{ fontSize: '12px', color: designTokens.colors.neutral[500], fontWeight: 400 }}
+            >
               用于服务器设备
             </div>
           </Button>
@@ -90,7 +92,9 @@ function BatchImportModal({ visible, onClose, onImportNetworkCard, onImportPort 
             }}
           >
             <div style={{ fontSize: '16px', fontWeight: 600 }}>批量导入端口</div>
-            <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], fontWeight: 400 }}>
+            <div
+              style={{ fontSize: '12px', color: designTokens.colors.neutral[500], fontWeight: 400 }}
+            >
               用于所有设备
             </div>
           </Button>

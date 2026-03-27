@@ -32,26 +32,37 @@ router.get('/', async (req, res) => {
           where: {
             createdAt: {
               [Op.gte]: dayStart,
-              [Op.lt]: dayEnd
-            }
-          }
-        })
+              [Op.lt]: dayEnd,
+            },
+          },
+        }),
       });
     }
 
     const dayResults = await Promise.all(dayQueries.map(d => d.query));
     const deviceTrendData = dayQueries.map((d, index) => ({
       label: d.label,
-      value: dayResults[index]
+      value: dayResults[index],
     }));
 
     const [
-      totalDevices, faultDevices, totalRacks, rooms, totalUsers, activeTickets,
-      newDevicesThisWeek, newDevicesLastWeek,
-      faultDevicesThisWeek, faultDevicesLastWeek,
-      newUsersThisWeek, newUsersLastWeek,
-      newTicketsThisWeek, newTicketsLastWeek,
-      runningDevices, maintenanceDevices, offlineDevices
+      totalDevices,
+      faultDevices,
+      totalRacks,
+      rooms,
+      totalUsers,
+      activeTickets,
+      newDevicesThisWeek,
+      newDevicesLastWeek,
+      faultDevicesThisWeek,
+      faultDevicesLastWeek,
+      newUsersThisWeek,
+      newUsersLastWeek,
+      newTicketsThisWeek,
+      newTicketsLastWeek,
+      runningDevices,
+      maintenanceDevices,
+      offlineDevices,
     ] = await Promise.all([
       Device.count(),
       Device.count({ where: { status: 'fault' } }),
@@ -62,7 +73,9 @@ router.get('/', async (req, res) => {
       Device.count({ where: { createdAt: { [Op.gte]: oneWeekAgo } } }),
       Device.count({ where: { createdAt: { [Op.gte]: twoWeeksAgo, [Op.lt]: oneWeekAgo } } }),
       Device.count({ where: { status: 'fault', updatedAt: { [Op.gte]: oneWeekAgo } } }),
-      Device.count({ where: { status: 'fault', updatedAt: { [Op.gte]: twoWeeksAgo, [Op.lt]: oneWeekAgo } } }),
+      Device.count({
+        where: { status: 'fault', updatedAt: { [Op.gte]: twoWeeksAgo, [Op.lt]: oneWeekAgo } },
+      }),
       User.count({ where: { createdAt: { [Op.gte]: oneWeekAgo } } }),
       User.count({ where: { createdAt: { [Op.gte]: twoWeeksAgo, [Op.lt]: oneWeekAgo } } }),
       Ticket.count({ where: { createdAt: { [Op.gte]: oneWeekAgo } } }),
@@ -74,7 +87,9 @@ router.get('/', async (req, res) => {
 
     let deviceGrowth = 0;
     if (newDevicesLastWeek > 0) {
-      deviceGrowth = parseFloat(((newDevicesThisWeek - newDevicesLastWeek) / newDevicesLastWeek * 100).toFixed(1));
+      deviceGrowth = parseFloat(
+        (((newDevicesThisWeek - newDevicesLastWeek) / newDevicesLastWeek) * 100).toFixed(1)
+      );
     } else if (newDevicesThisWeek > 0) {
       deviceGrowth = 100;
     } else {
@@ -83,7 +98,9 @@ router.get('/', async (req, res) => {
 
     let faultTrend = 0;
     if (faultDevicesLastWeek > 0) {
-      faultTrend = parseFloat(((faultDevicesThisWeek - faultDevicesLastWeek) / faultDevicesLastWeek * 100).toFixed(1));
+      faultTrend = parseFloat(
+        (((faultDevicesThisWeek - faultDevicesLastWeek) / faultDevicesLastWeek) * 100).toFixed(1)
+      );
     } else if (faultDevicesThisWeek > 0) {
       faultTrend = 100;
     } else {
@@ -92,7 +109,9 @@ router.get('/', async (req, res) => {
 
     let userGrowth = 0;
     if (newUsersLastWeek > 0) {
-      userGrowth = parseFloat(((newUsersThisWeek - newUsersLastWeek) / newUsersLastWeek * 100).toFixed(1));
+      userGrowth = parseFloat(
+        (((newUsersThisWeek - newUsersLastWeek) / newUsersLastWeek) * 100).toFixed(1)
+      );
     } else if (newUsersThisWeek > 0) {
       userGrowth = 100;
     } else {
@@ -101,16 +120,17 @@ router.get('/', async (req, res) => {
 
     let ticketTrend = 0;
     if (newTicketsLastWeek > 0) {
-      ticketTrend = parseFloat(((newTicketsThisWeek - newTicketsLastWeek) / newTicketsLastWeek * 100).toFixed(1));
+      ticketTrend = parseFloat(
+        (((newTicketsThisWeek - newTicketsLastWeek) / newTicketsLastWeek) * 100).toFixed(1)
+      );
     } else if (newTicketsThisWeek > 0) {
       ticketTrend = 100;
     } else {
       ticketTrend = 0;
     }
 
-    const onlineRate = totalDevices > 0
-      ? (((totalDevices - faultDevices) / totalDevices) * 100).toFixed(1)
-      : 100;
+    const onlineRate =
+      totalDevices > 0 ? (((totalDevices - faultDevices) / totalDevices) * 100).toFixed(1) : 100;
 
     const totalRooms = rooms.length;
 

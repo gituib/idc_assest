@@ -44,7 +44,7 @@ const api = axios.create({
   baseURL: '/api',
 });
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -96,7 +96,7 @@ const InventoryTaskExecution = () => {
     }
   }, [planId]);
 
-  const fetchTaskRecords = async (taskId) => {
+  const fetchTaskRecords = async taskId => {
     try {
       const res = await api.get(`/inventory/tasks/${taskId}`);
       setCurrentTask(res.data.task);
@@ -122,14 +122,14 @@ const InventoryTaskExecution = () => {
     return true;
   });
 
-  const handleBatchCheck = async (status) => {
+  const handleBatchCheck = async status => {
     if (selectedRowKeys.length === 0) {
       message.warning('请先选择要盘点的记录');
       return;
     }
     setBatchLoading(true);
     try {
-      const promises = selectedRowKeys.map(recordId => 
+      const promises = selectedRowKeys.map(recordId =>
         api.post(`/inventory/records/${recordId}/check`, {
           status,
           checkedAt: new Date().toISOString(),
@@ -148,7 +148,7 @@ const InventoryTaskExecution = () => {
     }
   };
 
-  const handleQuickCheckAll = async (status) => {
+  const handleQuickCheckAll = async status => {
     const pendingRecords = filteredRecords.filter(r => r.status === 'pending');
     if (pendingRecords.length === 0) {
       message.info('没有待盘点的记录');
@@ -156,7 +156,7 @@ const InventoryTaskExecution = () => {
     }
     setBatchLoading(true);
     try {
-      const promises = pendingRecords.map(record => 
+      const promises = pendingRecords.map(record =>
         api.post(`/inventory/records/${record.recordId}/check`, {
           status,
           checkedAt: new Date().toISOString(),
@@ -174,12 +174,12 @@ const InventoryTaskExecution = () => {
     }
   };
 
-  const handleScan = async (sn) => {
+  const handleScan = async sn => {
     if (!sn || sn.trim() === '') return;
-    
+
     const trimmedSN = sn.trim().toUpperCase();
-    const matchedRecord = records.find(r => 
-      r.serialNumber && r.serialNumber.toUpperCase() === trimmedSN
+    const matchedRecord = records.find(
+      r => r.serialNumber && r.serialNumber.toUpperCase() === trimmedSN
     );
 
     if (!matchedRecord) {
@@ -189,11 +189,11 @@ const InventoryTaskExecution = () => {
     }
 
     if (matchedRecord.status !== 'pending') {
-      setScanResult({ 
-        success: false, 
-        message: `设备 "${matchedRecord.deviceName}" 已盘点`, 
+      setScanResult({
+        success: false,
+        message: `设备 "${matchedRecord.deviceName}" 已盘点`,
         record: matchedRecord,
-        sn: trimmedSN 
+        sn: trimmedSN,
       });
       setScanModalVisible(true);
       return;
@@ -205,11 +205,11 @@ const InventoryTaskExecution = () => {
         actualSerialNumber: matchedRecord.serialNumber,
         checkedAt: new Date().toISOString(),
       });
-      setScanResult({ 
-        success: true, 
-        message: `设备 "${matchedRecord.deviceName}" 盘点成功！`, 
+      setScanResult({
+        success: true,
+        message: `设备 "${matchedRecord.deviceName}" 盘点成功！`,
         record: matchedRecord,
-        sn: trimmedSN 
+        sn: trimmedSN,
       });
       setScanModalVisible(true);
       if (currentTask) {
@@ -220,7 +220,7 @@ const InventoryTaskExecution = () => {
     }
   };
 
-  const handleScanInput = (e) => {
+  const handleScanInput = e => {
     const value = e.target.value;
     setScanInput(value);
     if (value.includes('\n') || value.includes('\r')) {
@@ -232,7 +232,7 @@ const InventoryTaskExecution = () => {
     }
   };
 
-  const handleScanKeyPress = (e) => {
+  const handleScanKeyPress = e => {
     if (e.key === 'Enter') {
       e.preventDefault();
       const sn = e.target.value.trim();
@@ -258,27 +258,133 @@ const InventoryTaskExecution = () => {
   }, [fetchPlan]);
 
   const defaultDeviceFields = [
-    { fieldName: 'deviceName', displayName: '设备名称', fieldType: 'string', required: true, visible: true, order: 1 },
-    { fieldName: 'deviceType', displayName: '设备类型', fieldType: 'select', required: true, visible: true, order: 2, options: [
-      { value: 'server', label: '服务器' },
-      { value: 'switch', label: '交换机' },
-      { value: 'router', label: '路由器' },
-      { value: 'storage', label: '存储设备' },
-      { value: 'other', label: '其他' },
-    ]},
-    { fieldName: 'model', displayName: '型号', fieldType: 'string', required: false, visible: true, order: 3 },
-    { fieldName: 'serialNumber', displayName: '序列号', fieldType: 'string', required: true, visible: true, order: 4 },
-    { fieldName: 'roomId', displayName: '所属机房', fieldType: 'select', required: false, visible: true, order: 5 },
-    { fieldName: 'rackId', displayName: '所属机柜', fieldType: 'select', required: false, visible: true, order: 6 },
-    { fieldName: 'position', displayName: '位置(U)', fieldType: 'number', required: false, visible: true, order: 7 },
-    { fieldName: 'height', displayName: '高度(U)', fieldType: 'number', required: false, visible: true, order: 8 },
-    { fieldName: 'powerConsumption', displayName: '功率(W)', fieldType: 'number', required: false, visible: true, order: 9 },
-    { fieldName: 'purchaseDate', displayName: '购买日期', fieldType: 'date', required: false, visible: true, order: 10 },
-    { fieldName: 'warrantyExpiry', displayName: '保修到期', fieldType: 'date', required: false, visible: true, order: 11 },
-    { fieldName: 'ipAddress', displayName: 'IP地址', fieldType: 'string', required: false, visible: true, order: 12 },
-    { fieldName: 'brand', displayName: '品牌', fieldType: 'string', required: false, visible: true, order: 13 },
-    { fieldName: 'description', displayName: '描述', fieldType: 'textarea', required: false, visible: true, order: 14 },
-    { fieldName: 'remark', displayName: '备注', fieldType: 'textarea', required: false, visible: true, order: 15 },
+    {
+      fieldName: 'deviceName',
+      displayName: '设备名称',
+      fieldType: 'string',
+      required: true,
+      visible: true,
+      order: 1,
+    },
+    {
+      fieldName: 'deviceType',
+      displayName: '设备类型',
+      fieldType: 'select',
+      required: true,
+      visible: true,
+      order: 2,
+      options: [
+        { value: 'server', label: '服务器' },
+        { value: 'switch', label: '交换机' },
+        { value: 'router', label: '路由器' },
+        { value: 'storage', label: '存储设备' },
+        { value: 'other', label: '其他' },
+      ],
+    },
+    {
+      fieldName: 'model',
+      displayName: '型号',
+      fieldType: 'string',
+      required: false,
+      visible: true,
+      order: 3,
+    },
+    {
+      fieldName: 'serialNumber',
+      displayName: '序列号',
+      fieldType: 'string',
+      required: true,
+      visible: true,
+      order: 4,
+    },
+    {
+      fieldName: 'roomId',
+      displayName: '所属机房',
+      fieldType: 'select',
+      required: false,
+      visible: true,
+      order: 5,
+    },
+    {
+      fieldName: 'rackId',
+      displayName: '所属机柜',
+      fieldType: 'select',
+      required: false,
+      visible: true,
+      order: 6,
+    },
+    {
+      fieldName: 'position',
+      displayName: '位置(U)',
+      fieldType: 'number',
+      required: false,
+      visible: true,
+      order: 7,
+    },
+    {
+      fieldName: 'height',
+      displayName: '高度(U)',
+      fieldType: 'number',
+      required: false,
+      visible: true,
+      order: 8,
+    },
+    {
+      fieldName: 'powerConsumption',
+      displayName: '功率(W)',
+      fieldType: 'number',
+      required: false,
+      visible: true,
+      order: 9,
+    },
+    {
+      fieldName: 'purchaseDate',
+      displayName: '购买日期',
+      fieldType: 'date',
+      required: false,
+      visible: true,
+      order: 10,
+    },
+    {
+      fieldName: 'warrantyExpiry',
+      displayName: '保修到期',
+      fieldType: 'date',
+      required: false,
+      visible: true,
+      order: 11,
+    },
+    {
+      fieldName: 'ipAddress',
+      displayName: 'IP地址',
+      fieldType: 'string',
+      required: false,
+      visible: true,
+      order: 12,
+    },
+    {
+      fieldName: 'brand',
+      displayName: '品牌',
+      fieldType: 'string',
+      required: false,
+      visible: true,
+      order: 13,
+    },
+    {
+      fieldName: 'description',
+      displayName: '描述',
+      fieldType: 'textarea',
+      required: false,
+      visible: true,
+      order: 14,
+    },
+    {
+      fieldName: 'remark',
+      displayName: '备注',
+      fieldType: 'textarea',
+      required: false,
+      visible: true,
+      order: 15,
+    },
   ];
 
   const fetchDeviceFields = async () => {
@@ -316,11 +422,11 @@ const InventoryTaskExecution = () => {
     fetchDeviceFields();
   }, []);
 
-  const filteredRacks = selectedRoomId 
+  const filteredRacks = selectedRoomId
     ? racks.filter(rack => rack.roomId === selectedRoomId)
     : racks;
 
-  const renderQuickAddFormField = (field) => {
+  const renderQuickAddFormField = field => {
     const { fieldName, displayName, fieldType, required, options } = field;
 
     // 统一的表单项样式
@@ -348,24 +454,25 @@ const InventoryTaskExecution = () => {
           rules={required ? [{ required: true, message: `请选择${displayName}` }] : []}
           style={formItemStyle}
         >
-          <Select 
-            placeholder={`请选择${displayName}`}
-            size="large"
-            style={inputStyle}
-          >
-            {(Array.isArray(options) && options.length > 0 ? options : [
-              { value: 'server', label: '服务器' },
-              { value: 'switch', label: '交换机' },
-              { value: 'router', label: '路由器' },
-              { value: 'storage', label: '存储设备' },
-              { value: 'other', label: '其他' },
-            ]).map(opt => (
+          <Select placeholder={`请选择${displayName}`} size="large" style={inputStyle}>
+            {(Array.isArray(options) && options.length > 0
+              ? options
+              : [
+                  { value: 'server', label: '服务器' },
+                  { value: 'switch', label: '交换机' },
+                  { value: 'router', label: '路由器' },
+                  { value: 'storage', label: '存储设备' },
+                  { value: 'other', label: '其他' },
+                ]
+            ).map(opt => (
               <Select.Option key={opt.value} value={opt.value}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ 
-                    fontSize: 16,
-                    filter: 'grayscale(0.3)',
-                  }}>
+                  <span
+                    style={{
+                      fontSize: 16,
+                      filter: 'grayscale(0.3)',
+                    }}
+                  >
                     {opt.value === 'server' && '🖥️'}
                     {opt.value === 'switch' && '🔀'}
                     {opt.value === 'router' && '📡'}
@@ -390,12 +497,7 @@ const InventoryTaskExecution = () => {
           rules={required ? [{ required: true, message: `请选择${displayName}` }] : []}
           style={formItemStyle}
         >
-          <Select 
-            placeholder={`请选择${displayName}`} 
-            allowClear
-            size="large"
-            style={inputStyle}
-          >
+          <Select placeholder={`请选择${displayName}`} allowClear size="large" style={inputStyle}>
             {(Array.isArray(options) ? options : []).map(opt => (
               <Select.Option key={opt.value} value={opt.value}>
                 {opt.label}
@@ -415,9 +517,9 @@ const InventoryTaskExecution = () => {
           rules={required ? [{ required: true, message: `请输入${displayName}` }] : []}
           style={formItemStyle}
         >
-          <Input 
-            type="number" 
-            placeholder={`请输入${displayName}`} 
+          <Input
+            type="number"
+            placeholder={`请输入${displayName}`}
             min={1}
             size="large"
             style={inputStyle}
@@ -435,7 +537,7 @@ const InventoryTaskExecution = () => {
           rules={required ? [{ required: true, message: `请选择${displayName}` }] : []}
           style={formItemStyle}
         >
-          <DatePicker 
+          <DatePicker
             style={{ ...inputStyle, width: '100%' }}
             placeholder={`请选择${displayName}`}
             size="large"
@@ -453,8 +555,8 @@ const InventoryTaskExecution = () => {
           rules={required ? [{ required: true, message: `请输入${displayName}` }] : []}
           style={formItemStyle}
         >
-          <Input.TextArea 
-            rows={3} 
+          <Input.TextArea
+            rows={3}
             placeholder={`请输入${displayName}`}
             style={{
               ...inputStyle,
@@ -473,11 +575,7 @@ const InventoryTaskExecution = () => {
         rules={required ? [{ required: true, message: `请输入${displayName}` }] : []}
         style={formItemStyle}
       >
-        <Input 
-          placeholder={`请输入${displayName}`}
-          size="large"
-          style={inputStyle}
-        />
+        <Input placeholder={`请输入${displayName}`} size="large" style={inputStyle} />
       </Form.Item>
     );
   };
@@ -485,21 +583,22 @@ const InventoryTaskExecution = () => {
   const renderQuickAddFormFields = () => {
     // 如果字段配置未加载，使用默认配置
     const fields = deviceFields || defaultDeviceFields;
-    
+
     // 排除机房和机柜字段（已在Modal中单独渲染）
-    const visibleFields = fields.filter(f => 
-      f.visible !== false && 
-      f.fieldName !== 'serialNumber' &&
-      f.fieldName !== 'roomId' &&
-      f.fieldName !== 'rackId'
+    const visibleFields = fields.filter(
+      f =>
+        f.visible !== false &&
+        f.fieldName !== 'serialNumber' &&
+        f.fieldName !== 'roomId' &&
+        f.fieldName !== 'rackId'
     );
     const sortedFields = visibleFields.sort((a, b) => a.order - b.order);
-    
+
     // 将字段分成两列
     const leftFields = [];
     const rightFields = [];
     const fullFields = [];
-    
+
     sortedFields.forEach((field, index) => {
       // 文本域类型独占一行
       if (field.fieldType === 'text') {
@@ -525,35 +624,31 @@ const InventoryTaskExecution = () => {
             {rightFields.map(renderQuickAddFormField)}
           </Col>
         </Row>
-        
+
         {/* 独占一行的字段（如备注） */}
         {fullFields.map(renderQuickAddFormField)}
       </>
     );
   };
 
-  const handleQuickAddDevice = async (values) => {
+  const handleQuickAddDevice = async values => {
     if (!plan) {
       message.error('盘点计划不存在');
       return;
     }
     setQuickAddLoading(true);
     try {
-      const { 
-        purchaseDate, 
-        warrantyExpiry, 
-        ...otherValues 
-      } = values;
-      
+      const { purchaseDate, warrantyExpiry, ...otherValues } = values;
+
       const payload = {
         taskId: currentTask?.taskId || null,
         planId: plan.planId,
         serialNumber: scanResult?.sn || values.serialNumber,
         ...otherValues,
         purchaseDate: purchaseDate ? dayjs(purchaseDate).toISOString() : null,
-        warrantyExpiry: warrantyExpiry ? dayjs(warrantyExpiry).toISOString() : null
+        warrantyExpiry: warrantyExpiry ? dayjs(warrantyExpiry).toISOString() : null,
       };
-      
+
       const res = await api.post('/inventory/quick-add-device', payload);
       message.success('设备已暂存！');
       setQuickAddModalVisible(false);
@@ -563,7 +658,7 @@ const InventoryTaskExecution = () => {
         success: true,
         message: `设备 "${res.data.pendingDevice.deviceName}" 已暂存，请前往「暂存设备」页面完善信息后同步到设备管理`,
         pendingDevice: res.data.pendingDevice,
-        sn: res.data.pendingDevice.serialNumber
+        sn: res.data.pendingDevice.serialNumber,
       });
     } catch (error) {
       message.error(error.response?.data?.error || '暂存设备失败');
@@ -586,7 +681,7 @@ const InventoryTaskExecution = () => {
     setQuickAddModalVisible(true);
   };
 
-  const handleCheck = (record) => {
+  const handleCheck = record => {
     setCurrentRecord(record);
     form.setFieldsValue({
       actualSerialNumber: record.serialNumber,
@@ -614,7 +709,7 @@ const InventoryTaskExecution = () => {
     }
   };
 
-  const handleSubmitCheck = async (values) => {
+  const handleSubmitCheck = async values => {
     if (!currentRecord) return;
     try {
       await api.post(`/inventory/records/${currentRecord.recordId}/check`, {
@@ -635,7 +730,7 @@ const InventoryTaskExecution = () => {
     }
   };
 
-  const getStatusTag = (status) => {
+  const getStatusTag = status => {
     const statusMap = {
       pending: { color: 'default', text: '待盘点', icon: <ExclamationCircleOutlined /> },
       normal: { color: 'success', text: '正常', icon: <CheckCircleOutlined /> },
@@ -650,7 +745,7 @@ const InventoryTaskExecution = () => {
     );
   };
 
-  const getAbnormalTypeTag = (type) => {
+  const getAbnormalTypeTag = type => {
     const typeMap = {
       serial_mismatch: '序列号不符',
       position_mismatch: '位置不符',
@@ -668,7 +763,11 @@ const InventoryTaskExecution = () => {
         <div>
           <div style={{ fontWeight: 600 }}>{record.targetName}</div>
           <div style={{ fontSize: '12px', color: designTokens.colors.text.tertiary }}>
-            {record.targetType === 'room' ? '机房' : record.targetType === 'rack' ? '机柜' : '全部设备'}
+            {record.targetType === 'room'
+              ? '机房'
+              : record.targetType === 'rack'
+                ? '机柜'
+                : '全部设备'}
           </div>
         </div>
       ),
@@ -678,7 +777,7 @@ const InventoryTaskExecution = () => {
       dataIndex: 'status',
       key: 'status',
       width: 100,
-      render: (status) => {
+      render: status => {
         const statusMap = {
           pending: <Badge status="default" text="待执行" />,
           in_progress: <Badge status="processing" text="进行中" />,
@@ -694,7 +793,11 @@ const InventoryTaskExecution = () => {
       width: 150,
       render: (_, record) => (
         <Progress
-          percent={record.totalDevices > 0 ? Math.round((record.checkedDevices / record.totalDevices) * 100) : 0}
+          percent={
+            record.totalDevices > 0
+              ? Math.round((record.checkedDevices / record.totalDevices) * 100)
+              : 0
+          }
           size="small"
           format={() => `${record.checkedDevices}/${record.totalDevices}`}
         />
@@ -705,7 +808,7 @@ const InventoryTaskExecution = () => {
       dataIndex: 'abnormalDevices',
       key: 'abnormalDevices',
       width: 80,
-      render: (count) => (count > 0 ? <Tag color="error">{count}</Tag> : '-'),
+      render: count => (count > 0 ? <Tag color="error">{count}</Tag> : '-'),
     },
     {
       title: '操作',
@@ -744,7 +847,7 @@ const InventoryTaskExecution = () => {
       dataIndex: 'deviceType',
       key: 'deviceType',
       width: 80,
-      render: (type) => {
+      render: type => {
         const typeMap = {
           server: '服务器',
           switch: '交换机',
@@ -760,7 +863,7 @@ const InventoryTaskExecution = () => {
       dataIndex: 'serialNumber',
       key: 'serialNumber',
       width: 140,
-      render: (sn) => <code style={{ fontSize: '12px' }}>{sn}</code>,
+      render: sn => <code style={{ fontSize: '12px' }}>{sn}</code>,
     },
     {
       title: '实际序列号',
@@ -775,7 +878,9 @@ const InventoryTaskExecution = () => {
             <span style={{ color: designTokens.colors.text.tertiary }}>-</span>
           )}
           {record.abnormalType === 'serial_mismatch' && (
-            <Tag color="error" style={{ marginLeft: 4 }}>不符</Tag>
+            <Tag color="error" style={{ marginLeft: 4 }}>
+              不符
+            </Tag>
           )}
         </div>
       ),
@@ -796,12 +901,16 @@ const InventoryTaskExecution = () => {
       render: (_, record) => (
         <div>
           {record.actualRackId ? (
-            <div>{record.actualRackId} - U{record.actualPosition}</div>
+            <div>
+              {record.actualRackId} - U{record.actualPosition}
+            </div>
           ) : (
             <span style={{ color: designTokens.colors.text.tertiary }}>-</span>
           )}
           {record.abnormalType === 'position_mismatch' && (
-            <Tag color="error" style={{ marginLeft: 4 }}>不符</Tag>
+            <Tag color="error" style={{ marginLeft: 4 }}>
+              不符
+            </Tag>
           )}
         </div>
       ),
@@ -811,21 +920,21 @@ const InventoryTaskExecution = () => {
       dataIndex: 'status',
       key: 'status',
       width: 90,
-      render: (status) => getStatusTag(status),
+      render: status => getStatusTag(status),
     },
     {
       title: '盘点人',
       dataIndex: ['Checker', 'realName'],
       key: 'checker',
       width: 90,
-      render: (name) => name || '-',
+      render: name => name || '-',
     },
     {
       title: '盘点时间',
       dataIndex: 'checkedAt',
       key: 'checkedAt',
       width: 140,
-      render: (date) => (date ? dayjs(date).format('MM-DD HH:mm') : '-'),
+      render: date => (date ? dayjs(date).format('MM-DD HH:mm') : '-'),
     },
     {
       title: '操作',
@@ -895,10 +1004,7 @@ const InventoryTaskExecution = () => {
           </Col>
           <Col>
             <Space>
-              <Statistic
-                title="总设备"
-                value={plan?.totalDevices || 0}
-              />
+              <Statistic title="总设备" value={plan?.totalDevices || 0} />
               <Statistic
                 title="已盘点"
                 value={plan?.checkedDevices || 0}
@@ -955,7 +1061,10 @@ const InventoryTaskExecution = () => {
                 <span>
                   盘点记录
                   {records.length > 0 && (
-                    <Tag style={{ marginLeft: 8 }} color={plan?.status === 'completed' ? 'success' : 'processing'}>
+                    <Tag
+                      style={{ marginLeft: 8 }}
+                      color={plan?.status === 'completed' ? 'success' : 'processing'}
+                    >
                       {filteredRecords.length}/{records.length}
                     </Tag>
                   )}
@@ -963,8 +1072,19 @@ const InventoryTaskExecution = () => {
               ),
               children: (
                 <div>
-                  <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      marginBottom: 16,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: 12,
+                    }}
+                  >
+                    <div
+                      style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}
+                    >
                       <Select
                         placeholder="筛选状态"
                         variant="outlined"
@@ -972,7 +1092,7 @@ const InventoryTaskExecution = () => {
                         className="统一输入框"
                         allowClear
                         value={statusFilter}
-                        onChange={(value) => {
+                        onChange={value => {
                           setStatusFilter(value);
                           setRecordPagination(prev => ({ ...prev, current: 1 }));
                         }}
@@ -989,14 +1109,14 @@ const InventoryTaskExecution = () => {
                         className="统一输入框"
                         allowClear
                         value={searchKeyword}
-                        onChange={(e) => {
+                        onChange={e => {
                           setSearchKeyword(e.target.value);
                           setRecordPagination(prev => ({ ...prev, current: 1 }));
                         }}
                       />
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <Button 
+                      <Button
                         type="primary"
                         size="small"
                         onClick={() => setScanModalVisible(true)}
@@ -1004,8 +1124,8 @@ const InventoryTaskExecution = () => {
                       >
                         扫码盘点
                       </Button>
-                      <Button 
-                        type="primary" 
+                      <Button
+                        type="primary"
                         size="small"
                         onClick={() => handleQuickCheckAll('normal')}
                         loading={batchLoading}
@@ -1014,7 +1134,7 @@ const InventoryTaskExecution = () => {
                       >
                         一键正常
                       </Button>
-                      <Button 
+                      <Button
                         danger
                         size="small"
                         onClick={() => handleQuickCheckAll('abnormal')}
@@ -1026,10 +1146,12 @@ const InventoryTaskExecution = () => {
                       </Button>
                     </div>
                   </div>
-                  
+
                   {records.length > 0 && (
-                    <Progress 
-                      percent={Math.round(((records.filter(r => r.status !== 'pending').length) / records.length) * 100)} 
+                    <Progress
+                      percent={Math.round(
+                        (records.filter(r => r.status !== 'pending').length / records.length) * 100
+                      )}
                       status="active"
                       strokeColor={{ from: '#108ee9', to: '#87d068' }}
                       style={{ marginBottom: 16 }}
@@ -1044,20 +1166,22 @@ const InventoryTaskExecution = () => {
                     columns={recordColumns}
                     dataSource={filteredRecords}
                     rowKey="recordId"
-                    pagination={{ 
-                      current: recordPagination.current, 
-                      pageSize: recordPagination.pageSize, 
+                    pagination={{
+                      current: recordPagination.current,
+                      pageSize: recordPagination.pageSize,
                       total: recordPagination.total,
-                      showSizeChanger: true, 
-                      showTotal: (total) => `共 ${total} 条`,
+                      showSizeChanger: true,
+                      showTotal: total => `共 ${total} 条`,
                       onChange: (page, pageSize) => {
                         setRecordPagination(prev => ({ ...prev, current: page, pageSize }));
-                      }
+                      },
                     }}
                     scroll={{ x: 1400 }}
                     loading={batchLoading}
                     locale={{
-                      emptyText: <Empty description="暂无盘点记录" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+                      emptyText: (
+                        <Empty description="暂无盘点记录" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                      ),
                     }}
                   />
                 </div>
@@ -1081,28 +1205,32 @@ const InventoryTaskExecution = () => {
         styles={{
           header: { display: 'none' },
           body: { padding: 0 },
-          content: { borderRadius: 16, overflow: 'hidden' }
+          content: { borderRadius: 16, overflow: 'hidden' },
         }}
       >
         {/* 自定义 Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: 'linear-gradient(135deg, #69c0ff 0%, #b37feb 100%)',
-          color: '#1f1f1f'
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px 24px',
+            background: 'linear-gradient(135deg, #69c0ff 0%, #b37feb 100%)',
+            color: '#1f1f1f',
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 36,
-              height: 36,
-              borderRadius: 8,
-              background: 'rgba(255,255,255,0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                background: 'rgba(255,255,255,0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <ScanOutlined style={{ fontSize: 20, color: '#fff' }} />
             </div>
             <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>扫码盘点</span>
@@ -1121,21 +1249,23 @@ const InventoryTaskExecution = () => {
               borderRadius: 8,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.1)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.1)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           />
         </div>
 
         <div style={{ padding: 24 }}>
-          <div style={{ 
-            background: 'linear-gradient(135deg, #e6f7ff 0%, #f0f5ff 100%)', 
-            borderRadius: 12, 
-            padding: 24,
-            marginBottom: 20,
-            border: '1px solid #91d5ff'
-          }}>
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #e6f7ff 0%, #f0f5ff 100%)',
+              borderRadius: 12,
+              padding: 24,
+              marginBottom: 20,
+              border: '1px solid #91d5ff',
+            }}
+          >
             <div style={{ textAlign: 'center', marginBottom: 16 }}>
               <ScanOutlined style={{ fontSize: 48, color: '#1890ff' }} />
             </div>
@@ -1143,20 +1273,20 @@ const InventoryTaskExecution = () => {
               <Input
                 placeholder="请用扫码枪扫描或输入设备序列号..."
                 value={scanInput}
-                onChange={(e) => setScanInput(e.target.value)}
+                onChange={e => setScanInput(e.target.value)}
                 onKeyDown={handleScanKeyPress}
                 variant="outlined"
-                style={{ 
-                  fontSize: 16, 
-                  textAlign: 'center', 
+                style={{
+                  fontSize: 16,
+                  textAlign: 'center',
                   height: 40,
                   borderRadius: 8,
                   boxShadow: '0 2px 8px rgba(24, 144, 255, 0.1)',
-                  width: 400
+                  width: 400,
                 }}
                 suffix={
-                  <Button 
-                    type="primary" 
+                  <Button
+                    type="primary"
                     size="small"
                     onClick={handleScanClick}
                     style={{ height: 32, borderRadius: 6 }}
@@ -1185,23 +1315,29 @@ const InventoryTaskExecution = () => {
               bodyStyle={{ padding: 0 }}
             >
               {/* 顶部状态条 */}
-              <div style={{
-                background: scanResult.success ? designTokens.colors.success.gradient : designTokens.colors.error.gradient,
-                padding: '20px 24px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 16,
-              }}>
-                <div style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.25)',
+              <div
+                style={{
+                  background: scanResult.success
+                    ? designTokens.colors.success.gradient
+                    : designTokens.colors.error.gradient,
+                  padding: '20px 24px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  backdropFilter: 'blur(10px)',
-                }}>
+                  gap: 16,
+                }}
+              >
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    background: 'rgba(255, 255, 255, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backdropFilter: 'blur(10px)',
+                  }}
+                >
                   {scanResult.success ? (
                     <CheckOutlined style={{ fontSize: 28, color: '#fff' }} />
                   ) : (
@@ -1209,18 +1345,22 @@ const InventoryTaskExecution = () => {
                   )}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ 
-                    fontSize: designTokens.typography.xl, 
-                    fontWeight: 600, 
-                    color: '#fff',
-                    marginBottom: 4,
-                  }}>
+                  <div
+                    style={{
+                      fontSize: designTokens.typography.xl,
+                      fontWeight: 600,
+                      color: '#fff',
+                      marginBottom: 4,
+                    }}
+                  >
                     {scanResult.success ? '盘点成功' : '未找到设备'}
                   </div>
-                  <div style={{ 
-                    fontSize: designTokens.typography.base, 
-                    color: 'rgba(255, 255, 255, 0.9)',
-                  }}>
+                  <div
+                    style={{
+                      fontSize: designTokens.typography.base,
+                      color: 'rgba(255, 255, 255, 0.9)',
+                    }}
+                  >
                     {scanResult.message}
                   </div>
                 </div>
@@ -1228,79 +1368,138 @@ const InventoryTaskExecution = () => {
 
               {/* 设备信息卡片 */}
               {scanResult.record && (
-                <div style={{ padding: '20px 24px', background: designTokens.colors.background.secondary }}>
-                  <div style={{ 
-                    fontSize: designTokens.typography.sm, 
-                    fontWeight: 600,
-                    color: designTokens.colors.text.secondary,
-                    marginBottom: 12,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                  }}>
+                <div
+                  style={{
+                    padding: '20px 24px',
+                    background: designTokens.colors.background.secondary,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: designTokens.typography.sm,
+                      fontWeight: 600,
+                      color: designTokens.colors.text.secondary,
+                      marginBottom: 12,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                    }}
+                  >
                     设备信息
                   </div>
                   <Row gutter={[16, 12]}>
                     <Col xs={24} sm={12} md={8}>
-                      <div style={{
-                        background: '#fff',
-                        padding: 12,
-                        borderRadius: designTokens.borderRadius.medium,
-                        border: `1px solid ${designTokens.colors.border.light}`,
-                      }}>
-                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                      <div
+                        style={{
+                          background: '#fff',
+                          padding: 12,
+                          borderRadius: designTokens.borderRadius.medium,
+                          border: `1px solid ${designTokens.colors.border.light}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.xs,
+                            color: designTokens.colors.text.tertiary,
+                            marginBottom: 4,
+                          }}
+                        >
                           设备ID
                         </div>
-                        <div style={{ fontSize: designTokens.typography.base, fontWeight: 500, color: designTokens.colors.text.primary }}>
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.base,
+                            fontWeight: 500,
+                            color: designTokens.colors.text.primary,
+                          }}
+                        >
                           {scanResult.record.deviceId}
                         </div>
                       </div>
                     </Col>
                     <Col xs={24} sm={12} md={8}>
-                      <div style={{
-                        background: '#fff',
-                        padding: 12,
-                        borderRadius: designTokens.borderRadius.medium,
-                        border: `1px solid ${designTokens.colors.border.light}`,
-                      }}>
-                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                      <div
+                        style={{
+                          background: '#fff',
+                          padding: 12,
+                          borderRadius: designTokens.borderRadius.medium,
+                          border: `1px solid ${designTokens.colors.border.light}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.xs,
+                            color: designTokens.colors.text.tertiary,
+                            marginBottom: 4,
+                          }}
+                        >
                           设备名称
                         </div>
-                        <div style={{ fontSize: designTokens.typography.base, fontWeight: 500, color: designTokens.colors.text.primary }}>
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.base,
+                            fontWeight: 500,
+                            color: designTokens.colors.text.primary,
+                          }}
+                        >
                           {scanResult.record.deviceName}
                         </div>
                       </div>
                     </Col>
                     <Col xs={24} sm={12} md={8}>
-                      <div style={{
-                        background: '#fff',
-                        padding: 12,
-                        borderRadius: designTokens.borderRadius.medium,
-                        border: `1px solid ${designTokens.colors.border.light}`,
-                      }}>
-                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                      <div
+                        style={{
+                          background: '#fff',
+                          padding: 12,
+                          borderRadius: designTokens.borderRadius.medium,
+                          border: `1px solid ${designTokens.colors.border.light}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.xs,
+                            color: designTokens.colors.text.tertiary,
+                            marginBottom: 4,
+                          }}
+                        >
                           序列号
                         </div>
-                        <div style={{ 
-                          fontSize: designTokens.typography.sm, 
-                          fontWeight: 600, 
-                          fontFamily: 'Consolas, Monaco, monospace',
-                          color: designTokens.colors.primary.main,
-                        }}>
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.sm,
+                            fontWeight: 600,
+                            fontFamily: 'Consolas, Monaco, monospace',
+                            color: designTokens.colors.primary.main,
+                          }}
+                        >
                           {scanResult.record.serialNumber}
                         </div>
                       </div>
                     </Col>
                     <Col xs={24} sm={24} md={24}>
-                      <div style={{
-                        background: '#fff',
-                        padding: 12,
-                        borderRadius: designTokens.borderRadius.medium,
-                        border: `1px solid ${designTokens.colors.border.light}`,
-                      }}>
-                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                      <div
+                        style={{
+                          background: '#fff',
+                          padding: 12,
+                          borderRadius: designTokens.borderRadius.medium,
+                          border: `1px solid ${designTokens.colors.border.light}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.xs,
+                            color: designTokens.colors.text.tertiary,
+                            marginBottom: 4,
+                          }}
+                        >
                           当前位置
                         </div>
-                        <div style={{ fontSize: designTokens.typography.base, fontWeight: 500, color: designTokens.colors.text.primary }}>
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.base,
+                            fontWeight: 500,
+                            color: designTokens.colors.text.primary,
+                          }}
+                        >
                           <Tag color="blue" style={{ marginRight: 8 }}>
                             {scanResult.record.displayLocation || `${scanResult.record.rackId}`}
                           </Tag>
@@ -1314,80 +1513,144 @@ const InventoryTaskExecution = () => {
 
               {/* 暂存设备信息 */}
               {scanResult.pendingDevice && (
-                <div style={{ padding: '20px 24px', background: designTokens.colors.background.secondary }}>
-                  <div style={{ 
-                    fontSize: designTokens.typography.sm, 
-                    fontWeight: 600,
-                    color: designTokens.colors.text.secondary,
-                    marginBottom: 12,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                  }}>
+                <div
+                  style={{
+                    padding: '20px 24px',
+                    background: designTokens.colors.background.secondary,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: designTokens.typography.sm,
+                      fontWeight: 600,
+                      color: designTokens.colors.text.secondary,
+                      marginBottom: 12,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                    }}
+                  >
                     暂存设备信息
                   </div>
                   <Row gutter={[16, 12]}>
                     <Col xs={24} sm={12} md={8}>
-                      <div style={{
-                        background: '#fff',
-                        padding: 12,
-                        borderRadius: designTokens.borderRadius.medium,
-                        border: `1px solid ${designTokens.colors.border.light}`,
-                      }}>
-                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                      <div
+                        style={{
+                          background: '#fff',
+                          padding: 12,
+                          borderRadius: designTokens.borderRadius.medium,
+                          border: `1px solid ${designTokens.colors.border.light}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.xs,
+                            color: designTokens.colors.text.tertiary,
+                            marginBottom: 4,
+                          }}
+                        >
                           暂存ID
                         </div>
-                        <div style={{ fontSize: designTokens.typography.base, fontWeight: 500, color: designTokens.colors.text.primary }}>
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.base,
+                            fontWeight: 500,
+                            color: designTokens.colors.text.primary,
+                          }}
+                        >
                           {scanResult.pendingDevice.pendingId}
                         </div>
                       </div>
                     </Col>
                     <Col xs={24} sm={12} md={8}>
-                      <div style={{
-                        background: '#fff',
-                        padding: 12,
-                        borderRadius: designTokens.borderRadius.medium,
-                        border: `1px solid ${designTokens.colors.border.light}`,
-                      }}>
-                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                      <div
+                        style={{
+                          background: '#fff',
+                          padding: 12,
+                          borderRadius: designTokens.borderRadius.medium,
+                          border: `1px solid ${designTokens.colors.border.light}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.xs,
+                            color: designTokens.colors.text.tertiary,
+                            marginBottom: 4,
+                          }}
+                        >
                           设备名称
                         </div>
-                        <div style={{ fontSize: designTokens.typography.base, fontWeight: 500, color: designTokens.colors.text.primary }}>
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.base,
+                            fontWeight: 500,
+                            color: designTokens.colors.text.primary,
+                          }}
+                        >
                           {scanResult.pendingDevice.deviceName}
                         </div>
                       </div>
                     </Col>
                     <Col xs={24} sm={12} md={8}>
-                      <div style={{
-                        background: '#fff',
-                        padding: 12,
-                        borderRadius: designTokens.borderRadius.medium,
-                        border: `1px solid ${designTokens.colors.border.light}`,
-                      }}>
-                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                      <div
+                        style={{
+                          background: '#fff',
+                          padding: 12,
+                          borderRadius: designTokens.borderRadius.medium,
+                          border: `1px solid ${designTokens.colors.border.light}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.xs,
+                            color: designTokens.colors.text.tertiary,
+                            marginBottom: 4,
+                          }}
+                        >
                           序列号
                         </div>
-                        <div style={{ 
-                          fontSize: designTokens.typography.sm, 
-                          fontWeight: 600, 
-                          fontFamily: 'Consolas, Monaco, monospace',
-                          color: designTokens.colors.primary.main,
-                        }}>
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.sm,
+                            fontWeight: 600,
+                            fontFamily: 'Consolas, Monaco, monospace',
+                            color: designTokens.colors.primary.main,
+                          }}
+                        >
                           {scanResult.pendingDevice.serialNumber}
                         </div>
                       </div>
                     </Col>
                     <Col xs={24} sm={12} md={12}>
-                      <div style={{
-                        background: '#fff',
-                        padding: 12,
-                        borderRadius: designTokens.borderRadius.medium,
-                        border: `1px solid ${designTokens.colors.border.light}`,
-                      }}>
-                        <div style={{ fontSize: designTokens.typography.xs, color: designTokens.colors.text.tertiary, marginBottom: 4 }}>
+                      <div
+                        style={{
+                          background: '#fff',
+                          padding: 12,
+                          borderRadius: designTokens.borderRadius.medium,
+                          border: `1px solid ${designTokens.colors.border.light}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.xs,
+                            color: designTokens.colors.text.tertiary,
+                            marginBottom: 4,
+                          }}
+                        >
                           设备类型
                         </div>
-                        <div style={{ fontSize: designTokens.typography.base, fontWeight: 500, color: designTokens.colors.text.primary }}>
-                          <Tag color={designTokens.colors.device[scanResult.pendingDevice.deviceType] || 'default'}>
+                        <div
+                          style={{
+                            fontSize: designTokens.typography.base,
+                            fontWeight: 500,
+                            color: designTokens.colors.text.primary,
+                          }}
+                        >
+                          <Tag
+                            color={
+                              designTokens.colors.device[scanResult.pendingDevice.deviceType] ||
+                              'default'
+                            }
+                          >
                             {scanResult.pendingDevice.deviceType}
                           </Tag>
                         </div>
@@ -1395,7 +1658,7 @@ const InventoryTaskExecution = () => {
                     </Col>
                   </Row>
                   <div style={{ marginTop: 16, textAlign: 'center' }}>
-                    <Button 
+                    <Button
                       type="primary"
                       onClick={() => navigate('/pending-devices')}
                       icon={<InboxOutlined />}
@@ -1416,11 +1679,13 @@ const InventoryTaskExecution = () => {
 
               {/* 快速添加按钮 */}
               {!scanResult.success && scanResult.sn && (
-                <div style={{ 
-                  padding: '20px 24px', 
-                  background: designTokens.colors.background.tertiary,
-                  borderTop: `1px solid ${designTokens.colors.border.light}`,
-                }}>
+                <div
+                  style={{
+                    padding: '20px 24px',
+                    background: designTokens.colors.background.tertiary,
+                    borderTop: `1px solid ${designTokens.colors.border.light}`,
+                  }}
+                >
                   <Button
                     type="primary"
                     size="large"
@@ -1445,8 +1710,8 @@ const InventoryTaskExecution = () => {
 
           {scanResult && (
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <Button 
-                size="large" 
+              <Button
+                size="large"
                 onClick={() => {
                   setScanResult(null);
                   setScanInput('');
@@ -1456,9 +1721,9 @@ const InventoryTaskExecution = () => {
               >
                 继续扫描
               </Button>
-              <Button 
-                type="primary" 
-                size="large" 
+              <Button
+                type="primary"
+                size="large"
                 onClick={() => {
                   setScanModalVisible(false);
                   setScanInput('');
@@ -1473,14 +1738,20 @@ const InventoryTaskExecution = () => {
 
           {!scanResult && (
             <div style={{ textAlign: 'center', marginTop: 24 }}>
-              <Statistic 
-                title="今日已盘点" 
-                value={records.filter(r => r.status !== 'pending').length} 
+              <Statistic
+                title="今日已盘点"
+                value={records.filter(r => r.status !== 'pending').length}
                 suffix={`/ ${records.length}`}
                 valueStyle={{ color: '#52c41a', fontWeight: 'bold' }}
               />
-              <Progress 
-                percent={records.length > 0 ? Math.round((records.filter(r => r.status !== 'pending').length / records.length) * 100) : 0} 
+              <Progress
+                percent={
+                  records.length > 0
+                    ? Math.round(
+                        (records.filter(r => r.status !== 'pending').length / records.length) * 100
+                      )
+                    : 0
+                }
                 strokeColor={{ from: '#1890ff', to: '#52c41a' }}
                 style={{ marginTop: 12 }}
               />
@@ -1509,27 +1780,21 @@ const InventoryTaskExecution = () => {
               <Descriptions.Item label="设备ID">{currentRecord.deviceId}</Descriptions.Item>
               <Descriptions.Item label="设备名称">{currentRecord.deviceName}</Descriptions.Item>
               <Descriptions.Item label="系统序列号">{currentRecord.serialNumber}</Descriptions.Item>
-              <Descriptions.Item label="系统位置">{currentRecord.displayLocation || `${currentRecord.rackId} - U${currentRecord.position}`}</Descriptions.Item>
+              <Descriptions.Item label="系统位置">
+                {currentRecord.displayLocation ||
+                  `${currentRecord.rackId} - U${currentRecord.position}`}
+              </Descriptions.Item>
             </Descriptions>
 
-            <Form.Item
-              name="actualSerialNumber"
-              label="实际序列号"
-            >
+            <Form.Item name="actualSerialNumber" label="实际序列号">
               <Input placeholder="请输入实际序列号" />
             </Form.Item>
 
-            <Form.Item
-              name="actualRackId"
-              label="实际机柜"
-            >
+            <Form.Item name="actualRackId" label="实际机柜">
               <Input placeholder="请输入实际机柜ID" />
             </Form.Item>
 
-            <Form.Item
-              name="actualPosition"
-              label="实际位置(U)"
-            >
+            <Form.Item name="actualPosition" label="实际位置(U)">
               <Input type="number" placeholder="请输入实际位置" />
             </Form.Item>
 
@@ -1548,10 +1813,7 @@ const InventoryTaskExecution = () => {
               </Select>
             </Form.Item>
 
-            <Form.Item
-              name="remark"
-              label="备注"
-            >
+            <Form.Item name="remark" label="备注">
               <Input.TextArea rows={2} placeholder="请输入备注（如有异常请说明原因）" />
             </Form.Item>
 
@@ -1582,28 +1844,40 @@ const InventoryTaskExecution = () => {
           body: { padding: 0 },
         }}
       >
-        <div style={{
-          background: designTokens.colors.primary.gradient,
-          padding: '24px 32px',
-          borderRadius: `${designTokens.borderRadius.large} ${designTokens.borderRadius.large} 0 0`,
-        }}>
+        <div
+          style={{
+            background: designTokens.colors.primary.gradient,
+            padding: '24px 32px',
+            borderRadius: `${designTokens.borderRadius.large} ${designTokens.borderRadius.large} 0 0`,
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              width: 48,
-              height: 48,
-              borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <PlusOutlined style={{ fontSize: 24, color: '#fff' }} />
             </div>
             <div>
-              <div style={{ fontSize: designTokens.typography['2xl'], fontWeight: 600, color: '#fff' }}>
+              <div
+                style={{ fontSize: designTokens.typography['2xl'], fontWeight: 600, color: '#fff' }}
+              >
                 快速添加设备
               </div>
-              <div style={{ fontSize: designTokens.typography.sm, color: 'rgba(255, 255, 255, 0.85)', marginTop: 4 }}>
+              <div
+                style={{
+                  fontSize: designTokens.typography.sm,
+                  color: 'rgba(255, 255, 255, 0.85)',
+                  marginTop: 4,
+                }}
+              >
                 将扫描到的设备添加到系统
               </div>
             </div>
@@ -1621,15 +1895,21 @@ const InventoryTaskExecution = () => {
             <Form.Item
               name="serialNumber"
               label={
-                <span style={{ fontSize: designTokens.typography.sm, fontWeight: 600, color: designTokens.colors.text.primary }}>
+                <span
+                  style={{
+                    fontSize: designTokens.typography.sm,
+                    fontWeight: 600,
+                    color: designTokens.colors.text.primary,
+                  }}
+                >
                   设备序列号
                 </span>
               }
               rules={[{ required: true, message: '请输入序列号' }]}
             >
-              <Input 
-                placeholder="请输入设备序列号" 
-                disabled 
+              <Input
+                placeholder="请输入设备序列号"
+                disabled
                 style={{
                   height: 44,
                   fontSize: designTokens.typography.md,
@@ -1643,46 +1923,48 @@ const InventoryTaskExecution = () => {
             </Form.Item>
 
             {/* 位置信息区域 */}
-            <div style={{
-              background: designTokens.colors.background.secondary,
-              padding: 20,
-              borderRadius: designTokens.borderRadius.medium,
-              marginBottom: 16,
-              border: `1px solid ${designTokens.colors.border.light}`,
-            }}>
-              <div style={{
-                fontSize: designTokens.typography.sm,
-                fontWeight: 600,
-                color: designTokens.colors.text.secondary,
+            <div
+              style={{
+                background: designTokens.colors.background.secondary,
+                padding: 20,
+                borderRadius: designTokens.borderRadius.medium,
                 marginBottom: 16,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}>
-                <span style={{
-                  width: 4,
-                  height: 16,
-                  background: designTokens.colors.primary.main,
-                  borderRadius: 2,
-                }}></span>
+                border: `1px solid ${designTokens.colors.border.light}`,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: designTokens.typography.sm,
+                  fontWeight: 600,
+                  color: designTokens.colors.text.secondary,
+                  marginBottom: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <span
+                  style={{
+                    width: 4,
+                    height: 16,
+                    background: designTokens.colors.primary.main,
+                    borderRadius: 2,
+                  }}
+                ></span>
                 位置信息（可选）
               </div>
-              
+
               <Row gutter={16}>
                 <Col xs={24} sm={12}>
-                  <Form.Item
-                    name="roomId"
-                    label="所属机房"
-                    style={{ marginBottom: 16 }}
-                  >
-                    <Select 
-                      placeholder="请选择机房" 
-                      allowClear 
-                      showSearch 
+                  <Form.Item name="roomId" label="所属机房" style={{ marginBottom: 16 }}>
+                    <Select
+                      placeholder="请选择机房"
+                      allowClear
+                      showSearch
                       optionFilterProp="children"
                       size="large"
                       style={{ borderRadius: designTokens.borderRadius.medium }}
-                      onChange={(value) => {
+                      onChange={value => {
                         setSelectedRoomId(value);
                         quickAddForm.setFieldsValue({ rackId: undefined });
                       }}
@@ -1704,21 +1986,19 @@ const InventoryTaskExecution = () => {
                           </Select.Option>
                         ))
                       ) : (
-                        <Select.Option value="" disabled>暂无机房数据</Select.Option>
+                        <Select.Option value="" disabled>
+                          暂无机房数据
+                        </Select.Option>
                       )}
                     </Select>
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
-                  <Form.Item
-                    name="rackId"
-                    label="所属机柜"
-                    style={{ marginBottom: 0 }}
-                  >
-                    <Select 
-                      placeholder={selectedRoomId ? "请选择机柜" : "请先选择机房"} 
-                      allowClear 
-                      showSearch 
+                  <Form.Item name="rackId" label="所属机柜" style={{ marginBottom: 0 }}>
+                    <Select
+                      placeholder={selectedRoomId ? '请选择机柜' : '请先选择机房'}
+                      allowClear
+                      showSearch
                       optionFilterProp="children"
                       disabled={!selectedRoomId}
                       size="large"
@@ -1735,10 +2015,14 @@ const InventoryTaskExecution = () => {
                             </Select.Option>
                           ))
                         ) : (
-                          <Select.Option value="" disabled>该机房下无机柜</Select.Option>
+                          <Select.Option value="" disabled>
+                            该机房下无机柜
+                          </Select.Option>
                         )
                       ) : (
-                        <Select.Option value="" disabled>请先选择机房</Select.Option>
+                        <Select.Option value="" disabled>
+                          请先选择机房
+                        </Select.Option>
                       )}
                     </Select>
                   </Form.Item>
@@ -1747,43 +2031,51 @@ const InventoryTaskExecution = () => {
             </div>
 
             {/* 设备详细信息 */}
-            <div style={{
-              background: designTokens.colors.background.secondary,
-              padding: 20,
-              borderRadius: designTokens.borderRadius.medium,
-              marginBottom: 24,
-              border: `1px solid ${designTokens.colors.border.light}`,
-            }}>
-              <div style={{
-                fontSize: designTokens.typography.sm,
-                fontWeight: 600,
-                color: designTokens.colors.text.secondary,
-                marginBottom: 16,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}>
-                <span style={{
-                  width: 4,
-                  height: 16,
-                  background: designTokens.colors.primary.main,
-                  borderRadius: 2,
-                }}></span>
+            <div
+              style={{
+                background: designTokens.colors.background.secondary,
+                padding: 20,
+                borderRadius: designTokens.borderRadius.medium,
+                marginBottom: 24,
+                border: `1px solid ${designTokens.colors.border.light}`,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: designTokens.typography.sm,
+                  fontWeight: 600,
+                  color: designTokens.colors.text.secondary,
+                  marginBottom: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <span
+                  style={{
+                    width: 4,
+                    height: 16,
+                    background: designTokens.colors.primary.main,
+                    borderRadius: 2,
+                  }}
+                ></span>
                 设备详细信息
               </div>
-              
+
               {renderQuickAddFormFields()}
             </div>
 
             {/* 操作按钮 */}
-            <div style={{ 
-              display: 'flex', 
-              gap: 12, 
-              justifyContent: 'flex-end',
-              paddingTop: 8,
-              borderTop: `1px solid ${designTokens.colors.border.light}`,
-            }}>
-              <Button 
+            <div
+              style={{
+                display: 'flex',
+                gap: 12,
+                justifyContent: 'flex-end',
+                paddingTop: 8,
+                borderTop: `1px solid ${designTokens.colors.border.light}`,
+              }}
+            >
+              <Button
                 size="large"
                 onClick={() => {
                   setQuickAddModalVisible(false);
@@ -1797,10 +2089,10 @@ const InventoryTaskExecution = () => {
               >
                 取消
               </Button>
-              <Button 
-                type="primary" 
+              <Button
+                type="primary"
                 size="large"
-                htmlType="submit" 
+                htmlType="submit"
                 loading={quickAddLoading}
                 style={{
                   borderRadius: designTokens.borderRadius.medium,

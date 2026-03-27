@@ -11,7 +11,7 @@ const defaultDeviceFields = [
     required: false,
     order: 1,
     visible: false,
-    isSystem: true
+    isSystem: true,
   },
   {
     fieldName: 'name',
@@ -20,7 +20,7 @@ const defaultDeviceFields = [
     required: true,
     order: 2,
     visible: true,
-    isSystem: true
+    isSystem: true,
   },
   {
     fieldName: 'type',
@@ -35,8 +35,8 @@ const defaultDeviceFields = [
       { value: 'switch', label: '交换机' },
       { value: 'router', label: '路由器' },
       { value: 'storage', label: '存储设备' },
-      { value: 'other', label: '其他设备' }
-    ]
+      { value: 'other', label: '其他设备' },
+    ],
   },
   {
     fieldName: 'model',
@@ -45,7 +45,7 @@ const defaultDeviceFields = [
     required: false,
     order: 4,
     visible: true,
-    isSystem: true
+    isSystem: true,
   },
   {
     fieldName: 'serialNumber',
@@ -54,7 +54,7 @@ const defaultDeviceFields = [
     required: true,
     order: 5,
     visible: true,
-    isSystem: true
+    isSystem: true,
   },
   {
     fieldName: 'rackId',
@@ -63,7 +63,7 @@ const defaultDeviceFields = [
     required: true,
     order: 6,
     visible: true,
-    isSystem: true
+    isSystem: true,
   },
   {
     fieldName: 'position',
@@ -72,7 +72,7 @@ const defaultDeviceFields = [
     required: true,
     order: 7,
     visible: true,
-    isSystem: true
+    isSystem: true,
   },
   {
     fieldName: 'height',
@@ -81,7 +81,7 @@ const defaultDeviceFields = [
     required: true,
     order: 8,
     visible: true,
-    isSystem: true
+    isSystem: true,
   },
   {
     fieldName: 'powerConsumption',
@@ -90,7 +90,7 @@ const defaultDeviceFields = [
     required: true,
     order: 9,
     visible: true,
-    isSystem: true
+    isSystem: true,
   },
   {
     fieldName: 'status',
@@ -105,8 +105,8 @@ const defaultDeviceFields = [
       { value: 'maintenance', label: '维护中' },
       { value: 'offline', label: '离线' },
       { value: 'fault', label: '故障' },
-      { value: 'idle', label: '空闲' }
-    ]
+      { value: 'idle', label: '空闲' },
+    ],
   },
   {
     fieldName: 'purchaseDate',
@@ -115,7 +115,7 @@ const defaultDeviceFields = [
     required: false,
     order: 11,
     visible: true,
-    isSystem: true
+    isSystem: true,
   },
   {
     fieldName: 'warrantyExpiry',
@@ -124,7 +124,7 @@ const defaultDeviceFields = [
     required: false,
     order: 12,
     visible: true,
-    isSystem: true
+    isSystem: true,
   },
   {
     fieldName: 'ipAddress',
@@ -133,7 +133,7 @@ const defaultDeviceFields = [
     required: false,
     order: 13,
     visible: true,
-    isSystem: false
+    isSystem: false,
   },
   {
     fieldName: 'description',
@@ -142,7 +142,7 @@ const defaultDeviceFields = [
     required: false,
     order: 14,
     visible: true,
-    isSystem: false
+    isSystem: false,
   },
   {
     fieldName: 'brand',
@@ -151,8 +151,8 @@ const defaultDeviceFields = [
     required: false,
     order: 15,
     visible: true,
-    isSystem: false
-  }
+    isSystem: false,
+  },
 ];
 
 // 初始化设备字段
@@ -165,9 +165,9 @@ async function initDeviceFields() {
     for (const field of defaultDeviceFields) {
       // 检查字段是否已存在
       const existingField = await DeviceField.findOne({
-        where: { fieldName: field.fieldName }
+        where: { fieldName: field.fieldName },
       });
-      
+
       if (!existingField) {
         // 只创建新字段，不更新已存在的字段
         await DeviceField.create(field);
@@ -185,7 +185,9 @@ async function initDeviceFields() {
           if (missingOptions.length > 0) {
             const updatedOptions = [...existingField.options, ...missingOptions];
             await existingField.update({ options: updatedOptions });
-            console.log(`补充缺失的 options: ${field.displayName}，新增: ${missingOptions.map(o => o.label).join(', ')}`);
+            console.log(
+              `补充缺失的 options: ${field.displayName}，新增: ${missingOptions.map(o => o.label).join(', ')}`
+            );
           } else {
             console.log(`跳过已存在字段: ${field.displayName}`);
           }
@@ -194,7 +196,7 @@ async function initDeviceFields() {
         }
       }
     }
-    
+
     console.log('设备字段配置初始化完成');
   } catch (error) {
     console.error('设备字段配置初始化失败:', error);

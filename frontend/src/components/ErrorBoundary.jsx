@@ -1,11 +1,6 @@
 import React, { Component } from 'react';
 import { Button, Result, Space, Collapse, Typography } from 'antd';
-import {
-  WarningOutlined,
-  ReloadOutlined,
-  HomeOutlined,
-  BugOutlined,
-} from '@ant-design/icons';
+import { WarningOutlined, ReloadOutlined, HomeOutlined, BugOutlined } from '@ant-design/icons';
 
 const { Text, Paragraph } = Typography;
 const { Panel } = Collapse;
@@ -79,17 +74,10 @@ class ErrorBoundary extends Component {
             }
             extra={
               <Space size="middle">
-                <Button
-                  type="primary"
-                  icon={<ReloadOutlined />}
-                  onClick={this.handleReload}
-                >
+                <Button type="primary" icon={<ReloadOutlined />} onClick={this.handleReload}>
                   重新加载
                 </Button>
-                <Button
-                  icon={<HomeOutlined />}
-                  onClick={this.handleGoHome}
-                >
+                <Button icon={<HomeOutlined />} onClick={this.handleGoHome}>
                   返回首页
                 </Button>
               </Space>

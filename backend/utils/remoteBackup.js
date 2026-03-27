@@ -28,9 +28,9 @@ const PROTOCOL_LABELS = {
  */
 async function uploadViaFTP(config, localFilePath, remotePath) {
   const { Client } = require('basic-ftp');
-  
+
   const client = new Client();
-  
+
   try {
     await client.access({
       host: config.host,
@@ -42,16 +42,16 @@ async function uploadViaFTP(config, localFilePath, remotePath) {
         rejectUnauthorized: config.rejectUnauthorized !== false,
       },
     });
-    
+
     await client.cd(config.rootPath || '/');
-    
+
     const dirPath = path.dirname(remotePath);
     if (dirPath !== '.') {
       await ensureRemoteDir(client, dirPath, 'ftp');
     }
-    
+
     await client.uploadFrom(localFilePath, path.basename(remotePath));
-    
+
     return {
       success: true,
       message: `FTP 上传成功：${remotePath}`,
@@ -69,7 +69,7 @@ async function uploadViaFTP(config, localFilePath, remotePath) {
 async function uploadViaSFTP(config, localFilePath, remotePath) {
   const Client = require('ssh2-sftp-client');
   const client = new Client();
-  
+
   try {
     await client.connect({
       host: config.host,
@@ -80,14 +80,14 @@ async function uploadViaSFTP(config, localFilePath, remotePath) {
       passphrase: config.passphrase,
       readyTimeout: config.timeout || 10000,
     });
-    
+
     const dirPath = path.dirname(remotePath);
     if (dirPath !== '.') {
       await ensureRemoteDir(client, dirPath, 'sftp');
     }
-    
+
     await client.put(fs.createReadStream(localFilePath), remotePath);
-    
+
     return {
       success: true,
       message: `SFTP 上传成功：${remotePath}`,
@@ -104,7 +104,7 @@ async function uploadViaSFTP(config, localFilePath, remotePath) {
  */
 async function uploadViaWebDAV(config, localFilePath, remotePath) {
   const { createClient } = require('webdav');
-  
+
   const client = createClient(config.url, {
     username: config.username,
     password: config.password,
@@ -113,18 +113,18 @@ async function uploadViaWebDAV(config, localFilePath, remotePath) {
       'User-Agent': 'IDC-Backup-Client/1.0',
     },
   });
-  
+
   try {
     const dirPath = path.dirname(remotePath);
     if (dirPath !== '/') {
       await ensureRemoteDir(client, dirPath, 'webdav');
     }
-    
+
     const fileContent = fs.readFileSync(localFilePath);
     await client.putFileContents(remotePath, fileContent, {
       overwrite: true,
     });
-    
+
     return {
       success: true,
       message: `WebDAV 上传成功：${remotePath}`,
@@ -139,22 +139,22 @@ async function uploadViaWebDAV(config, localFilePath, remotePath) {
  */
 async function uploadViaSMB(config, localFilePath, remotePath) {
   const smb = require('smb2');
-  
+
   const client = new smb({
     share: `\\\\${config.host}\\${config.share}`,
     domain: config.domain || '',
     username: config.username,
     password: config.password,
   });
-  
+
   try {
     const dirPath = path.dirname(remotePath);
     if (dirPath !== '.') {
       await ensureRemoteDir(client, dirPath, 'smb');
     }
-    
+
     await client.writeFile(remotePath, fs.readFileSync(localFilePath));
-    
+
     return {
       success: true,
       message: `SMB 上传成功：${remotePath}`,
@@ -216,11 +216,11 @@ async function ensureRemoteDir(client, dirPath, protocol) {
  */
 async function uploadToRemote(config, localFilePath, remotePath) {
   console.log(`开始上传到远端 [${config.protocol}]: ${remotePath}`);
-  
+
   const startTime = Date.now();
-  
+
   let result;
-  
+
   switch (config.protocol) {
     case PROTOCOL_TYPES.FTP:
       result = await uploadViaFTP(config, localFilePath, remotePath);
@@ -237,12 +237,14 @@ async function uploadToRemote(config, localFilePath, remotePath) {
     default:
       throw new Error(`不支持的协议类型：${config.protocol}`);
   }
-  
+
   const duration = Date.now() - startTime;
   const fileSize = fs.statSync(localFilePath).size;
-  
-  console.log(`远端上传完成 [${config.protocol}] - 耗时：${duration}ms, 文件大小：${(fileSize / 1024).toFixed(2)}KB`);
-  
+
+  console.log(
+    `远端上传完成 [${config.protocol}] - 耗时：${duration}ms, 文件大小：${(fileSize / 1024).toFixed(2)}KB`
+  );
+
   return {
     ...result,
     protocol: config.protocol,
@@ -258,22 +260,22 @@ async function uploadToRemote(config, localFilePath, remotePath) {
  */
 async function testRemoteConnection(config) {
   console.log(`测试远端连接 [${config.protocol}]...`);
-  
+
   try {
     const testContent = `IDC Backup Connection Test - ${new Date().toISOString()}`;
     const testFile = path.join(require('os').tmpdir(), `backup-test-${Date.now()}.txt`);
     fs.writeFileSync(testFile, testContent);
-    
+
     const testRemotePath = `test/backup-connection-test-${Date.now()}.txt`;
-    
+
     const result = await uploadToRemote(config, testFile, testRemotePath);
-    
+
     try {
       fs.unlinkSync(testFile);
     } catch (e) {
       console.warn('删除测试文件失败:', e.message);
     }
-    
+
     return {
       success: true,
       message: '连接测试成功',

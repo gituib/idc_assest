@@ -72,7 +72,7 @@ const createNavButtonStyle = (color, isHovered) => ({
   minWidth: 0,
 });
 
-const createNavIconContainer = (color) => ({
+const createNavIconContainer = color => ({
   width: 'clamp(44px, 10vw, 60px)',
   height: 'clamp(44px, 10vw, 60px)',
   borderRadius: designTokens.borderRadius.medium,
@@ -117,7 +117,7 @@ const NavigationGrid = ({ hoveredCard, onHover }) => {
             className="nav-button"
             style={{
               ...createNavButtonStyle(color, isHovered),
-              animationDelay: `${NAV_BUTTONS_DATA.findIndex((b) => b.key === key) * 0.1}s`,
+              animationDelay: `${NAV_BUTTONS_DATA.findIndex(b => b.key === key) * 0.1}s`,
             }}
             onMouseEnter={() => onHover(`nav-${key}`)}
             onMouseLeave={() => onHover(null)}

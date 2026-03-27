@@ -192,7 +192,8 @@ const AppLayout = ({ children }) => {
     if (path === '/') return 'dashboard';
     if (path.startsWith('/visualization-3d')) return 'visualization-3d';
     if (path.startsWith('/rooms') || path.startsWith('/racks')) return 'room-management';
-    if (path.startsWith('/devices') ||
+    if (
+      path.startsWith('/devices') ||
       path.startsWith('/fields') ||
       path.startsWith('/cables') ||
       path.startsWith('/ports') ||
@@ -209,7 +210,8 @@ const AppLayout = ({ children }) => {
     )
       return 'system-management';
     if (path.startsWith('/tickets')) return 'ticket-management';
-    if (path.startsWith('/inventory') || path.startsWith('/pending-devices')) return 'inventory-management';
+    if (path.startsWith('/inventory') || path.startsWith('/pending-devices'))
+      return 'inventory-management';
     return 'dashboard';
   };
 
@@ -652,9 +654,7 @@ const ThemeConfig = () => {
                   </ErrorBoundary>
                 }
               />
-              {routeConfig.map(({ path, component: Component }) =>
-                renderRoute(path, Component)
-              )}
+              {routeConfig.map(({ path, component: Component }) => renderRoute(path, Component))}
               <Route
                 path="/visualization-3d"
                 element={

@@ -10,11 +10,18 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 
 const SETTINGS_FILE = path.join(__dirname, '../backgroundSettings.json');
 if (!fs.existsSync(SETTINGS_FILE)) {
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify({
-    type: 'gradient',
-    image: '',
-    size: 'contain'
-  }, null, 2));
+  fs.writeFileSync(
+    SETTINGS_FILE,
+    JSON.stringify(
+      {
+        type: 'gradient',
+        image: '',
+        size: 'contain',
+      },
+      null,
+      2
+    )
+  );
 }
 
 router.get('/', (req, res) => {
@@ -22,7 +29,7 @@ router.get('/', (req, res) => {
     const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
     res.json({
       success: true,
-      data: settings
+      data: settings,
     });
   } catch (error) {
     console.error('读取背景设置失败:', error);
@@ -36,7 +43,7 @@ router.put('/', (req, res) => {
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
     res.json({
       success: true,
-      data: settings
+      data: settings,
     });
   } catch (error) {
     console.error('保存背景设置失败:', error);
@@ -54,7 +61,7 @@ router.post('/upload', (req, res) => {
     const fileName = `${Date.now()}_${file.name}`;
     const filePath = path.join(UPLOAD_DIR, fileName);
 
-    file.mv(filePath, (err) => {
+    file.mv(filePath, err => {
       if (err) {
         console.error('文件保存失败:', err);
         return res.status(500).json({ error: '文件保存失败' });

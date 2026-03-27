@@ -209,12 +209,21 @@ function CategoryManagement() {
               allowClear
               prefix={<SearchOutlined />}
             />
-            <Select value={status} onChange={setStatus} style={{ ...selectStyles.base, width: 120 }}>
+            <Select
+              value={status}
+              onChange={setStatus}
+              style={{ ...selectStyles.base, width: 120 }}
+            >
               <Option value="all">所有状态</Option>
               <Option value="active">启用</Option>
               <Option value="inactive">停用</Option>
             </Select>
-            <Button onClick={() => fetchCategories()} style={{ height: '40px', borderRadius: '10px' }}>刷新</Button>
+            <Button
+              onClick={() => fetchCategories()}
+              style={{ height: '40px', borderRadius: '10px' }}
+            >
+              刷新
+            </Button>
           </Space>
         </Card>
 
@@ -249,12 +258,22 @@ function CategoryManagement() {
             <Input placeholder="请输入分类名称" style={inputStyles.form} />
           </Form.Item>
           <Form.Item name="description" label="描述">
-            <Input.TextArea rows={3} placeholder={inputPlaceholders.description} maxLength={200} showCount style={textAreaStyles.base} />
+            <Input.TextArea
+              rows={3}
+              placeholder={inputPlaceholders.description}
+              maxLength={200}
+              showCount
+              style={textAreaStyles.base}
+            />
           </Form.Item>
           <Form.Item name="sortOrder" label="排序">
             <InputNumber min={0} placeholder="数值越小越靠前" style={inputNumberStyles.base} />
           </Form.Item>
-          <Form.Item name="status" label="状态" rules={[inputValidationRules.required('请选择状态')]}>
+          <Form.Item
+            name="status"
+            label="状态"
+            rules={[inputValidationRules.required('请选择状态')]}
+          >
             <Select style={selectStyles.base}>
               <Option value="active">启用</Option>
               <Option value="inactive">停用</Option>
@@ -262,10 +281,16 @@ function CategoryManagement() {
           </Form.Item>
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit" style={{ height: '40px', borderRadius: '10px' }}>
+              <Button
+                type="primary"
+                htmlType="submit"
+                style={{ height: '40px', borderRadius: '10px' }}
+              >
                 {editingCategory ? '更新' : '创建'}
               </Button>
-              <Button onClick={handleCancel} style={{ height: '40px', borderRadius: '10px' }}>取消</Button>
+              <Button onClick={handleCancel} style={{ height: '40px', borderRadius: '10px' }}>
+                取消
+              </Button>
             </Space>
           </Form.Item>
         </Form>

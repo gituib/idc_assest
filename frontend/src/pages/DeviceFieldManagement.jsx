@@ -45,51 +45,51 @@ const OptionsEditor = ({ value = [], onChange }) => {
   };
 
   const handleUpdate = (index, field, fieldValue) => {
-    const newOptions = value.map((opt, i) =>
-      i === index ? { ...opt, [field]: fieldValue } : opt
-    );
+    const newOptions = value.map((opt, i) => (i === index ? { ...opt, [field]: fieldValue } : opt));
     onChange(newOptions);
   };
 
   return (
-    <div style={{
-      border: '1px solid #e8e8e8',
-      borderRadius: '12px',
-      padding: '20px',
-      background: 'linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%)',
-      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        marginBottom: '16px',
-        gap: '8px',
-      }}>
-        <div style={{
-          width: '4px',
-          height: '16px',
-          background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
-          borderRadius: '2px',
-        }}/>
-        <span style={{ color: '#333', fontSize: '14px', fontWeight: '600' }}>
-          选项配置
-        </span>
-        <span style={{ color: '#999', fontSize: '12px' }}>
-          （值用于提交，标签用于显示）
-        </span>
+    <div
+      style={{
+        border: '1px solid #e8e8e8',
+        borderRadius: '12px',
+        padding: '20px',
+        background: 'linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%)',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          marginBottom: '16px',
+          gap: '8px',
+        }}
+      >
+        <div
+          style={{
+            width: '4px',
+            height: '16px',
+            background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '2px',
+          }}
+        />
+        <span style={{ color: '#333', fontSize: '14px', fontWeight: '600' }}>选项配置</span>
+        <span style={{ color: '#999', fontSize: '12px' }}>（值用于提交，标签用于显示）</span>
       </div>
 
       {value.length === 0 ? (
-        <div style={{
-          textAlign: 'center',
-          padding: '24px',
-          background: '#fff',
-          borderRadius: '8px',
-          border: '1px dashed #d9d9d9',
-        }}>
-          <div style={{ color: '#bbb', fontSize: '14px', marginBottom: '12px' }}>
-            暂无选项
-          </div>
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '24px',
+            background: '#fff',
+            borderRadius: '8px',
+            border: '1px dashed #d9d9d9',
+          }}
+        >
+          <div style={{ color: '#bbb', fontSize: '14px', marginBottom: '12px' }}>暂无选项</div>
           <Button
             type="primary"
             icon={<PlusCircleOutlined />}
@@ -105,15 +105,23 @@ const OptionsEditor = ({ value = [], onChange }) => {
           </Button>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            padding: '0 4px',
-            marginBottom: '4px',
-          }}>
-            <span style={{ width: '160px', color: '#666', fontSize: '12px', fontWeight: '500' }}>值（value）</span>
-            <span style={{ width: '160px', color: '#666', fontSize: '12px', fontWeight: '500' }}>标签（label）</span>
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              gap: '12px',
+              padding: '0 4px',
+              marginBottom: '4px',
+            }}
+          >
+            <span style={{ width: '160px', color: '#666', fontSize: '12px', fontWeight: '500' }}>
+              值（value）
+            </span>
+            <span style={{ width: '160px', color: '#666', fontSize: '12px', fontWeight: '500' }}>
+              标签（label）
+            </span>
           </div>
           {value.map((opt, index) => (
             <div
@@ -129,19 +137,21 @@ const OptionsEditor = ({ value = [], onChange }) => {
                 transition: 'all 0.2s ease',
               }}
             >
-              <div style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #667eea20 0%, #764ba220 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#667eea',
-                fontSize: '12px',
-                fontWeight: '600',
-                flexShrink: 0,
-              }}>
+              <div
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #667eea20 0%, #764ba220 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#667eea',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  flexShrink: 0,
+                }}
+              >
                 {index + 1}
               </div>
               <Input

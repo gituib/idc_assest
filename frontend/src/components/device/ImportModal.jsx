@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { Modal, Upload, Button, Progress, message, Table, Alert, Space, Spin } from 'antd';
-import { UploadOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, FileTextOutlined } from '@ant-design/icons';
+import {
+  UploadOutlined,
+  DownloadOutlined,
+  CheckCircleOutlined,
+  WarningOutlined,
+  FileTextOutlined,
+} from '@ant-design/icons';
 import axios from 'axios';
 import { designTokens } from '../../config/theme';
 
@@ -12,12 +18,7 @@ const modalHeaderStyle = {
   fontWeight: 600,
 };
 
-const ImportModal = ({
-  visible,
-  deviceFields,
-  onImport,
-  onCancel,
-}) => {
+const ImportModal = ({ visible, deviceFields, onImport, onCancel }) => {
   const [step, setStep] = useState('upload');
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -32,7 +33,7 @@ const ImportModal = ({
     baseURL: '/api',
   });
 
-  api.interceptors.request.use((config) => {
+  api.interceptors.request.use(config => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -57,7 +58,7 @@ const ImportModal = ({
     onCancel();
   };
 
-  const handlePreview = async (file) => {
+  const handlePreview = async file => {
     const actualFile = file.originFileObj || file;
     setSelectedFile(actualFile);
     setPreviewLoading(true);
@@ -107,14 +108,14 @@ const ImportModal = ({
           setImportProgress(progress);
           setImportPhase(phase);
         },
-        onSuccess: (result) => {
+        onSuccess: result => {
           setImportResult(result);
           setImportProgress(100);
           setImportPhase('导入完成');
           setIsConfirming(false);
           setStep('result');
         },
-        onError: (error) => {
+        onError: error => {
           setImportResult({
             success: false,
             statistics: {
@@ -135,14 +136,14 @@ const ImportModal = ({
     }
   };
 
-  const requiredFields = deviceFields.filter((f) => f.visible && f.required);
-  const optionalFields = deviceFields.filter((f) => f.visible && !f.required);
+  const requiredFields = deviceFields.filter(f => f.visible && f.required);
+  const optionalFields = deviceFields.filter(f => f.visible && !f.required);
 
   const previewColumns = previewData?.fieldList
     ? [
         ...previewData.fieldList
-          .filter((field) => field.fieldName !== 'rackId')
-          .map((field) => ({
+          .filter(field => field.fieldName !== 'rackId')
+          .map(field => ({
             title: field.displayName + (field.required ? ' *' : ''),
             dataIndex: field.fieldName,
             key: field.fieldName,
@@ -163,7 +164,7 @@ const ImportModal = ({
         { title: '状态', dataIndex: 'status', key: 'status', width: 80 },
       ];
 
-  const getRowClassName = (record) => {
+  const getRowClassName = record => {
     if (record._hasError) {
       return 'ant-table-row-error';
     }
@@ -173,9 +174,7 @@ const ImportModal = ({
   const renderUploadStep = () => (
     <div>
       <p style={{ color: '#666', marginBottom: '8px' }}>请上传CSV格式的设备数据文件</p>
-      <p style={{ color: '#999', fontSize: '12px', marginBottom: '20px' }}>
-        支持的编码格式：GBK
-      </p>
+      <p style={{ color: '#999', fontSize: '12px', marginBottom: '20px' }}>支持的编码格式：GBK</p>
 
       <div
         style={{
@@ -186,15 +185,13 @@ const ImportModal = ({
           border: '1px solid #f0f0f0',
         }}
       >
-        <p style={{ fontWeight: '600', marginBottom: '8px', color: '#333' }}>
-          CSV文件格式要求：
-        </p>
+        <p style={{ fontWeight: '600', marginBottom: '8px', color: '#333' }}>CSV文件格式要求：</p>
         <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
           {requiredFields.length > 0 && (
             <div style={{ marginBottom: '8px' }}>
               <span style={{ color: '#d93025', fontWeight: '500' }}>必填字段：</span>
               <span style={{ color: '#666', fontSize: '13px' }}>
-                {requiredFields.map((f) => f.displayName).join('、')}
+                {requiredFields.map(f => f.displayName).join('、')}
               </span>
             </div>
           )}
@@ -202,7 +199,7 @@ const ImportModal = ({
             <div style={{ marginBottom: '8px' }}>
               <span style={{ color: '#666', fontWeight: '500' }}>可选字段：</span>
               <span style={{ color: '#666', fontSize: '13px' }}>
-                {optionalFields.map((f) => f.displayName).join('、')}
+                {optionalFields.map(f => f.displayName).join('、')}
               </span>
             </div>
           )}
@@ -290,7 +287,8 @@ const ImportModal = ({
               {selectedFile?.name || '已选择文件'}
             </div>
             <div style={{ color: '#666', fontSize: '13px', marginTop: '2px' }}>
-              共 {previewData?.total || 0} 条记录，已解析 {previewData?.previewCount || 0} 条作为预览
+              共 {previewData?.total || 0} 条记录，已解析 {previewData?.previewCount || 0}{' '}
+              条作为预览
             </div>
           </div>
         </div>
@@ -384,7 +382,7 @@ const ImportModal = ({
           pagination={{
             pageSize: 10,
             showSizeChanger: false,
-            showTotal: (total) => `共 ${total} 条`,
+            showTotal: total => `共 ${total} 条`,
           }}
           scroll={{ x: 'max-content' }}
         />
@@ -402,7 +400,9 @@ const ImportModal = ({
             backgroundColor: '#fff7f7',
           }}
         >
-          <h4 style={{ color: '#d93025', marginBottom: '12px', fontWeight: '600', fontSize: '13px' }}>
+          <h4
+            style={{ color: '#d93025', marginBottom: '12px', fontWeight: '600', fontSize: '13px' }}
+          >
             错误详情：
           </h4>
           {previewData.errors.slice(0, 10).map((err, index) => (
@@ -437,7 +437,8 @@ const ImportModal = ({
           style={{
             height: '40px',
             borderRadius: designTokens.borderRadius.small,
-            background: previewData?.statistics?.invalid > 0 ? '#ccc' : designTokens.colors.primary.gradient,
+            background:
+              previewData?.statistics?.invalid > 0 ? '#ccc' : designTokens.colors.primary.gradient,
             border: 'none',
             color: '#ffffff',
             fontWeight: '500',

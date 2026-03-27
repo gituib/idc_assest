@@ -4,15 +4,19 @@ const { Op } = require('sequelize');
 const Device = require('../models/Device');
 const Rack = require('../models/Rack');
 const Room = require('../models/Room');
-const { logDeviceOperation, generateDeviceDescription, buildDeviceMetadata } = require('../utils/operationLogger');
+const {
+  logDeviceOperation,
+  generateDeviceDescription,
+  buildDeviceMetadata,
+} = require('../utils/operationLogger');
 
 async function generateIdleDeviceId() {
   const devices = await Device.findAll({
     where: {
       deviceId: {
-        [Op.like]: 'DEV%'
-      }
-    }
+        [Op.like]: 'DEV%',
+      },
+    },
   });
 
   let maxNumber = 0;
@@ -41,7 +45,7 @@ router.get('/', async (req, res) => {
       where[Op.or] = [
         { deviceId: { [Op.like]: `%${keyword}%` } },
         { name: { [Op.like]: `%${keyword}%` } },
-        { serialNumber: { [Op.like]: `%${keyword}%` } }
+        { serialNumber: { [Op.like]: `%${keyword}%` } },
       ];
     }
 
@@ -59,22 +63,24 @@ router.get('/', async (req, res) => {
         {
           model: Rack,
           attributes: ['rackId', 'name', 'roomId'],
-          include: [{
-            model: Room,
-            attributes: ['roomId', 'name']
-          }]
-        }
+          include: [
+            {
+              model: Room,
+              attributes: ['roomId', 'name'],
+            },
+          ],
+        },
       ],
       offset: parseInt(offset),
       limit: parseInt(pageSize),
-      order: [['idleDate', 'DESC']]
+      order: [['idleDate', 'DESC']],
     });
 
     res.json({
       total: count,
       idleDevices: rows,
       page: parseInt(page),
-      pageSize: parseInt(pageSize)
+      pageSize: parseInt(pageSize),
     });
   } catch (error) {
     console.error('获取空闲设备列表失败:', error);
@@ -90,12 +96,14 @@ router.get('/:deviceId', async (req, res) => {
         {
           model: Rack,
           attributes: ['rackId', 'name', 'roomId'],
-          include: [{
-            model: Room,
-            attributes: ['roomId', 'name']
-          }]
-        }
-      ]
+          include: [
+            {
+              model: Room,
+              attributes: ['roomId', 'name'],
+            },
+          ],
+        },
+      ],
     });
 
     if (!device) {
@@ -110,7 +118,18 @@ router.get('/:deviceId', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { name, type, model, serialNumber, powerConsumption, idleReason, warehouseId, description, rackId, position } = req.body;
+    const {
+      name,
+      type,
+      model,
+      serialNumber,
+      powerConsumption,
+      idleReason,
+      warehouseId,
+      description,
+      rackId,
+      position,
+    } = req.body;
 
     let { deviceId } = req.body;
 
@@ -144,24 +163,35 @@ router.post('/', async (req, res) => {
       warehouseId: warehouseId || null,
       rackId: rackId || null,
       position: position || null,
-      sourceType: warehouseId ? 'warehouse' : (rackId ? 'rack' : 'rack'),
-      description: description || ''
+      sourceType: warehouseId ? 'warehouse' : rackId ? 'rack' : 'rack',
+      description: description || '',
     });
 
-    await logDeviceOperation('create', generateDeviceDescription('新增空闲设备', {
-      deviceId: device.deviceId,
-      name: device.name || deviceId,
-      type: device.type,
-      model: device.model,
-      serialNumber: device.serialNumber,
-      ipAddress: device.ipAddress
-    }, { includeRack: false }), {
-      targetId: device.deviceId,
-      targetName: device.name || deviceId,
-      afterState: device.toJSON(),
-      req,
-      metadata: buildDeviceMetadata(device.toJSON(), { sourceType: device.sourceType, type: 'idle_device_create' })
-    });
+    await logDeviceOperation(
+      'create',
+      generateDeviceDescription(
+        '新增空闲设备',
+        {
+          deviceId: device.deviceId,
+          name: device.name || deviceId,
+          type: device.type,
+          model: device.model,
+          serialNumber: device.serialNumber,
+          ipAddress: device.ipAddress,
+        },
+        { includeRack: false }
+      ),
+      {
+        targetId: device.deviceId,
+        targetName: device.name || deviceId,
+        afterState: device.toJSON(),
+        req,
+        metadata: buildDeviceMetadata(device.toJSON(), {
+          sourceType: device.sourceType,
+          type: 'idle_device_create',
+        }),
+      }
+    );
 
     res.status(201).json(device);
   } catch (error) {
@@ -186,13 +216,16 @@ router.post('/from-device/:deviceId', async (req, res) => {
       return res.status(400).json({ error: '设备已经标记为空闲设备' });
     }
 
-    await device.update({
-      isIdle: true,
-      status: 'idle',
-      idleDate: new Date(),
-      idleReason: idleReason || `从设备管理转入`,
-      sourceType: 'rack'
-    }, { transaction: t });
+    await device.update(
+      {
+        isIdle: true,
+        status: 'idle',
+        idleDate: new Date(),
+        idleReason: idleReason || `从设备管理转入`,
+        sourceType: 'rack',
+      },
+      { transaction: t }
+    );
 
     await t.commit();
 
@@ -203,12 +236,12 @@ router.post('/from-device/:deviceId', async (req, res) => {
       beforeState: { ...deviceData, isIdle: false },
       afterState: { ...deviceData, isIdle: true },
       req,
-      metadata: buildDeviceMetadata(deviceData, { idleReason, type: 'device_to_idle' })
+      metadata: buildDeviceMetadata(deviceData, { idleReason, type: 'device_to_idle' }),
     });
 
     res.json({
       message: '设备已转入空闲设备',
-      device: device.toJSON()
+      device: device.toJSON(),
     });
   } catch (error) {
     await t.rollback();
@@ -229,7 +262,7 @@ router.post('/batch-from-devices', async (req, res) => {
 
     const devices = await Device.findAll({
       where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
+      transaction: t,
     });
 
     const notIdleDevices = devices.filter(d => !d.isIdle);
@@ -241,11 +274,11 @@ router.post('/batch-from-devices', async (req, res) => {
           isIdle: true,
           status: 'idle',
           idleDate: new Date(),
-          idleReason: idleReason || `批量转入`
+          idleReason: idleReason || `批量转入`,
         },
         {
           where: { deviceId: { [Op.in]: notIdleDevices.map(d => d.deviceId) } },
-          transaction: t
+          transaction: t,
         }
       );
     }
@@ -253,22 +286,29 @@ router.post('/batch-from-devices', async (req, res) => {
     await t.commit();
 
     const deviceDetails = notIdleDevices.map(d => d.toJSON());
-    const deviceSummary = deviceDetails.map(d =>
-      `${d.name}(编号:${d.deviceId}${d.type ? `,类型:${d.type}` : ''}${d.serialNumber ? `,序列号:${d.serialNumber}` : ''})`
-    ).join('、');
+    const deviceSummary = deviceDetails
+      .map(
+        d =>
+          `${d.name}(编号:${d.deviceId}${d.type ? `,类型:${d.type}` : ''}${d.serialNumber ? `,序列号:${d.serialNumber}` : ''})`
+      )
+      .join('、');
 
-    await logDeviceOperation('batch_to_idle', `批量将 ${notIdleDevices.length} 台设备转入空闲设备：${deviceSummary}`, {
-      targetId: deviceIds.join(','),
-      targetName: `${notIdleDevices.length}台设备`,
-      req,
-      metadata: { idleReason, type: 'batch_device_to_idle', devices: deviceDetails }
-    });
+    await logDeviceOperation(
+      'batch_to_idle',
+      `批量将 ${notIdleDevices.length} 台设备转入空闲设备：${deviceSummary}`,
+      {
+        targetId: deviceIds.join(','),
+        targetName: `${notIdleDevices.length}台设备`,
+        req,
+        metadata: { idleReason, type: 'batch_device_to_idle', devices: deviceDetails },
+      }
+    );
 
     res.json({
       message: `成功将 ${notIdleDevices.length} 台设备转入空闲设备`,
       total: devices.length,
       updated: notIdleDevices.length,
-      skipped: alreadyIdleDevices.length
+      skipped: alreadyIdleDevices.length,
     });
   } catch (error) {
     await t.rollback();
@@ -305,23 +345,29 @@ router.put('/batch-restore', async (req, res) => {
 
     const idleDevices = await Device.findAll({
       where: { deviceId: { [Op.in]: deviceIds }, isIdle: true },
-      transaction: t
+      transaction: t,
     });
 
     console.log('查询到的空闲设备数量:', idleDevices.length);
     if (idleDevices.length > 0) {
-      console.log('查询到的设备ID:', idleDevices.map(d => d.deviceId));
+      console.log(
+        '查询到的设备ID:',
+        idleDevices.map(d => d.deviceId)
+      );
     }
 
     if (idleDevices.length === 0) {
       console.log('没有找到空闲设备，检查设备是否存在:');
       const allDevices = await Device.findAll({
         where: { deviceId: { [Op.in]: deviceIds } },
-        transaction: t
+        transaction: t,
       });
       console.log('设备表中存在的设备数量:', allDevices.length);
       if (allDevices.length > 0) {
-        console.log('存在的设备及其 isIdle 状态:', allDevices.map(d => ({ deviceId: d.deviceId, isIdle: d.isIdle })));
+        console.log(
+          '存在的设备及其 isIdle 状态:',
+          allDevices.map(d => ({ deviceId: d.deviceId, isIdle: d.isIdle }))
+        );
       }
 
       await t.rollback();
@@ -333,7 +379,9 @@ router.put('/batch-restore', async (req, res) => {
 
     for (const device of idleDevices) {
       const deviceConfig = devices.find(d => d.deviceId === device.deviceId);
-      if (!deviceConfig) continue;
+      if (!deviceConfig) {
+        continue;
+      }
 
       const targetRackId = deviceConfig.targetRackId;
       const targetPosition = deviceConfig.targetPosition;
@@ -343,7 +391,7 @@ router.put('/batch-restore', async (req, res) => {
           deviceId: device.deviceId,
           name: device.name,
           status: 'skipped',
-          reason: '未指定目标机柜'
+          reason: '未指定目标机柜',
         });
         continue;
       }
@@ -354,7 +402,7 @@ router.put('/batch-restore', async (req, res) => {
           deviceId: device.deviceId,
           name: device.name,
           status: 'failed',
-          reason: '目标机柜不存在'
+          reason: '目标机柜不存在',
         });
         continue;
       }
@@ -368,25 +416,31 @@ router.put('/batch-restore', async (req, res) => {
           deviceId: device.deviceId,
           name: device.name,
           status: 'failed',
-          reason: `U位${position}已被占用`
+          reason: `U位${position}已被占用`,
         });
         continue;
       }
 
-      await device.update({
-        isIdle: false,
-        idleDate: null,
-        idleReason: null,
-        rackId: targetRackId,
-        position: position,
-        warehouseId: null,
-        sourceType: 'rack',
-        status: 'offline'
-      }, { transaction: t });
+      await device.update(
+        {
+          isIdle: false,
+          idleDate: null,
+          idleReason: null,
+          rackId: targetRackId,
+          position: position,
+          warehouseId: null,
+          sourceType: 'rack',
+          status: 'offline',
+        },
+        { transaction: t }
+      );
 
-      await targetRack.update({
-        currentPower: targetRack.currentPower + (device.powerConsumption || 0)
-      }, { transaction: t });
+      await targetRack.update(
+        {
+          currentPower: targetRack.currentPower + (device.powerConsumption || 0),
+        },
+        { transaction: t }
+      );
 
       restoredCount++;
       results.push({
@@ -394,7 +448,7 @@ router.put('/batch-restore', async (req, res) => {
         name: device.name,
         status: 'success',
         targetRack: targetRack.name,
-        targetPosition: position
+        targetPosition: position,
       });
     }
 
@@ -404,17 +458,30 @@ router.put('/batch-restore', async (req, res) => {
     const failedCount = results.filter(r => r.status === 'failed').length;
     const skippedCount = results.filter(r => r.status === 'skipped').length;
 
-    const successDevices = idleDevices.filter(d => results.some(r => r.deviceId === d.deviceId && r.status === 'success'));
-    const deviceSummary = successDevices.map(d =>
-      `${d.name}(编号:${d.deviceId}${d.type ? `,类型:${d.type}` : ''}${d.ipAddress ? `,IP:${d.ipAddress}` : ''})`
-    ).join('、');
+    const successDevices = idleDevices.filter(d =>
+      results.some(r => r.deviceId === d.deviceId && r.status === 'success')
+    );
+    const deviceSummary = successDevices
+      .map(
+        d =>
+          `${d.name}(编号:${d.deviceId}${d.type ? `,类型:${d.type}` : ''}${d.ipAddress ? `,IP:${d.ipAddress}` : ''})`
+      )
+      .join('、');
 
-    await logDeviceOperation('batch_restore', `批量上架 ${successCount} 台空闲设备：${deviceSummary}`, {
-      targetId: deviceIds.join(','),
-      targetName: `${successCount}台设备`,
-      req,
-      metadata: { results, type: 'batch_idle_device_restore', devices: successDevices.map(d => d.toJSON()) }
-    });
+    await logDeviceOperation(
+      'batch_restore',
+      `批量上架 ${successCount} 台空闲设备：${deviceSummary}`,
+      {
+        targetId: deviceIds.join(','),
+        targetName: `${successCount}台设备`,
+        req,
+        metadata: {
+          results,
+          type: 'batch_idle_device_restore',
+          devices: successDevices.map(d => d.toJSON()),
+        },
+      }
+    );
 
     res.json({
       message: `成功上架 ${successCount} 台设备`,
@@ -422,7 +489,7 @@ router.put('/batch-restore', async (req, res) => {
       restored: successCount,
       failed: failedCount,
       skipped: skippedCount,
-      details: results
+      details: results,
     });
   } catch (error) {
     await t.rollback();
@@ -435,11 +502,21 @@ router.put('/:deviceId/shelve', async (req, res) => {
   const t = await require('../db').sequelize.transaction();
   try {
     const { deviceId } = req.params;
-    const { name, type, model, serialNumber, height, powerConsumption, rackId, position, description } = req.body;
+    const {
+      name,
+      type,
+      model,
+      serialNumber,
+      height,
+      powerConsumption,
+      rackId,
+      position,
+      description,
+    } = req.body;
 
     const device = await Device.findOne({
       where: { deviceId, isIdle: true },
-      transaction: t
+      transaction: t,
     });
 
     if (!device) {
@@ -467,54 +544,63 @@ router.put('/:deviceId/shelve', async (req, res) => {
 
     const beforeState = device.toJSON();
 
-    await device.update({
-      name: name || device.name,
-      type: type || device.type,
-      model: model || device.model,
-      serialNumber: serialNumber || device.serialNumber,
-      height: deviceHeight,
-      powerConsumption: powerConsumption || device.powerConsumption || 0,
-      rackId: rackId,
-      position: position,
-      description: description || device.description,
-      isIdle: false,
-      idleDate: null,
-      idleReason: null,
-      warehouseId: null,
-      sourceType: 'rack',
-      status: 'running'
-    }, { transaction: t });
+    await device.update(
+      {
+        name: name || device.name,
+        type: type || device.type,
+        model: model || device.model,
+        serialNumber: serialNumber || device.serialNumber,
+        height: deviceHeight,
+        powerConsumption: powerConsumption || device.powerConsumption || 0,
+        rackId: rackId,
+        position: position,
+        description: description || device.description,
+        isIdle: false,
+        idleDate: null,
+        idleReason: null,
+        warehouseId: null,
+        sourceType: 'rack',
+        status: 'running',
+      },
+      { transaction: t }
+    );
 
-    await targetRack.update({
-      currentPower: targetRack.currentPower + (powerConsumption || device.powerConsumption || 0)
-    }, { transaction: t });
+    await targetRack.update(
+      {
+        currentPower: targetRack.currentPower + (powerConsumption || device.powerConsumption || 0),
+      },
+      { transaction: t }
+    );
 
     await t.commit();
 
     const updatedDevice = await Device.findByPk(deviceId, {
-      include: [
-        { model: Rack, include: [Room] }
-      ]
+      include: [{ model: Rack, include: [Room] }],
     });
 
     const deviceData = {
       ...updatedDevice.toJSON(),
       rackName: targetRack.name,
-      roomName: updatedDevice.Rack?.Room?.name
+      roomName: updatedDevice.Rack?.Room?.name,
     };
 
-    await logDeviceOperation('shelve', generateDeviceDescription('空闲设备上架', deviceData, { includePosition: false }) + `到机柜【${targetRack.name}】U${position}`, {
-      targetId: device.deviceId,
-      targetName: device.name,
-      beforeState: { ...beforeState, isIdle: true },
-      afterState: deviceData,
-      req,
-      metadata: buildDeviceMetadata(deviceData, { rackId, position, type: 'idle_device_shelve' })
-    });
+    await logDeviceOperation(
+      'shelve',
+      generateDeviceDescription('空闲设备上架', deviceData, { includePosition: false }) +
+        `到机柜【${targetRack.name}】U${position}`,
+      {
+        targetId: device.deviceId,
+        targetName: device.name,
+        beforeState: { ...beforeState, isIdle: true },
+        afterState: deviceData,
+        req,
+        metadata: buildDeviceMetadata(deviceData, { rackId, position, type: 'idle_device_shelve' }),
+      }
+    );
 
     res.json({
       message: '设备上架成功',
-      device: updatedDevice
+      device: updatedDevice,
     });
   } catch (error) {
     await t.rollback();
@@ -526,7 +612,7 @@ router.put('/:deviceId/shelve', async (req, res) => {
 router.put('/:deviceId', async (req, res) => {
   try {
     const device = await Device.findOne({
-      where: { deviceId: req.params.deviceId, isIdle: true }
+      where: { deviceId: req.params.deviceId, isIdle: true },
     });
 
     if (!device) {
@@ -534,7 +620,14 @@ router.put('/:deviceId', async (req, res) => {
     }
 
     const beforeState = device.toJSON();
-    const allowedFields = ['name', 'type', 'model', 'idleReason', 'description', 'powerConsumption'];
+    const allowedFields = [
+      'name',
+      'type',
+      'model',
+      'idleReason',
+      'description',
+      'powerConsumption',
+    ];
 
     allowedFields.forEach(field => {
       if (req.body[field] !== undefined) {
@@ -566,14 +659,18 @@ router.put('/:deviceId', async (req, res) => {
 
     await device.save();
 
-    await logDeviceOperation('update', generateDeviceDescription('更新空闲设备', device.toJSON(), { includeRack: false }), {
-      targetId: device.deviceId,
-      targetName: device.name,
-      beforeState,
-      afterState: device.toJSON(),
-      req,
-      metadata: buildDeviceMetadata(device.toJSON(), { type: 'idle_device_update' })
-    });
+    await logDeviceOperation(
+      'update',
+      generateDeviceDescription('更新空闲设备', device.toJSON(), { includeRack: false }),
+      {
+        targetId: device.deviceId,
+        targetName: device.name,
+        beforeState,
+        afterState: device.toJSON(),
+        req,
+        metadata: buildDeviceMetadata(device.toJSON(), { type: 'idle_device_update' }),
+      }
+    );
 
     res.json(device);
   } catch (error) {
@@ -589,7 +686,7 @@ router.put('/:deviceId/restore', async (req, res) => {
 
     const device = await Device.findOne({
       where: { deviceId, isIdle: true },
-      transaction: t
+      transaction: t,
     });
 
     if (!device) {
@@ -608,53 +705,72 @@ router.put('/:deviceId/restore', async (req, res) => {
       return res.status(404).json({ error: '目标机柜不存在' });
     }
 
-    const positionCheck = await checkPositionAvailable(targetRackId, targetPosition, device.height || 1, deviceId, t);
+    const positionCheck = await checkPositionAvailable(
+      targetRackId,
+      targetPosition,
+      device.height || 1,
+      deviceId,
+      t
+    );
     if (!positionCheck.available) {
       await t.rollback();
       return res.status(400).json({ error: positionCheck.reason });
     }
 
-    await device.update({
-      isIdle: false,
-      idleDate: null,
-      idleReason: null,
-      rackId: targetRackId,
-      position: targetPosition,
-      warehouseId: null,
-      sourceType: 'rack',
-      status: 'offline'
-    }, { transaction: t });
+    await device.update(
+      {
+        isIdle: false,
+        idleDate: null,
+        idleReason: null,
+        rackId: targetRackId,
+        position: targetPosition,
+        warehouseId: null,
+        sourceType: 'rack',
+        status: 'offline',
+      },
+      { transaction: t }
+    );
 
-    await targetRack.update({
-      currentPower: targetRack.currentPower + (device.powerConsumption || 0)
-    }, { transaction: t });
+    await targetRack.update(
+      {
+        currentPower: targetRack.currentPower + (device.powerConsumption || 0),
+      },
+      { transaction: t }
+    );
 
     await t.commit();
 
     const updatedDevice = await Device.findByPk(deviceId, {
-      include: [
-        { model: Rack, include: [Room] }
-      ]
+      include: [{ model: Rack, include: [Room] }],
     });
 
     const deviceData = {
       ...updatedDevice.toJSON(),
       rackName: targetRack.name,
-      roomName: updatedDevice.Rack?.Room?.name
+      roomName: updatedDevice.Rack?.Room?.name,
     };
 
-    await logDeviceOperation('restore', generateDeviceDescription('空闲设备恢复', deviceData, { includePosition: false }) + `到机柜【${targetRack.name}】U${targetPosition}`, {
-      targetId: device.deviceId,
-      targetName: device.name,
-      beforeState: { ...device.toJSON(), isIdle: true },
-      afterState: deviceData,
-      req,
-      metadata: buildDeviceMetadata(deviceData, { targetRackId, targetPosition, type: 'idle_device_restore' })
-    });
+    await logDeviceOperation(
+      'restore',
+      generateDeviceDescription('空闲设备恢复', deviceData, { includePosition: false }) +
+        `到机柜【${targetRack.name}】U${targetPosition}`,
+      {
+        targetId: device.deviceId,
+        targetName: device.name,
+        beforeState: { ...device.toJSON(), isIdle: true },
+        afterState: deviceData,
+        req,
+        metadata: buildDeviceMetadata(deviceData, {
+          targetRackId,
+          targetPosition,
+          type: 'idle_device_restore',
+        }),
+      }
+    );
 
     res.json({
       message: '设备已恢复到设备管理',
-      device: updatedDevice
+      device: updatedDevice,
     });
   } catch (error) {
     await t.rollback();
@@ -692,23 +808,29 @@ router.put('/batch-restore', async (req, res) => {
 
     const idleDevices = await Device.findAll({
       where: { deviceId: { [Op.in]: deviceIds }, isIdle: true },
-      transaction: t
+      transaction: t,
     });
 
     console.log('查询到的空闲设备数量:', idleDevices.length);
     if (idleDevices.length > 0) {
-      console.log('查询到的设备ID:', idleDevices.map(d => d.deviceId));
+      console.log(
+        '查询到的设备ID:',
+        idleDevices.map(d => d.deviceId)
+      );
     }
 
     if (idleDevices.length === 0) {
       console.log('没有找到空闲设备，检查设备是否存在:');
       const allDevices = await Device.findAll({
         where: { deviceId: { [Op.in]: deviceIds } },
-        transaction: t
+        transaction: t,
       });
       console.log('设备表中存在的设备数量:', allDevices.length);
       if (allDevices.length > 0) {
-        console.log('存在的设备及其 isIdle 状态:', allDevices.map(d => ({ deviceId: d.deviceId, isIdle: d.isIdle })));
+        console.log(
+          '存在的设备及其 isIdle 状态:',
+          allDevices.map(d => ({ deviceId: d.deviceId, isIdle: d.isIdle }))
+        );
       }
 
       await t.rollback();
@@ -720,7 +842,9 @@ router.put('/batch-restore', async (req, res) => {
 
     for (const device of idleDevices) {
       const deviceConfig = devices.find(d => d.deviceId === device.deviceId);
-      if (!deviceConfig) continue;
+      if (!deviceConfig) {
+        continue;
+      }
 
       const targetRackId = deviceConfig.targetRackId;
       const targetPosition = deviceConfig.targetPosition;
@@ -730,7 +854,7 @@ router.put('/batch-restore', async (req, res) => {
           deviceId: device.deviceId,
           name: device.name,
           status: 'skipped',
-          reason: '未指定目标机柜'
+          reason: '未指定目标机柜',
         });
         continue;
       }
@@ -741,7 +865,7 @@ router.put('/batch-restore', async (req, res) => {
           deviceId: device.deviceId,
           name: device.name,
           status: 'failed',
-          reason: '目标机柜不存在'
+          reason: '目标机柜不存在',
         });
         continue;
       }
@@ -755,25 +879,31 @@ router.put('/batch-restore', async (req, res) => {
           deviceId: device.deviceId,
           name: device.name,
           status: 'failed',
-          reason: `U位${position}已被占用`
+          reason: `U位${position}已被占用`,
         });
         continue;
       }
 
-      await device.update({
-        isIdle: false,
-        idleDate: null,
-        idleReason: null,
-        rackId: targetRackId,
-        position: position,
-        warehouseId: null,
-        sourceType: 'rack',
-        status: 'offline'
-      }, { transaction: t });
+      await device.update(
+        {
+          isIdle: false,
+          idleDate: null,
+          idleReason: null,
+          rackId: targetRackId,
+          position: position,
+          warehouseId: null,
+          sourceType: 'rack',
+          status: 'offline',
+        },
+        { transaction: t }
+      );
 
-      await targetRack.update({
-        currentPower: targetRack.currentPower + (device.powerConsumption || 0)
-      }, { transaction: t });
+      await targetRack.update(
+        {
+          currentPower: targetRack.currentPower + (device.powerConsumption || 0),
+        },
+        { transaction: t }
+      );
 
       restoredCount++;
       results.push({
@@ -781,7 +911,7 @@ router.put('/batch-restore', async (req, res) => {
         name: device.name,
         status: 'success',
         targetRack: targetRack.name,
-        targetPosition: position
+        targetPosition: position,
       });
     }
 
@@ -791,17 +921,30 @@ router.put('/batch-restore', async (req, res) => {
     const failedCount = results.filter(r => r.status === 'failed').length;
     const skippedCount = results.filter(r => r.status === 'skipped').length;
 
-    const successDevices = idleDevices.filter(d => results.some(r => r.deviceId === d.deviceId && r.status === 'success'));
-    const deviceSummary = successDevices.map(d =>
-      `${d.name}(编号:${d.deviceId}${d.type ? `,类型:${d.type}` : ''}${d.ipAddress ? `,IP:${d.ipAddress}` : ''})`
-    ).join('、');
+    const successDevices = idleDevices.filter(d =>
+      results.some(r => r.deviceId === d.deviceId && r.status === 'success')
+    );
+    const deviceSummary = successDevices
+      .map(
+        d =>
+          `${d.name}(编号:${d.deviceId}${d.type ? `,类型:${d.type}` : ''}${d.ipAddress ? `,IP:${d.ipAddress}` : ''})`
+      )
+      .join('、');
 
-    await logDeviceOperation('batch_restore', `批量上架 ${successCount} 台空闲设备：${deviceSummary}`, {
-      targetId: deviceIds.join(','),
-      targetName: `${successCount}台设备`,
-      req,
-      metadata: { results, type: 'batch_idle_device_restore', devices: successDevices.map(d => d.toJSON()) }
-    });
+    await logDeviceOperation(
+      'batch_restore',
+      `批量上架 ${successCount} 台空闲设备：${deviceSummary}`,
+      {
+        targetId: deviceIds.join(','),
+        targetName: `${successCount}台设备`,
+        req,
+        metadata: {
+          results,
+          type: 'batch_idle_device_restore',
+          devices: successDevices.map(d => d.toJSON()),
+        },
+      }
+    );
 
     res.json({
       message: `成功上架 ${successCount} 台设备`,
@@ -809,7 +952,7 @@ router.put('/batch-restore', async (req, res) => {
       restored: successCount,
       failed: failedCount,
       skipped: skippedCount,
-      details: results
+      details: results,
     });
   } catch (error) {
     await t.rollback();
@@ -823,7 +966,7 @@ router.delete('/:deviceId', async (req, res) => {
   try {
     const device = await Device.findOne({
       where: { deviceId: req.params.deviceId, isIdle: true },
-      transaction: t
+      transaction: t,
     });
 
     if (!device) {
@@ -837,16 +980,24 @@ router.delete('/:deviceId', async (req, res) => {
 
     await t.commit();
 
-    await logDeviceOperation('delete', generateDeviceDescription('删除空闲设备', {
-      ...device.toJSON(),
-      name: device.name || device.deviceId
-    }, { includeRack: false }), {
-      targetId: device.deviceId,
-      targetName: device.name,
-      beforeState,
-      req,
-      metadata: buildDeviceMetadata(device.toJSON(), { type: 'idle_device_delete' })
-    });
+    await logDeviceOperation(
+      'delete',
+      generateDeviceDescription(
+        '删除空闲设备',
+        {
+          ...device.toJSON(),
+          name: device.name || device.deviceId,
+        },
+        { includeRack: false }
+      ),
+      {
+        targetId: device.deviceId,
+        targetName: device.name,
+        beforeState,
+        req,
+        metadata: buildDeviceMetadata(device.toJSON(), { type: 'idle_device_delete' }),
+      }
+    );
 
     res.json({ message: '空闲设备删除成功' });
   } catch (error) {
@@ -856,7 +1007,13 @@ router.delete('/:deviceId', async (req, res) => {
   }
 });
 
-async function checkPositionAvailable(rackId, position, height, excludeDeviceId = null, transaction = null) {
+async function checkPositionAvailable(
+  rackId,
+  position,
+  height,
+  excludeDeviceId = null,
+  transaction = null
+) {
   if (!position || position <= 0) {
     return { available: true, reason: null };
   }
@@ -869,9 +1026,9 @@ async function checkPositionAvailable(rackId, position, height, excludeDeviceId 
     where: {
       rackId: rackId,
       position: { [Op.ne]: null },
-      isIdle: false
+      isIdle: false,
     },
-    attributes: ['deviceId', 'position', 'height']
+    attributes: ['deviceId', 'position', 'height'],
   };
 
   if (transaction) {
@@ -891,7 +1048,7 @@ async function checkPositionAvailable(rackId, position, height, excludeDeviceId 
     if (!(endU < existStart || startU > existEnd)) {
       return {
         available: false,
-        reason: `U位冲突：机柜中已有设备 ${d.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}`
+        reason: `U位冲突：机柜中已有设备 ${d.deviceId} 占用 U${existStart}${existEnd !== existStart ? '-' + existEnd : ''}`,
       };
     }
   }

@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
   try {
     const { deviceId } = req.query;
     const where = {};
-    
+
     if (deviceId) {
       where.deviceId = deviceId;
     }
@@ -24,10 +24,13 @@ router.get('/', async (req, res) => {
         {
           model: Device,
           as: 'device',
-          attributes: ['deviceId', 'name', 'type']
-        }
+          attributes: ['deviceId', 'name', 'type'],
+        },
       ],
-      order: [['slotNumber', 'ASC'], ['name', 'ASC']]
+      order: [
+        ['slotNumber', 'ASC'],
+        ['name', 'ASC'],
+      ],
     });
 
     res.json(networkCards);
@@ -47,10 +50,13 @@ router.get('/device/:deviceId', async (req, res) => {
         {
           model: Device,
           as: 'device',
-          attributes: ['deviceId', 'name', 'type']
-        }
+          attributes: ['deviceId', 'name', 'type'],
+        },
       ],
-      order: [['slotNumber', 'ASC'], ['name', 'ASC']]
+      order: [
+        ['slotNumber', 'ASC'],
+        ['name', 'ASC'],
+      ],
     });
 
     res.json(networkCards);
@@ -66,14 +72,17 @@ router.get('/device/:deviceId/with-ports', async (req, res) => {
 
     const networkCards = await NetworkCard.findAll({
       where: { deviceId },
-      order: [['slotNumber', 'ASC'], ['name', 'ASC']]
+      order: [
+        ['slotNumber', 'ASC'],
+        ['name', 'ASC'],
+      ],
     });
 
     const cardsWithPorts = await Promise.all(
-      networkCards.map(async (card) => {
+      networkCards.map(async card => {
         const ports = await DevicePort.findAll({
           where: { nicId: card.nicId },
-          order: [['portName', 'ASC']]
+          order: [['portName', 'ASC']],
         });
 
         const freeCount = ports.filter(p => p.status === 'free').length;
@@ -87,15 +96,15 @@ router.get('/device/:deviceId/with-ports', async (req, res) => {
             total: ports.length,
             free: freeCount,
             occupied: occupiedCount,
-            fault: faultCount
-          }
+            fault: faultCount,
+          },
         };
       })
     );
 
     const ungroupedPorts = await DevicePort.findAll({
       where: { deviceId, nicId: null },
-      order: [['portName', 'ASC']]
+      order: [['portName', 'ASC']],
     });
 
     if (ungroupedPorts.length > 0) {
@@ -110,8 +119,8 @@ router.get('/device/:deviceId/with-ports', async (req, res) => {
           total: ungroupedPorts.length,
           free: ungroupedPorts.filter(p => p.status === 'free').length,
           occupied: ungroupedPorts.filter(p => p.status === 'occupied').length,
-          fault: ungroupedPorts.filter(p => p.status === 'fault').length
-        }
+          fault: ungroupedPorts.filter(p => p.status === 'fault').length,
+        },
       });
     }
 
@@ -129,9 +138,9 @@ router.get('/:nicId', async (req, res) => {
         {
           model: Device,
           as: 'device',
-          attributes: ['deviceId', 'name', 'type']
-        }
-      ]
+          attributes: ['deviceId', 'name', 'type'],
+        },
+      ],
     });
 
     if (!networkCard) {
@@ -151,7 +160,7 @@ router.get('/:nicId/ports', async (req, res) => {
 
     const ports = await DevicePort.findAll({
       where: { nicId },
-      order: [['portName', 'ASC']]
+      order: [['portName', 'ASC']],
     });
 
     res.json(ports);
@@ -170,7 +179,7 @@ router.get('/find', async (req, res) => {
     }
 
     const networkCard = await NetworkCard.findOne({
-      where: { deviceId, name }
+      where: { deviceId, name },
     });
 
     if (!networkCard) {
@@ -186,14 +195,15 @@ router.get('/find', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { nicId, deviceId, name, description, slotNumber, model, manufacturer, status } = req.body;
+    const { nicId, deviceId, name, description, slotNumber, model, manufacturer, status } =
+      req.body;
 
     if (!deviceId || !name) {
       return res.status(400).json({ error: '缺少必填字段' });
     }
 
     const existingCard = await NetworkCard.findOne({
-      where: { deviceId, name }
+      where: { deviceId, name },
     });
 
     if (existingCard) {
@@ -211,7 +221,7 @@ router.post('/', async (req, res) => {
       model,
       manufacturer,
       status: status || 'normal',
-      portCount: 0
+      portCount: 0,
     });
 
     const createdCard = await NetworkCard.findByPk(networkCard.nicId, {
@@ -219,9 +229,9 @@ router.post('/', async (req, res) => {
         {
           model: Device,
           as: 'device',
-          attributes: ['deviceId', 'name', 'type']
-        }
-      ]
+          attributes: ['deviceId', 'name', 'type'],
+        },
+      ],
     });
 
     res.status(201).json(createdCard);
@@ -245,7 +255,7 @@ router.post('/batch', async (req, res) => {
       failed: 0,
       skipped: 0,
       updated: 0,
-      errors: []
+      errors: [],
     };
 
     const transaction = await NetworkCard.sequelize.transaction();
@@ -272,7 +282,7 @@ router.post('/batch', async (req, res) => {
 
           const existingCard = await NetworkCard.findOne({
             where: { deviceId: cardData.deviceId, name: cardData.name },
-            transaction
+            transaction,
           });
 
           if (existingCard) {
@@ -281,16 +291,28 @@ router.post('/batch', async (req, res) => {
               continue;
             }
             if (updateExisting) {
-              await NetworkCard.update({
-                slotNumber: cardData.slotNumber !== undefined ? cardData.slotNumber : existingCard.slotNumber,
-                model: cardData.model !== undefined ? cardData.model : existingCard.model,
-                manufacturer: cardData.manufacturer !== undefined ? cardData.manufacturer : existingCard.manufacturer,
-                description: cardData.description !== undefined ? cardData.description : existingCard.description,
-                status: cardData.status || existingCard.status
-              }, {
-                where: { nicId: existingCard.nicId },
-                transaction
-              });
+              await NetworkCard.update(
+                {
+                  slotNumber:
+                    cardData.slotNumber !== undefined
+                      ? cardData.slotNumber
+                      : existingCard.slotNumber,
+                  model: cardData.model !== undefined ? cardData.model : existingCard.model,
+                  manufacturer:
+                    cardData.manufacturer !== undefined
+                      ? cardData.manufacturer
+                      : existingCard.manufacturer,
+                  description:
+                    cardData.description !== undefined
+                      ? cardData.description
+                      : existingCard.description,
+                  status: cardData.status || existingCard.status,
+                },
+                {
+                  where: { nicId: existingCard.nicId },
+                  transaction,
+                }
+              );
               results.updated++;
               results.success++;
               continue;
@@ -298,19 +320,23 @@ router.post('/batch', async (req, res) => {
             throw new Error('该设备已存在同名网卡');
           }
 
-          const autoNicId = cardData.nicId || `NIC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+          const autoNicId =
+            cardData.nicId || `NIC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-          await NetworkCard.create({
-            nicId: autoNicId,
-            deviceId: cardData.deviceId,
-            name: cardData.name,
-            slotNumber: cardData.slotNumber,
-            model: cardData.model,
-            manufacturer: cardData.manufacturer,
-            description: cardData.description,
-            status: cardData.status || 'normal',
-            portCount: 0
-          }, { transaction });
+          await NetworkCard.create(
+            {
+              nicId: autoNicId,
+              deviceId: cardData.deviceId,
+              name: cardData.name,
+              slotNumber: cardData.slotNumber,
+              model: cardData.model,
+              manufacturer: cardData.manufacturer,
+              description: cardData.description,
+              status: cardData.status || 'normal',
+              portCount: 0,
+            },
+            { transaction }
+          );
 
           results.success++;
         } catch (error) {
@@ -319,7 +345,7 @@ router.post('/batch', async (req, res) => {
             index: i + 1,
             deviceId: cardData.deviceId,
             name: cardData.name,
-            error: error.message
+            error: error.message,
           });
         }
       }
@@ -339,7 +365,7 @@ router.post('/batch', async (req, res) => {
 router.put('/:nicId', async (req, res) => {
   try {
     const [updated] = await NetworkCard.update(req.body, {
-      where: { nicId: req.params.nicId }
+      where: { nicId: req.params.nicId },
     });
 
     if (updated) {
@@ -348,9 +374,9 @@ router.put('/:nicId', async (req, res) => {
           {
             model: Device,
             as: 'device',
-            attributes: ['deviceId', 'name', 'type']
-          }
-        ]
+            attributes: ['deviceId', 'name', 'type'],
+          },
+        ],
       });
       res.json(networkCard);
     } else {
@@ -368,13 +394,13 @@ router.delete('/:nicId', async (req, res) => {
 
     const portCount = await DevicePort.count({ where: { nicId } });
     if (portCount > 0) {
-      return res.status(400).json({ 
-        error: `该网卡下还有 ${portCount} 个端口，请先删除或转移端口后再删除网卡` 
+      return res.status(400).json({
+        error: `该网卡下还有 ${portCount} 个端口，请先删除或转移端口后再删除网卡`,
       });
     }
 
     const deleted = await NetworkCard.destroy({
-      where: { nicId }
+      where: { nicId },
     });
 
     if (deleted) {

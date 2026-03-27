@@ -34,7 +34,7 @@ export const useDangerousOperation = () => {
     const entityLabel = ENTITY_LABELS[entityType] || entityType;
     const operationLabel = OPERATION_LABELS[operationType] || operationType;
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const modalKey = `dangerous-${Date.now()}`;
 
       const handleOk = () => {
@@ -74,14 +74,21 @@ export const useDangerousOperation = () => {
               }
               description={
                 <Paragraph style={{ marginBottom: 0 }}>
-                  {description || `您即将${operationLabel} ${itemCount > 1 ? `${itemCount} 个` : '1 个'}${entityLabel}。`}
+                  {description ||
+                    `您即将${operationLabel} ${itemCount > 1 ? `${itemCount} 个` : '1 个'}${entityLabel}。`}
                   <br />
                   <Text type="secondary" style={{ fontSize: 12 }}>
                     此操作不可逆，一旦删除将无法恢复。
                   </Text>
                 </Paragraph>
               }
-              type={riskLevel === RISK_LEVEL.EXTREME ? 'error' : riskLevel === RISK_LEVEL.HIGH ? 'warning' : 'info'}
+              type={
+                riskLevel === RISK_LEVEL.EXTREME
+                  ? 'error'
+                  : riskLevel === RISK_LEVEL.HIGH
+                    ? 'warning'
+                    : 'info'
+              }
               style={{
                 backgroundColor: config.bgColor,
                 borderColor: config.borderColor,
@@ -106,7 +113,11 @@ export const useDangerousOperation = () => {
                 <Alert
                   message={
                     <Text>
-                      为确认此操作，请输入 <Text code strong>CONFIRM</Text>：
+                      为确认此操作，请输入{' '}
+                      <Text code strong>
+                        CONFIRM
+                      </Text>
+                      ：
                     </Text>
                   }
                   type="error"
@@ -115,7 +126,7 @@ export const useDangerousOperation = () => {
                 <Input
                   id={`keyword-input-${modalKey}`}
                   placeholder="请输入 CONFIRM"
-                  onChange={(e) => {
+                  onChange={e => {
                     const inputValue = e.target.value;
                     const okButton = document.querySelector('.ant-modal-confirm .ant-btn-primary');
                     if (okButton) {
@@ -212,7 +223,7 @@ export const useDangerousOperation = () => {
   return { confirm, logOperation };
 };
 
-export const confirmDangerousOperation = async (options) => {
+export const confirmDangerousOperation = async options => {
   const hook = useDangerousOperation();
   return hook.confirm(options);
 };

@@ -69,11 +69,7 @@ import {
   BatchStatusModal,
 } from '../components/device';
 import { useDebounce } from '../hooks/useDebounce';
-import {
-  getDeviceTypeIcon,
-  getStatusConfig,
-  processDeviceData,
-} from '../utils/deviceUtils.jsx';
+import { getDeviceTypeIcon, getStatusConfig, processDeviceData } from '../utils/deviceUtils.jsx';
 
 const { Option } = Select;
 
@@ -165,7 +161,7 @@ function DeviceManagement() {
         } else {
           setAllDevices(processedDevices);
         }
-        setPagination((prev) => ({ ...prev, current: page, pageSize, total }));
+        setPagination(prev => ({ ...prev, current: page, pageSize, total }));
         hasMoreRef.current = page * pageSize < total;
       } catch (error) {
         message.error('获取设备列表失败');
@@ -183,7 +179,7 @@ function DeviceManagement() {
       setLoadingFields(true);
       const response = await axios.get('/api/deviceFields');
       let fields = response.data.sort((a, b) => a.order - b.order);
-      
+
       // 补充缺失的 options（状态和设备类型）
       fields = fields.map(field => {
         if (field.fieldName === 'type' && !field.options) {
@@ -191,12 +187,14 @@ function DeviceManagement() {
           return { ...field, options: defaultTypeField?.options || [] };
         }
         if (field.fieldName === 'status' && !field.options) {
-          const defaultStatusField = DEFAULT_DEVICE_FIELDS_LOCAL.find(f => f.fieldName === 'status');
+          const defaultStatusField = DEFAULT_DEVICE_FIELDS_LOCAL.find(
+            f => f.fieldName === 'status'
+          );
           return { ...field, options: defaultStatusField?.options || [] };
         }
         return field;
       });
-      
+
       setDeviceFields(fields);
     } catch (error) {
       message.error('获取字段配置失败');
@@ -275,7 +273,13 @@ function DeviceManagement() {
 
   const handleLoadMoreDevices = useCallback(() => {
     if (!hasMoreRef.current || isLoadingRef.current || deviceLoadingMore) return;
-    if (debouncedKeyword || status !== 'all' || type !== 'all' || roomId !== 'all' || rackId !== 'all') {
+    if (
+      debouncedKeyword ||
+      status !== 'all' ||
+      type !== 'all' ||
+      roomId !== 'all' ||
+      rackId !== 'all'
+    ) {
       return;
     }
     isLoadingRef.current = true;
@@ -283,7 +287,17 @@ function DeviceManagement() {
     fetchDevices(nextPage, pagination.pageSize, true).then(() => {
       isLoadingRef.current = false;
     });
-  }, [pagination.current, pagination.pageSize, debouncedKeyword, status, type, roomId, rackId, deviceLoadingMore, fetchDevices]);
+  }, [
+    pagination.current,
+    pagination.pageSize,
+    debouncedKeyword,
+    status,
+    type,
+    roomId,
+    rackId,
+    deviceLoadingMore,
+    fetchDevices,
+  ]);
 
   useEffect(() => {
     if (!loadMoreRef.current) return;
@@ -291,7 +305,13 @@ function DeviceManagement() {
     const observer = new IntersectionObserver(
       entries => {
         if (entries[0].isIntersecting && hasMoreRef.current && !deviceLoadingMore) {
-          if (!debouncedKeyword && status === 'all' && type === 'all' && roomId === 'all' && rackId === 'all') {
+          if (
+            !debouncedKeyword &&
+            status === 'all' &&
+            type === 'all' &&
+            roomId === 'all' &&
+            rackId === 'all'
+          ) {
             handleLoadMoreDevices();
           }
         }
@@ -316,7 +336,7 @@ function DeviceManagement() {
     setEditingDevice(null);
   };
 
-  const handleSubmit = async (deviceData) => {
+  const handleSubmit = async deviceData => {
     try {
       if (editingDevice) {
         await axios.put(`/api/devices/${editingDevice.deviceId}`, deviceData);
@@ -336,7 +356,7 @@ function DeviceManagement() {
     }
   };
 
-  const handleSearch = (values) => {
+  const handleSearch = values => {
     setSearching(true);
 
     setKeyword(values.keyword || '');
@@ -345,7 +365,7 @@ function DeviceManagement() {
     setRoomId(values.roomId || 'all');
     setRackId(values.rackId || 'all');
 
-    setPagination((prev) => ({ ...prev, current: 1 }));
+    setPagination(prev => ({ ...prev, current: 1 }));
 
     setTimeout(() => setSearching(false), 300);
   };
@@ -363,7 +383,7 @@ function DeviceManagement() {
     setTimeout(() => setSearching(false), 300);
   };
 
-  const handleTableChange = (newPagination) => {
+  const handleTableChange = newPagination => {
     setPagination(newPagination);
 
     const start = (newPagination.current - 1) * newPagination.pageSize;
@@ -453,7 +473,7 @@ function DeviceManagement() {
     });
   };
 
-  const handleDelete = async (deviceId) => {
+  const handleDelete = async deviceId => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个设备吗？',
@@ -473,18 +493,18 @@ function DeviceManagement() {
     });
   };
 
-  const handleShowDetail = (device) => {
+  const handleShowDetail = device => {
     setSelectedDevice(device);
     setDetailModalVisible(true);
   };
 
-  const handleViewDeviceTickets = (device) => {
+  const handleViewDeviceTickets = device => {
     navigate(
       `/tickets?deviceId=${device.deviceId}&deviceName=${encodeURIComponent(device.name)}&serialNumber=${encodeURIComponent(device.serialNumber || '')}&view=true`
     );
   };
 
-  const handleCreateTicketForDevice = (device) => {
+  const handleCreateTicketForDevice = device => {
     navigate(
       `/tickets?deviceId=${device.deviceId}&deviceName=${encodeURIComponent(device.name)}&serialNumber=${encodeURIComponent(device.serialNumber || '')}&create=true`
     );
@@ -498,7 +518,7 @@ function DeviceManagement() {
     setBatchStatusModalVisible(true);
   };
 
-  const handleBatchStatusChange = async (newStatus) => {
+  const handleBatchStatusChange = async newStatus => {
     setBatchStatusLoading(true);
     try {
       const response = await axios.put('/api/devices/batch-status', {
@@ -532,9 +552,9 @@ function DeviceManagement() {
     if (scope === 'selected') {
       deviceIds = selectedDevices;
     } else if (scope === 'currentPage') {
-      deviceIds = allDevices.map((device) => device.deviceId);
+      deviceIds = allDevices.map(device => device.deviceId);
     } else if (scope === 'all') {
-      deviceIds = allDevices.map((device) => device.deviceId);
+      deviceIds = allDevices.map(device => device.deviceId);
     }
 
     if (deviceIds.length === 0) {
@@ -543,7 +563,7 @@ function DeviceManagement() {
     }
 
     const params = new URLSearchParams();
-    deviceIds.forEach((id) => params.append('deviceIds', id));
+    deviceIds.forEach(id => params.append('deviceIds', id));
     params.append('format', format);
 
     const response = await axios.get(`/api/devices/enhanced-export?${params.toString()}`, {
@@ -575,7 +595,7 @@ function DeviceManagement() {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        onUploadProgress: (progressEvent) => {
+        onUploadProgress: progressEvent => {
           const progress = Math.round((progressEvent.loaded * 50) / progressEvent.total);
           callbacks.onProgress(Math.min(progress, 50), '正在上传文件...');
         },
@@ -617,7 +637,7 @@ function DeviceManagement() {
           Array.isArray(data.errors) &&
           data.errors.length > 0
         ) {
-          errorDetails = data.errors.map((err) => ({
+          errorDetails = data.errors.map(err => ({
             row: err.row || 0,
             error: err.error || err.message || '服务器内部错误',
           }));
@@ -645,7 +665,7 @@ function DeviceManagement() {
     }
   };
 
-  const handleSaveFieldConfig = async (updatedFields) => {
+  const handleSaveFieldConfig = async updatedFields => {
     try {
       const response = await axios.post('/api/deviceFields/config', updatedFields);
       setDeviceFields(response.data);
@@ -657,26 +677,26 @@ function DeviceManagement() {
     }
   };
 
-  const handleResetFieldConfig = (defaultFields) => {
+  const handleResetFieldConfig = defaultFields => {
     setDeviceFields(defaultFields);
   };
 
-  const handleSelectionChange = (selectedRowKeys) => {
+  const handleSelectionChange = selectedRowKeys => {
     setSelectedDevices(selectedRowKeys);
     setSelectAll(selectedRowKeys.length === allDevices.length && allDevices.length > 0);
   };
 
-  const handleHeaderCellResize = (key) => (column) => ({
+  const handleHeaderCellResize = key => column => ({
     width: column.width,
-    onResize: (width) => {
-      setColumnWidths((prev) => ({ ...prev, [key]: width }));
+    onResize: width => {
+      setColumnWidths(prev => ({ ...prev, [key]: width }));
     },
   });
 
   const columns = useMemo(() => {
     const generatedColumns = [];
 
-    deviceFields.forEach((field) => {
+    deviceFields.forEach(field => {
       if (!field.visible) return;
 
       if (field.fieldName === 'rackId') {
@@ -701,7 +721,7 @@ function DeviceManagement() {
           key: field.fieldName,
           width: columnWidths[field.fieldName] || 100,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
-          render: (type) => (
+          render: type => (
             <Space>
               {getDeviceTypeIcon(type)}
               <span>{TYPE_MAP[type]}</span>
@@ -715,7 +735,7 @@ function DeviceManagement() {
           key: field.fieldName,
           width: columnWidths[field.fieldName] || 90,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
-          render: (status) => {
+          render: status => {
             const config = STATUS_MAP[status] || { text: status, color: 'default' };
             const statusStyles = {
               running: { bg: '#f6ffed', border: '#52c41a', text: '#389e0d' },
@@ -724,7 +744,11 @@ function DeviceManagement() {
               fault: { bg: '#fff2f0', border: '#ff4d4f', text: '#cf1322' },
               idle: { bg: '#E6FFFA', border: '#36cfc9', text: '#08979d' },
             };
-            const style = statusStyles[status] || { bg: '#fafafa', border: '#d9d9d9', text: '#595959' };
+            const style = statusStyles[status] || {
+              bg: '#fafafa',
+              border: '#d9d9d9',
+              text: '#595959',
+            };
             return (
               <Tag
                 style={{
@@ -752,7 +776,7 @@ function DeviceManagement() {
           key: field.fieldName,
           width: columnWidths[field.fieldName] || 120,
           onHeaderCell: handleHeaderCellResize(field.fieldName),
-          render: (date) => {
+          render: date => {
             if (!date) return '';
 
             const dateObj = new Date(date);
@@ -809,8 +833,8 @@ function DeviceManagement() {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}
-              onMouseEnter={(e) => (e.target.style.textDecoration = 'underline')}
-              onMouseLeave={(e) => (e.target.style.textDecoration = 'none')}
+              onMouseEnter={e => (e.target.style.textDecoration = 'underline')}
+              onMouseLeave={e => (e.target.style.textDecoration = 'none')}
             >
               {value || '-'}
             </a>
@@ -993,17 +1017,38 @@ function DeviceManagement() {
           style={{ width: '100%' }}
           className="filter-form"
         >
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: designTokens.spacing.md, alignItems: 'center', width: '100%' }}>
-            <div style={{
+          <div
+            style={{
               display: 'flex',
+              flexWrap: 'wrap',
+              gap: designTokens.spacing.md,
               alignItems: 'center',
-              gap: designTokens.spacing.sm,
-              padding: '0 12px',
-              borderRight: `1px solid ${designTokens.colors.border.light}`,
-              marginRight: 4,
-            }}>
-              <FilterOutlined style={{ color: designTokens.colors.primary.main, fontSize: '16px' }} />
-              <span style={{ fontSize: '13px', fontWeight: 500, color: designTokens.colors.text.secondary, whiteSpace: 'nowrap' }}>筛选</span>
+              width: '100%',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: designTokens.spacing.sm,
+                padding: '0 12px',
+                borderRight: `1px solid ${designTokens.colors.border.light}`,
+                marginRight: 4,
+              }}
+            >
+              <FilterOutlined
+                style={{ color: designTokens.colors.primary.main, fontSize: '16px' }}
+              />
+              <span
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: designTokens.colors.text.secondary,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                筛选
+              </span>
             </div>
 
             <Form.Item name="keyword" style={{ margin: 0 }}>
@@ -1017,7 +1062,7 @@ function DeviceManagement() {
                   transition: `all ${designTokens.transitions.fast}`,
                 }}
                 value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
+                onChange={e => setKeyword(e.target.value)}
                 allowClear
               />
             </Form.Item>
@@ -1064,10 +1109,14 @@ function DeviceManagement() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                color: advancedSearchVisible ? designTokens.colors.primary.main : designTokens.colors.text.secondary,
+                color: advancedSearchVisible
+                  ? designTokens.colors.primary.main
+                  : designTokens.colors.text.secondary,
                 fontWeight: 500,
                 borderRadius: designTokens.borderRadius.medium,
-                background: advancedSearchVisible ? `${designTokens.colors.primary.main}10` : 'transparent',
+                background: advancedSearchVisible
+                  ? `${designTokens.colors.primary.main}10`
+                  : 'transparent',
                 transition: `all ${designTokens.transitions.fast}`,
               }}
             >
@@ -1117,30 +1166,43 @@ function DeviceManagement() {
           </div>
 
           {advancedSearchVisible && (
-            <div style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: designTokens.spacing.md,
-              padding: `${designTokens.spacing.md}px 0`,
-              borderTop: `1px dashed ${designTokens.colors.border.light}`,
-              marginTop: designTokens.spacing.sm,
-            }}>
-              <div style={{
+            <div
+              style={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: designTokens.spacing.sm,
-                padding: '0 12px',
-                borderRight: `1px solid ${designTokens.colors.border.light}`,
-                marginRight: 4,
-              }}>
+                flexWrap: 'wrap',
+                gap: designTokens.spacing.md,
+                padding: `${designTokens.spacing.md}px 0`,
+                borderTop: `1px dashed ${designTokens.colors.border.light}`,
+                marginTop: designTokens.spacing.sm,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: designTokens.spacing.sm,
+                  padding: '0 12px',
+                  borderRight: `1px solid ${designTokens.colors.border.light}`,
+                  marginRight: 4,
+                }}
+              >
                 <EnvironmentOutlined style={{ color: '#3b82f6', fontSize: '16px' }} />
-                <span style={{ fontSize: '13px', fontWeight: 500, color: designTokens.colors.text.secondary, whiteSpace: 'nowrap' }}>位置筛选</span>
+                <span
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: designTokens.colors.text.secondary,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  位置筛选
+                </span>
               </div>
 
               <Form.Item name="roomId" style={{ margin: 0 }}>
                 <Select
                   value={roomId}
-                  onChange={(value) => {
+                  onChange={value => {
                     setRoomId(value);
                     setRackId('all');
                   }}
@@ -1149,7 +1211,7 @@ function DeviceManagement() {
                   suffixIcon={<EnvironmentOutlined style={{ color: '#3b82f6' }} />}
                 >
                   <Option value="all">所有机房</Option>
-                  {rooms.map((room) => (
+                  {rooms.map(room => (
                     <Option key={room.roomId} value={room.roomId}>
                       {room.name}
                     </Option>
@@ -1169,8 +1231,8 @@ function DeviceManagement() {
                 >
                   <Option value="all">所有机柜</Option>
                   {racks
-                    .filter((rack) => roomId === 'all' || rack.roomId === roomId)
-                    .map((rack) => (
+                    .filter(rack => roomId === 'all' || rack.roomId === roomId)
+                    .map(rack => (
                       <Option key={rack.rackId} value={rack.rackId}>
                         {rack.name}
                       </Option>
@@ -1217,7 +1279,7 @@ function DeviceManagement() {
                 showSizeChanger: true,
                 showQuickJumper: true,
                 pageSizeOptions: ['10', '20', '30', '50', '100'],
-                showTotal: (total) => `共 ${total} 条记录`,
+                showTotal: total => `共 ${total} 条记录`,
                 style: { marginTop: '16px' },
               }}
               onChange={handleTableChange}
@@ -1243,7 +1305,7 @@ function DeviceManagement() {
                     key: 'all',
                     text: '全选',
                     onSelect: () => {
-                      const allIds = allDevices.map((device) => device.deviceId);
+                      const allIds = allDevices.map(device => device.deviceId);
                       setSelectedDevices(allIds);
                       setSelectAll(true);
                     },
@@ -1252,8 +1314,8 @@ function DeviceManagement() {
                     key: 'invert',
                     text: '反选',
                     onSelect: () => {
-                      const visibleIds = allDevices.map((device) => device.deviceId);
-                      const newSelected = visibleIds.filter((id) => !selectedDevices.includes(id));
+                      const visibleIds = allDevices.map(device => device.deviceId);
+                      const newSelected = visibleIds.filter(id => !selectedDevices.includes(id));
                       setSelectedDevices(newSelected);
                       setSelectAll(newSelected.length === allDevices.length);
                     },
@@ -1268,11 +1330,11 @@ function DeviceManagement() {
                   },
                 ],
               }}
-              onRow={(record) => ({
+              onRow={record => ({
                 onClick: () =>
                   handleSelectionChange(
                     selectedDevices.includes(record.deviceId)
-                      ? selectedDevices.filter((id) => id !== record.deviceId)
+                      ? selectedDevices.filter(id => id !== record.deviceId)
                       : [...selectedDevices, record.deviceId]
                   ),
               })}
@@ -1283,11 +1345,16 @@ function DeviceManagement() {
                 return index % 2 === 0 ? 'ant-table-row-even' : 'ant-table-row-odd';
               }}
             />
-            {hasMoreRef.current && !debouncedKeyword && status === 'all' && type === 'all' && roomId === 'all' && rackId === 'all' && (
-              <div ref={loadMoreRef} style={{ textAlign: 'center', padding: '20px' }}>
-                {deviceLoadingMore && <Spin tip="加载更多设备..." />}
-              </div>
-            )}
+            {hasMoreRef.current &&
+              !debouncedKeyword &&
+              status === 'all' &&
+              type === 'all' &&
+              roomId === 'all' &&
+              rackId === 'all' && (
+                <div ref={loadMoreRef} style={{ textAlign: 'center', padding: '20px' }}>
+                  {deviceLoadingMore && <Spin tip="加载更多设备..." />}
+                </div>
+              )}
             {!hasMoreRef.current && allDevices.length > 0 && (
               <div style={{ textAlign: 'center', padding: '16px', color: '#999' }}>
                 已加载全部 {pagination.total} 个设备

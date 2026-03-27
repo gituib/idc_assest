@@ -371,15 +371,15 @@ function ConsumableManagement() {
           const workbook = XLSX.read(data, { type: 'array' });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
           const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-          
+
           if (jsonData.length < 2) {
             resolve([]);
             return;
           }
-          
+
           const headers = jsonData[0].map(h => String(h || '').trim());
           const result = [];
-          
+
           for (let i = 1; i < jsonData.length; i++) {
             const row = jsonData[i];
             const obj = {};
@@ -390,7 +390,7 @@ function ConsumableManagement() {
               result.push(obj);
             }
           }
-          
+
           resolve(result);
         } catch (error) {
           reject(error);
@@ -415,7 +415,11 @@ function ConsumableManagement() {
       if (!category) {
         errors.push({ row: rowNum, field: '分类', message: '分类为必填项' });
       } else if (validCategoryNames.length > 0 && !validCategoryNames.includes(category)) {
-        errors.push({ row: rowNum, field: '分类', message: `分类"${category}"不存在，请使用系统已有的分类` });
+        errors.push({
+          row: rowNum,
+          field: '分类',
+          message: `分类"${category}"不存在，请使用系统已有的分类`,
+        });
       }
     });
     return errors;
@@ -427,21 +431,21 @@ function ConsumableManagement() {
       try {
         setImporting(true);
         setImportPhase('正在解析文件...');
-        
+
         const parsedData = await parseFile(file.originFileObj);
-        
+
         if (parsedData.length === 0) {
           message.warning('文件中没有有效数据');
           setImporting(false);
           return;
         }
-        
+
         const validationErrors = validateImportData(parsedData, categories);
         setImportValidationErrors(validationErrors);
         setImportPreview(parsedData);
         setImportFile(file.originFileObj);
         setImportStep('preview');
-        
+
         if (validationErrors.length > 0) {
           message.warning(`数据校验发现 ${validationErrors.length} 个问题，请检查预览`);
         } else {
@@ -493,9 +497,9 @@ function ConsumableManagement() {
       setImportProgress(30);
       setImportPhase('正在提交到服务器...');
 
-      const response = await axios.post('/api/consumables/import', { 
-        items: importPreview, 
-        mode: importMode 
+      const response = await axios.post('/api/consumables/import', {
+        items: importPreview,
+        mode: importMode,
       });
 
       setImportProgress(70);
@@ -506,7 +510,7 @@ function ConsumableManagement() {
       setImportStep('result');
       setImportProgress(100);
       setImportPhase('导入完成');
-      
+
       if (results.failed > 0) {
         message.warning(response.data.message);
       } else {
@@ -515,7 +519,7 @@ function ConsumableManagement() {
           icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
         });
       }
-      
+
       fetchConsumables();
     } catch (error) {
       message.error('导入失败，请检查网络连接或服务器状态');
@@ -528,49 +532,49 @@ function ConsumableManagement() {
   const downloadTemplate = () => {
     const template = [
       {
-        '耗材ID': '',
-        '名称': '示例耗材-网络模块',
-        '分类': '光模块',
-        '单位': '个',
-        '当前库存': 100,
-        '最小库存': 10,
-        '最大库存': 500,
-        '单价': 5.00,
-        '供应商': 'XX公司',
-        '存放位置': 'A柜-01层',
-        '描述': '测试数据',
-        'SN序列号': 'SN001,SN002,SN003',
-        '状态': 'active'
-      }
+        耗材ID: '',
+        名称: '示例耗材-网络模块',
+        分类: '光模块',
+        单位: '个',
+        当前库存: 100,
+        最小库存: 10,
+        最大库存: 500,
+        单价: 5.0,
+        供应商: 'XX公司',
+        存放位置: 'A柜-01层',
+        描述: '测试数据',
+        SN序列号: 'SN001,SN002,SN003',
+        状态: 'active',
+      },
     ];
-    
+
     const ws = XLSX.utils.json_to_sheet(template);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '耗材导入模板');
     XLSX.writeFile(wb, '耗材导入模板.xlsx');
-    
+
     message.success('模板下载成功');
   };
 
   const downloadFailedRecords = () => {
     if (!importResult || !importResult.details) return;
-    
+
     const failedRecords = importResult.details
       .filter(d => d.status === 'failed')
       .map(d => {
         const original = importPreview[d.row - 1] || {};
         return {
-          '行号': d.row,
-          '错误原因': d.error,
-          ...original
+          行号: d.row,
+          错误原因: d.error,
+          ...original,
         };
       });
-    
+
     if (failedRecords.length === 0) {
       message.info('没有失败记录');
       return;
     }
-    
+
     const ws = XLSX.utils.json_to_sheet(failedRecords);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '失败记录');
@@ -632,7 +636,7 @@ function ConsumableManagement() {
     [stockRecord, stockType, fetchConsumables, selectedSnList]
   );
 
-  const showScanModal = useCallback((mode) => {
+  const showScanModal = useCallback(mode => {
     setScanMode(mode);
     setScanValue('');
     setScannedSnList([]);
@@ -651,117 +655,136 @@ function ConsumableManagement() {
     setScanChecking(false);
   }, []);
 
-  const handleScanKeyDown = useCallback(async (e) => {
-    if (e.key === 'Enter' && scanValue.trim()) {
-      e.preventDefault();
-      const code = scanValue.trim();
-      
-      if (scanMode === 'add') {
-        setScanChecking(true);
-        try {
-          const res = await axios.get(`/api/consumables/by-sn/${encodeURIComponent(code)}`);
-          if (res.data.found) {
-            const existingConsumable = res.data.consumable;
-            Modal.confirm({
-              title: 'SN已存在',
-              content: (
-                <div>
-                  <p>该SN已关联耗材：<strong>{existingConsumable.name}</strong></p>
-                  <p>分类：{existingConsumable.category}</p>
-                  <p>当前库存：{existingConsumable.currentStock} {existingConsumable.unit}</p>
-                  <p style={{ marginTop: 12, color: '#1890ff' }}>是否为该耗材入库？</p>
-                </div>
-              ),
-              okText: '入库',
-              cancelText: '关闭',
-              onOk: () => {
-                handleScanCancel();
-                setModalVisible(false);
-                showStockModal(existingConsumable, 'in');
-                setSelectedSnList([code]);
-                stockForm.setFieldsValue({ quantity: 1 });
-              },
-              onCancel: () => {
-                setScanValue('');
-                scanInputRef.current?.focus();
-              }
-            });
-          } else {
-            if (!snList.includes(code)) {
-              setSnList(prev => [...prev, code]);
-              const currentStock = form.getFieldValue('currentStock') || 0;
-              form.setFieldsValue({ currentStock: currentStock + 1 });
-              message.success(`已添加SN: ${code}`);
+  const handleScanKeyDown = useCallback(
+    async e => {
+      if (e.key === 'Enter' && scanValue.trim()) {
+        e.preventDefault();
+        const code = scanValue.trim();
+
+        if (scanMode === 'add') {
+          setScanChecking(true);
+          try {
+            const res = await axios.get(`/api/consumables/by-sn/${encodeURIComponent(code)}`);
+            if (res.data.found) {
+              const existingConsumable = res.data.consumable;
+              Modal.confirm({
+                title: 'SN已存在',
+                content: (
+                  <div>
+                    <p>
+                      该SN已关联耗材：<strong>{existingConsumable.name}</strong>
+                    </p>
+                    <p>分类：{existingConsumable.category}</p>
+                    <p>
+                      当前库存：{existingConsumable.currentStock} {existingConsumable.unit}
+                    </p>
+                    <p style={{ marginTop: 12, color: '#1890ff' }}>是否为该耗材入库？</p>
+                  </div>
+                ),
+                okText: '入库',
+                cancelText: '关闭',
+                onOk: () => {
+                  handleScanCancel();
+                  setModalVisible(false);
+                  showStockModal(existingConsumable, 'in');
+                  setSelectedSnList([code]);
+                  stockForm.setFieldsValue({ quantity: 1 });
+                },
+                onCancel: () => {
+                  setScanValue('');
+                  scanInputRef.current?.focus();
+                },
+              });
             } else {
-              message.warning(`SN已在列表中: ${code}`);
+              if (!snList.includes(code)) {
+                setSnList(prev => [...prev, code]);
+                const currentStock = form.getFieldValue('currentStock') || 0;
+                form.setFieldsValue({ currentStock: currentStock + 1 });
+                message.success(`已添加SN: ${code}`);
+              } else {
+                message.warning(`SN已在列表中: ${code}`);
+              }
+              setScanValue('');
+              scanInputRef.current?.focus();
             }
-            setScanValue('');
-            scanInputRef.current?.focus();
+          } catch (error) {
+            message.error('查询SN失败');
+            console.error('查询SN失败:', error);
+          } finally {
+            setScanChecking(false);
           }
-        } catch (error) {
-          message.error('查询SN失败');
-          console.error('查询SN失败:', error);
-        } finally {
-          setScanChecking(false);
-        }
-      } else if (scanMode === 'in') {
-        if (!scannedSnList.includes(code)) {
-          setScannedSnList(prev => [...prev, code]);
-          message.success(`已添加SN: ${code}`);
-        } else {
-          message.warning(`SN已存在: ${code}`);
-        }
-        setScanValue('');
-        scanInputRef.current?.focus();
-      } else if (scanMode === 'out') {
-        setScanChecking(true);
-        try {
-          const res = await axios.get(`/api/consumables/by-sn/${encodeURIComponent(code)}`);
-          if (res.data.found) {
-            handleScanCancel();
-            showStockModal(res.data.consumable, 'out');
-            setSelectedSnList([code]);
-            stockForm.setFieldsValue({ quantity: 1 });
+        } else if (scanMode === 'in') {
+          if (!scannedSnList.includes(code)) {
+            setScannedSnList(prev => [...prev, code]);
+            message.success(`已添加SN: ${code}`);
           } else {
-            message.warning('未找到该SN对应的耗材');
-            setScanValue('');
-            scanInputRef.current?.focus();
+            message.warning(`SN已存在: ${code}`);
           }
-        } catch (error) {
-          message.error('查询SN失败');
-          console.error('查询SN失败:', error);
-        } finally {
-          setScanChecking(false);
+          setScanValue('');
+          scanInputRef.current?.focus();
+        } else if (scanMode === 'out') {
+          setScanChecking(true);
+          try {
+            const res = await axios.get(`/api/consumables/by-sn/${encodeURIComponent(code)}`);
+            if (res.data.found) {
+              handleScanCancel();
+              showStockModal(res.data.consumable, 'out');
+              setSelectedSnList([code]);
+              stockForm.setFieldsValue({ quantity: 1 });
+            } else {
+              message.warning('未找到该SN对应的耗材');
+              setScanValue('');
+              scanInputRef.current?.focus();
+            }
+          } catch (error) {
+            message.error('查询SN失败');
+            console.error('查询SN失败:', error);
+          } finally {
+            setScanChecking(false);
+          }
         }
       }
-    }
-  }, [scanMode, scanValue, scannedSnList, handleScanCancel, showModal, form, showStockModal, stockForm]);
+    },
+    [
+      scanMode,
+      scanValue,
+      scannedSnList,
+      handleScanCancel,
+      showModal,
+      form,
+      showStockModal,
+      stockForm,
+    ]
+  );
 
-  const handleScanInSubmit = useCallback(async (consumableId) => {
-    if (scannedSnList.length === 0) {
-      message.warning('请先扫描SN序列号');
-      return;
-    }
-    try {
-      await axios.post('/api/consumables/quick-inout', {
-        consumableId,
-        type: 'in',
-        quantity: scannedSnList.length,
-        operator: '系统管理员',
-        reason: '扫码入库',
-        snList: scannedSnList,
-      });
-      message.success({
-        content: `成功入库 ${scannedSnList.length} 个SN`,
-        icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
-      });
-      handleScanCancel();
-      fetchConsumables();
-    } catch (error) {
-      message.error(error.response?.data?.error || '入库操作失败');
-      console.error('入库失败:', error);
-    }
-  }, [scannedSnList, handleScanCancel, fetchConsumables]);
+  const handleScanInSubmit = useCallback(
+    async consumableId => {
+      if (scannedSnList.length === 0) {
+        message.warning('请先扫描SN序列号');
+        return;
+      }
+      try {
+        await axios.post('/api/consumables/quick-inout', {
+          consumableId,
+          type: 'in',
+          quantity: scannedSnList.length,
+          operator: '系统管理员',
+          reason: '扫码入库',
+          snList: scannedSnList,
+        });
+        message.success({
+          content: `成功入库 ${scannedSnList.length} 个SN`,
+          icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+        });
+        handleScanCancel();
+        fetchConsumables();
+      } catch (error) {
+        message.error(error.response?.data?.error || '入库操作失败');
+        console.error('入库失败:', error);
+      }
+    },
+    [scannedSnList, handleScanCancel, fetchConsumables]
+  );
 
   const columns = useMemo(
     () => [
@@ -770,14 +793,20 @@ function ConsumableManagement() {
         dataIndex: 'name',
         key: 'name',
         width: 150,
-        render: text => <span style={{ fontWeight: 500, color: designTokens.colors.neutral[800] }}>{text}</span>,
+        render: text => (
+          <span style={{ fontWeight: 500, color: designTokens.colors.neutral[800] }}>{text}</span>
+        ),
       },
       {
         title: '分类',
         dataIndex: 'category',
         key: 'category',
         width: 120,
-        render: text => <Tag color="blue" style={{ borderRadius: '4px' }}>{text}</Tag>,
+        render: text => (
+          <Tag color="blue" style={{ borderRadius: '4px' }}>
+            {text}
+          </Tag>
+        ),
       },
       {
         title: '单位',
@@ -794,7 +823,7 @@ function ConsumableManagement() {
           const snList = Array.isArray(record.snList) ? record.snList : [];
           const snCount = snList.length;
           const stock = record.currentStock || 0;
-          
+
           if (snCount === 0) {
             return (
               <Tag color="default" style={{ borderRadius: '4px' }}>
@@ -802,7 +831,7 @@ function ConsumableManagement() {
               </Tag>
             );
           }
-          
+
           const snContent = (
             <div style={{ maxHeight: '200px', overflowY: 'auto', maxWidth: '300px' }}>
               {snList.map((sn, index) => (
@@ -812,18 +841,15 @@ function ConsumableManagement() {
               ))}
             </div>
           );
-          
+
           return (
-            <Popover 
-              content={snContent} 
+            <Popover
+              content={snContent}
               title={`SN 列表 (${snCount}个)`}
               trigger="click"
               placement="right"
             >
-              <Tag 
-                color="purple" 
-                style={{ borderRadius: '4px', cursor: 'pointer' }}
-              >
+              <Tag color="purple" style={{ borderRadius: '4px', cursor: 'pointer' }}>
                 {snCount}/{stock} 🔍
               </Tag>
             </Popover>
@@ -841,10 +867,14 @@ function ConsumableManagement() {
             <Badge
               status={isLow ? 'error' : 'success'}
               text={
-                <span style={{ 
-                  color: isLow ? designTokens.colors.error.main : designTokens.colors.success.main, 
-                  fontWeight: 600 
-                }}>
+                <span
+                  style={{
+                    color: isLow
+                      ? designTokens.colors.error.main
+                      : designTokens.colors.success.main,
+                    fontWeight: 600,
+                  }}
+                >
                   {value}
                 </span>
               }
@@ -909,7 +939,7 @@ function ConsumableManagement() {
         key: 'status',
         width: 100,
         render: value => (
-          <Tag 
+          <Tag
             color={value === 'active' ? 'success' : 'error'}
             style={{ borderRadius: '4px' }}
             icon={value === 'active' ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
@@ -950,8 +980,8 @@ function ConsumableManagement() {
               />
             </Tooltip>
             <Tooltip title="删除">
-              <Popconfirm 
-                title="确定删除该耗材?" 
+              <Popconfirm
+                title="确定删除该耗材?"
                 onConfirm={() => handleDelete(record.consumableId)}
                 okText="确定"
                 cancelText="取消"
@@ -982,9 +1012,9 @@ function ConsumableManagement() {
       variants={animations.container}
       initial="hidden"
       animate="visible"
-      style={{ 
-        padding: '24px', 
-        background: designTokens.colors.neutral[50], 
+      style={{
+        padding: '24px',
+        background: designTokens.colors.neutral[50],
         minHeight: '100vh',
       }}
     >
@@ -1007,8 +1037,12 @@ function ConsumableManagement() {
             <ShoppingOutlined />
           </div>
           <div>
-            <Title level={4} style={{ margin: 0, color: designTokens.colors.neutral[800] }}>耗材管理</Title>
-            <Text type="secondary" style={{ fontSize: '13px' }}>管理机房耗材的库存、入库和出库</Text>
+            <Title level={4} style={{ margin: 0, color: designTokens.colors.neutral[800] }}>
+              耗材管理
+            </Title>
+            <Text type="secondary" style={{ fontSize: '13px' }}>
+              管理机房耗材的库存、入库和出库
+            </Text>
           </div>
         </div>
       </motion.div>
@@ -1035,9 +1069,7 @@ function ConsumableManagement() {
             >
               <Row gutter={[16, 16]} align="middle">
                 <Col xs={24} sm={12} md={8} lg={8}>
-                  <div style={filterInputStyles.container}>
-                    搜索
-                  </div>
+                  <div style={filterInputStyles.container}>搜索</div>
                   <Input
                     placeholder={inputPlaceholders.searchConsumable}
                     value={keyword}
@@ -1050,9 +1082,7 @@ function ConsumableManagement() {
                 </Col>
 
                 <Col xs={24} sm={12} md={6} lg={5}>
-                  <div style={filterInputStyles.container}>
-                    分类
-                  </div>
+                  <div style={filterInputStyles.container}>分类</div>
                   <Select
                     placeholder={inputPlaceholders.category}
                     style={filterInputStyles.select}
@@ -1070,9 +1100,7 @@ function ConsumableManagement() {
                 </Col>
 
                 <Col xs={24} sm={12} md={6} lg={5}>
-                  <div style={filterInputStyles.container}>
-                    状态
-                  </div>
+                  <div style={filterInputStyles.container}>状态</div>
                   <Select
                     placeholder="选择状态"
                     style={filterInputStyles.select}
@@ -1086,14 +1114,16 @@ function ConsumableManagement() {
                 </Col>
 
                 <Col xs={24} sm={12} md={4} lg={6}>
-                  <div style={{ marginBottom: '6px', fontSize: '13px', color: 'transparent' }}>操作</div>
+                  <div style={{ marginBottom: '6px', fontSize: '13px', color: 'transparent' }}>
+                    操作
+                  </div>
                   <Space>
                     <Button
                       type="primary"
                       icon={<FilterOutlined />}
                       onClick={() => fetchConsumables()}
-                      style={{ 
-                        background: designTokens.colors.primary.gradient, 
+                      style={{
+                        background: designTokens.colors.primary.gradient,
                         border: 'none',
                         borderRadius: designTokens.borderRadius.sm,
                         height: '40px',
@@ -1102,8 +1132,8 @@ function ConsumableManagement() {
                       筛选
                     </Button>
                     <Tooltip title="重置筛选条件">
-                      <Button 
-                        icon={<ClearOutlined />} 
+                      <Button
+                        icon={<ClearOutlined />}
                         onClick={handleReset}
                         style={{ borderRadius: designTokens.borderRadius.sm, height: '40px' }}
                       />
@@ -1115,15 +1145,22 @@ function ConsumableManagement() {
           </div>
 
           {/* 操作按钮区域 */}
-          <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div
+            style={{
+              marginBottom: '20px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
             <Space size="middle">
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => showModal()}
                 size="large"
-                style={{ 
-                  background: designTokens.colors.primary.gradient, 
+                style={{
+                  background: designTokens.colors.primary.gradient,
                   border: 'none',
                   borderRadius: designTokens.borderRadius.sm,
                   boxShadow: designTokens.shadows.md,
@@ -1135,7 +1172,11 @@ function ConsumableManagement() {
                 icon={<ArrowDownOutlined />}
                 onClick={() => showScanModal('in')}
                 size="large"
-                style={{ borderRadius: designTokens.borderRadius.sm, color: designTokens.colors.success.main, borderColor: designTokens.colors.success.main }}
+                style={{
+                  borderRadius: designTokens.borderRadius.sm,
+                  color: designTokens.colors.success.main,
+                  borderColor: designTokens.colors.success.main,
+                }}
               >
                 扫码入库
               </Button>
@@ -1143,7 +1184,11 @@ function ConsumableManagement() {
                 icon={<ArrowUpOutlined />}
                 onClick={() => showScanModal('out')}
                 size="large"
-                style={{ borderRadius: designTokens.borderRadius.sm, color: designTokens.colors.error.main, borderColor: designTokens.colors.error.main }}
+                style={{
+                  borderRadius: designTokens.borderRadius.sm,
+                  color: designTokens.colors.error.main,
+                  borderColor: designTokens.colors.error.main,
+                }}
               >
                 扫码出库
               </Button>
@@ -1155,7 +1200,7 @@ function ConsumableManagement() {
               >
                 批量导入
               </Button>
-              <Button 
+              <Button
                 icon={<ExportOutlined />}
                 onClick={handleExport}
                 size="large"
@@ -1167,8 +1212,8 @@ function ConsumableManagement() {
 
             <Space>
               <Tooltip title="刷新数据">
-                <Button 
-                  icon={<ReloadOutlined />} 
+                <Button
+                  icon={<ReloadOutlined />}
                   onClick={() => fetchConsumables()}
                   loading={loading}
                   style={{ borderRadius: designTokens.borderRadius.sm }}
@@ -1192,7 +1237,13 @@ function ConsumableManagement() {
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description={
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '16px', color: designTokens.colors.neutral[600], marginBottom: '8px' }}>
+                    <div
+                      style={{
+                        fontSize: '16px',
+                        color: designTokens.colors.neutral[600],
+                        marginBottom: '8px',
+                      }}
+                    >
                       暂无耗材数据
                     </div>
                     <div style={{ fontSize: '13px', color: designTokens.colors.neutral[400] }}>
@@ -1205,8 +1256,8 @@ function ConsumableManagement() {
                   type="primary"
                   icon={<PlusOutlined />}
                   onClick={() => showModal()}
-                  style={{ 
-                    background: designTokens.colors.primary.gradient, 
+                  style={{
+                    background: designTokens.colors.primary.gradient,
                     border: 'none',
                     borderRadius: designTokens.borderRadius.sm,
                   }}
@@ -1233,7 +1284,7 @@ function ConsumableManagement() {
                 }}
                 onChange={pagination => fetchConsumables(pagination.current, pagination.pageSize)}
                 scroll={{ x: 1400 }}
-                style={{ 
+                style={{
                   borderRadius: designTokens.borderRadius.md,
                   overflow: 'hidden',
                 }}
@@ -1273,544 +1324,594 @@ function ConsumableManagement() {
         width={900}
         style={{ top: 20 }}
       >
-        <div 
-          style={{ 
-            maxHeight: '65vh', 
-            overflowY: 'auto', 
+        <div
+          style={{
+            maxHeight: '65vh',
+            overflowY: 'auto',
             padding: '24px',
             paddingRight: '16px',
           }}
           className="custom-scroll-container"
         >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          {/* 基本信息 */}
-          <div style={{
-            background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-            borderRadius: designTokens.borderRadius.lg,
-            padding: '20px',
-            marginBottom: '20px',
-            border: '1px solid #bae6fd',
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '16px',
-              fontSize: '15px',
-              fontWeight: '600',
-              color: designTokens.colors.neutral[700],
-            }}>
-              <div style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                background: designTokens.colors.primary.gradient,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontSize: '12px',
-              }}>1</div>
-              基本信息
-            </div>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item name="name" label="名称" rules={[inputValidationRules.required('请输入名称')]}>
-                  <Input 
-                    placeholder={inputPlaceholders.consumableName} 
-                    style={inputStyles.form}
-                    prefix={<ShoppingOutlined style={{ color: designTokens.colors.neutral[400] }} />}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="category"
-                  label="分类"
-                  rules={[inputValidationRules.required('请选择分类')]}
-                >
-                  <Select 
-                    placeholder={inputPlaceholders.category} 
-                    allowClear 
-                    style={selectStyles.base}
-                  >
-                    {categories.map(cat => (
-                      <Option key={cat.id} value={cat.name}>
-                        {cat.name}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="unit"
-                  label="单位"
-                  rules={[inputValidationRules.required('请输入单位')]}
-                  initialValue="个"
-                >
-                  <Input 
-                    placeholder={inputPlaceholders.unit} 
-                    style={inputStyles.form}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item name="description" label="描述">
-                  <Input 
-                    placeholder={inputPlaceholders.description} 
-                    style={inputStyles.form}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          </div>
-
-          {/* 库存管理 */}
-          <div style={{
-            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-            borderRadius: designTokens.borderRadius.lg,
-            padding: '20px',
-            marginBottom: '20px',
-            border: '1px solid #86efac',
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '16px',
-              fontSize: '15px',
-              fontWeight: '600',
-              color: designTokens.colors.neutral[700],
-            }}>
-              <div style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                background: designTokens.colors.success.gradient,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontSize: '12px',
-              }}>2</div>
-              库存管理
-              <Text type="secondary" style={{ fontSize: '12px', marginLeft: 'auto' }}>
-                设置库存预警和上限
-              </Text>
-            </div>
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item
-                  name="currentStock"
-                  label="当前库存"
-                  rules={[inputValidationRules.required('请输入当前库存')]}
-                >
-                  <InputNumber 
-                    min={0} 
-                    style={{ ...inputNumberStyles.base, width: '100%' }} 
-                    placeholder={inputPlaceholders.stock}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  name="minStock"
-                  label="最小库存(预警线)"
-                  rules={[inputValidationRules.required('请输入最小库存')]}
-                >
-                  <InputNumber 
-                    min={0} 
-                    style={{ ...inputNumberStyles.base, width: '100%' }} 
-                    placeholder={inputPlaceholders.minStock}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item label="最大库存">
-                  <div style={{ marginBottom: '8px' }}>
-                    <Checkbox
-                      checked={maxStockUnlimited}
-                      onChange={e => {
-                        setMaxStockUnlimited(e.target.checked);
-                        if (e.target.checked) {
-                          form.setFieldsValue({ maxStock: undefined });
-                        }
-                      }}
-                    >
-                      无限制
-                    </Checkbox>
-                  </div>
-                  {!maxStockUnlimited && (
-                    <Form.Item
-                      name="maxStock"
-                      noStyle
-                      rules={[inputValidationRules.required('请输入最大库存')]}
-                    >
-                      <InputNumber 
-                        min={0} 
-                        style={{ ...inputNumberStyles.base, width: '100%' }} 
-                        placeholder={inputPlaceholders.maxStock}
-                      />
-                    </Form.Item>
-                  )}
-                </Form.Item>
-              </Col>
-            </Row>
-          </div>
-
-          {/* 价格与状态 */}
-          <div style={{
-            background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-            borderRadius: designTokens.borderRadius.lg,
-            padding: '20px',
-            marginBottom: '20px',
-            border: '1px solid #fcd34d',
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '16px',
-              fontSize: '15px',
-              fontWeight: '600',
-              color: designTokens.colors.neutral[700],
-            }}>
-              <div style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                background: designTokens.colors.warning.gradient,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontSize: '12px',
-              }}>3</div>
-              价格与状态
-            </div>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item name="unitPrice" label="单价(元)">
-                  <InputNumber
-                    min={0}
-                    step={0.01}
-                    precision={2}
-                    style={{ ...inputNumberStyles.base, width: '100%' }}
-                    placeholder={inputPlaceholders.unitPrice}
-                    prefix="¥"
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item name="status" label="状态" rules={[inputValidationRules.required('请选择状态')]}>
-                  <Select placeholder="请选择状态" style={selectStyles.base}>
-                    <Option value="active">
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />
-                        启用
-                      </span>
-                    </Option>
-                    <Option value="inactive">
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <ExclamationCircleOutlined style={{ color: designTokens.colors.error.main }} />
-                        停用
-                      </span>
-                    </Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-          </div>
-
-          {/* 其他信息 */}
-          <div style={{
-            background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
-            borderRadius: designTokens.borderRadius.lg,
-            padding: '20px',
-            marginBottom: '20px',
-            border: '1px solid #d8b4fe',
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '16px',
-              fontSize: '15px',
-              fontWeight: '600',
-              color: designTokens.colors.neutral[700],
-            }}>
-              <div style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontSize: '12px',
-              }}>4</div>
-              其他信息
-            </div>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item name="supplier" label="供应商">
-                  <Input 
-                    placeholder={inputPlaceholders.supplier} 
-                    style={inputStyles.form}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item name="location" label="存放位置">
-                  <Input 
-                    placeholder={inputPlaceholders.location} 
-                    style={inputStyles.form}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          </div>
-
-          {/* SN序列号管理 */}
-          <div style={{
-            background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
-            borderRadius: designTokens.borderRadius.lg,
-            padding: '20px',
-            marginBottom: '20px',
-            border: '1px solid #fda4af',
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '16px',
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '15px',
-                fontWeight: '600',
-                color: designTokens.colors.neutral[700],
-              }}>
-                <div style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  background: designTokens.colors.error.gradient,
+          <Form form={form} layout="vertical" onFinish={handleSubmit}>
+            {/* 基本信息 */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                borderRadius: designTokens.borderRadius.lg,
+                padding: '20px',
+                marginBottom: '20px',
+                border: '1px solid #bae6fd',
+              }}
+            >
+              <div
+                style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#fff',
-                  fontSize: '12px',
-                }}>5</div>
-                SN序列号管理
-                <Tag color="red" style={{ marginLeft: '8px', borderRadius: '12px' }}>
-                  已录入 {snList.length} 个
-                </Tag>
-              </div>
-              <Space>
-                <Button 
-                  type="primary"
-                  size="small" 
-                  icon={<ScanOutlined />}
-                  onClick={() => {
-                    setScanMode('add');
-                    setScanValue('');
-                    setScanModalVisible(true);
-                    setTimeout(() => scanInputRef.current?.focus(), 100);
-                  }}
-                  style={{
-                    background: designTokens.colors.primary.gradient,
-                    border: 'none',
-                    borderRadius: designTokens.borderRadius.sm,
-                  }}
-                >
-                  扫码添加
-                </Button>
-                <Button 
-                  size="small" 
-                  icon={<PlusOutlined />}
-                  onClick={() => setSnInputVisible(!snInputVisible)}
-                  style={{ borderRadius: designTokens.borderRadius.sm }}
-                >
-                  批量添加
-                </Button>
-                <Button 
-                  size="small" 
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => {
-                    setSnList([]);
-                    form.setFieldsValue({ currentStock: 0 });
-                  }}
-                  disabled={snList.length === 0}
-                  style={{ borderRadius: designTokens.borderRadius.sm }}
-                >
-                  清空全部
-                </Button>
-              </Space>
-            </div>
-            
-            {/* 批量添加输入区 */}
-            {snInputVisible && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                style={{ marginBottom: '12px' }}
+                  gap: '8px',
+                  marginBottom: '16px',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  color: designTokens.colors.neutral[700],
+                }}
               >
-                <Alert
-                  message="批量添加提示"
-                  description="每行输入一个SN序列号，系统会自动过滤重复项"
-                  type="info"
-                  showIcon
-                  style={{ marginBottom: '12px', borderRadius: designTokens.borderRadius.md }}
-                />
-                <TextArea
-                  rows={4}
-                  placeholder="输入SN序列号，每行一个&#10;例如：&#10;SN001&#10;SN002&#10;SN003"
-                  value={snInputValue}
-                  onChange={e => setSnInputValue(e.target.value)}
-                  style={{ ...textAreaStyles.base, marginBottom: '8px' }}
-                />
-                <Space>
-                  <Button 
-                    type="primary" 
-                    size="small"
-                    onClick={() => {
-                      const newSns = snInputValue
-                        .split('\n')
-                        .map(s => s.trim())
-                        .filter(s => s && !snList.includes(s));
-                      if (newSns.length > 0) {
-                        const updatedSnList = [...snList, ...newSns];
-                        setSnList(updatedSnList);
-                        form.setFieldsValue({ currentStock: updatedSnList.length });
-                        setSnInputValue('');
-                        message.success(`成功添加 ${newSns.length} 个SN`);
-                      } else {
-                        message.warning('没有新的SN可添加（可能已存在或为空）');
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: designTokens.colors.primary.gradient,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    fontSize: '12px',
+                  }}
+                >
+                  1
+                </div>
+                基本信息
+              </div>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="name"
+                    label="名称"
+                    rules={[inputValidationRules.required('请输入名称')]}
+                  >
+                    <Input
+                      placeholder={inputPlaceholders.consumableName}
+                      style={inputStyles.form}
+                      prefix={
+                        <ShoppingOutlined style={{ color: designTokens.colors.neutral[400] }} />
                       }
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="category"
+                    label="分类"
+                    rules={[inputValidationRules.required('请选择分类')]}
+                  >
+                    <Select
+                      placeholder={inputPlaceholders.category}
+                      allowClear
+                      style={selectStyles.base}
+                    >
+                      {categories.map(cat => (
+                        <Option key={cat.id} value={cat.name}>
+                          {cat.name}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="unit"
+                    label="单位"
+                    rules={[inputValidationRules.required('请输入单位')]}
+                    initialValue="个"
+                  >
+                    <Input placeholder={inputPlaceholders.unit} style={inputStyles.form} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="description" label="描述">
+                    <Input placeholder={inputPlaceholders.description} style={inputStyles.form} />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+
+            {/* 库存管理 */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                borderRadius: designTokens.borderRadius.lg,
+                padding: '20px',
+                marginBottom: '20px',
+                border: '1px solid #86efac',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '16px',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  color: designTokens.colors.neutral[700],
+                }}
+              >
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: designTokens.colors.success.gradient,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    fontSize: '12px',
+                  }}
+                >
+                  2
+                </div>
+                库存管理
+                <Text type="secondary" style={{ fontSize: '12px', marginLeft: 'auto' }}>
+                  设置库存预警和上限
+                </Text>
+              </div>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item
+                    name="currentStock"
+                    label="当前库存"
+                    rules={[inputValidationRules.required('请输入当前库存')]}
+                  >
+                    <InputNumber
+                      min={0}
+                      style={{ ...inputNumberStyles.base, width: '100%' }}
+                      placeholder={inputPlaceholders.stock}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item
+                    name="minStock"
+                    label="最小库存(预警线)"
+                    rules={[inputValidationRules.required('请输入最小库存')]}
+                  >
+                    <InputNumber
+                      min={0}
+                      style={{ ...inputNumberStyles.base, width: '100%' }}
+                      placeholder={inputPlaceholders.minStock}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item label="最大库存">
+                    <div style={{ marginBottom: '8px' }}>
+                      <Checkbox
+                        checked={maxStockUnlimited}
+                        onChange={e => {
+                          setMaxStockUnlimited(e.target.checked);
+                          if (e.target.checked) {
+                            form.setFieldsValue({ maxStock: undefined });
+                          }
+                        }}
+                      >
+                        无限制
+                      </Checkbox>
+                    </div>
+                    {!maxStockUnlimited && (
+                      <Form.Item
+                        name="maxStock"
+                        noStyle
+                        rules={[inputValidationRules.required('请输入最大库存')]}
+                      >
+                        <InputNumber
+                          min={0}
+                          style={{ ...inputNumberStyles.base, width: '100%' }}
+                          placeholder={inputPlaceholders.maxStock}
+                        />
+                      </Form.Item>
+                    )}
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+
+            {/* 价格与状态 */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                borderRadius: designTokens.borderRadius.lg,
+                padding: '20px',
+                marginBottom: '20px',
+                border: '1px solid #fcd34d',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '16px',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  color: designTokens.colors.neutral[700],
+                }}
+              >
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: designTokens.colors.warning.gradient,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    fontSize: '12px',
+                  }}
+                >
+                  3
+                </div>
+                价格与状态
+              </div>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="unitPrice" label="单价(元)">
+                    <InputNumber
+                      min={0}
+                      step={0.01}
+                      precision={2}
+                      style={{ ...inputNumberStyles.base, width: '100%' }}
+                      placeholder={inputPlaceholders.unitPrice}
+                      prefix="¥"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="status"
+                    label="状态"
+                    rules={[inputValidationRules.required('请选择状态')]}
+                  >
+                    <Select placeholder="请选择状态" style={selectStyles.base}>
+                      <Option value="active">
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircleOutlined
+                            style={{ color: designTokens.colors.success.main }}
+                          />
+                          启用
+                        </span>
+                      </Option>
+                      <Option value="inactive">
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <ExclamationCircleOutlined
+                            style={{ color: designTokens.colors.error.main }}
+                          />
+                          停用
+                        </span>
+                      </Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+
+            {/* 其他信息 */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
+                borderRadius: designTokens.borderRadius.lg,
+                padding: '20px',
+                marginBottom: '20px',
+                border: '1px solid #d8b4fe',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '16px',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  color: designTokens.colors.neutral[700],
+                }}
+              >
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    fontSize: '12px',
+                  }}
+                >
+                  4
+                </div>
+                其他信息
+              </div>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="supplier" label="供应商">
+                    <Input placeholder={inputPlaceholders.supplier} style={inputStyles.form} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="location" label="存放位置">
+                    <Input placeholder={inputPlaceholders.location} style={inputStyles.form} />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+
+            {/* SN序列号管理 */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
+                borderRadius: designTokens.borderRadius.lg,
+                padding: '20px',
+                marginBottom: '20px',
+                border: '1px solid #fda4af',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '16px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    color: designTokens.colors.neutral[700],
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: designTokens.colors.error.gradient,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: '12px',
+                    }}
+                  >
+                    5
+                  </div>
+                  SN序列号管理
+                  <Tag color="red" style={{ marginLeft: '8px', borderRadius: '12px' }}>
+                    已录入 {snList.length} 个
+                  </Tag>
+                </div>
+                <Space>
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<ScanOutlined />}
+                    onClick={() => {
+                      setScanMode('add');
+                      setScanValue('');
+                      setScanModalVisible(true);
+                      setTimeout(() => scanInputRef.current?.focus(), 100);
                     }}
                     style={{
-                      background: designTokens.colors.success.gradient,
+                      background: designTokens.colors.primary.gradient,
                       border: 'none',
                       borderRadius: designTokens.borderRadius.sm,
                     }}
                   >
-                    确认添加
+                    扫码添加
                   </Button>
-                  <Button 
+                  <Button
                     size="small"
-                    onClick={() => {
-                      setSnInputValue('');
-                      setSnInputVisible(false);
-                    }}
+                    icon={<PlusOutlined />}
+                    onClick={() => setSnInputVisible(!snInputVisible)}
                     style={{ borderRadius: designTokens.borderRadius.sm }}
                   >
-                    取消
+                    批量添加
+                  </Button>
+                  <Button
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => {
+                      setSnList([]);
+                      form.setFieldsValue({ currentStock: 0 });
+                    }}
+                    disabled={snList.length === 0}
+                    style={{ borderRadius: designTokens.borderRadius.sm }}
+                  >
+                    清空全部
                   </Button>
                 </Space>
-              </motion.div>
-            )}
+              </div>
 
-            {/* SN列表展示 */}
-            {snList.length > 0 ? (
-              <div 
-                style={{ 
-                  maxHeight: '200px', 
-                  overflowY: 'auto', 
-                  border: `1px solid ${designTokens.colors.neutral[200]}`,
-                  borderRadius: designTokens.borderRadius.md,
-                  padding: '12px',
-                  background: '#fff',
+              {/* 批量添加输入区 */}
+              {snInputVisible && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  style={{ marginBottom: '12px' }}
+                >
+                  <Alert
+                    message="批量添加提示"
+                    description="每行输入一个SN序列号，系统会自动过滤重复项"
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: '12px', borderRadius: designTokens.borderRadius.md }}
+                  />
+                  <TextArea
+                    rows={4}
+                    placeholder="输入SN序列号，每行一个&#10;例如：&#10;SN001&#10;SN002&#10;SN003"
+                    value={snInputValue}
+                    onChange={e => setSnInputValue(e.target.value)}
+                    style={{ ...textAreaStyles.base, marginBottom: '8px' }}
+                  />
+                  <Space>
+                    <Button
+                      type="primary"
+                      size="small"
+                      onClick={() => {
+                        const newSns = snInputValue
+                          .split('\n')
+                          .map(s => s.trim())
+                          .filter(s => s && !snList.includes(s));
+                        if (newSns.length > 0) {
+                          const updatedSnList = [...snList, ...newSns];
+                          setSnList(updatedSnList);
+                          form.setFieldsValue({ currentStock: updatedSnList.length });
+                          setSnInputValue('');
+                          message.success(`成功添加 ${newSns.length} 个SN`);
+                        } else {
+                          message.warning('没有新的SN可添加（可能已存在或为空）');
+                        }
+                      }}
+                      style={{
+                        background: designTokens.colors.success.gradient,
+                        border: 'none',
+                        borderRadius: designTokens.borderRadius.sm,
+                      }}
+                    >
+                      确认添加
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setSnInputValue('');
+                        setSnInputVisible(false);
+                      }}
+                      style={{ borderRadius: designTokens.borderRadius.sm }}
+                    >
+                      取消
+                    </Button>
+                  </Space>
+                </motion.div>
+              )}
+
+              {/* SN列表展示 */}
+              {snList.length > 0 ? (
+                <div
+                  style={{
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    border: `1px solid ${designTokens.colors.neutral[200]}`,
+                    borderRadius: designTokens.borderRadius.md,
+                    padding: '12px',
+                    background: '#fff',
+                  }}
+                >
+                  <AnimatePresence>
+                    {snList.map((sn, index) => (
+                      <motion.div
+                        key={sn}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.2 }}
+                        style={{ display: 'inline-block', marginBottom: '8px', marginRight: '8px' }}
+                      >
+                        <Tag
+                          closable
+                          onClose={() => {
+                            const newSnList = snList.filter((_, i) => i !== index);
+                            setSnList(newSnList);
+                            form.setFieldsValue({ currentStock: newSnList.length });
+                          }}
+                          color="blue"
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: designTokens.borderRadius.sm,
+                            fontSize: '13px',
+                          }}
+                        >
+                          {sn}
+                        </Tag>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: '24px',
+                    color: designTokens.colors.neutral[400],
+                    background: '#fff',
+                    borderRadius: designTokens.borderRadius.md,
+                    border: `1px dashed ${designTokens.colors.neutral[300]}`,
+                  }}
+                >
+                  <BarcodeOutlined
+                    style={{ fontSize: '32px', marginBottom: '8px', display: 'block' }}
+                  />
+                  <div>暂无SN序列号</div>
+                  <div style={{ fontSize: '12px', marginTop: '4px' }}>点击上方按钮添加</div>
+                </div>
+              )}
+            </div>
+
+            {/* 操作按钮 */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '12px',
+                paddingTop: '16px',
+                borderTop: `1px solid ${designTokens.colors.neutral[200]}`,
+              }}
+            >
+              <Button
+                size="large"
+                onClick={handleCancel}
+                style={{
+                  borderRadius: designTokens.borderRadius.sm,
+                  minWidth: '100px',
                 }}
               >
-                <AnimatePresence>
-                  {snList.map((sn, index) => (
-                    <motion.div
-                      key={sn}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      transition={{ duration: 0.2 }}
-                      style={{ display: 'inline-block', marginBottom: '8px', marginRight: '8px' }}
-                    >
-                      <Tag
-                        closable
-                        onClose={() => {
-                          const newSnList = snList.filter((_, i) => i !== index);
-                          setSnList(newSnList);
-                          form.setFieldsValue({ currentStock: newSnList.length });
-                        }}
-                        color="blue"
-                        style={{ 
-                          padding: '4px 8px',
-                          borderRadius: designTokens.borderRadius.sm,
-                          fontSize: '13px',
-                        }}
-                      >
-                        {sn}
-                      </Tag>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <div style={{
-                textAlign: 'center',
-                padding: '24px',
-                color: designTokens.colors.neutral[400],
-                background: '#fff',
-                borderRadius: designTokens.borderRadius.md,
-                border: `1px dashed ${designTokens.colors.neutral[300]}`,
-              }}>
-                <BarcodeOutlined style={{ fontSize: '32px', marginBottom: '8px', display: 'block' }} />
-                <div>暂无SN序列号</div>
-                <div style={{ fontSize: '12px', marginTop: '4px' }}>点击上方按钮添加</div>
-              </div>
-            )}
-          </div>
-
-          {/* 操作按钮 */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '12px',
-            paddingTop: '16px',
-            borderTop: `1px solid ${designTokens.colors.neutral[200]}`,
-          }}>
-            <Button 
-              size="large"
-              onClick={handleCancel}
-              style={{ 
-                borderRadius: designTokens.borderRadius.sm,
-                minWidth: '100px',
-              }}
-            >
-              取消
-            </Button>
-            <Button 
-              type="primary" 
-              size="large"
-              htmlType="submit"
-              style={{
-                background: designTokens.colors.primary.gradient,
-                border: 'none',
-                borderRadius: designTokens.borderRadius.sm,
-                minWidth: '120px',
-                boxShadow: designTokens.shadows.md,
-              }}
-            >
-              {editingConsumable ? '更新耗材' : '创建耗材'}
-            </Button>
-          </div>
-        </Form>
+                取消
+              </Button>
+              <Button
+                type="primary"
+                size="large"
+                htmlType="submit"
+                style={{
+                  background: designTokens.colors.primary.gradient,
+                  border: 'none',
+                  borderRadius: designTokens.borderRadius.sm,
+                  minWidth: '120px',
+                  boxShadow: designTokens.shadows.md,
+                }}
+              >
+                {editingConsumable ? '更新耗材' : '创建耗材'}
+              </Button>
+            </div>
+          </Form>
         </div>
       </Modal>
 
@@ -1834,8 +1935,24 @@ function ConsumableManagement() {
               <ImportOutlined style={{ fontSize: '20px' }} />
             </div>
             <div>
-              <span style={{ fontSize: '18px', fontWeight: 600, color: designTokens.colors.neutral[800] }}>批量导入耗材</span>
-              <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], marginTop: '2px' }}>支持 Excel/CSV 格式批量导入</div>
+              <span
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: designTokens.colors.neutral[800],
+                }}
+              >
+                批量导入耗材
+              </span>
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: designTokens.colors.neutral[500],
+                  marginTop: '2px',
+                }}
+              >
+                支持 Excel/CSV 格式批量导入
+              </div>
             </div>
           </div>
         }
@@ -1848,13 +1965,15 @@ function ConsumableManagement() {
         style={{ top: 40 }}
       >
         {/* 步骤指示器 */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          marginBottom: '32px',
-          padding: '0 40px'
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: '32px',
+            padding: '0 40px',
+          }}
+        >
           {[
             { key: 'upload', label: '上传文件', icon: UploadOutlined },
             { key: 'preview', label: '预览确认', icon: FileTextOutlined },
@@ -1875,9 +1994,10 @@ function ConsumableManagement() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      background: isActive || isPast
-                        ? `linear-gradient(135deg, ${designTokens.colors.primary.main} 0%, ${designTokens.colors.success.main} 100%)`
-                        : designTokens.colors.neutral[100],
+                      background:
+                        isActive || isPast
+                          ? `linear-gradient(135deg, ${designTokens.colors.primary.main} 0%, ${designTokens.colors.success.main} 100%)`
+                          : designTokens.colors.neutral[100],
                       color: isActive || isPast ? '#fff' : designTokens.colors.neutral[400],
                       boxShadow: isActive
                         ? `0 4px 16px ${designTokens.colors.primary.main}50`
@@ -1888,25 +2008,33 @@ function ConsumableManagement() {
                   >
                     <StepIcon style={{ fontSize: '18px' }} />
                   </div>
-                  <span style={{
-                    marginTop: '8px',
-                    fontSize: '13px',
-                    fontWeight: isActive ? 600 : 400,
-                    color: isActive ? designTokens.colors.primary.main : designTokens.colors.neutral[500]
-                  }}>
+                  <span
+                    style={{
+                      marginTop: '8px',
+                      fontSize: '13px',
+                      fontWeight: isActive ? 600 : 400,
+                      color: isActive
+                        ? designTokens.colors.primary.main
+                        : designTokens.colors.neutral[500],
+                    }}
+                  >
                     {step.label}
                   </span>
                 </div>
                 {index < 2 && (
-                  <div style={{
-                    width: '80px',
-                    height: '2px',
-                    background: isPast ? designTokens.colors.success.main : designTokens.colors.neutral[200],
-                    margin: '0 12px',
-                    marginBottom: '28px',
-                    borderRadius: '1px',
-                    transition: 'background 0.3s ease',
-                  }} />
+                  <div
+                    style={{
+                      width: '80px',
+                      height: '2px',
+                      background: isPast
+                        ? designTokens.colors.success.main
+                        : designTokens.colors.neutral[200],
+                      margin: '0 12px',
+                      marginBottom: '28px',
+                      borderRadius: '1px',
+                      transition: 'background 0.3s ease',
+                    }}
+                  />
                 )}
               </React.Fragment>
             );
@@ -1923,18 +2051,45 @@ function ConsumableManagement() {
               transition={{ duration: 0.3 }}
             >
               {/* 模板下载区域 */}
-              <div style={{
-                background: `linear-gradient(135deg, ${designTokens.colors.neutral[50]} 0%, ${designTokens.colors.info.main}08 100%)`,
-                borderRadius: '16px',
-                padding: '24px',
-                marginBottom: '24px',
-                border: `1px solid ${designTokens.colors.neutral[200]}`,
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+              <div
+                style={{
+                  background: `linear-gradient(135deg, ${designTokens.colors.neutral[50]} 0%, ${designTokens.colors.info.main}08 100%)`,
+                  borderRadius: '16px',
+                  padding: '24px',
+                  marginBottom: '24px',
+                  border: `1px solid ${designTokens.colors.neutral[200]}`,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                  }}
+                >
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <FileExcelOutlined style={{ fontSize: '20px', color: designTokens.colors.success.main }} />
-                      <span style={{ fontSize: '15px', fontWeight: 600, color: designTokens.colors.neutral[800] }}>下载导入模板</span>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '8px',
+                      }}
+                    >
+                      <FileExcelOutlined
+                        style={{ fontSize: '20px', color: designTokens.colors.success.main }}
+                      />
+                      <span
+                        style={{
+                          fontSize: '15px',
+                          fontWeight: 600,
+                          color: designTokens.colors.neutral[800],
+                        }}
+                      >
+                        下载导入模板
+                      </span>
                     </div>
                     <Text type="secondary" style={{ fontSize: '13px', lineHeight: 1.6 }}>
                       先下载标准模板，填写数据后再上传，支持 .xlsx、.xls、.csv 格式
@@ -1961,86 +2116,184 @@ function ConsumableManagement() {
                 <Divider style={{ margin: '20px 0' }} />
 
                 {/* 字段说明 */}
-                <div style={{
-                  background: '#fff',
-                  borderRadius: '10px',
-                  padding: '20px',
-                  border: `1px solid ${designTokens.colors.neutral[100]}`,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                    <div style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '6px',
-                      background: `${designTokens.colors.info.main}15`,
+                <div
+                  style={{
+                    background: '#fff',
+                    borderRadius: '10px',
+                    padding: '20px',
+                    border: `1px solid ${designTokens.colors.neutral[100]}`,
+                  }}
+                >
+                  <div
+                    style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <InfoCircleOutlined style={{ fontSize: '14px', color: designTokens.colors.info.main }} />
+                      gap: '8px',
+                      marginBottom: '16px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '6px',
+                        background: `${designTokens.colors.info.main}15`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <InfoCircleOutlined
+                        style={{ fontSize: '14px', color: designTokens.colors.info.main }}
+                      />
                     </div>
-                    <span style={{ fontSize: '14px', fontWeight: 600, color: designTokens.colors.neutral[800] }}>模板字段说明</span>
-                    <Tag color="error" style={{ marginLeft: '8px', borderRadius: '4px', fontSize: '11px' }}>必填</Tag>
-                    <Tag color="default" style={{ borderRadius: '4px', fontSize: '11px' }}>可选</Tag>
+                    <span
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: designTokens.colors.neutral[800],
+                      }}
+                    >
+                      模板字段说明
+                    </span>
+                    <Tag
+                      color="error"
+                      style={{ marginLeft: '8px', borderRadius: '4px', fontSize: '11px' }}
+                    >
+                      必填
+                    </Tag>
+                    <Tag color="default" style={{ borderRadius: '4px', fontSize: '11px' }}>
+                      可选
+                    </Tag>
                   </div>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+
+                  <div
+                    style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}
+                  >
                     {[
-                      { field: '耗材ID', desc: '留空自动生成；填写后可识别并更新现有耗材', required: false, icon: '🔑' },
+                      {
+                        field: '耗材ID',
+                        desc: '留空自动生成；填写后可识别并更新现有耗材',
+                        required: false,
+                        icon: '🔑',
+                      },
                       { field: '名称', desc: '耗材名称，必填项', required: true, icon: '📝' },
-                      { field: '分类', desc: '耗材分类，如"光模块"或"光纤跳线"，必填', required: true, icon: '📂' },
-                      { field: '单位', desc: '计量单位，如"个"、"根"、"箱"，默认"个"', required: false, icon: '📏' },
-                      { field: '当前库存', desc: '当前库存数量，数字类型', required: false, icon: '📦' },
-                      { field: '最小库存', desc: '安全库存阈值，低于此值会触发预警', required: false, icon: '⚠️' },
-                      { field: '最大库存', desc: '最大库存限制，0表示无限制', required: false, icon: '📈' },
+                      {
+                        field: '分类',
+                        desc: '耗材分类，如"光模块"或"光纤跳线"，必填',
+                        required: true,
+                        icon: '📂',
+                      },
+                      {
+                        field: '单位',
+                        desc: '计量单位，如"个"、"根"、"箱"，默认"个"',
+                        required: false,
+                        icon: '📏',
+                      },
+                      {
+                        field: '当前库存',
+                        desc: '当前库存数量，数字类型',
+                        required: false,
+                        icon: '📦',
+                      },
+                      {
+                        field: '最小库存',
+                        desc: '安全库存阈值，低于此值会触发预警',
+                        required: false,
+                        icon: '⚠️',
+                      },
+                      {
+                        field: '最大库存',
+                        desc: '最大库存限制，0表示无限制',
+                        required: false,
+                        icon: '📈',
+                      },
                       { field: '单价', desc: '耗材单价，数字类型', required: false, icon: '💰' },
                       { field: '供应商', desc: '耗材供应商名称', required: false, icon: '🏭' },
-                      { field: '存放位置', desc: '仓库内存放位置，如"A柜-01层"', required: false, icon: '📍' },
+                      {
+                        field: '存放位置',
+                        desc: '仓库内存放位置，如"A柜-01层"',
+                        required: false,
+                        icon: '📍',
+                      },
                       { field: '描述', desc: '耗材的详细描述或备注', required: false, icon: '📄' },
-                      { field: 'SN序列号', desc: '多个SN用逗号分隔，如"SN001,SN002"', required: false, icon: '🏷️' },
-                      { field: '状态', desc: '"active"启用，"inactive"停用，默认启用', required: false, icon: '✅' },
+                      {
+                        field: 'SN序列号',
+                        desc: '多个SN用逗号分隔，如"SN001,SN002"',
+                        required: false,
+                        icon: '🏷️',
+                      },
+                      {
+                        field: '状态',
+                        desc: '"active"启用，"inactive"停用，默认启用',
+                        required: false,
+                        icon: '✅',
+                      },
                     ].map((item, idx) => (
-                      <div key={idx} style={{
-                        display: 'flex',
-                        gap: '10px',
-                        padding: '10px 12px',
-                        background: designTokens.colors.neutral[50],
-                        borderRadius: '8px',
-                        border: `1px solid ${designTokens.colors.neutral[100]}`,
-                      }}>
-                        <div style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '6px',
-                          background: item.required 
-                            ? `${designTokens.colors.error.main}15` 
-                            : `${designTokens.colors.primary.main}10`,
+                      <div
+                        key={idx}
+                        style={{
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}>
+                          gap: '10px',
+                          padding: '10px 12px',
+                          background: designTokens.colors.neutral[50],
+                          borderRadius: '8px',
+                          border: `1px solid ${designTokens.colors.neutral[100]}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '6px',
+                            background: item.required
+                              ? `${designTokens.colors.error.main}15`
+                              : `${designTokens.colors.primary.main}10`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
                           <span style={{ fontSize: '14px' }}>{item.icon}</span>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: designTokens.colors.neutral[800] }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              marginBottom: '4px',
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                color: designTokens.colors.neutral[800],
+                              }}
+                            >
                               {item.field}
                             </span>
                             {item.required && (
-                              <span style={{
-                                fontSize: '10px',
-                                padding: '1px 6px',
-                                borderRadius: '3px',
-                                background: `${designTokens.colors.error.main}15`,
-                                color: designTokens.colors.error.main,
-                                fontWeight: 500,
-                              }}>
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  padding: '1px 6px',
+                                  borderRadius: '3px',
+                                  background: `${designTokens.colors.error.main}15`,
+                                  color: designTokens.colors.error.main,
+                                  fontWeight: 500,
+                                }}
+                              >
                                 必填
                               </span>
                             )}
                           </div>
-                          <Text type="secondary" style={{ fontSize: '11px', lineHeight: 1.4, display: 'block' }}>
+                          <Text
+                            type="secondary"
+                            style={{ fontSize: '11px', lineHeight: 1.4, display: 'block' }}
+                          >
                             {item.desc}
                           </Text>
                         </div>
@@ -2075,20 +2328,32 @@ function ConsumableManagement() {
                       margin: '0 auto 20px',
                     }}
                   >
-                    <UploadOutlined style={{ fontSize: '32px', color: designTokens.colors.primary.main }} />
+                    <UploadOutlined
+                      style={{ fontSize: '32px', color: designTokens.colors.primary.main }}
+                    />
                   </div>
-                  <Text style={{ fontSize: '16px', fontWeight: 500, display: 'block', marginBottom: '8px', color: designTokens.colors.neutral[800] }}>
+                  <Text
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: 500,
+                      display: 'block',
+                      marginBottom: '8px',
+                      color: designTokens.colors.neutral[800],
+                    }}
+                  >
                     点击或拖拽文件到此处上传
                   </Text>
                   <Text type="secondary" style={{ fontSize: '13px' }}>
                     支持 .xlsx、.xls、.csv 格式，文件大小不超过 10MB
                   </Text>
-                  <div style={{
-                    marginTop: '20px',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    gap: '12px'
-                  }}>
+                  <div
+                    style={{
+                      marginTop: '20px',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      gap: '12px',
+                    }}
+                  >
                     {['.xlsx', '.xls', '.csv'].map(type => (
                       <Tag
                         key={type}
@@ -2118,31 +2383,40 @@ function ConsumableManagement() {
               transition={{ duration: 0.3 }}
             >
               {/* 数据统计卡片 */}
-              <div style={{
-                display: 'flex',
-                gap: '16px',
-                marginBottom: '20px',
-              }}>
-                <div style={{
-                  flex: 1,
-                  background: `linear-gradient(135deg, ${designTokens.colors.primary.main} 0%, ${designTokens.colors.info.main} 100%)`,
-                  borderRadius: '12px',
-                  padding: '16px 20px',
-                  color: '#fff',
-                }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '16px',
+                  marginBottom: '20px',
+                }}
+              >
+                <div
+                  style={{
+                    flex: 1,
+                    background: `linear-gradient(135deg, ${designTokens.colors.primary.main} 0%, ${designTokens.colors.info.main} 100%)`,
+                    borderRadius: '12px',
+                    padding: '16px 20px',
+                    color: '#fff',
+                  }}
+                >
                   <div style={{ fontSize: '28px', fontWeight: 700 }}>{importPreview.length}</div>
                   <div style={{ fontSize: '13px', opacity: 0.9 }}>待导入记录</div>
                 </div>
-                <div style={{
-                  flex: 1,
-                  background: importValidationErrors.length > 0
-                    ? `linear-gradient(135deg, ${designTokens.colors.warning.main} 0%, ${designTokens.colors.error.main} 100%)`
-                    : `linear-gradient(135deg, ${designTokens.colors.success.main} 0%, #52c41a 100%)`,
-                  borderRadius: '12px',
-                  padding: '16px 20px',
-                  color: '#fff',
-                }}>
-                  <div style={{ fontSize: '28px', fontWeight: 700 }}>{importValidationErrors.length}</div>
+                <div
+                  style={{
+                    flex: 1,
+                    background:
+                      importValidationErrors.length > 0
+                        ? `linear-gradient(135deg, ${designTokens.colors.warning.main} 0%, ${designTokens.colors.error.main} 100%)`
+                        : `linear-gradient(135deg, ${designTokens.colors.success.main} 0%, #52c41a 100%)`,
+                    borderRadius: '12px',
+                    padding: '16px 20px',
+                    color: '#fff',
+                  }}
+                >
+                  <div style={{ fontSize: '28px', fontWeight: 700 }}>
+                    {importValidationErrors.length}
+                  </div>
                   <div style={{ fontSize: '13px', opacity: 0.9 }}>数据问题</div>
                 </div>
               </div>
@@ -2155,8 +2429,12 @@ function ConsumableManagement() {
                     <div style={{ maxHeight: '80px', overflowY: 'auto', marginTop: '8px' }}>
                       {importValidationErrors.slice(0, 5).map((err, idx) => (
                         <div key={idx} style={{ fontSize: '13px', marginBottom: '4px' }}>
-                          <Tag color="warning" style={{ marginRight: '8px' }}>行{err.row}</Tag>
-                          <Text type="secondary">{err.field && `[${err.field}]`} {err.message}</Text>
+                          <Tag color="warning" style={{ marginRight: '8px' }}>
+                            行{err.row}
+                          </Tag>
+                          <Text type="secondary">
+                            {err.field && `[${err.field}]`} {err.message}
+                          </Text>
                         </div>
                       ))}
                       {importValidationErrors.length > 5 && (
@@ -2187,16 +2465,25 @@ function ConsumableManagement() {
                 }}
                 bodyStyle={{ padding: '16px 20px' }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    background: `${designTokens.colors.primary.main}15`,
+                <div
+                  style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
+                    gap: '12px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background: `${designTokens.colors.primary.main}15`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
                     <FileTextOutlined style={{ color: designTokens.colors.primary.main }} />
                   </div>
                   <span style={{ fontSize: '14px', fontWeight: 600 }}>导入模式</span>
@@ -2214,12 +2501,14 @@ function ConsumableManagement() {
                           marginLeft: '8px',
                           width: 'calc(100% - 8px)',
                           borderRadius: '10px',
-                          border: importMode === 'create'
-                            ? `2px solid ${designTokens.colors.primary.main}`
-                            : `1px solid ${designTokens.colors.neutral[200]}`,
-                          background: importMode === 'create'
-                            ? `${designTokens.colors.primary.main}08`
-                            : '#fff',
+                          border:
+                            importMode === 'create'
+                              ? `2px solid ${designTokens.colors.primary.main}`
+                              : `1px solid ${designTokens.colors.neutral[200]}`,
+                          background:
+                            importMode === 'create'
+                              ? `${designTokens.colors.primary.main}08`
+                              : '#fff',
                         }}
                         bodyStyle={{ padding: '12px 16px' }}
                       >
@@ -2236,12 +2525,14 @@ function ConsumableManagement() {
                           marginLeft: '8px',
                           width: 'calc(100% - 8px)',
                           borderRadius: '10px',
-                          border: importMode === 'update'
-                            ? `2px solid ${designTokens.colors.primary.main}`
-                            : `1px solid ${designTokens.colors.neutral[200]}`,
-                          background: importMode === 'update'
-                            ? `${designTokens.colors.primary.main}08`
-                            : '#fff',
+                          border:
+                            importMode === 'update'
+                              ? `2px solid ${designTokens.colors.primary.main}`
+                              : `1px solid ${designTokens.colors.neutral[200]}`,
+                          background:
+                            importMode === 'update'
+                              ? `${designTokens.colors.primary.main}08`
+                              : '#fff',
                         }}
                         bodyStyle={{ padding: '12px 16px' }}
                       >
@@ -2302,10 +2593,12 @@ function ConsumableManagement() {
               transition={{ duration: 0.4, ease: 'easeOut' }}
             >
               {/* 结果状态 */}
-              <div style={{
-                textAlign: 'center',
-                padding: '32px 0 28px',
-              }}>
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '32px 0 28px',
+                }}
+              >
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -2314,16 +2607,18 @@ function ConsumableManagement() {
                     width: '88px',
                     height: '88px',
                     borderRadius: '50%',
-                    background: importResult.failed === 0
-                      ? `linear-gradient(135deg, ${designTokens.colors.success.main} 0%, #52c41a 100%)`
-                      : `linear-gradient(135deg, ${designTokens.colors.warning.main} 0%, ${designTokens.colors.error.main} 100%)`,
+                    background:
+                      importResult.failed === 0
+                        ? `linear-gradient(135deg, ${designTokens.colors.success.main} 0%, #52c41a 100%)`
+                        : `linear-gradient(135deg, ${designTokens.colors.warning.main} 0%, ${designTokens.colors.error.main} 100%)`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     margin: '0 auto 20px',
-                    boxShadow: importResult.failed === 0
-                      ? `0 8px 24px ${designTokens.colors.success.main}50`
-                      : `0 8px 24px ${designTokens.colors.warning.main}50`,
+                    boxShadow:
+                      importResult.failed === 0
+                        ? `0 8px 24px ${designTokens.colors.success.main}50`
+                        : `0 8px 24px ${designTokens.colors.warning.main}50`,
                   }}
                 >
                   {importResult.failed === 0 ? (
@@ -2346,10 +2641,30 @@ function ConsumableManagement() {
               {/* 统计卡片 */}
               <Row gutter={[12, 12]} style={{ marginBottom: '24px' }}>
                 {[
-                  { label: '新增成功', value: importResult.success, color: designTokens.colors.success.main, bg: `${designTokens.colors.success.main}15` },
-                  { label: '更新成功', value: importResult.updated, color: designTokens.colors.primary.main, bg: `${designTokens.colors.primary.main}15` },
-                  { label: '跳过', value: importResult.skipped, color: designTokens.colors.neutral[500], bg: designTokens.colors.neutral[100] },
-                  { label: '失败', value: importResult.failed, color: designTokens.colors.error.main, bg: `${designTokens.colors.error.main}15` },
+                  {
+                    label: '新增成功',
+                    value: importResult.success,
+                    color: designTokens.colors.success.main,
+                    bg: `${designTokens.colors.success.main}15`,
+                  },
+                  {
+                    label: '更新成功',
+                    value: importResult.updated,
+                    color: designTokens.colors.primary.main,
+                    bg: `${designTokens.colors.primary.main}15`,
+                  },
+                  {
+                    label: '跳过',
+                    value: importResult.skipped,
+                    color: designTokens.colors.neutral[500],
+                    bg: designTokens.colors.neutral[100],
+                  },
+                  {
+                    label: '失败',
+                    value: importResult.failed,
+                    color: designTokens.colors.error.main,
+                    bg: `${designTokens.colors.error.main}15`,
+                  },
                 ].map((stat, idx) => (
                   <Col span={6} key={idx}>
                     <motion.div
@@ -2367,19 +2682,23 @@ function ConsumableManagement() {
                         }}
                         bodyStyle={{ padding: '16px 8px' }}
                       >
-                        <div style={{
-                          fontSize: '28px',
-                          fontWeight: 700,
-                          color: stat.color,
-                          lineHeight: 1.2,
-                        }}>
+                        <div
+                          style={{
+                            fontSize: '28px',
+                            fontWeight: 700,
+                            color: stat.color,
+                            lineHeight: 1.2,
+                          }}
+                        >
                           {stat.value}
                         </div>
-                        <div style={{
-                          fontSize: '12px',
-                          color: designTokens.colors.neutral[600],
-                          marginTop: '4px',
-                        }}>
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: designTokens.colors.neutral[600],
+                            marginTop: '4px',
+                          }}
+                        >
                           {stat.label}
                         </div>
                       </Card>
@@ -2429,25 +2748,35 @@ function ConsumableManagement() {
                             key={idx}
                             style={{
                               padding: '12px 20px',
-                              borderBottom: idx < importResult.details.filter(d => d.status === 'failed').length - 1
-                                ? `1px solid ${designTokens.colors.neutral[100]}`
-                                : 'none',
+                              borderBottom:
+                                idx <
+                                importResult.details.filter(d => d.status === 'failed').length - 1
+                                  ? `1px solid ${designTokens.colors.neutral[100]}`
+                                  : 'none',
                               display: 'flex',
                               alignItems: 'center',
                               gap: '12px',
                             }}
                           >
-                            <div style={{
-                              width: '28px',
-                              height: '28px',
-                              borderRadius: '50%',
-                              background: `${designTokens.colors.error.main}15`,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                            }}>
-                              <span style={{ fontSize: '12px', fontWeight: 600, color: designTokens.colors.error.main }}>
+                            <div
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                background: `${designTokens.colors.error.main}15`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  color: designTokens.colors.error.main,
+                                }}
+                              >
                                 {detail.row}
                               </span>
                             </div>
@@ -2499,7 +2828,14 @@ function ConsumableManagement() {
               >
                 <ImportOutlined style={{ fontSize: '36px', color: '#fff' }} />
               </div>
-              <Text style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px', color: designTokens.colors.neutral[800] }}>
+              <Text
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  marginBottom: '16px',
+                  color: designTokens.colors.neutral[800],
+                }}
+              >
                 正在导入数据...
               </Text>
               <Progress
@@ -2520,14 +2856,16 @@ function ConsumableManagement() {
 
         {/* 底部按钮 */}
         {!importing && importStep !== 'result' && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingTop: '20px',
-            borderTop: `1px solid ${designTokens.colors.neutral[100]}`,
-            marginTop: '24px',
-          }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingTop: '20px',
+              borderTop: `1px solid ${designTokens.colors.neutral[100]}`,
+              marginTop: '24px',
+            }}
+          >
             <Button
               onClick={handleImportCancel}
               style={{
@@ -2568,7 +2906,10 @@ function ConsumableManagement() {
                 width: '36px',
                 height: '36px',
                 borderRadius: designTokens.borderRadius.md,
-                background: stockType === 'in' ? designTokens.colors.success.gradient : designTokens.colors.error.gradient,
+                background:
+                  stockType === 'in'
+                    ? designTokens.colors.success.gradient
+                    : designTokens.colors.error.gradient,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -2588,23 +2929,30 @@ function ConsumableManagement() {
         footer={null}
         width={500}
       >
-        <Form form={stockForm} layout="vertical" onFinish={handleStockSubmit} style={{ marginTop: '16px' }}>
+        <Form
+          form={stockForm}
+          layout="vertical"
+          onFinish={handleStockSubmit}
+          style={{ marginTop: '16px' }}
+        >
           <Form.Item name="consumableId" label="耗材ID">
             <Input disabled style={{ ...inputStyles.form, ...inputStyles.disabled }} />
           </Form.Item>
           <Form.Item name="consumableName" label="耗材名称">
             <Input disabled style={{ ...inputStyles.form, ...inputStyles.disabled }} />
           </Form.Item>
-          
+
           {stockType === 'out' && stockRecord?.snList && stockRecord.snList.length > 0 && (
-            <Form.Item label={
-              <span>
-                选择SN序列号 
-                <Text type="secondary" style={{ fontSize: '12px', marginLeft: '8px' }}>
-                  (已选 {selectedSnList.length} 个)
-                </Text>
-              </span>
-            }>
+            <Form.Item
+              label={
+                <span>
+                  选择SN序列号
+                  <Text type="secondary" style={{ fontSize: '12px', marginLeft: '8px' }}>
+                    (已选 {selectedSnList.length} 个)
+                  </Text>
+                </span>
+              }
+            >
               <Space direction="vertical" style={{ width: '100%' }} size="small">
                 <Input
                   placeholder="搜索SN序列号..."
@@ -2615,21 +2963,23 @@ function ConsumableManagement() {
                   style={{ ...inputStyles.search, marginBottom: '8px' }}
                 />
                 <Space size="small" style={{ marginBottom: '8px' }}>
-                  <Button 
-                    size="small" 
+                  <Button
+                    size="small"
                     type="link"
                     onClick={() => {
-                      const filtered = stockRecord.snList.filter(sn => 
+                      const filtered = stockRecord.snList.filter(sn =>
                         sn.toLowerCase().includes(snSearchKeyword.toLowerCase())
                       );
                       setSelectedSnList([...new Set([...selectedSnList, ...filtered])]);
-                      stockForm.setFieldsValue({ quantity: [...new Set([...selectedSnList, ...filtered])].length });
+                      stockForm.setFieldsValue({
+                        quantity: [...new Set([...selectedSnList, ...filtered])].length,
+                      });
                     }}
                   >
                     全选过滤结果
                   </Button>
-                  <Button 
-                    size="small" 
+                  <Button
+                    size="small"
                     type="link"
                     onClick={() => {
                       setSelectedSnList([]);
@@ -2639,22 +2989,29 @@ function ConsumableManagement() {
                     清空选择
                   </Button>
                 </Space>
-                <div 
-                  style={{ 
-                    maxHeight: '150px', 
-                    overflowY: 'auto', 
+                <div
+                  style={{
+                    maxHeight: '150px',
+                    overflowY: 'auto',
                     border: `1px solid ${designTokens.colors.neutral[200]}`,
                     borderRadius: designTokens.borderRadius.sm,
-                    padding: '8px'
+                    padding: '8px',
                   }}
                 >
                   {(() => {
                     const snListArray = Array.isArray(stockRecord.snList) ? stockRecord.snList : [];
-                    const filteredSnList = snListArray.filter(sn => 
+                    const filteredSnList = snListArray.filter(sn =>
                       sn.toLowerCase().includes(snSearchKeyword.toLowerCase())
                     );
                     if (filteredSnList.length === 0) {
-                      return <Text type="secondary" style={{ display: 'block', textAlign: 'center', padding: '16px 0' }}>无匹配的 SN</Text>;
+                      return (
+                        <Text
+                          type="secondary"
+                          style={{ display: 'block', textAlign: 'center', padding: '16px 0' }}
+                        >
+                          无匹配的 SN
+                        </Text>
+                      );
                     }
                     return filteredSnList.map((sn, index) => (
                       <Tag.CheckableTag
@@ -2678,7 +3035,9 @@ function ConsumableManagement() {
                   })()}
                 </div>
                 <Text type="secondary" style={{ fontSize: '12px' }}>
-                  {snSearchKeyword ? `过滤结果: ${stockRecord.snList.filter(sn => sn.toLowerCase().includes(snSearchKeyword.toLowerCase())).length} 个SN` : `共 ${stockRecord.snList.length} 个SN`}
+                  {snSearchKeyword
+                    ? `过滤结果: ${stockRecord.snList.filter(sn => sn.toLowerCase().includes(snSearchKeyword.toLowerCase())).length} 个SN`
+                    : `共 ${stockRecord.snList.length} 个SN`}
                   ，点击SN进行选择
                 </Text>
               </Space>
@@ -2701,29 +3060,39 @@ function ConsumableManagement() {
             label="数量"
             rules={[inputValidationRules.required('请输入数量')]}
           >
-            <InputNumber 
-              min={1} 
-              max={stockType === 'out' && stockRecord?.snList?.length > 0 ? stockRecord.snList.length : undefined}
-              style={inputNumberStyles.base} 
-              placeholder="请输入数量" 
+            <InputNumber
+              min={1}
+              max={
+                stockType === 'out' && stockRecord?.snList?.length > 0
+                  ? stockRecord.snList.length
+                  : undefined
+              }
+              style={inputNumberStyles.base}
+              placeholder="请输入数量"
             />
           </Form.Item>
           <Form.Item name="operator" label="操作人">
             <Input placeholder={inputPlaceholders.operator} style={inputStyles.form} />
           </Form.Item>
           <Form.Item name="reason" label={stockType === 'in' ? '入库原因' : '出库原因'}>
-            <Input placeholder={stockType === 'in' ? '如: 采购入库' : '如: 部门领用、报损出库'} style={inputStyles.form} />
+            <Input
+              placeholder={stockType === 'in' ? '如: 采购入库' : '如: 部门领用、报损出库'}
+              style={inputStyles.form}
+            />
           </Form.Item>
           <Form.Item name="notes" label="备注">
             <TextArea rows={2} placeholder={inputPlaceholders.notes} style={textAreaStyles.base} />
           </Form.Item>
           <Form.Item>
             <Space>
-              <Button 
-                type="primary" 
+              <Button
+                type="primary"
                 htmlType="submit"
                 style={{
-                  background: stockType === 'in' ? designTokens.colors.success.gradient : designTokens.colors.error.gradient,
+                  background:
+                    stockType === 'in'
+                      ? designTokens.colors.success.gradient
+                      : designTokens.colors.error.gradient,
                   border: 'none',
                   borderRadius: designTokens.borderRadius.sm,
                 }}
@@ -2748,9 +3117,7 @@ function ConsumableManagement() {
         <div style={{ padding: '16px 0' }}>
           <Alert
             message={
-              scanMode === 'add' 
-                ? '扫描SN序列号，自动添加到表单中' 
-                : '请使用扫码枪扫描SN序列号'
+              scanMode === 'add' ? '扫描SN序列号，自动添加到表单中' : '请使用扫码枪扫描SN序列号'
             }
             type="info"
             showIcon
@@ -2774,16 +3141,22 @@ function ConsumableManagement() {
 
           {scanMode === 'add' && snList.length > 0 && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ marginBottom: '8px', fontWeight: 500, color: designTokens.colors.neutral[700] }}>
+              <div
+                style={{
+                  marginBottom: '8px',
+                  fontWeight: 500,
+                  color: designTokens.colors.neutral[700],
+                }}
+              >
                 已添加SN列表 ({snList.length}个)
               </div>
-              <div 
-                style={{ 
-                  maxHeight: '150px', 
-                  overflowY: 'auto', 
+              <div
+                style={{
+                  maxHeight: '150px',
+                  overflowY: 'auto',
                   border: `1px solid ${designTokens.colors.neutral[200]}`,
                   borderRadius: designTokens.borderRadius.sm,
-                  padding: '8px'
+                  padding: '8px',
                 }}
               >
                 {(Array.isArray(snList) ? snList : []).map((sn, index) => (
@@ -2807,16 +3180,22 @@ function ConsumableManagement() {
 
           {scanMode === 'in' && scannedSnList.length > 0 && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ marginBottom: '8px', fontWeight: 500, color: designTokens.colors.neutral[700] }}>
+              <div
+                style={{
+                  marginBottom: '8px',
+                  fontWeight: 500,
+                  color: designTokens.colors.neutral[700],
+                }}
+              >
                 已扫描SN列表 ({scannedSnList.length}个)
               </div>
-              <div 
-                style={{ 
-                  maxHeight: '150px', 
-                  overflowY: 'auto', 
+              <div
+                style={{
+                  maxHeight: '150px',
+                  overflowY: 'auto',
                   border: `1px solid ${designTokens.colors.neutral[200]}`,
                   borderRadius: designTokens.borderRadius.sm,
-                  padding: '8px'
+                  padding: '8px',
                 }}
               >
                 {scannedSnList.map((sn, index) => (
@@ -2831,9 +3210,15 @@ function ConsumableManagement() {
                   </Tag>
                 ))}
               </div>
-              
+
               <div style={{ marginTop: '16px' }}>
-                <div style={{ marginBottom: '8px', fontWeight: 500, color: designTokens.colors.neutral[700] }}>
+                <div
+                  style={{
+                    marginBottom: '8px',
+                    fontWeight: 500,
+                    color: designTokens.colors.neutral[700],
+                  }}
+                >
                   选择入库耗材
                 </div>
                 <Select
@@ -2845,7 +3230,7 @@ function ConsumableManagement() {
                     option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
                   }
                   value={selectedScanInConsumable}
-                  onChange={(value) => setSelectedScanInConsumable(value)}
+                  onChange={value => setSelectedScanInConsumable(value)}
                 >
                   {consumables.map(item => (
                     <Option key={item.consumableId} value={item.consumableId}>
@@ -2854,7 +3239,7 @@ function ConsumableManagement() {
                   ))}
                 </Select>
               </div>
-              
+
               <Button
                 type="primary"
                 style={{

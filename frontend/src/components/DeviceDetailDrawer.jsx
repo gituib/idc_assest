@@ -49,7 +49,7 @@ function DeviceDetailDrawer({
   refreshTrigger,
 }) {
   const [activeTab, setActiveTab] = useState('ports');
-  
+
   const [tickets, setTickets] = useState([]);
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [ticketsPagination, setTicketsPagination] = useState({
@@ -91,26 +91,29 @@ function DeviceDetailDrawer({
     }
   }, [visible, device?.deviceId, fetchNetworkCards, refreshTrigger]);
 
-  const fetchDeviceTickets = useCallback(async (page = 1, pageSize = PAGE_SIZE) => {
-    if (!device?.deviceId) return;
-    setTicketsLoading(true);
-    try {
-      const response = await deviceAPI.getTickets(device.deviceId, {
-        page,
-        pageSize,
-      });
-      setTickets(response.data || []);
-      setTicketsPagination({
-        current: response.page || 1,
-        pageSize: response.pageSize || PAGE_SIZE,
-        total: response.total || 0,
-      });
-    } catch (error) {
-      console.error('获取设备工单失败:', error);
-    } finally {
-      setTicketsLoading(false);
-    }
-  }, [device?.deviceId]);
+  const fetchDeviceTickets = useCallback(
+    async (page = 1, pageSize = PAGE_SIZE) => {
+      if (!device?.deviceId) return;
+      setTicketsLoading(true);
+      try {
+        const response = await deviceAPI.getTickets(device.deviceId, {
+          page,
+          pageSize,
+        });
+        setTickets(response.data || []);
+        setTicketsPagination({
+          current: response.page || 1,
+          pageSize: response.pageSize || PAGE_SIZE,
+          total: response.total || 0,
+        });
+      } catch (error) {
+        console.error('获取设备工单失败:', error);
+      } finally {
+        setTicketsLoading(false);
+      }
+    },
+    [device?.deviceId]
+  );
 
   useEffect(() => {
     if (visible && device?.deviceId && activeTab === 'tickets') {
@@ -118,63 +121,66 @@ function DeviceDetailDrawer({
     }
   }, [visible, device?.deviceId, activeTab, fetchDeviceTickets]);
 
-  const ticketColumns = useMemo(() => [
-    {
-      title: '工单编号',
-      dataIndex: 'ticketId',
-      key: 'ticketId',
-      width: 120,
-      render: (text) => <Text code>{text}</Text>,
-    },
-    {
-      title: '标题',
-      dataIndex: 'title',
-      key: 'title',
-      ellipsis: true,
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 90,
-      render: (status) => {
-        const statusConfig = {
-          pending: { color: 'warning', text: '待处理' },
-          processing: { color: 'processing', text: '处理中' },
-          completed: { color: 'success', text: '已完成' },
-          closed: { color: 'default', text: '已关闭' },
-        };
-        const config = statusConfig[status] || { color: 'default', text: status };
-        return <Badge status={config.color} text={config.text} />;
+  const ticketColumns = useMemo(
+    () => [
+      {
+        title: '工单编号',
+        dataIndex: 'ticketId',
+        key: 'ticketId',
+        width: 120,
+        render: text => <Text code>{text}</Text>,
       },
-    },
-    {
-      title: '优先级',
-      dataIndex: 'priority',
-      key: 'priority',
-      width: 80,
-      render: (priority) => {
-        const priorityConfig = {
-          low: { color: 'success', text: '低' },
-          medium: { color: 'warning', text: '中' },
-          high: { color: 'error', text: '高' },
-          critical: { color: 'purple', text: '紧急' },
-        };
-        const config = priorityConfig[priority] || { color: 'default', text: priority };
-        return <Tag color={config.color}>{config.text}</Tag>;
+      {
+        title: '标题',
+        dataIndex: 'title',
+        key: 'title',
+        ellipsis: true,
       },
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 150,
-      render: (date) => {
-        if (!date) return '-';
-        return dayjs(date).format('YYYY-MM-DD HH:mm');
+      {
+        title: '状态',
+        dataIndex: 'status',
+        key: 'status',
+        width: 90,
+        render: status => {
+          const statusConfig = {
+            pending: { color: 'warning', text: '待处理' },
+            processing: { color: 'processing', text: '处理中' },
+            completed: { color: 'success', text: '已完成' },
+            closed: { color: 'default', text: '已关闭' },
+          };
+          const config = statusConfig[status] || { color: 'default', text: status };
+          return <Badge status={config.color} text={config.text} />;
+        },
       },
-    },
-  ], []);
+      {
+        title: '优先级',
+        dataIndex: 'priority',
+        key: 'priority',
+        width: 80,
+        render: priority => {
+          const priorityConfig = {
+            low: { color: 'success', text: '低' },
+            medium: { color: 'warning', text: '中' },
+            high: { color: 'error', text: '高' },
+            critical: { color: 'purple', text: '紧急' },
+          };
+          const config = priorityConfig[priority] || { color: 'default', text: priority };
+          return <Tag color={config.color}>{config.text}</Tag>;
+        },
+      },
+      {
+        title: '创建时间',
+        dataIndex: 'createdAt',
+        key: 'createdAt',
+        width: 150,
+        render: date => {
+          if (!date) return '-';
+          return dayjs(date).format('YYYY-MM-DD HH:mm');
+        },
+      },
+    ],
+    []
+  );
 
   const deviceCables = useMemo(() => {
     if (!device || !cables) return [];
@@ -237,7 +243,7 @@ function DeviceDetailDrawer({
     return typeMap[type?.toLowerCase()] || type || '未知设备';
   }, []);
 
-  const renderPortTable = (ports) => {
+  const renderPortTable = ports => {
     const columns = [
       {
         title: '端口名称',
@@ -397,7 +403,7 @@ function DeviceDetailDrawer({
         </div>
 
         <Collapse
-          activeKey={expandedCards.filter(id => 
+          activeKey={expandedCards.filter(id =>
             paginatedNetworkCards.some(card => card.nicId === id)
           )}
           onChange={keys => setExpandedCards(keys)}
@@ -466,11 +472,7 @@ function DeviceDetailDrawer({
       <div className="cable-panel">
         <Space direction="vertical" size={16} style={{ width: '100%' }}>
           {paginatedCables.map(cable => (
-            <Card
-              key={cable.cableId}
-              size="small"
-              style={{ borderRadius: '8px' }}
-            >
+            <Card key={cable.cableId} size="small" style={{ borderRadius: '8px' }}>
               <Row gutter={[16, 8]}>
                 <Col span={12}>
                   <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>源设备</div>
@@ -563,8 +565,24 @@ function DeviceDetailDrawer({
   if (!device) return null;
 
   const customFields = device.customFields || {};
-  const standardFields = ['deviceId', 'name', 'type', 'model', 'serialNumber', 'status', 'ipAddress', 'position', 'height', 'powerConsumption', 'purchaseDate', 'warrantyExpiry', 'description'];
-  const customFieldEntries = Object.entries(customFields).filter(([key]) => !standardFields.includes(key));
+  const standardFields = [
+    'deviceId',
+    'name',
+    'type',
+    'model',
+    'serialNumber',
+    'status',
+    'ipAddress',
+    'position',
+    'height',
+    'powerConsumption',
+    'purchaseDate',
+    'warrantyExpiry',
+    'description',
+  ];
+  const customFieldEntries = Object.entries(customFields).filter(
+    ([key]) => !standardFields.includes(key)
+  );
 
   const tabItems = [
     {
@@ -639,7 +657,13 @@ function DeviceDetailDrawer({
       }
       styles={{ body: { padding: '0', overflow: 'auto' } }}
     >
-      <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff' }}>
+      <div
+        style={{
+          padding: '20px 24px',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: '#fff',
+        }}
+      >
         <Row gutter={[16, 16]} align="middle">
           <Col>
             <DesktopOutlined style={{ fontSize: 48, opacity: 0.9 }} />
@@ -682,7 +706,9 @@ function DeviceDetailDrawer({
             </Col>
             <Col span={8}>
               <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>功耗</div>
-              <div style={{ fontWeight: 500 }}>{device.powerConsumption ? `${device.powerConsumption}W` : '-'}</div>
+              <div style={{ fontWeight: 500 }}>
+                {device.powerConsumption ? `${device.powerConsumption}W` : '-'}
+              </div>
             </Col>
           </Row>
         </Card>
@@ -717,7 +743,9 @@ function DeviceDetailDrawer({
                 const fieldLabel = tooltipFields?.[key]?.label || key;
                 return (
                   <Col span={8} key={key}>
-                    <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>{fieldLabel}</div>
+                    <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>
+                      {fieldLabel}
+                    </div>
                     <div style={{ fontWeight: 500 }}>{String(value)}</div>
                   </Col>
                 );

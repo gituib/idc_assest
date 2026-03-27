@@ -17,41 +17,56 @@ router.get('/stats', async (req, res) => {
     const where = {};
     if (startDate || endDate) {
       where.createdAt = {};
-      if (startDate) where.createdAt[Op.gte] = new Date(startDate);
-      if (endDate) where.createdAt[Op.lte] = new Date(endDate + ' 23:59:59');
+      if (startDate) {
+        where.createdAt[Op.gte] = new Date(startDate);
+      }
+      if (endDate) {
+        where.createdAt[Op.lte] = new Date(endDate + ' 23:59:59');
+      }
     }
 
     const Sequelize = require('sequelize');
 
-    const [total, statusStats, priorityStats, categoryStats, monthlyStats, deviceStats, dailyCreatedStats, dailyCompletedStats] = await Promise.all([
+    const [
+      total,
+      statusStats,
+      priorityStats,
+      categoryStats,
+      monthlyStats,
+      deviceStats,
+      dailyCreatedStats,
+      dailyCompletedStats,
+    ] = await Promise.all([
       Ticket.count({ where }),
       Ticket.findAll({
         where,
         attributes: ['status', [Sequelize.fn('COUNT', '*'), 'count']],
-        group: ['status']
+        group: ['status'],
       }),
       Ticket.findAll({
         where,
         attributes: ['priority', [Sequelize.fn('COUNT', '*'), 'count']],
-        group: ['priority']
+        group: ['priority'],
       }),
       Ticket.findAll({
         where,
         attributes: ['faultCategory', [Sequelize.fn('COUNT', '*'), 'count']],
-        group: ['faultCategory']
+        group: ['faultCategory'],
       }),
       Ticket.findAll({
         where,
         attributes: [
-          [dbDialect === 'mysql' 
-            ? Sequelize.fn('DATE_FORMAT', Sequelize.col('createdAt'), '%Y-%m')
-            : Sequelize.fn('strftime', '%Y-%m', Sequelize.col('createdAt')), 
-            'month'],
-          [Sequelize.fn('COUNT', '*'), 'count']
+          [
+            dbDialect === 'mysql'
+              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('createdAt'), '%Y-%m')
+              : Sequelize.fn('strftime', '%Y-%m', Sequelize.col('createdAt')),
+            'month',
+          ],
+          [Sequelize.fn('COUNT', '*'), 'count'],
         ],
         group: ['month'],
         order: [['month', 'DESC']],
-        limit: 12
+        limit: 12,
       }),
       Ticket.findAll({
         where,
@@ -59,39 +74,43 @@ router.get('/stats', async (req, res) => {
           'deviceId',
           'deviceName',
           [Sequelize.fn('COUNT', '*'), 'count'],
-          [Sequelize.fn('MAX', Sequelize.col('createdAt')), 'lastFaultTime']
+          [Sequelize.fn('MAX', Sequelize.col('createdAt')), 'lastFaultTime'],
         ],
         group: ['deviceId', 'deviceName'],
         order: [[Sequelize.fn('COUNT', '*'), 'DESC']],
-        limit: 10
+        limit: 10,
       }),
       Ticket.findAll({
         where,
         attributes: [
-          [dbDialect === 'mysql' 
-            ? Sequelize.fn('DATE_FORMAT', Sequelize.col('createdAt'), '%Y-%m-%d')
-            : Sequelize.fn('date', Sequelize.col('createdAt')), 
-            'date'],
-          [Sequelize.fn('COUNT', '*'), 'created']
+          [
+            dbDialect === 'mysql'
+              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('createdAt'), '%Y-%m-%d')
+              : Sequelize.fn('date', Sequelize.col('createdAt')),
+            'date',
+          ],
+          [Sequelize.fn('COUNT', '*'), 'created'],
         ],
         group: ['date'],
-        order: [['date', 'ASC']]
+        order: [['date', 'ASC']],
       }),
       Ticket.findAll({
         where: {
           ...where,
-          status: 'completed'
+          status: 'completed',
         },
         attributes: [
-          [dbDialect === 'mysql' 
-            ? Sequelize.fn('DATE_FORMAT', Sequelize.col('updatedAt'), '%Y-%m-%d')
-            : Sequelize.fn('date', Sequelize.col('updatedAt')), 
-            'date'],
-          [Sequelize.fn('COUNT', '*'), 'completed']
+          [
+            dbDialect === 'mysql'
+              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('updatedAt'), '%Y-%m-%d')
+              : Sequelize.fn('date', Sequelize.col('updatedAt')),
+            'date',
+          ],
+          [Sequelize.fn('COUNT', '*'), 'completed'],
         ],
         group: ['date'],
-        order: [['date', 'ASC']]
-      })
+        order: [['date', 'ASC']],
+      }),
     ]);
 
     const statusData = statusStats.map(s => s.dataValues);
@@ -103,21 +122,21 @@ router.get('/stats', async (req, res) => {
     const byStatus = statusData.map(item => ({
       status: item.status,
       count: item.count,
-      percentage: total > 0 ? (item.count / total * 100) : 0
+      percentage: total > 0 ? (item.count / total) * 100 : 0,
     }));
 
     const byPriority = priorityStats.map(p => ({
       priority: p.dataValues.priority,
       count: p.dataValues.count,
       completed: 0,
-      avgTime: 0
+      avgTime: 0,
     }));
 
     const byCategory = categoryStats.map(c => ({
       category: c.dataValues.faultCategory,
       count: c.dataValues.count,
       completed: 0,
-      avgTime: 0
+      avgTime: 0,
     }));
 
     const byDevice = deviceStats.map(d => ({
@@ -125,7 +144,7 @@ router.get('/stats', async (req, res) => {
       deviceName: d.deviceName,
       count: d.dataValues.count,
       lastFaultTime: d.dataValues.lastFaultTime,
-      deviceType: ''
+      deviceType: '',
     }));
 
     const createdMap = {};
@@ -137,22 +156,24 @@ router.get('/stats', async (req, res) => {
       completedMap[d.dataValues.date] = d.dataValues.completed;
     });
 
-    const allDates = [...new Set([...Object.keys(createdMap), ...Object.keys(completedMap)])].sort();
+    const allDates = [
+      ...new Set([...Object.keys(createdMap), ...Object.keys(completedMap)]),
+    ].sort();
     const trend = allDates.map(date => ({
       date,
       created: createdMap[date] || 0,
       completed: completedMap[date] || 0,
       closed: 0,
       inProgress: 0,
-      pending: 0
+      pending: 0,
     }));
 
     const completedTickets = await Ticket.findAll({
       where: {
         ...where,
-        status: 'completed'
+        status: 'completed',
       },
-      attributes: ['createdAt', 'updatedAt']
+      attributes: ['createdAt', 'updatedAt'],
     });
 
     let avgProcessingTime = 0;
@@ -162,7 +183,11 @@ router.get('/stats', async (req, res) => {
         const updated = new Date(ticket.updatedAt);
         return sum + (updated - created);
       }, 0);
-      avgProcessingTime = (totalProcessingTime / completedTickets.length / (1000 * 60 * 60)).toFixed(1);
+      avgProcessingTime = (
+        totalProcessingTime /
+        completedTickets.length /
+        (1000 * 60 * 60)
+      ).toFixed(1);
     }
 
     res.json({
@@ -177,7 +202,10 @@ router.get('/stats', async (req, res) => {
       byCategory,
       byDevice,
       trend,
-      monthlyStats: monthlyStats.map(m => ({ month: m.dataValues.month, count: m.dataValues.count }))
+      monthlyStats: monthlyStats.map(m => ({
+        month: m.dataValues.month,
+        count: m.dataValues.count,
+      })),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -203,7 +231,7 @@ router.get('/', async (req, res) => {
       startDate,
       endDate,
       page = 1,
-      pageSize = 10
+      pageSize = 10,
     } = req.query;
 
     const offset = (page - 1) * pageSize;
@@ -216,7 +244,7 @@ router.get('/', async (req, res) => {
         { title: { [Op.like]: `%${keyword}%` } },
         { deviceName: { [Op.like]: `%${keyword}%` } },
         { serialNumber: { [Op.like]: `%${keyword}%` } },
-        { description: { [Op.like]: `%${keyword}%` } }
+        { description: { [Op.like]: `%${keyword}%` } },
       ];
     }
 
@@ -260,18 +288,18 @@ router.get('/', async (req, res) => {
       where,
       include: [
         { model: User, as: 'reporter', attributes: ['userId', 'username'] },
-        { model: Device, attributes: ['deviceId', 'name', 'type', 'model'] }
+        { model: Device, attributes: ['deviceId', 'name', 'type', 'model'] },
       ],
       order: [['createdAt', 'DESC']],
       offset,
-      limit: parseInt(pageSize)
+      limit: parseInt(pageSize),
     });
 
     res.json({
       total: count,
       tickets: rows,
       page: parseInt(page),
-      pageSize: parseInt(pageSize)
+      pageSize: parseInt(pageSize),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -293,14 +321,14 @@ router.get('/:ticketId', async (req, res) => {
               include: [
                 {
                   model: Room,
-                  attributes: ['roomId', 'name']
-                }
-              ]
-            }
-          ]
+                  attributes: ['roomId', 'name'],
+                },
+              ],
+            },
+          ],
         },
-        { model: TicketOperationRecord, as: 'operationRecords', order: [['createdAt', 'DESC']] }
-      ]
+        { model: TicketOperationRecord, as: 'operationRecords', order: [['createdAt', 'DESC']] },
+      ],
     });
 
     if (!ticket) {
@@ -334,7 +362,7 @@ router.post('/', async (req, res) => {
       expectedCompletionDate,
       title,
       attachments,
-      tags
+      tags,
     } = req.body;
 
     let device = null;
@@ -347,7 +375,7 @@ router.post('/', async (req, res) => {
     if (deviceId) {
       // 从设备列表选择
       device = await Device.findByPk(deviceId, {
-        include: [{ model: require('../models/Rack') }]
+        include: [{ model: require('../models/Rack') }],
       });
       if (!device) {
         return res.status(404).json({ error: '设备不存在' });
@@ -385,7 +413,7 @@ router.post('/', async (req, res) => {
       location: ticketLocation,
       attachments: attachments || [],
       tags: tags || [],
-      status: 'pending'
+      status: 'pending',
     });
 
     // 创建操作记录
@@ -397,7 +425,7 @@ router.post('/', async (req, res) => {
       operatorId: ticket.reporterId,
       operatorName: ticket.reporterName,
       operatorRole: 'user',
-      afterState: ticket.toJSON()
+      afterState: ticket.toJSON(),
     });
 
     res.status(201).json(ticket);
@@ -428,7 +456,7 @@ router.put('/:ticketId', async (req, res) => {
       operatorName: operatorName || ticket.reporterName,
       operatorRole: operatorRole || 'user',
       beforeState,
-      afterState: ticket.toJSON()
+      afterState: ticket.toJSON(),
     });
 
     res.json(ticket);
@@ -468,7 +496,7 @@ router.put('/:ticketId/status', async (req, res) => {
       operatorName: operatorName || ticket.reporterName,
       operatorRole: operatorRole || 'user',
       beforeState,
-      afterState: ticket.toJSON()
+      afterState: ticket.toJSON(),
     });
 
     res.json(ticket);
@@ -490,7 +518,7 @@ router.put('/:ticketId/process', async (req, res) => {
     const beforeState = ticket.toJSON();
     const updateData = {
       status: 'in_progress',
-      resolution: solution
+      resolution: solution,
     };
 
     if (result === 'resolved') {
@@ -513,7 +541,7 @@ router.put('/:ticketId/process', async (req, res) => {
       operatorName: operatorName || ticket.reporterName,
       operatorRole: operatorRole || 'user',
       beforeState,
-      afterState: ticket.toJSON()
+      afterState: ticket.toJSON(),
     });
 
     res.json(ticket);
@@ -535,7 +563,7 @@ router.post('/:ticketId/operations', async (req, res) => {
       notes,
       operatorId,
       operatorName,
-      operatorRole
+      operatorRole,
     } = req.body;
 
     const ticket = await Ticket.findByPk(req.params.ticketId);
@@ -555,7 +583,7 @@ router.post('/:ticketId/operations', async (req, res) => {
       notes,
       operatorId,
       operatorName,
-      operatorRole
+      operatorRole,
     });
 
     res.status(201).json(record);
@@ -569,7 +597,7 @@ router.get('/:ticketId/operations', async (req, res) => {
   try {
     const records = await TicketOperationRecord.findAll({
       where: { ticketId: req.params.ticketId },
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
     });
 
     res.json(records);
@@ -613,7 +641,7 @@ router.post('/:ticketId/evaluate', async (req, res) => {
       operatorId,
       operatorName,
       operatorRole: 'user',
-      notes: `评价: ${evaluation}, 星级: ${evaluationRating}`
+      notes: `评价: ${evaluation}, 星级: ${evaluationRating}`,
     });
 
     res.json(ticket);

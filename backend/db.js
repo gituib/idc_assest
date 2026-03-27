@@ -20,11 +20,11 @@ if (DB_TYPE === 'mysql') {
       logging: process.env.NODE_ENV === 'development' ? console.log : false,
       // 连接池配置 - 提升并发处理能力
       pool: {
-        max: 10,        // 最大连接数
-        min: 2,         // 最小连接数
+        max: 10, // 最大连接数
+        min: 2, // 最小连接数
         acquire: 30000, // 获取连接超时时间(ms)
-        idle: 10000     // 连接空闲时间(ms)
-      }
+        idle: 10000, // 连接空闲时间(ms)
+      },
     }
   );
   dbDialect = 'mysql';
@@ -38,8 +38,8 @@ if (DB_TYPE === 'mysql') {
       max: 5,
       min: 1,
       acquire: 30000,
-      idle: 10000
-    }
+      idle: 10000,
+    },
   });
   dbDialect = 'sqlite';
 }

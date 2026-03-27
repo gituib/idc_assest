@@ -20,13 +20,7 @@ const secondaryActionStyle = {
   fontWeight: '500',
 };
 
-const BatchStatusModal = ({
-  visible,
-  selectedCount,
-  loading,
-  onSubmit,
-  onCancel,
-}) => {
+const BatchStatusModal = ({ visible, selectedCount, loading, onSubmit, onCancel }) => {
   const [form] = Form.useForm();
 
   const handleSubmit = async () => {
@@ -99,8 +93,7 @@ const BatchStatusModal = ({
           </Select>
         </Form.Item>
         <div style={{ color: '#666', fontSize: '13px' }}>
-          已选择{' '}
-          <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedCount}</span> 个设备
+          已选择 <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedCount}</span> 个设备
         </div>
       </Form>
     </Modal>

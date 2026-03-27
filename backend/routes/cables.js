@@ -8,10 +8,7 @@ const DevicePort = require('../models/DevicePort');
 // 辅助函数：更新端口状态
 async function updatePortStatus(deviceId, portName, status) {
   try {
-    await DevicePort.update(
-      { status },
-      { where: { deviceId, portName } }
-    );
+    await DevicePort.update({ status }, { where: { deviceId, portName } });
   } catch (error) {
     console.error(`更新端口状态失败: ${deviceId}:${portName} -> ${status}`, error);
   }
@@ -29,51 +26,58 @@ async function freePort(deviceId, portName) {
 
 router.get('/', async (req, res) => {
   try {
-    const { sourceDeviceId, targetDeviceId, status, cableType, page = 1, pageSize = 10 } = req.query;
+    const {
+      sourceDeviceId,
+      targetDeviceId,
+      status,
+      cableType,
+      page = 1,
+      pageSize = 10,
+    } = req.query;
     const offset = (page - 1) * pageSize;
-    
+
     const where = {};
-    
+
     if (sourceDeviceId) {
       where.sourceDeviceId = sourceDeviceId;
     }
-    
+
     if (targetDeviceId) {
       where.targetDeviceId = targetDeviceId;
     }
-    
+
     if (status && status !== 'all') {
       where.status = status;
     }
-    
+
     if (cableType && cableType !== 'all') {
       where.cableType = cableType;
     }
-    
+
     const { count, rows } = await Cable.findAndCountAll({
       where,
       include: [
         {
           model: Device,
           as: 'sourceDevice',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
         },
         {
           model: Device,
           as: 'targetDevice',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
-        }
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
+        },
       ],
       offset,
       limit: parseInt(pageSize),
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
     });
-    
+
     res.json({
       total: count,
       cables: rows,
       page: parseInt(page),
-      pageSize: parseInt(pageSize)
+      pageSize: parseInt(pageSize),
     });
   } catch (error) {
     console.error('获取接线列表失败:', error);
@@ -84,28 +88,25 @@ router.get('/', async (req, res) => {
 router.get('/device/:deviceId', async (req, res) => {
   try {
     const { deviceId } = req.params;
-    
+
     const cables = await Cable.findAll({
       where: {
-        [Op.or]: [
-          { sourceDeviceId: deviceId },
-          { targetDeviceId: deviceId }
-        ]
+        [Op.or]: [{ sourceDeviceId: deviceId }, { targetDeviceId: deviceId }],
       },
       include: [
         {
           model: Device,
           as: 'sourceDevice',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
         },
         {
           model: Device,
           as: 'targetDevice',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
-        }
-      ]
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
+        },
+      ],
     });
-    
+
     res.json(cables);
   } catch (error) {
     console.error('获取设备接线失败:', error);
@@ -117,15 +118,15 @@ router.get('/device/:deviceId', async (req, res) => {
 router.get('/rack/:rackId', async (req, res) => {
   try {
     const { rackId } = req.params;
-    
+
     // 1. 找出该机柜下的所有设备ID
     const devices = await Device.findAll({
       where: { rackId: rackId },
-      attributes: ['deviceId']
+      attributes: ['deviceId'],
     });
-    
+
     const deviceIds = devices.map(d => d.deviceId);
-    
+
     if (deviceIds.length === 0) {
       return res.json([]);
     }
@@ -135,23 +136,23 @@ router.get('/rack/:rackId', async (req, res) => {
       where: {
         [Op.or]: [
           { sourceDeviceId: { [Op.in]: deviceIds } },
-          { targetDeviceId: { [Op.in]: deviceIds } }
-        ]
+          { targetDeviceId: { [Op.in]: deviceIds } },
+        ],
       },
       include: [
         {
           model: Device,
           as: 'sourceDevice',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
         },
         {
           model: Device,
           as: 'targetDevice',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
-        }
-      ]
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
+        },
+      ],
     });
-    
+
     res.json(cables);
   } catch (error) {
     console.error('获取机柜接线失败:', error);
@@ -175,22 +176,22 @@ router.post('/check-conflict', async (req, res) => {
       where: {
         [Op.or]: [
           { sourceDeviceId, sourcePort },
-          { targetDeviceId: sourceDeviceId, targetPort: sourcePort }
+          { targetDeviceId: sourceDeviceId, targetPort: sourcePort },
         ],
-        ...(excludeCableId && { cableId: { [Op.ne]: excludeCableId } })
+        ...(excludeCableId && { cableId: { [Op.ne]: excludeCableId } }),
       },
       include: [
         {
           model: Device,
           as: 'sourceDevice',
-          attributes: ['deviceId', 'name', 'type']
+          attributes: ['deviceId', 'name', 'type'],
         },
         {
           model: Device,
           as: 'targetDevice',
-          attributes: ['deviceId', 'name', 'type']
-        }
-      ]
+          attributes: ['deviceId', 'name', 'type'],
+        },
+      ],
     });
 
     if (sourceConflict) {
@@ -198,7 +199,7 @@ router.post('/check-conflict', async (req, res) => {
         type: 'source',
         port: sourcePort,
         deviceId: sourceDeviceId,
-        existingCable: sourceConflict
+        existingCable: sourceConflict,
       });
     }
 
@@ -207,22 +208,22 @@ router.post('/check-conflict', async (req, res) => {
       where: {
         [Op.or]: [
           { sourceDeviceId: targetDeviceId, sourcePort: targetPort },
-          { targetDeviceId, targetPort }
+          { targetDeviceId, targetPort },
         ],
-        ...(excludeCableId && { cableId: { [Op.ne]: excludeCableId } })
+        ...(excludeCableId && { cableId: { [Op.ne]: excludeCableId } }),
       },
       include: [
         {
           model: Device,
           as: 'sourceDevice',
-          attributes: ['deviceId', 'name', 'type']
+          attributes: ['deviceId', 'name', 'type'],
         },
         {
           model: Device,
           as: 'targetDevice',
-          attributes: ['deviceId', 'name', 'type']
-        }
-      ]
+          attributes: ['deviceId', 'name', 'type'],
+        },
+      ],
     });
 
     if (targetConflict) {
@@ -230,13 +231,13 @@ router.post('/check-conflict', async (req, res) => {
         type: 'target',
         port: targetPort,
         deviceId: targetDeviceId,
-        existingCable: targetConflict
+        existingCable: targetConflict,
       });
     }
 
     res.json({
       hasConflict: conflicts.length > 0,
-      conflicts
+      conflicts,
     });
   } catch (error) {
     console.error('检查接线冲突失败:', error);
@@ -246,7 +247,18 @@ router.post('/check-conflict', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { cableId, sourceDeviceId, sourcePort, targetDeviceId, targetPort, cableType, cableLength, status, description, force } = req.body;
+    const {
+      cableId,
+      sourceDeviceId,
+      sourcePort,
+      targetDeviceId,
+      targetPort,
+      cableType,
+      cableLength,
+      status,
+      description,
+      force,
+    } = req.body;
 
     if (!sourceDeviceId || !sourcePort || !targetDeviceId || !targetPort) {
       return res.status(400).json({ error: '缺少必填字段' });
@@ -262,16 +274,16 @@ router.post('/', async (req, res) => {
         where: {
           [Op.or]: [
             { sourceDeviceId, sourcePort },
-            { targetDeviceId, targetPort }
-          ]
-        }
+            { targetDeviceId, targetPort },
+          ],
+        },
       });
 
       if (existingCable) {
         return res.status(409).json({
           error: '端口已被占用',
           conflict: true,
-          existingCable
+          existingCable,
         });
       }
     }
@@ -284,9 +296,9 @@ router.post('/', async (req, res) => {
             { sourceDeviceId, sourcePort },
             { targetDeviceId: sourceDeviceId, targetPort: sourcePort },
             { sourceDeviceId: targetDeviceId, sourcePort: targetPort },
-            { targetDeviceId, targetPort }
-          ]
-        }
+            { targetDeviceId, targetPort },
+          ],
+        },
       });
 
       for (const cable of existingCables) {
@@ -308,7 +320,7 @@ router.post('/', async (req, res) => {
       cableType: cableType || 'ethernet',
       cableLength,
       status: status || 'normal',
-      description
+      description,
     });
 
     const createdCable = await Cable.findByPk(cable.cableId, {
@@ -316,14 +328,14 @@ router.post('/', async (req, res) => {
         {
           model: Device,
           as: 'sourceDevice',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
         },
         {
           model: Device,
           as: 'targetDevice',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
-        }
-      ]
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
+        },
+      ],
     });
 
     // 自动将源端口和目标端口状态设为occupied
@@ -340,44 +352,49 @@ router.post('/', async (req, res) => {
 router.post('/batch', async (req, res) => {
   try {
     const { cables } = req.body;
-    
+
     if (!cables || !Array.isArray(cables) || cables.length === 0) {
       return res.status(400).json({ error: '请提供有效的接线数据' });
     }
-    
+
     const results = {
       total: cables.length,
       success: 0,
       failed: 0,
-      errors: []
+      errors: [],
     };
-    
+
     for (let i = 0; i < cables.length; i++) {
       const cableData = cables[i];
-      
+
       try {
-        if (!cableData.cableId || !cableData.sourceDeviceId || !cableData.sourcePort || 
-            !cableData.targetDeviceId || !cableData.targetPort) {
+        if (
+          !cableData.cableId ||
+          !cableData.sourceDeviceId ||
+          !cableData.sourcePort ||
+          !cableData.targetDeviceId ||
+          !cableData.targetPort
+        ) {
           throw new Error('缺少必填字段');
         }
-        
+
         if (cableData.sourceDeviceId === cableData.targetDeviceId) {
           throw new Error('源设备和目标设备不能相同');
         }
-        
+
         const existingCable = await Cable.findOne({
           where: {
             [Op.or]: [
               { sourceDeviceId: cableData.sourceDeviceId, sourcePort: cableData.sourcePort },
-              { targetDeviceId: cableData.targetDeviceId, targetPort: cableData.targetPort }
-            ]
-          }
+              { targetDeviceId: cableData.targetDeviceId, targetPort: cableData.targetPort },
+            ],
+          },
         });
-        
+
         if (existingCable) {
           throw new Error('端口已被占用');
         }
-        
+
         await Cable.create({
           cableId: cableData.cableId,
           sourceDeviceId: cableData.sourceDeviceId,
@@ -387,24 +404,24 @@ router.post('/batch', async (req, res) => {
           cableType: cableData.cableType || 'ethernet',
           cableLength: cableData.cableLength,
           status: cableData.status || 'normal',
-          description: cableData.description
+          description: cableData.description,
         });
-        
+
         // 自动将源端口和目标端口状态设为occupied
         await occupyPort(cableData.sourceDeviceId, cableData.sourcePort);
         await occupyPort(cableData.targetDeviceId, cableData.targetPort);
-        
+
         results.success++;
       } catch (error) {
         results.failed++;
         results.errors.push({
           index: i + 1,
           cableId: cableData.cableId,
-          error: error.message
+          error: error.message,
         });
       }
     }
-    
+
     res.json(results);
   } catch (error) {
     console.error('批量创建接线失败:', error);
@@ -416,48 +433,53 @@ router.put('/:cableId', async (req, res) => {
   try {
     // 获取更新前的接线信息
     const oldCable = await Cable.findByPk(req.params.cableId);
-    
+
     if (!oldCable) {
       return res.status(404).json({ error: '接线不存在' });
     }
-    
-    const { sourceDeviceId: oldSourceDeviceId, sourcePort: oldSourcePort, targetDeviceId: oldTargetDeviceId, targetPort: oldTargetPort } = oldCable;
-    
+
+    const {
+      sourceDeviceId: oldSourceDeviceId,
+      sourcePort: oldSourcePort,
+      targetDeviceId: oldTargetDeviceId,
+      targetPort: oldTargetPort,
+    } = oldCable;
+
     const [updated] = await Cable.update(req.body, {
-      where: { cableId: req.params.cableId }
+      where: { cableId: req.params.cableId },
     });
-    
+
     if (updated) {
       const cable = await Cable.findByPk(req.params.cableId, {
         include: [
           {
             model: Device,
             as: 'sourceDevice',
-            attributes: ['deviceId', 'name', 'type', 'rackId']
+            attributes: ['deviceId', 'name', 'type', 'rackId'],
           },
           {
             model: Device,
             as: 'targetDevice',
-            attributes: ['deviceId', 'name', 'type', 'rackId']
-          }
-        ]
+            attributes: ['deviceId', 'name', 'type', 'rackId'],
+          },
+        ],
       });
-      
+
       const { sourceDeviceId, sourcePort, targetDeviceId, targetPort } = cable;
-      
+
       // 同步更新端口状态
       // 源端口变更：释放旧端口，占用新端口
       if (oldSourceDeviceId !== sourceDeviceId || oldSourcePort !== sourcePort) {
         await freePort(oldSourceDeviceId, oldSourcePort);
         await occupyPort(sourceDeviceId, sourcePort);
       }
-      
+
       // 目标端口变更：释放旧端口，占用新端口
       if (oldTargetDeviceId !== targetDeviceId || oldTargetPort !== targetPort) {
         await freePort(oldTargetDeviceId, oldTargetPort);
         await occupyPort(targetDeviceId, targetPort);
       }
-      
+
       res.json(cable);
     } else {
       res.status(404).json({ error: '接线不存在' });
@@ -472,22 +494,22 @@ router.delete('/:cableId', async (req, res) => {
   try {
     // 先获取接线信息，用于后续恢复端口状态
     const cable = await Cable.findByPk(req.params.cableId);
-    
+
     if (!cable) {
       return res.status(404).json({ error: '接线不存在' });
     }
-    
+
     const { sourceDeviceId, sourcePort, targetDeviceId, targetPort } = cable;
-    
+
     const deleted = await Cable.destroy({
-      where: { cableId: req.params.cableId }
+      where: { cableId: req.params.cableId },
     });
-    
+
     if (deleted) {
       // 自动将源端口和目标端口状态恢复为free
       await freePort(sourceDeviceId, sourcePort);
       await freePort(targetDeviceId, targetPort);
-      
+
       res.status(204).json();
     } else {
       res.status(404).json({ error: '接线不存在' });
@@ -501,29 +523,29 @@ router.delete('/:cableId', async (req, res) => {
 router.delete('/batch', async (req, res) => {
   try {
     const { cableIds } = req.body;
-    
+
     if (!cableIds || !Array.isArray(cableIds) || cableIds.length === 0) {
       return res.status(400).json({ error: '请提供有效的接线ID列表' });
     }
-    
+
     // 先获取所有要删除的接线信息，用于后续恢复端口状态
     const cables = await Cable.findAll({
-      where: { cableId: { [Op.in]: cableIds } }
+      where: { cableId: { [Op.in]: cableIds } },
     });
-    
+
     const deletedCount = await Cable.destroy({
-      where: { cableId: { [Op.in]: cableIds } }
+      where: { cableId: { [Op.in]: cableIds } },
     });
-    
+
     // 自动将所有相关端口状态恢复为free
     for (const cable of cables) {
       await freePort(cable.sourceDeviceId, cable.sourcePort);
       await freePort(cable.targetDeviceId, cable.targetPort);
     }
-    
+
     res.json({
       message: `批量删除成功，已删除 ${deletedCount} 条接线`,
-      deletedCount
+      deletedCount,
     });
   } catch (error) {
     console.error('批量删除接线失败:', error);
@@ -538,20 +560,20 @@ router.get('/:cableId', async (req, res) => {
         {
           model: Device,
           as: 'sourceDevice',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
         },
         {
           model: Device,
           as: 'targetDevice',
-          attributes: ['deviceId', 'name', 'type', 'rackId']
-        }
-      ]
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
+        },
+      ],
     });
-    
+
     if (!cable) {
       return res.status(404).json({ error: '接线不存在' });
     }
-    
+
     res.json(cable);
   } catch (error) {
     console.error('获取接线详情失败:', error);

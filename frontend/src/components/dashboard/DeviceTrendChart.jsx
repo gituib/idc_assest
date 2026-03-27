@@ -2,7 +2,7 @@ import React from 'react';
 import { designTokens } from '../../config/theme';
 
 const DeviceTrendChart = ({ data }) => {
-  const maxValue = Math.max(...data.map((d) => d.value));
+  const maxValue = Math.max(...data.map(d => d.value));
   const chartHeight = 120;
 
   return (

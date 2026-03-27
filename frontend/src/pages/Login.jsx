@@ -374,9 +374,7 @@ const Login = () => {
             >
               {headerContent.title}
             </Title>
-            <Text style={{ fontSize: '15px', color: '#64748b' }}>
-              {headerContent.subtitle}
-            </Text>
+            <Text style={{ fontSize: '15px', color: '#64748b' }}>{headerContent.subtitle}</Text>
           </div>
 
           {/* 首次使用提示 */}
@@ -436,7 +434,11 @@ const Login = () => {
                       rules={[{ required: true, message: '请输入真实姓名' }]}
                     >
                       <Input
-                        prefix={<SafetyCertificateOutlined style={{ color: '#94a3b8', fontSize: '18px' }} />}
+                        prefix={
+                          <SafetyCertificateOutlined
+                            style={{ color: '#94a3b8', fontSize: '18px' }}
+                          />
+                        }
                         placeholder="请输入真实姓名"
                         style={{ borderRadius: '12px', height: '48px' }}
                       />

@@ -25,7 +25,7 @@ const initDefaultFaultCategories = async () => {
         defaultPriority: 'high',
         expectedDuration: 4,
         solutions: ['重启服务', '回滚版本', '修复配置', '重装系统'],
-        isSystem: true
+        isSystem: true,
       },
       {
         categoryId: 'CAT002',
@@ -38,7 +38,7 @@ const initDefaultFaultCategories = async () => {
         defaultPriority: 'critical',
         expectedDuration: 8,
         solutions: ['更换部件', '联系厂商', '现场维修'],
-        isSystem: true
+        isSystem: true,
       },
       {
         categoryId: 'CAT003',
@@ -51,7 +51,7 @@ const initDefaultFaultCategories = async () => {
         defaultPriority: 'high',
         expectedDuration: 2,
         solutions: ['检查网线', '重启交换机', '修复配置', '联系运营商'],
-        isSystem: true
+        isSystem: true,
       },
       {
         categoryId: 'CAT004',
@@ -64,7 +64,7 @@ const initDefaultFaultCategories = async () => {
         defaultPriority: 'medium',
         expectedDuration: 6,
         solutions: ['修复Bug', '优化性能', '更新版本', '配置调整'],
-        isSystem: true
+        isSystem: true,
       },
       {
         categoryId: 'CAT005',
@@ -77,7 +77,7 @@ const initDefaultFaultCategories = async () => {
         defaultPriority: 'critical',
         expectedDuration: 1,
         solutions: ['隔离系统', '调查取证', '修复漏洞', '更新安全策略'],
-        isSystem: true
+        isSystem: true,
       },
       {
         categoryId: 'CAT006',
@@ -90,7 +90,7 @@ const initDefaultFaultCategories = async () => {
         defaultPriority: 'medium',
         expectedDuration: 4,
         solutions: ['资源扩容', '优化SQL', '清理缓存', '负载均衡'],
-        isSystem: true
+        isSystem: true,
       },
       {
         categoryId: 'CAT007',
@@ -103,7 +103,7 @@ const initDefaultFaultCategories = async () => {
         defaultPriority: 'low',
         expectedDuration: 2,
         solutions: ['调整配置', '参数优化', '功能启用'],
-        isSystem: true
+        isSystem: true,
       },
       {
         categoryId: 'CAT008',
@@ -116,7 +116,7 @@ const initDefaultFaultCategories = async () => {
         defaultPriority: 'low',
         expectedDuration: 4,
         solutions: ['系统更新', '安全检查', '日志清理', '硬件检测'],
-        isSystem: true
+        isSystem: true,
       },
       {
         categoryId: 'CAT009',
@@ -129,7 +129,7 @@ const initDefaultFaultCategories = async () => {
         defaultPriority: 'high',
         expectedDuration: 6,
         solutions: ['数据恢复', '数据修复', '重新同步', '备份还原'],
-        isSystem: true
+        isSystem: true,
       },
       {
         categoryId: 'CAT010',
@@ -142,8 +142,8 @@ const initDefaultFaultCategories = async () => {
         defaultPriority: 'critical',
         expectedDuration: 2,
         solutions: ['切换电源', '更换UPS', '联系供电', '检查线路'],
-        isSystem: true
-      }
+        isSystem: true,
+      },
     ];
 
     for (const category of defaultCategories) {
@@ -157,14 +157,14 @@ const initDefaultFaultCategories = async () => {
 };
 
 const initAssociations = () => {
-  Ticket.hasMany(TicketOperationRecord, { 
-    foreignKey: 'ticketId', 
-    as: 'operationRecords',
-    constraints: false
-  });
-  TicketOperationRecord.belongsTo(Ticket, { 
+  Ticket.hasMany(TicketOperationRecord, {
     foreignKey: 'ticketId',
-    constraints: false
+    as: 'operationRecords',
+    constraints: false,
+  });
+  TicketOperationRecord.belongsTo(Ticket, {
+    foreignKey: 'ticketId',
+    constraints: false,
   });
 };
 
@@ -185,5 +185,5 @@ module.exports = {
   initAssociations,
   Ticket,
   TicketOperationRecord,
-  FaultCategory
+  FaultCategory,
 };

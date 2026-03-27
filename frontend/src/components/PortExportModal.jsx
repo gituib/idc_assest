@@ -57,8 +57,10 @@ const PortExportModal = ({
     const activeFilters = [];
     if (filters.deviceId) activeFilters.push(`设备ID: ${filters.deviceId}`);
     if (filters.status && filters.status !== 'all') activeFilters.push(`状态: ${filters.status}`);
-    if (filters.portType && filters.portType !== 'all') activeFilters.push(`类型: ${filters.portType}`);
-    if (filters.portSpeed && filters.portSpeed !== 'all') activeFilters.push(`速率: ${filters.portSpeed}`);
+    if (filters.portType && filters.portType !== 'all')
+      activeFilters.push(`类型: ${filters.portType}`);
+    if (filters.portSpeed && filters.portSpeed !== 'all')
+      activeFilters.push(`速率: ${filters.portSpeed}`);
     if (filters.searchText) activeFilters.push(`搜索: ${filters.searchText}`);
     return activeFilters;
   };
@@ -142,15 +144,18 @@ const PortExportModal = ({
             </Text>
             <div style={{ marginTop: '4px' }}>
               {activeFilters.map((filter, index) => (
-                <span key={index} style={{
-                  display: 'inline-block',
-                  background: designTokens.colors.neutral[100],
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  marginRight: '4px',
-                  marginBottom: '4px',
-                }}>
+                <span
+                  key={index}
+                  style={{
+                    display: 'inline-block',
+                    background: designTokens.colors.neutral[100],
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    marginRight: '4px',
+                    marginBottom: '4px',
+                  }}
+                >
                   {filter}
                 </span>
               ))}
@@ -164,7 +169,8 @@ const PortExportModal = ({
           message={
             <div>
               <Text style={{ fontSize: '13px' }}>
-                导出将包含以下字段：端口ID、设备ID、设备名称、设备类型、机房、机架、网卡名称、端口名称、端口类型、端口速率、状态、VLAN ID、描述、创建时间
+                导出将包含以下字段：端口ID、设备ID、设备名称、设备类型、机房、机架、网卡名称、端口名称、端口类型、端口速率、状态、VLAN
+                ID、描述、创建时间
               </Text>
             </div>
           }
@@ -176,7 +182,8 @@ const PortExportModal = ({
             type="warning"
             message={
               <Text style={{ fontSize: '13px' }}>
-                当前数据量较大（{totalCount} 条），导出可能需要较长时间。系统最大支持导出 50000 条数据。
+                当前数据量较大（{totalCount} 条），导出可能需要较长时间。系统最大支持导出 50000
+                条数据。
               </Text>
             }
             style={{ marginTop: '12px' }}

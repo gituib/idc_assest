@@ -49,10 +49,7 @@ import dayjs from 'dayjs';
 import api from '../api';
 import { consumableRecordAPI, consumableCategoryAPI, consumableAPI } from '../api/cache';
 import { message } from 'antd';
-import {
-  selectStyles,
-  datePickerStyles,
-} from '../styles/deviceManagementStyles';
+import { selectStyles, datePickerStyles } from '../styles/deviceManagementStyles';
 import { designTokens } from '../config/theme';
 
 const { Title, Text } = Typography;
@@ -145,14 +142,16 @@ const QuickFilterBtn = styled(Button)`
   padding: 0 16px;
   font-size: 13px;
   font-weight: 500;
-  border: 1px solid ${props => props.$active ? designTokens.colors.primary.main : designTokens.colors.border};
-  background: ${props => props.$active ? designTokens.colors.primary.main : 'transparent'};
-  color: ${props => props.$active ? 'white' : designTokens.colors.text.secondary};
-  
+  border: 1px solid
+    ${props => (props.$active ? designTokens.colors.primary.main : designTokens.colors.border)};
+  background: ${props => (props.$active ? designTokens.colors.primary.main : 'transparent')};
+  color: ${props => (props.$active ? 'white' : designTokens.colors.text.secondary)};
+
   &:hover {
     border-color: ${designTokens.colors.primary.main};
-    color: ${props => props.$active ? 'white' : designTokens.colors.primary.main};
-    background: ${props => props.$active ? designTokens.colors.primary.main : 'rgba(99, 102, 241, 0.05)'};
+    color: ${props => (props.$active ? 'white' : designTokens.colors.primary.main)};
+    background: ${props =>
+      props.$active ? designTokens.colors.primary.main : 'rgba(99, 102, 241, 0.05)'};
   }
 `;
 
@@ -304,17 +303,17 @@ const StatsCard = styled(motion.div)`
     font-weight: 600;
     padding: 4px 10px;
     border-radius: 20px;
-    
+
     &.up {
       color: ${designTokens.colors.success.main};
       background: rgba(16, 185, 129, 0.1);
     }
-    
+
     &.down {
       color: ${designTokens.colors.error.main};
       background: rgba(239, 68, 68, 0.1);
     }
-    
+
     &.neutral {
       color: ${designTokens.colors.text.secondary};
       background: rgba(107, 114, 128, 0.1);
@@ -478,7 +477,7 @@ const ComparisonItem = styled.div`
     align-items: center;
     justify-content: center;
     gap: 4px;
-    
+
     strong {
       color: ${props => props.$color};
       font-weight: 600;
@@ -519,7 +518,7 @@ const CategoryCard = styled(motion.div)`
     transform: translateY(-4px);
     box-shadow: 0 8px 24px ${props => props.$color}20;
     border-color: ${props => props.$color}40;
-    
+
     &::before {
       opacity: 1;
     }
@@ -567,7 +566,7 @@ const CategoryCard = styled(motion.div)`
     color: ${designTokens.colors.text.secondary};
     padding-top: 8px;
     border-top: 1px solid ${designTokens.colors.border}40;
-    
+
     strong {
       color: ${designTokens.colors.text.primary};
       font-weight: 600;
@@ -731,7 +730,7 @@ const ConsumableStatistics = () => {
       const statsResponse = await consumableRecordAPI.statistics(params);
       console.log('[统计] 返回:', statsResponse);
       console.log('[统计] 最近记录:', statsResponse?.recentRecords);
-      
+
       setStats({
         inCount: statsResponse?.inCount || 0,
         outCount: statsResponse?.outCount || 0,
@@ -742,7 +741,7 @@ const ConsumableStatistics = () => {
 
       const summaryResponse = await consumableAPI.getStatistics();
       console.log('[汇总] 返回:', summaryResponse);
-      
+
       setSummary({
         total: summaryResponse?.total || 0,
         lowStock: summaryResponse?.lowStock || 0,
@@ -808,7 +807,7 @@ const ConsumableStatistics = () => {
     };
   }, [realTimeRefresh]);
 
-  const handleQuickFilter = (key) => {
+  const handleQuickFilter = key => {
     setQuickFilter(key);
     const filter = quickFilters.find(f => f.key === key);
     if (filter) {
@@ -823,10 +822,7 @@ const ConsumableStatistics = () => {
   const handleRefresh = () => {
     setLoading(true);
     setIsAutoRefreshing(false);
-    Promise.all([
-      loadStatistics(false),
-      loadLowStockItems(false)
-    ]).finally(() => {
+    Promise.all([loadStatistics(false), loadLowStockItems(false)]).finally(() => {
       setLoading(false);
       if (!realTimeRefresh) {
         message.success('数据已手动刷新');
@@ -838,22 +834,30 @@ const ConsumableStatistics = () => {
     message.info('导出功能开发中...');
   };
 
-  const getCategoryColor = (category) => {
+  const getCategoryColor = category => {
     const predefinedColors = [
-      '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6',
-      '#06b6d4', '#f97316', '#14b8a6', '#ef4444', '#3b82f6'
+      '#6366f1',
+      '#10b981',
+      '#f59e0b',
+      '#ec4899',
+      '#8b5cf6',
+      '#06b6d4',
+      '#f97316',
+      '#14b8a6',
+      '#ef4444',
+      '#3b82f6',
     ];
-    
+
     const colorMap = {
-      '网络设备': '#6366f1',
-      '线缆': '#10b981',
-      '配件': '#f59e0b',
-      '工具': '#ec4899',
-      '其他': '#6b7280',
+      网络设备: '#6366f1',
+      线缆: '#10b981',
+      配件: '#f59e0b',
+      工具: '#ec4899',
+      其他: '#6b7280',
     };
-    
+
     if (colorMap[category]) return colorMap[category];
-    
+
     let hash = 0;
     for (let i = 0; i < category.length; i++) {
       hash = category.charCodeAt(i) + ((hash << 5) - hash);
@@ -880,23 +884,27 @@ const ConsumableStatistics = () => {
             <WarningOutlined />
           </Avatar>
           <div style={{ minWidth: 0 }}>
-            <div style={{
-              fontWeight: 600,
-              color: designTokens.colors.text.primary,
-              fontSize: '13px',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}>
+            <div
+              style={{
+                fontWeight: 600,
+                color: designTokens.colors.text.primary,
+                fontSize: '13px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               {text}
             </div>
-            <div style={{
-              fontSize: '11px',
-              color: designTokens.colors.text.secondary,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}>
+            <div
+              style={{
+                fontSize: '11px',
+                color: designTokens.colors.text.secondary,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               {record.specification || record.category || '-'}
             </div>
           </div>
@@ -913,12 +921,16 @@ const ConsumableStatistics = () => {
         const min = record.minStock || 0;
         const isLow = current < min;
         return (
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 4 }}>
-            <span style={{
-              fontWeight: 700,
-              fontSize: '14px',
-              color: isLow ? designTokens.colors.error.main : designTokens.colors.text.primary,
-            }}>
+          <div
+            style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 4 }}
+          >
+            <span
+              style={{
+                fontWeight: 700,
+                fontSize: '14px',
+                color: isLow ? designTokens.colors.error.main : designTokens.colors.text.primary,
+              }}
+            >
               {current}
             </span>
             <span style={{ color: designTokens.colors.text.secondary, fontSize: '11px' }}>/</span>
@@ -942,13 +954,20 @@ const ConsumableStatistics = () => {
         const currentStock = record.currentStock || 0;
 
         if (minStock <= 0) {
-          return <Text type="secondary" style={{ fontSize: '11px' }}>未设置</Text>;
+          return (
+            <Text type="secondary" style={{ fontSize: '11px' }}>
+              未设置
+            </Text>
+          );
         }
 
         const rate = Math.min(100, Math.round((currentStock / minStock) * 100));
-        const color = rate < 30 ? designTokens.colors.error.main :
-                     rate < 60 ? designTokens.colors.warning.main :
-                     designTokens.colors.success.main;
+        const color =
+          rate < 30
+            ? designTokens.colors.error.main
+            : rate < 60
+              ? designTokens.colors.warning.main
+              : designTokens.colors.success.main;
 
         return (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
@@ -959,13 +978,15 @@ const ConsumableStatistics = () => {
               showInfo={false}
               style={{ width: 60 }}
             />
-            <span style={{
-              fontWeight: 600,
-              fontSize: '12px',
-              color,
-              minWidth: 32,
-              textAlign: 'right',
-            }}>
+            <span
+              style={{
+                fontWeight: 600,
+                fontSize: '12px',
+                color,
+                minWidth: 32,
+                textAlign: 'right',
+              }}
+            >
               {rate}%
             </span>
           </div>
@@ -980,7 +1001,7 @@ const ConsumableStatistics = () => {
       dataIndex: 'type',
       key: 'type',
       width: 80,
-      render: (type) => (
+      render: type => (
         <Tag
           icon={type === 'in' ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
           color={type === 'in' ? 'success' : 'processing'}
@@ -1000,14 +1021,18 @@ const ConsumableStatistics = () => {
           <Avatar
             size={30}
             style={{
-              background: record.category ? getCategoryColor(record.category) : designTokens.colors.info.main,
+              background: record.category
+                ? getCategoryColor(record.category)
+                : designTokens.colors.info.main,
               fontSize: '12px',
             }}
           >
             {record.category?.charAt(0) || '耗'}
           </Avatar>
           <div>
-            <div style={{ fontWeight: 600, fontSize: '14px', color: designTokens.colors.text.primary }}>
+            <div
+              style={{ fontWeight: 600, fontSize: '14px', color: designTokens.colors.text.primary }}
+            >
               {text || '-'}
             </div>
             {record.category && (
@@ -1030,10 +1055,14 @@ const ConsumableStatistics = () => {
           strong
           style={{
             fontSize: '15px',
-            color: record.type === 'in' ? designTokens.colors.success.main : designTokens.colors.error.main,
+            color:
+              record.type === 'in'
+                ? designTokens.colors.success.main
+                : designTokens.colors.error.main,
           }}
         >
-          {record.type === 'in' ? '+' : '-'}{quantity} {record.unit || '个'}
+          {record.type === 'in' ? '+' : '-'}
+          {quantity} {record.unit || '个'}
         </Text>
       ),
     },
@@ -1042,7 +1071,7 @@ const ConsumableStatistics = () => {
       dataIndex: 'operator',
       key: 'operator',
       width: 100,
-      render: (operator) => (
+      render: operator => (
         <Space size={6}>
           <Avatar size={24} style={{ background: designTokens.colors.info.main, fontSize: '12px' }}>
             {operator?.charAt(0) || '?'}
@@ -1056,7 +1085,7 @@ const ConsumableStatistics = () => {
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 140,
-      render: (date) => (
+      render: date => (
         <Text type="secondary" style={{ fontSize: '12px' }}>
           {dayjs(date).format('MM-DD HH:mm')}
         </Text>
@@ -1086,13 +1115,19 @@ const ConsumableStatistics = () => {
         </TitleSection>
         <Space>
           {lastUpdateTime && (
-            <div style={{ fontSize: 12, color: designTokens.colors.text.secondary, display: 'flex', alignItems: 'center', gap: 4 }}>
-              {isAutoRefreshing ? (
-                <Spin size="small" />
-              ) : (
-                <span style={{ fontSize: 10 }}>●</span>
-              )}
-              {isAutoRefreshing ? '刷新中...' : `更新于 ${dayjs(lastUpdateTime).format('HH:mm:ss')}`}
+            <div
+              style={{
+                fontSize: 12,
+                color: designTokens.colors.text.secondary,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              {isAutoRefreshing ? <Spin size="small" /> : <span style={{ fontSize: 10 }}>●</span>}
+              {isAutoRefreshing
+                ? '刷新中...'
+                : `更新于 ${dayjs(lastUpdateTime).format('HH:mm:ss')}`}
             </div>
           )}
           <Tooltip title={realTimeRefresh ? '已开启30秒自动刷新' : '已关闭自动刷新'}>
@@ -1154,7 +1189,7 @@ const ConsumableStatistics = () => {
               <span className="filter-label">时间范围</span>
               <RangePicker
                 value={dateRange}
-                onChange={(dates) => {
+                onChange={dates => {
                   setDateRange(dates);
                   setQuickFilter(null);
                 }}
@@ -1174,7 +1209,9 @@ const ConsumableStatistics = () => {
               >
                 <Option value="all">全部类别</Option>
                 {categories.map(cat => (
-                  <Option key={cat.id} value={cat.name}>{cat.name}</Option>
+                  <Option key={cat.id} value={cat.name}>
+                    {cat.name}
+                  </Option>
                 ))}
               </Select>
             </FilterItem>
@@ -1227,7 +1264,9 @@ const ConsumableStatistics = () => {
         >
           <div className="card-content">
             <div className="card-header">
-              <div className="card-icon"><DatabaseOutlined /></div>
+              <div className="card-icon">
+                <DatabaseOutlined />
+              </div>
               <div className="card-trend neutral">
                 <AppstoreOutlined /> 总览
               </div>
@@ -1250,7 +1289,9 @@ const ConsumableStatistics = () => {
         >
           <div className="card-content">
             <div className="card-header">
-              <div className="card-icon"><WarningOutlined /></div>
+              <div className="card-icon">
+                <WarningOutlined />
+              </div>
               {summary?.lowStock > 0 && (
                 <div className="card-trend down">
                   <ExclamationCircleOutlined /> 需关注
@@ -1277,7 +1318,9 @@ const ConsumableStatistics = () => {
         >
           <div className="card-content">
             <div className="card-header">
-              <div className="card-icon"><ArrowDownOutlined /></div>
+              <div className="card-icon">
+                <ArrowDownOutlined />
+              </div>
               <div className="card-trend up">
                 <RiseOutlined /> 入库
               </div>
@@ -1302,7 +1345,9 @@ const ConsumableStatistics = () => {
         >
           <div className="card-content">
             <div className="card-header">
-              <div className="card-icon"><ArrowUpOutlined /></div>
+              <div className="card-icon">
+                <ArrowUpOutlined />
+              </div>
               <div className="card-trend neutral">
                 <FallOutlined /> 出库
               </div>
@@ -1318,10 +1363,16 @@ const ConsumableStatistics = () => {
       </StatsGrid>
 
       <BentoGrid variants={containerVariants} initial="hidden" animate="visible">
-        <BentoCard variants={itemVariants} $col="span 6" $iconBg={designTokens.colors.info.gradient}>
+        <BentoCard
+          variants={itemVariants}
+          $col="span 6"
+          $iconBg={designTokens.colors.info.gradient}
+        >
           <div className="card-header">
             <div className="header-left">
-              <div className="header-icon"><ShoppingCartOutlined /></div>
+              <div className="header-icon">
+                <ShoppingCartOutlined />
+              </div>
               <span className="header-title">出入库统计</span>
             </div>
             <div className="header-extra">
@@ -1334,28 +1385,36 @@ const ConsumableStatistics = () => {
                 $bg="rgba(16, 185, 129, 0.04)"
                 $color={designTokens.colors.success.main}
               >
-                <div className="item-icon"><ArrowDownOutlined /></div>
+                <div className="item-icon">
+                  <ArrowDownOutlined />
+                </div>
                 <div className="item-value">{stats?.inCount || 0}</div>
                 <div className="item-label">入库次数</div>
-                <div className="item-sub">共 <strong>{stats?.inQuantity || 0}</strong> 件</div>
+                <div className="item-sub">
+                  共 <strong>{stats?.inQuantity || 0}</strong> 件
+                </div>
               </ComparisonItem>
               <ComparisonItem
                 $bg="rgba(99, 102, 241, 0.04)"
                 $color={designTokens.colors.primary.main}
               >
-                <div className="item-icon"><ArrowUpOutlined /></div>
+                <div className="item-icon">
+                  <ArrowUpOutlined />
+                </div>
                 <div className="item-value">{stats?.outCount || 0}</div>
                 <div className="item-label">出库次数</div>
-                <div className="item-sub">共 <strong>{stats?.outQuantity || 0}</strong> 件</div>
+                <div className="item-sub">
+                  共 <strong>{stats?.outQuantity || 0}</strong> 件
+                </div>
               </ComparisonItem>
             </InOutComparison>
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              style={{ 
-                marginTop: 20, 
-                padding: '18px 24px', 
+              style={{
+                marginTop: 20,
+                padding: '18px 24px',
                 background: `linear-gradient(135deg, ${netQuantity >= 0 ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)'} 0%, ${netQuantity >= 0 ? 'rgba(5, 150, 105, 0.04)' : 'rgba(185, 28, 28, 0.04)'} 100%)`,
                 borderRadius: 14,
                 display: 'flex',
@@ -1368,14 +1427,22 @@ const ConsumableStatistics = () => {
               {netQuantity >= 0 ? (
                 <>
                   <RiseOutlined style={{ color: designTokens.colors.success.main, fontSize: 20 }} />
-                  <Text style={{ color: designTokens.colors.success.main, fontWeight: 600, fontSize: 15 }}>
+                  <Text
+                    style={{
+                      color: designTokens.colors.success.main,
+                      fontWeight: 600,
+                      fontSize: 15,
+                    }}
+                  >
                     净入库 +{netQuantity} 件
                   </Text>
                 </>
               ) : (
                 <>
                   <FallOutlined style={{ color: designTokens.colors.error.main, fontSize: 20 }} />
-                  <Text style={{ color: designTokens.colors.error.main, fontWeight: 600, fontSize: 15 }}>
+                  <Text
+                    style={{ color: designTokens.colors.error.main, fontWeight: 600, fontSize: 15 }}
+                  >
                     净出库 {Math.abs(netQuantity)} 件
                   </Text>
                 </>
@@ -1384,10 +1451,16 @@ const ConsumableStatistics = () => {
           </div>
         </BentoCard>
 
-        <BentoCard variants={itemVariants} $col="span 6" $iconBg={designTokens.colors.secondary.gradient}>
+        <BentoCard
+          variants={itemVariants}
+          $col="span 6"
+          $iconBg={designTokens.colors.secondary.gradient}
+        >
           <div className="card-header">
             <div className="header-left">
-              <div className="header-icon"><PieChartOutlined /></div>
+              <div className="header-icon">
+                <PieChartOutlined />
+              </div>
               <span className="header-title">类别分布</span>
             </div>
           </div>
@@ -1426,10 +1499,16 @@ const ConsumableStatistics = () => {
       </BentoGrid>
 
       <BentoGrid variants={containerVariants} initial="hidden" animate="visible">
-        <BentoCard variants={itemVariants} $col="span 6" $iconBg={designTokens.colors.warning.gradient}>
+        <BentoCard
+          variants={itemVariants}
+          $col="span 6"
+          $iconBg={designTokens.colors.warning.gradient}
+        >
           <div className="card-header">
             <div className="header-left">
-              <div className="header-icon"><ExclamationCircleOutlined /></div>
+              <div className="header-icon">
+                <ExclamationCircleOutlined />
+              </div>
               <span className="header-title">库存预警</span>
             </div>
             {lowStockItems.length > 0 ? (
@@ -1438,14 +1517,16 @@ const ConsumableStatistics = () => {
                 style={{ backgroundColor: designTokens.colors.warning.main }}
               />
             ) : (
-              <span style={{ 
-                fontSize: 12, 
-                color: designTokens.colors.success.main,
-                fontWeight: 500,
-                padding: '4px 10px',
-                background: 'rgba(16, 185, 129, 0.1)',
-                borderRadius: 8
-              }}>
+              <span
+                style={{
+                  fontSize: 12,
+                  color: designTokens.colors.success.main,
+                  fontWeight: 500,
+                  padding: '4px 10px',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  borderRadius: 8,
+                }}
+              >
                 全部充足
               </span>
             )}
@@ -1461,15 +1542,18 @@ const ConsumableStatistics = () => {
                 total: lowStockItems.length,
                 showSizeChanger: false,
                 showQuickJumper: false,
-                showTotal: (total) => `共 ${total} 条`,
-                onChange: (page) => setLowStockPagination(prev => ({ ...prev, current: page })),
+                showTotal: total => `共 ${total} 条`,
+                onChange: page => setLowStockPagination(prev => ({ ...prev, current: page })),
               }}
               size="small"
               scroll={{ x: 'max-content', y: 300 }}
               locale={{
                 emptyText: (
                   <EmptyState>
-                    <BoxPlotOutlined className="empty-icon" style={{ color: designTokens.colors.success.main }} />
+                    <BoxPlotOutlined
+                      className="empty-icon"
+                      style={{ color: designTokens.colors.success.main }}
+                    />
                     <div className="empty-text">库存充足</div>
                     <div className="empty-subtext">所有耗材均在安全范围内</div>
                   </EmptyState>
@@ -1479,10 +1563,16 @@ const ConsumableStatistics = () => {
           </div>
         </BentoCard>
 
-        <BentoCard variants={itemVariants} $col="span 6" $iconBg={designTokens.colors.success.gradient}>
+        <BentoCard
+          variants={itemVariants}
+          $col="span 6"
+          $iconBg={designTokens.colors.success.gradient}
+        >
           <div className="card-header">
             <div className="header-left">
-              <div className="header-icon"><HistoryOutlined /></div>
+              <div className="header-icon">
+                <HistoryOutlined />
+              </div>
               <span className="header-title">最近记录</span>
             </div>
             <div className="header-extra">最近10条</div>

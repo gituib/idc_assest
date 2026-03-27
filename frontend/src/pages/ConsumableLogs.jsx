@@ -84,7 +84,11 @@ function ConsumableLogs() {
       setLoading(true);
       const params = { page, pageSize };
 
-      if (currentFilters.operationType && currentFilters.operationType !== 'all' && currentFilters.operationType.length > 0) {
+      if (
+        currentFilters.operationType &&
+        currentFilters.operationType !== 'all' &&
+        currentFilters.operationType.length > 0
+      ) {
         params.operationType = currentFilters.operationType.join(',');
       }
       if (currentFilters.consumableId) {
@@ -169,7 +173,9 @@ function ConsumableLogs() {
           <Space direction="vertical" size={0}>
             <span>{value}</span>
             {record.isConsumableDeleted && (
-              <Tag color="red" size="small">已删除</Tag>
+              <Tag color="red" size="small">
+                已删除
+              </Tag>
             )}
           </Space>
         </Tooltip>
@@ -288,13 +294,15 @@ function ConsumableLogs() {
       width: 200,
       render: value => (
         <Tooltip title={value || '-'}>
-          <span style={{ 
-            display: 'inline-block', 
-            maxWidth: '180px',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }}>
+          <span
+            style={{
+              display: 'inline-block',
+              maxWidth: '180px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
             {value || '-'}
           </span>
         </Tooltip>
@@ -648,7 +656,11 @@ function ConsumableLogs() {
                 导出 <DownOutlined />
               </Button>
             </Dropdown>
-            <Button icon={<UploadOutlined />} onClick={() => setImportModalVisible(true)} style={{ height: '40px', borderRadius: '10px' }}>
+            <Button
+              icon={<UploadOutlined />}
+              onClick={() => setImportModalVisible(true)}
+              style={{ height: '40px', borderRadius: '10px' }}
+            >
               导入
             </Button>
           </Space>
@@ -735,17 +747,29 @@ function ConsumableLogs() {
       >
         <Form form={form} layout="vertical" onFinish={handleEditSubmit}>
           <Form.Item label="操作原因" name="reason">
-            <Input.TextArea rows={2} placeholder={inputPlaceholders.reason} style={textAreaStyles.base} />
+            <Input.TextArea
+              rows={2}
+              placeholder={inputPlaceholders.reason}
+              style={textAreaStyles.base}
+            />
           </Form.Item>
           <Form.Item label="备注" name="notes">
-            <Input.TextArea rows={3} placeholder={inputPlaceholders.notes} style={textAreaStyles.base} />
+            <Input.TextArea
+              rows={3}
+              placeholder={inputPlaceholders.notes}
+              style={textAreaStyles.base}
+            />
           </Form.Item>
           <Form.Item
             label="修改原因"
             name="modificationReason"
             rules={[inputValidationRules.required('请输入修改原因')]}
           >
-            <Input.TextArea rows={2} placeholder="请输入修改原因（必填）" style={textAreaStyles.base} />
+            <Input.TextArea
+              rows={2}
+              placeholder="请输入修改原因（必填）"
+              style={textAreaStyles.base}
+            />
           </Form.Item>
           <Form.Item label="修改人" name="operator">
             <Input placeholder={inputPlaceholders.operator} style={inputStyles.form} />
@@ -788,7 +812,11 @@ function ConsumableLogs() {
                 <div style={{ fontSize: 12, color: '#666' }}>
                   <p>
                     <strong>耗材:</strong> {item.consumableName} ({item.consumableId})
-                    {item.isConsumableDeleted && <Tag color="red" style={{ marginLeft: 8 }}>已删除</Tag>}
+                    {item.isConsumableDeleted && (
+                      <Tag color="red" style={{ marginLeft: 8 }}>
+                        已删除
+                      </Tag>
+                    )}
                   </p>
                   <p>
                     <strong>操作人:</strong> {item.operator}
@@ -806,8 +834,8 @@ function ConsumableLogs() {
                   {item.consumableSnapshot && (
                     <p>
                       <strong>快照信息:</strong> 分类:{item.consumableSnapshot.category || '-'} |
-                      单位:{item.consumableSnapshot.unit || '-'} |
-                      单价:{item.consumableSnapshot.unitPrice || '-'}
+                      单位:{item.consumableSnapshot.unit || '-'} | 单价:
+                      {item.consumableSnapshot.unitPrice || '-'}
                     </p>
                   )}
                   {item.modifiedBy && (
@@ -854,12 +882,25 @@ function ConsumableLogs() {
         ) : (
           <div>
             <Card size="small" title="基本信息" style={{ marginBottom: 16 }}>
-              <p><strong>归档ID:</strong> <code>{currentArchive.archiveId}</code></p>
-              <p><strong>耗材ID:</strong> <code>{currentArchive.consumableId}</code></p>
-              <p><strong>耗材名称:</strong> {currentArchive.consumableName}</p>
-              <p><strong>删除人:</strong> {currentArchive.deletedBy}</p>
-              <p><strong>删除时间:</strong> {dayjs(currentArchive.deletedAt).format('YYYY-MM-DD HH:mm:ss')}</p>
-              <p><strong>删除原因:</strong> {currentArchive.deleteReason || '-'}</p>
+              <p>
+                <strong>归档ID:</strong> <code>{currentArchive.archiveId}</code>
+              </p>
+              <p>
+                <strong>耗材ID:</strong> <code>{currentArchive.consumableId}</code>
+              </p>
+              <p>
+                <strong>耗材名称:</strong> {currentArchive.consumableName}
+              </p>
+              <p>
+                <strong>删除人:</strong> {currentArchive.deletedBy}
+              </p>
+              <p>
+                <strong>删除时间:</strong>{' '}
+                {dayjs(currentArchive.deletedAt).format('YYYY-MM-DD HH:mm:ss')}
+              </p>
+              <p>
+                <strong>删除原因:</strong> {currentArchive.deleteReason || '-'}
+              </p>
             </Card>
 
             <Card size="small" title="操作统计" style={{ marginBottom: 16 }}>
@@ -875,20 +916,46 @@ function ConsumableLogs() {
                 </Col>
               </Row>
               <Divider style={{ margin: '12px 0' }} />
-              <p><strong>首次操作:</strong> {currentArchive.firstOperationAt ? dayjs(currentArchive.firstOperationAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</p>
-              <p><strong>最后操作:</strong> {currentArchive.lastOperationAt ? dayjs(currentArchive.lastOperationAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</p>
-              <p><strong>删除时库存:</strong> {currentArchive.finalStock}</p>
+              <p>
+                <strong>首次操作:</strong>{' '}
+                {currentArchive.firstOperationAt
+                  ? dayjs(currentArchive.firstOperationAt).format('YYYY-MM-DD HH:mm:ss')
+                  : '-'}
+              </p>
+              <p>
+                <strong>最后操作:</strong>{' '}
+                {currentArchive.lastOperationAt
+                  ? dayjs(currentArchive.lastOperationAt).format('YYYY-MM-DD HH:mm:ss')
+                  : '-'}
+              </p>
+              <p>
+                <strong>删除时库存:</strong> {currentArchive.finalStock}
+              </p>
             </Card>
 
             {currentArchive.consumableSnapshot && (
               <Card size="small" title="耗材快照">
-                <p><strong>分类:</strong> {currentArchive.consumableSnapshot.category || '-'}</p>
-                <p><strong>单位:</strong> {currentArchive.consumableSnapshot.unit || '-'}</p>
-                <p><strong>单价:</strong> {currentArchive.consumableSnapshot.unitPrice || '-'}</p>
-                <p><strong>供应商:</strong> {currentArchive.consumableSnapshot.supplier || '-'}</p>
-                <p><strong>位置:</strong> {currentArchive.consumableSnapshot.location || '-'}</p>
-                <p><strong>最小库存:</strong> {currentArchive.consumableSnapshot.minStock || '-'}</p>
-                <p><strong>最大库存:</strong> {currentArchive.consumableSnapshot.maxStock || '-'}</p>
+                <p>
+                  <strong>分类:</strong> {currentArchive.consumableSnapshot.category || '-'}
+                </p>
+                <p>
+                  <strong>单位:</strong> {currentArchive.consumableSnapshot.unit || '-'}
+                </p>
+                <p>
+                  <strong>单价:</strong> {currentArchive.consumableSnapshot.unitPrice || '-'}
+                </p>
+                <p>
+                  <strong>供应商:</strong> {currentArchive.consumableSnapshot.supplier || '-'}
+                </p>
+                <p>
+                  <strong>位置:</strong> {currentArchive.consumableSnapshot.location || '-'}
+                </p>
+                <p>
+                  <strong>最小库存:</strong> {currentArchive.consumableSnapshot.minStock || '-'}
+                </p>
+                <p>
+                  <strong>最大库存:</strong> {currentArchive.consumableSnapshot.maxStock || '-'}
+                </p>
               </Card>
             )}
           </div>

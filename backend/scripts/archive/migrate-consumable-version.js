@@ -16,18 +16,15 @@ async function migrate() {
 
     if (actualDbType === 'sqlite') {
       // SQLite: 检查字段是否存在
-      const tableInfo = await sequelize.query(
-        "PRAGMA table_info(consumables)",
-        { type: sequelize.QueryTypes.SELECT }
-      );
-      
+      const tableInfo = await sequelize.query('PRAGMA table_info(consumables)', {
+        type: sequelize.QueryTypes.SELECT,
+      });
+
       const hasVersion = tableInfo.some(col => col.name === 'version');
-      
+
       if (!hasVersion) {
         console.log('添加 version 字段...');
-        await sequelize.query(
-          "ALTER TABLE consumables ADD COLUMN version INTEGER DEFAULT 0"
-        );
+        await sequelize.query('ALTER TABLE consumables ADD COLUMN version INTEGER DEFAULT 0');
         console.log('version 字段添加成功');
       } else {
         console.log('version 字段已存在，跳过');
@@ -38,19 +35,16 @@ async function migrate() {
         "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='consumables'",
         { type: sequelize.QueryTypes.SELECT }
       );
-      
+
       const hasUpdatedAtIndex = indexes.some(idx => idx.name === 'consumables_updatedAt');
-      
+
       if (!hasUpdatedAtIndex) {
         console.log('添加 updatedAt 索引...');
-        await sequelize.query(
-          "CREATE INDEX consumables_updatedAt ON consumables(updatedAt)"
-        );
+        await sequelize.query('CREATE INDEX consumables_updatedAt ON consumables(updatedAt)');
         console.log('updatedAt 索引添加成功');
       } else {
         console.log('updatedAt 索引已存在，跳过');
       }
-
     } else if (actualDbType === 'mysql') {
       // MySQL: 检查并添加字段
       try {
@@ -70,9 +64,7 @@ async function migrate() {
       // 添加索引
       try {
         console.log('添加 updatedAt 索引...');
-        await sequelize.query(
-          "CREATE INDEX idx_consumables_updatedAt ON consumables(updatedAt)"
-        );
+        await sequelize.query('CREATE INDEX idx_consumables_updatedAt ON consumables(updatedAt)');
         console.log('updatedAt 索引添加成功');
       } catch (err) {
         if (err.message.includes('Duplicate key')) {
@@ -85,9 +77,7 @@ async function migrate() {
 
     // 初始化现有数据的 version 值
     console.log('初始化现有数据的 version 值...');
-    await sequelize.query(
-      "UPDATE consumables SET version = 0 WHERE version IS NULL"
-    );
+    await sequelize.query('UPDATE consumables SET version = 0 WHERE version IS NULL');
     console.log('version 值初始化完成');
 
     console.log('迁移完成！');

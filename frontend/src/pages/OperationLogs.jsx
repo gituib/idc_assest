@@ -27,7 +27,11 @@ import {
 import api from '../api';
 import CloseButton from '../components/CloseButton';
 import dayjs from 'dayjs';
-import { selectStyles, filterInputStyles, inputPlaceholders } from '../styles/deviceManagementStyles';
+import {
+  selectStyles,
+  filterInputStyles,
+  inputPlaceholders,
+} from '../styles/deviceManagementStyles';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -98,7 +102,7 @@ function OperationLogs() {
           ...prev,
           current: page,
           pageSize,
-          total: response.data.total
+          total: response.data.total,
         }));
       }
     } catch (error) {
@@ -135,7 +139,7 @@ function OperationLogs() {
     fetchLogs(1, pagination.pageSize, clearedFilters);
   };
 
-  const handleViewDetail = async (record) => {
+  const handleViewDetail = async record => {
     setDetailLoading(true);
     setDetailVisible(true);
     try {
@@ -151,7 +155,7 @@ function OperationLogs() {
     }
   };
 
-  const getModuleTag = (module) => {
+  const getModuleTag = module => {
     const colors = {
       device: 'blue',
       user: 'green',
@@ -175,7 +179,7 @@ function OperationLogs() {
     return <Tag color={colors[module] || 'default'}>{names[module] || module}</Tag>;
   };
 
-  const getOperationTag = (type) => {
+  const getOperationTag = type => {
     const colors = {
       create: 'green',
       update: 'blue',
@@ -203,10 +207,8 @@ function OperationLogs() {
     return <Tag color={colors[type] || 'default'}>{names[type] || type}</Tag>;
   };
 
-  const getResultTag = (result) => {
-    return result === 'success'
-      ? <Tag color="success">成功</Tag>
-      : <Tag color="error">失败</Tag>;
+  const getResultTag = result => {
+    return result === 'success' ? <Tag color="success">成功</Tag> : <Tag color="error">失败</Tag>;
   };
 
   const columns = [
@@ -272,18 +274,19 @@ function OperationLogs() {
       width: 80,
       fixed: 'right',
       render: (_, record) => (
-        <Button
-          type="link"
-          icon={<EyeOutlined />}
-          onClick={() => handleViewDetail(record)}
-        >
+        <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)}>
           详情
         </Button>
       ),
     },
   ];
 
-  const hasFilters = filters.module || filters.operationType || filters.keyword || filters.dateRange || filters.result;
+  const hasFilters =
+    filters.module ||
+    filters.operationType ||
+    filters.keyword ||
+    filters.dateRange ||
+    filters.result;
 
   return (
     <div style={{ padding: '24px' }}>
@@ -311,7 +314,9 @@ function OperationLogs() {
                 onChange={value => handleFilterChange('module', value)}
               >
                 {MODULE_OPTIONS.map(opt => (
-                  <Option key={opt.value} value={opt.value}>{opt.label}</Option>
+                  <Option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </Option>
                 ))}
               </Select>
             </Col>
@@ -324,7 +329,9 @@ function OperationLogs() {
                 onChange={value => handleFilterChange('operationType', value)}
               >
                 {OPERATION_TYPE_OPTIONS.map(opt => (
-                  <Option key={opt.value} value={opt.value}>{opt.label}</Option>
+                  <Option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </Option>
                 ))}
               </Select>
             </Col>
@@ -337,7 +344,9 @@ function OperationLogs() {
                 onChange={value => handleFilterChange('result', value)}
               >
                 {RESULT_OPTIONS.map(opt => (
-                  <Option key={opt.value} value={opt.value}>{opt.label}</Option>
+                  <Option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </Option>
                 ))}
               </Select>
             </Col>
@@ -368,10 +377,7 @@ function OperationLogs() {
                   筛选
                 </Button>
                 {hasFilters && (
-                  <Button
-                    icon={<ClearOutlined />}
-                    onClick={handleClearFilters}
-                  >
+                  <Button icon={<ClearOutlined />} onClick={handleClearFilters}>
                     清除
                   </Button>
                 )}
@@ -391,7 +397,7 @@ function OperationLogs() {
             total: pagination.total,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 条`,
+            showTotal: total => `共 ${total} 条`,
             pageSizeOptions: ['10', '20', '50', '100'],
           }}
           onChange={handleTableChange}
@@ -428,7 +434,9 @@ function OperationLogs() {
             </Descriptions.Item>
             <Descriptions.Item label="模块">{currentLog.module}</Descriptions.Item>
             <Descriptions.Item label="操作类型">{currentLog.operationType}</Descriptions.Item>
-            <Descriptions.Item label="操作描述">{currentLog.operationDescription}</Descriptions.Item>
+            <Descriptions.Item label="操作描述">
+              {currentLog.operationDescription}
+            </Descriptions.Item>
             <Descriptions.Item label="目标ID">{currentLog.targetId || '-'}</Descriptions.Item>
             <Descriptions.Item label="目标名称">{currentLog.targetName || '-'}</Descriptions.Item>
             <Descriptions.Item label="操作人ID">{currentLog.operatorId}</Descriptions.Item>
@@ -450,7 +458,15 @@ function OperationLogs() {
             {currentLog.beforeState && (
               <>
                 <Text strong>变更前：</Text>
-                <pre style={{ background: '#f5f5f5', padding: 12, borderRadius: 4, overflow: 'auto', maxHeight: 200 }}>
+                <pre
+                  style={{
+                    background: '#f5f5f5',
+                    padding: 12,
+                    borderRadius: 4,
+                    overflow: 'auto',
+                    maxHeight: 200,
+                  }}
+                >
                   {JSON.stringify(currentLog.beforeState, null, 2)}
                 </pre>
               </>
@@ -458,7 +474,15 @@ function OperationLogs() {
             {currentLog.afterState && (
               <>
                 <Text strong>变更后：</Text>
-                <pre style={{ background: '#f0f0f0', padding: 12, borderRadius: 4, overflow: 'auto', maxHeight: 200 }}>
+                <pre
+                  style={{
+                    background: '#f0f0f0',
+                    padding: 12,
+                    borderRadius: 4,
+                    overflow: 'auto',
+                    maxHeight: 200,
+                  }}
+                >
                   {JSON.stringify(currentLog.afterState, null, 2)}
                 </pre>
               </>
@@ -469,7 +493,15 @@ function OperationLogs() {
         {currentLog && currentLog.metadata && Object.keys(currentLog.metadata).length > 0 && (
           <>
             <h4 style={{ marginTop: 16 }}>扩展信息</h4>
-            <pre style={{ background: '#f5f5f5', padding: 12, borderRadius: 4, overflow: 'auto', maxHeight: 200 }}>
+            <pre
+              style={{
+                background: '#f5f5f5',
+                padding: 12,
+                borderRadius: 4,
+                overflow: 'auto',
+                maxHeight: 200,
+              }}
+            >
               {JSON.stringify(currentLog.metadata, null, 2)}
             </pre>
           </>

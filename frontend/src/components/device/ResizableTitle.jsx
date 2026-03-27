@@ -27,10 +27,10 @@ const resizableTitleStyles = {
   },
 };
 
-const ResizableTitle = (props) => {
+const ResizableTitle = props => {
   const { children, onResize, width, ...restProps } = props;
 
-  const handleMouseDown = (e) => {
+  const handleMouseDown = e => {
     if (!onResize) return;
 
     e.preventDefault();
@@ -42,7 +42,7 @@ const ResizableTitle = (props) => {
     const startWidth = th.offsetWidth;
     const startX = e.clientX;
 
-    const handleMouseMove = (moveEvent) => {
+    const handleMouseMove = moveEvent => {
       const diff = moveEvent.clientX - startX;
       const newWidth = Math.max(50, startWidth + diff);
       onResize(newWidth);

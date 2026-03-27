@@ -44,7 +44,7 @@ const DeviceDetailModal = ({
 
   if (!device) return null;
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = status => {
     const iconMap = {
       running: <SyncOutlined spin style={{ color: colors.status.running }} />,
       maintenance: <ClockCircleOutlined style={{ color: colors.status.maintenance }} />,
@@ -55,7 +55,7 @@ const DeviceDetailModal = ({
     return iconMap[status] || <DesktopOutlined style={{ color: colors.text.tertiary }} />;
   };
 
-  const getDeviceTypeColor = (type) => {
+  const getDeviceTypeColor = type => {
     return colors.device[type] || colors.device.other;
   };
 
@@ -313,7 +313,15 @@ const DeviceDetailModal = ({
           }}
         />
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '20px', position: 'relative', zIndex: 1 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '20px',
+            position: 'relative',
+            zIndex: 1,
+          }}
+        >
           <div
             className="device-icon-wrapper"
             style={{
@@ -328,9 +336,7 @@ const DeviceDetailModal = ({
               boxShadow: `0 8px 32px rgba(0, 0, 0, 0.2)`,
             }}
           >
-            <div style={{ fontSize: '32px', color: '#fff' }}>
-              {getDeviceTypeIcon(device.type)}
-            </div>
+            <div style={{ fontSize: '32px', color: '#fff' }}>{getDeviceTypeIcon(device.type)}</div>
           </div>
 
           <div style={{ flex: 1 }}>
@@ -434,7 +440,7 @@ const DeviceDetailModal = ({
             paddingTop: '16px',
           }}
         >
-          {tabItems.map((tab) => (
+          {tabItems.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
@@ -509,19 +515,34 @@ const DeviceDetailModal = ({
                 />
               </Col>
               <Col span={8}>
-                <InfoItem label="功率消耗" value={device.powerConsumption ? `${device.powerConsumption}W` : '-'} />
+                <InfoItem
+                  label="功率消耗"
+                  value={device.powerConsumption ? `${device.powerConsumption}W` : '-'}
+                />
               </Col>
               <Col span={8}>
                 <InfoItem label="设备高度" value={device.height ? `${device.height}U` : '-'} />
               </Col>
             </Row>
             {device.description && (
-              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px dashed ${colors.border.light}` }}>
+              <div
+                style={{
+                  marginTop: '16px',
+                  paddingTop: '16px',
+                  borderTop: `1px dashed ${colors.border.light}`,
+                }}
+              >
                 <InfoItem label="设备描述" value={device.description} fullWidth />
               </div>
             )}
             {device.customFields && Object.keys(device.customFields).length > 0 && (
-              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px dashed ${colors.border.light}` }}>
+              <div
+                style={{
+                  marginTop: '16px',
+                  paddingTop: '16px',
+                  borderTop: `1px dashed ${colors.border.light}`,
+                }}
+              >
                 <div
                   style={{
                     fontSize: '12px',
@@ -536,7 +557,7 @@ const DeviceDetailModal = ({
                 </div>
                 <Row gutter={[16, 16]}>
                   {Object.entries(device.customFields).map(([key, value]) => {
-                    const fieldConfig = deviceFields.find((f) => f.fieldName === key);
+                    const fieldConfig = deviceFields.find(f => f.fieldName === key);
                     const displayName = fieldConfig?.displayName || key;
                     return (
                       <Col span={8} key={key}>
@@ -609,12 +630,23 @@ const DeviceDetailModal = ({
             >
               <Row gutter={[24, 16]}>
                 <Col span={8}>
-                  <InfoItem label="购买日期" value={device.purchaseDate ? new Date(device.purchaseDate).toLocaleDateString('zh-CN') : '-'} />
+                  <InfoItem
+                    label="购买日期"
+                    value={
+                      device.purchaseDate
+                        ? new Date(device.purchaseDate).toLocaleDateString('zh-CN')
+                        : '-'
+                    }
+                  />
                 </Col>
                 <Col span={8}>
                   <InfoItem
                     label="保修到期"
-                    value={device.warrantyExpiry ? new Date(device.warrantyExpiry).toLocaleDateString('zh-CN') : '-'}
+                    value={
+                      device.warrantyExpiry
+                        ? new Date(device.warrantyExpiry).toLocaleDateString('zh-CN')
+                        : '-'
+                    }
                     status={isWarrantyExpired ? 'danger' : undefined}
                   />
                 </Col>
@@ -655,7 +687,9 @@ const DeviceDetailModal = ({
                     gap: '10px',
                   }}
                 >
-                  <ExclamationCircleOutlined style={{ color: colors.error.main, fontSize: '18px' }} />
+                  <ExclamationCircleOutlined
+                    style={{ color: colors.error.main, fontSize: '18px' }}
+                  />
                   <span style={{ color: colors.error.main, fontSize: '13px', fontWeight: 500 }}>
                     设备已过保，建议续保
                   </span>

@@ -38,9 +38,7 @@ function ErrorBoundaryTest() {
           color: '#fff',
         }}
       >
-        <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>
-          🧪 错误边界测试页面
-        </h1>
+        <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>🧪 错误边界测试页面</h1>
         <p style={{ opacity: 0.9 }}>
           用于测试 React 错误边界（Error Boundary）功能，确保单个组件错误不会导致整个页面崩溃
         </p>
@@ -62,11 +60,7 @@ function ErrorBoundaryTest() {
 
         <Card title="测试 2：页面级别错误边界" size="small">
           <p>这个测试会触发页面级别的错误边界</p>
-          <Button
-            type="primary"
-            danger
-            onClick={() => setShowError(true)}
-          >
+          <Button type="primary" danger onClick={() => setShowError(true)}>
             触发页面错误
           </Button>
           {showError && <BrokenComponent />}
@@ -95,9 +89,7 @@ function ErrorBoundaryTest() {
                   textAlign: 'center',
                 }}
               >
-                <h3 style={{ color: '#ff4d4f', margin: '0 0 8px 0' }}>
-                  ⚠️ 自定义错误提示
-                </h3>
+                <h3 style={{ color: '#ff4d4f', margin: '0 0 8px 0' }}>⚠️ 自定义错误提示</h3>
                 <p style={{ margin: 0, color: '#666' }}>
                   这是自定义的 fallback UI，当组件出错时会显示这个界面
                 </p>
@@ -131,16 +123,15 @@ function ErrorBoundaryTest() {
         <Card title="使用说明" size="small">
           <ul style={{ lineHeight: '2' }}>
             <li>
-              <strong>错误边界（Error Boundary）</strong>：
-              是 React 提供的错误处理机制，可以捕获子组件树中的 JavaScript 错误
+              <strong>错误边界（Error Boundary）</strong>： 是 React
+              提供的错误处理机制，可以捕获子组件树中的 JavaScript 错误
             </li>
             <li>
-              <strong>作用</strong>：
-              防止单个组件的错误导致整个应用崩溃，提供友好的错误提示界面
+              <strong>作用</strong>： 防止单个组件的错误导致整个应用崩溃，提供友好的错误提示界面
             </li>
             <li>
-              <strong>实现方式</strong>：
-              使用 React.Component 的 componentDidCatch 和 getDerivedStateFromError 生命周期方法
+              <strong>实现方式</strong>： 使用 React.Component 的 componentDidCatch 和
+              getDerivedStateFromError 生命周期方法
             </li>
             <li>
               <strong>注意事项</strong>：

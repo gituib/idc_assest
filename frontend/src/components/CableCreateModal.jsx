@@ -55,7 +55,7 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
       setTargetPorts([]);
       setDevices([]);
       devicesRef.current = [];
-      
+
       fetchDevices().then(deviceList => {
         console.log('[CableCreateModal] Devices fetched:', deviceList.length);
         const sourceDeviceId = sourceDevice?.deviceId || sourceDevice?.id;
@@ -157,7 +157,11 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
       maskClosable={false}
     >
       <Form form={form} layout="vertical">
-        <Form.Item label="源设备" name="sourceDeviceId" rules={[{ required: true, message: '请选择源设备' }]}>
+        <Form.Item
+          label="源设备"
+          name="sourceDeviceId"
+          rules={[{ required: true, message: '请选择源设备' }]}
+        >
           <Select
             showSearch
             filterOption={false}
@@ -175,11 +179,12 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
           </Select>
         </Form.Item>
 
-        <Form.Item label="源端口" name="sourcePort" rules={[{ required: true, message: '请选择源端口' }]}>
-          <Select
-            placeholder="请先选择设备"
-            disabled={!sourcePorts.length}
-          >
+        <Form.Item
+          label="源端口"
+          name="sourcePort"
+          rules={[{ required: true, message: '请选择源端口' }]}
+        >
+          <Select placeholder="请先选择设备" disabled={!sourcePorts.length}>
             {sourcePorts.map(port => (
               <Option key={port.portId} value={port.portName}>
                 {port.portName}
@@ -188,7 +193,11 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
           </Select>
         </Form.Item>
 
-        <Form.Item label="目标设备" name="targetDeviceId" rules={[{ required: true, message: '请选择目标设备' }]}>
+        <Form.Item
+          label="目标设备"
+          name="targetDeviceId"
+          rules={[{ required: true, message: '请选择目标设备' }]}
+        >
           <Select
             showSearch
             filterOption={false}
@@ -206,11 +215,12 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
           </Select>
         </Form.Item>
 
-        <Form.Item label="目标端口" name="targetPort" rules={[{ required: true, message: '请选择目标端口' }]}>
-          <Select
-            placeholder="请先选择设备"
-            disabled={!targetPorts.length}
-          >
+        <Form.Item
+          label="目标端口"
+          name="targetPort"
+          rules={[{ required: true, message: '请选择目标端口' }]}
+        >
+          <Select placeholder="请先选择设备" disabled={!targetPorts.length}>
             {targetPorts.map(port => (
               <Option key={port.portId} value={port.portName}>
                 {port.portName}

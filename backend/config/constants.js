@@ -9,7 +9,7 @@ module.exports = {
     MAX_PAGE_SIZE: parseInt(process.env.MAX_PAGE_SIZE, 10) || 1000,
     PAGE_SIZE_OPTIONS: [10, 20, 30, 50, 100],
   },
-  
+
   FILE_UPLOAD: {
     MAX_FILE_SIZE: (parseInt(process.env.MAX_FILE_SIZE_MB, 10) || 500) * 1024 * 1024,
     MAX_AVATAR_SIZE: (parseInt(process.env.MAX_AVATAR_SIZE_MB, 10) || 5) * 1024 * 1024,
@@ -22,17 +22,17 @@ module.exports = {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     ],
   },
-  
+
   RETRY: {
     MAX_RETRIES: parseInt(process.env.MAX_RETRIES, 10) || 3,
     RETRY_DELAY: parseInt(process.env.RETRY_DELAY, 10) || 1000,
   },
-  
+
   TIMEOUT: {
     API_TIMEOUT: parseInt(process.env.API_TIMEOUT, 10) || 30000,
     DB_QUERY_TIMEOUT: parseInt(process.env.DB_QUERY_TIMEOUT, 10) || 30000,
   },
-  
+
   FRONTEND: {
     DEFAULT_PORT: parseInt(process.env.FRONTEND_PORT, 10) || 3000,
   },

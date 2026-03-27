@@ -515,14 +515,14 @@ const options = {
       version: '1.0.0',
       description: '数据中心设备管理平台后端服务 API 文档',
       contact: {
-        name: 'API Support'
-      }
+        name: 'API Support',
+      },
     },
     servers: [
       {
         url: 'http://localhost:8000',
-        description: '开发环境服务器'
-      }
+        description: '开发环境服务器',
+      },
     ],
     components: {
       securitySchemes: {
@@ -530,13 +530,15 @@ const options = {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: '输入 JWT token'
-        }
-      }
+          description: '输入 JWT token',
+        },
+      },
     },
-    security: [{
-      bearerAuth: []
-    }],
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
     tags: [
       { name: 'health', description: '健康检查' },
       { name: 'auth', description: '认证接口' },
@@ -560,10 +562,10 @@ const options = {
       { name: 'inventory', description: '盘点管理' },
       { name: 'statistics', description: '统计接口' },
       { name: 'operation-logs', description: '操作日志' },
-      { name: 'backup', description: '备份管理' }
-    ]
+      { name: 'backup', description: '备份管理' },
+    ],
   },
-  apis: ['./routes/*.js', './swagger_docs.yaml']
+  apis: ['./routes/*.js', './swagger_docs.yaml'],
 };
 
 const specs = swaggerJsdoc(options);

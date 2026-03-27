@@ -18,7 +18,7 @@ router.get('/', authMiddleware, async (req, res) => {
       keyword,
       startDate,
       endDate,
-      result
+      result,
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(pageSize);
@@ -46,7 +46,7 @@ router.get('/', authMiddleware, async (req, res) => {
       where[Op.or] = [
         { operationDescription: { [Op.like]: `%${keyword}%` } },
         { targetName: { [Op.like]: `%${keyword}%` } },
-        { operatorName: { [Op.like]: `%${keyword}%` } }
+        { operatorName: { [Op.like]: `%${keyword}%` } },
       ];
     }
 
@@ -70,7 +70,7 @@ router.get('/', authMiddleware, async (req, res) => {
       where,
       order: [['createdAt', 'DESC']],
       offset,
-      limit
+      limit,
     });
 
     res.json({
@@ -79,14 +79,14 @@ router.get('/', authMiddleware, async (req, res) => {
         total: count,
         page: parseInt(page),
         pageSize: parseInt(pageSize),
-        logs
-      }
+        logs,
+      },
     });
   } catch (error) {
     console.error('获取操作日志失败:', error);
     res.status(500).json({
       success: false,
-      message: '获取操作日志失败'
+      message: '获取操作日志失败',
     });
   }
 });
@@ -95,23 +95,23 @@ router.get('/modules', authMiddleware, async (req, res) => {
   try {
     const modules = await OperationLog.findAll({
       attributes: ['module'],
-      group: ['module']
+      group: ['module'],
     });
 
     const moduleList = modules.map(m => ({
       value: m.module,
-      label: getModuleName(m.module)
+      label: getModuleName(m.module),
     }));
 
     res.json({
       success: true,
-      data: moduleList
+      data: moduleList,
     });
   } catch (error) {
     console.error('获取模块列表失败:', error);
     res.status(500).json({
       success: false,
-      message: '获取模块列表失败'
+      message: '获取模块列表失败',
     });
   }
 });
@@ -128,23 +128,23 @@ router.get('/types', authMiddleware, async (req, res) => {
     const types = await OperationLog.findAll({
       where,
       attributes: ['operationType'],
-      group: ['operationType']
+      group: ['operationType'],
     });
 
     const typeList = types.map(t => ({
       value: t.operationType,
-      label: getOperationTypeName(t.operationType)
+      label: getOperationTypeName(t.operationType),
     }));
 
     res.json({
       success: true,
-      data: typeList
+      data: typeList,
     });
   } catch (error) {
     console.error('获取操作类型列表失败:', error);
     res.status(500).json({
       success: false,
-      message: '获取操作类型列表失败'
+      message: '获取操作类型列表失败',
     });
   }
 });
@@ -170,23 +170,26 @@ router.get('/statistics', authMiddleware, async (req, res) => {
       OperationLog.findAll({
         where,
         attributes: ['module', [sequelize.fn('COUNT', sequelize.col('module')), 'count']],
-        group: ['module']
+        group: ['module'],
       }),
       OperationLog.findAll({
         where,
-        attributes: ['operationType', [sequelize.fn('COUNT', sequelize.col('operationType')), 'count']],
-        group: ['operationType']
+        attributes: [
+          'operationType',
+          [sequelize.fn('COUNT', sequelize.col('operationType')), 'count'],
+        ],
+        group: ['operationType'],
       }),
       OperationLog.findAll({
         where,
         attributes: [
           [sequelize.fn('DATE', sequelize.col('createdAt')), 'date'],
-          [sequelize.fn('COUNT', '*'), 'count']
+          [sequelize.fn('COUNT', '*'), 'count'],
         ],
         group: [sequelize.fn('DATE', sequelize.col('createdAt'))],
         order: [[sequelize.fn('DATE', sequelize.col('createdAt')), 'DESC']],
-        limit: 30
-      })
+        limit: 30,
+      }),
     ]);
 
     res.json({
@@ -194,14 +197,14 @@ router.get('/statistics', authMiddleware, async (req, res) => {
       data: {
         byModule: moduleStats.map(s => ({ module: s.module, count: s.get('count') })),
         byType: typeStats.map(s => ({ type: s.operationType, count: s.get('count') })),
-        byDay: dailyStats.map(s => ({ date: s.get('date'), count: s.get('count') }))
-      }
+        byDay: dailyStats.map(s => ({ date: s.get('date'), count: s.get('count') })),
+      },
     });
   } catch (error) {
     console.error('获取操作日志统计失败:', error);
     res.status(500).json({
       success: false,
-      message: '获取操作日志统计失败'
+      message: '获取操作日志统计失败',
     });
   }
 });
@@ -213,19 +216,19 @@ router.get('/:recordId', authMiddleware, async (req, res) => {
     if (!log) {
       return res.status(404).json({
         success: false,
-        message: '日志记录不存在'
+        message: '日志记录不存在',
       });
     }
 
     res.json({
       success: true,
-      data: log
+      data: log,
     });
   } catch (error) {
     console.error('获取操作日志详情失败:', error);
     res.status(500).json({
       success: false,
-      message: '获取操作日志详情失败'
+      message: '获取操作日志详情失败',
     });
   }
 });
@@ -239,7 +242,7 @@ function getModuleName(module) {
     rack: '机柜管理',
     room: '机房管理',
     ticket: '工单管理',
-    backup: '备份管理'
+    backup: '备份管理',
   };
   return moduleNames[module] || module;
 }
@@ -255,7 +258,7 @@ function getOperationTypeName(type) {
     move: '移动',
     permission_change: '权限变更',
     import: '导入',
-    export: '导出'
+    export: '导出',
   };
   return typeNames[type] || type;
 }

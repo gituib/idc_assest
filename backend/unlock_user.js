@@ -10,12 +10,12 @@ async function unlockUser(username = null) {
     if (username) {
       // 解锁指定用户
       users = await User.findAll({
-        where: { 
+        where: {
           username,
-          status: 'locked' 
-        }
+          status: 'locked',
+        },
       });
-      
+
       if (users.length === 0) {
         console.log(`未找到被锁定的用户: ${username}`);
         const user = await User.findOne({ where: { username } });
@@ -28,9 +28,9 @@ async function unlockUser(username = null) {
     } else {
       // 解锁所有被锁定的用户
       users = await User.findAll({
-        where: { status: 'locked' }
+        where: { status: 'locked' },
       });
-      
+
       if (users.length === 0) {
         console.log('没有被锁定的用户');
         await sequelize.close();

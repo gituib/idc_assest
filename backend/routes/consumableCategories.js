@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     if (keyword) {
       where[Op.or] = [
         { name: { [Op.like]: `%${keyword}%` } },
-        { description: { [Op.like]: `%${keyword}%` } }
+        { description: { [Op.like]: `%${keyword}%` } },
       ];
     }
 
@@ -23,9 +23,12 @@ router.get('/', async (req, res) => {
 
     const { count, rows } = await ConsumableCategory.findAndCountAll({
       where,
-      order: [['sortOrder', 'ASC'], ['id', 'DESC']],
+      order: [
+        ['sortOrder', 'ASC'],
+        ['id', 'DESC'],
+      ],
       offset,
-      limit: parseInt(pageSize)
+      limit: parseInt(pageSize),
     });
 
     res.json({
@@ -33,7 +36,7 @@ router.get('/', async (req, res) => {
       total: count,
       currentPage: parseInt(page),
       pageSize: parseInt(pageSize),
-      totalPages: Math.ceil(count / pageSize)
+      totalPages: Math.ceil(count / pageSize),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -44,7 +47,10 @@ router.get('/list', async (req, res) => {
   try {
     const categories = await ConsumableCategory.findAll({
       where: { status: 'active' },
-      order: [['sortOrder', 'ASC'], ['name', 'ASC']]
+      order: [
+        ['sortOrder', 'ASC'],
+        ['name', 'ASC'],
+      ],
     });
     res.json(categories);
   } catch (error) {
@@ -77,7 +83,7 @@ router.post('/', async (req, res) => {
       name,
       description,
       sortOrder: sortOrder || 0,
-      status: status || 'active'
+      status: status || 'active',
     });
 
     res.status(201).json(category);
@@ -106,7 +112,7 @@ router.put('/:id', async (req, res) => {
       name: name || category.name,
       description: description !== undefined ? description : category.description,
       sortOrder: sortOrder !== undefined ? sortOrder : category.sortOrder,
-      status: status || category.status
+      status: status || category.status,
     });
 
     res.json(category);

@@ -4,7 +4,7 @@ import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import { designTokens } from '../../config/theme';
 import AnimatedCounter from './AnimatedCounter';
 
-const createStatCardStyle = (color) => ({
+const createStatCardStyle = color => ({
   borderRadius: designTokens.borderRadius.large,
   border: 'none',
   boxShadow: designTokens.shadows.medium,
@@ -17,7 +17,7 @@ const createStatCardStyle = (color) => ({
   borderLeft: `4px solid ${color}`,
 });
 
-const createStatIconContainer = (color) => ({
+const createStatIconContainer = color => ({
   width: 'clamp(40px, 8vw, 64px)',
   height: 'clamp(40px, 8vw, 64px)',
   borderRadius: designTokens.borderRadius.medium,
@@ -30,14 +30,7 @@ const createStatIconContainer = (color) => ({
   background: `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)`,
 });
 
-const StatCard = ({
-  config,
-  stats,
-  loading,
-  animatedKey,
-  hoveredCard,
-  onHover,
-}) => {
+const StatCard = ({ config, stats, loading, animatedKey, hoveredCard, onHover }) => {
   const {
     icon: Icon,
     color,
@@ -143,7 +136,8 @@ const StatCard = ({
                 alignItems: 'center',
                 fontSize: 'clamp(0.7rem, 1.8vw, 0.875rem)',
                 fontWeight: '500',
-                color: trend > 0 ? designTokens.colors.success.main : designTokens.colors.error.main,
+                color:
+                  trend > 0 ? designTokens.colors.success.main : designTokens.colors.error.main,
                 flexWrap: 'wrap',
                 gap: '4px',
               }}

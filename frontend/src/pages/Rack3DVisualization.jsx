@@ -371,7 +371,7 @@ const Rack3DVisualization = () => {
 
     // 计算已用U位（考虑设备高度）
     const usedU = devices.reduce((sum, device) => sum + (device.height || 1), 0);
-    
+
     // 计算总功率
     const totalPower = devices.reduce((sum, device) => {
       const power = parseFloat(device.powerConsumption) || 0;
@@ -380,7 +380,7 @@ const Rack3DVisualization = () => {
 
     // 机柜总高度
     const totalHeight = selectedRack.height || 45;
-    
+
     // 可用U位
     const availableU = totalHeight - usedU;
 
@@ -568,7 +568,8 @@ const Rack3DVisualization = () => {
                     position: 'absolute',
                     top: 88,
                     right: 24,
-                    background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%)',
+                    background:
+                      'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%)',
                     backdropFilter: 'blur(16px)',
                     padding: isRackInfoCollapsed ? '14px 18px' : '20px',
                     borderRadius: '20px',
@@ -615,10 +616,13 @@ const Rack3DVisualization = () => {
                             left: 0,
                             right: 0,
                             height: '50%',
-                            background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%)',
+                            background:
+                              'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%)',
                           }}
                         />
-                        <CloudServerOutlined style={{ color: 'white', fontSize: 22, position: 'relative', zIndex: 1 }} />
+                        <CloudServerOutlined
+                          style={{ color: 'white', fontSize: 22, position: 'relative', zIndex: 1 }}
+                        />
                       </div>
                       <div
                         style={{
@@ -640,13 +644,15 @@ const Rack3DVisualization = () => {
                         >
                           {selectedRack.name}
                         </div>
-                        <div style={{ 
-                          fontSize: '12px', 
-                          color: 'rgba(148, 163, 184, 0.8)', 
-                          marginTop: 4,
-                          fontFamily: 'monospace',
-                          letterSpacing: '0.5px',
-                        }}>
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: 'rgba(148, 163, 184, 0.8)',
+                            marginTop: 4,
+                            fontFamily: 'monospace',
+                            letterSpacing: '0.5px',
+                          }}
+                        >
                           #{selectedRack.rackId}
                         </div>
                       </div>
@@ -660,7 +666,7 @@ const Rack3DVisualization = () => {
                         e.stopPropagation();
                         setIsRackInfoCollapsed(!isRackInfoCollapsed);
                       }}
-                      style={{ 
+                      style={{
                         color: 'rgba(148, 163, 184, 0.7)',
                         marginLeft: isRackInfoCollapsed ? 0 : 8,
                         width: isRackInfoCollapsed ? 44 : 32,
@@ -701,10 +707,24 @@ const Rack3DVisualization = () => {
                           textAlign: 'center',
                         }}
                       >
-                        <div style={{ fontSize: '22px', fontWeight: 700, color: '#60a5fa', lineHeight: 1 }}>
+                        <div
+                          style={{
+                            fontSize: '22px',
+                            fontWeight: 700,
+                            color: '#60a5fa',
+                            lineHeight: 1,
+                          }}
+                        >
                           {selectedRack.height}
                         </div>
-                        <div style={{ fontSize: '10px', color: 'rgba(148, 163, 184, 0.7)', marginTop: 4, fontWeight: 500 }}>
+                        <div
+                          style={{
+                            fontSize: '10px',
+                            color: 'rgba(148, 163, 184, 0.7)',
+                            marginTop: 4,
+                            fontWeight: 500,
+                          }}
+                        >
                           总高度
                         </div>
                       </div>
@@ -717,10 +737,24 @@ const Rack3DVisualization = () => {
                           textAlign: 'center',
                         }}
                       >
-                        <div style={{ fontSize: '22px', fontWeight: 700, color: '#34d399', lineHeight: 1 }}>
+                        <div
+                          style={{
+                            fontSize: '22px',
+                            fontWeight: 700,
+                            color: '#34d399',
+                            lineHeight: 1,
+                          }}
+                        >
                           {devices.length}
                         </div>
-                        <div style={{ fontSize: '10px', color: 'rgba(148, 163, 184, 0.7)', marginTop: 4, fontWeight: 500 }}>
+                        <div
+                          style={{
+                            fontSize: '10px',
+                            color: 'rgba(148, 163, 184, 0.7)',
+                            marginTop: 4,
+                            fontWeight: 500,
+                          }}
+                        >
                           设备数
                         </div>
                       </div>
@@ -733,10 +767,24 @@ const Rack3DVisualization = () => {
                           textAlign: 'center',
                         }}
                       >
-                        <div style={{ fontSize: '22px', fontWeight: 700, color: '#fbbf24', lineHeight: 1 }}>
+                        <div
+                          style={{
+                            fontSize: '22px',
+                            fontWeight: 700,
+                            color: '#fbbf24',
+                            lineHeight: 1,
+                          }}
+                        >
                           {Math.round((devices.length / selectedRack.height) * 100)}%
                         </div>
-                        <div style={{ fontSize: '10px', color: 'rgba(148, 163, 184, 0.7)', marginTop: 4, fontWeight: 500 }}>
+                        <div
+                          style={{
+                            fontSize: '10px',
+                            color: 'rgba(148, 163, 184, 0.7)',
+                            marginTop: 4,
+                            fontWeight: 500,
+                          }}
+                        >
                           负载率
                         </div>
                       </div>
@@ -752,49 +800,86 @@ const Rack3DVisualization = () => {
                         marginBottom: 16,
                       }}
                     >
-                      <div style={{ fontSize: '11px', color: 'rgba(148, 163, 184, 0.6)', marginBottom: 12, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          color: 'rgba(148, 163, 184, 0.6)',
+                          marginBottom: 12,
+                          fontWeight: 600,
+                          letterSpacing: '0.5px',
+                          textTransform: 'uppercase',
+                        }}
+                      >
                         资源监控
                       </div>
                       {[
-                        { 
-                          label: 'U位使用', 
-                          value: `${rackStats.usedU}U / ${selectedRack.height}U`, 
-                          status: rackStats.usagePercent > 80 ? 'warning' : 'normal', 
+                        {
+                          label: 'U位使用',
+                          value: `${rackStats.usedU}U / ${selectedRack.height}U`,
+                          status: rackStats.usagePercent > 80 ? 'warning' : 'normal',
                           icon: '📊',
                           subValue: `剩余 ${rackStats.availableU}U`,
                         },
-                        { 
-                          label: '总功率', 
-                          value: `${rackStats.totalPower.toFixed(1)}kW`, 
-                          status: 'normal', 
+                        {
+                          label: '总功率',
+                          value: `${rackStats.totalPower.toFixed(1)}kW`,
+                          status: 'normal',
                           icon: '⚡',
                           subValue: '当前负载',
                         },
-                        { 
-                          label: '设备数', 
-                          value: `${devices.length} 台`, 
-                          status: 'normal', 
+                        {
+                          label: '设备数',
+                          value: `${devices.length} 台`,
+                          status: 'normal',
                           icon: '🖥️',
                           subValue: `负载率 ${rackStats.usagePercent}%`,
                         },
                       ].map((item, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: i < 2 ? 12 : 0 }}>
+                        <div
+                          key={i}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: i < 2 ? 12 : 0,
+                          }}
+                        >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <span style={{ fontSize: 16 }}>{item.icon}</span>
                             <div>
-                              <div style={{ fontSize: '13px', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500 }}>{item.label}</div>
-                              <div style={{ fontSize: '11px', color: 'rgba(148, 163, 184, 0.6)', marginTop: 2 }}>{item.subValue}</div>
+                              <div
+                                style={{
+                                  fontSize: '13px',
+                                  color: 'rgba(226, 232, 240, 0.9)',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {item.label}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: '11px',
+                                  color: 'rgba(148, 163, 184, 0.6)',
+                                  marginTop: 2,
+                                }}
+                              >
+                                {item.subValue}
+                              </div>
                             </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>{item.value}</span>
-                            <div style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: '50%',
-                              background: item.status === 'normal' ? '#10b981' : '#f59e0b',
-                              boxShadow: `0 0 8px ${item.status === 'normal' ? 'rgba(16, 185, 129, 0.6)' : 'rgba(245, 158, 11, 0.6)'}`,
-                            }} />
+                            <span style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>
+                              {item.value}
+                            </span>
+                            <div
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                background: item.status === 'normal' ? '#10b981' : '#f59e0b',
+                                boxShadow: `0 0 8px ${item.status === 'normal' ? 'rgba(16, 185, 129, 0.6)' : 'rgba(245, 158, 11, 0.6)'}`,
+                              }}
+                            />
                           </div>
                         </div>
                       ))}
@@ -845,13 +930,15 @@ const Rack3DVisualization = () => {
                           >
                             <span style={{ fontSize: 14 }}>{item.icon}</span>
                             <span style={{ flex: 1 }}>{item.text}</span>
-                            <div style={{
-                              width: 4,
-                              height: 4,
-                              borderRadius: '50%',
-                              background: item.color,
-                              boxShadow: `0 0 6px ${item.color}`,
-                            }} />
+                            <div
+                              style={{
+                                width: 4,
+                                height: 4,
+                                borderRadius: '50%',
+                                background: item.color,
+                                boxShadow: `0 0 6px ${item.color}`,
+                              }}
+                            />
                           </div>
                         ))}
                       </div>

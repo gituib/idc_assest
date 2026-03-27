@@ -47,7 +47,7 @@ const CascadingRackPanel = ({
     const lowerSearch = searchText.toLowerCase().trim();
 
     return rooms
-      .map((room) => {
+      .map(room => {
         const roomNameMatch = room.name?.toLowerCase().includes(lowerSearch);
         const roomIdMatch = room.roomId?.toLowerCase().includes(lowerSearch);
 
@@ -56,7 +56,7 @@ const CascadingRackPanel = ({
         }
 
         const filteredRacks = room.racks.filter(
-          (rack) =>
+          rack =>
             rack.name?.toLowerCase().includes(lowerSearch) ||
             rack.rackId?.toLowerCase().includes(lowerSearch)
         );
@@ -67,13 +67,13 @@ const CascadingRackPanel = ({
 
         return null;
       })
-      .filter((room) => room !== null);
+      .filter(room => room !== null);
   }, [rooms, searchText]);
 
   const flatRackList = useMemo(() => {
     const list = [];
-    filteredRooms.forEach((room) => {
-      room.racks.forEach((rack) => {
+    filteredRooms.forEach(room => {
+      room.racks.forEach(rack => {
         list.push({ ...rack, roomKey: room.key, roomName: room.name });
       });
     });
@@ -81,7 +81,7 @@ const CascadingRackPanel = ({
   }, [filteredRooms]);
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = e => {
       if (!visible) return;
 
       switch (e.key) {
@@ -91,11 +91,11 @@ const CascadingRackPanel = ({
           break;
         case 'ArrowDown':
           e.preventDefault();
-          setFocusedIndex((prev) => Math.min(prev + 1, flatRackList.length - 1));
+          setFocusedIndex(prev => Math.min(prev + 1, flatRackList.length - 1));
           break;
         case 'ArrowUp':
           e.preventDefault();
-          setFocusedIndex((prev) => Math.max(prev - 1, 0));
+          setFocusedIndex(prev => Math.max(prev - 1, 0));
           break;
         case 'Enter':
           e.preventDefault();
@@ -113,13 +113,13 @@ const CascadingRackPanel = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [visible, focusedIndex, flatRackList, onSelect, onClose]);
 
-  const getUsageColor = (percent) => {
+  const getUsageColor = percent => {
     if (percent >= 90) return '#ef4444';
     if (percent >= 70) return '#f59e0b';
     return '#22c55e';
   };
 
-  const getUsageBadgeStatus = (percent) => {
+  const getUsageBadgeStatus = percent => {
     if (percent >= 90) return 'error';
     if (percent >= 70) return 'warning';
     return 'success';
@@ -132,7 +132,7 @@ const CascadingRackPanel = ({
     [onSelect]
   );
 
-  const handlePanelClick = useCallback((e) => {
+  const handlePanelClick = useCallback(e => {
     e.stopPropagation();
   }, []);
 
@@ -191,7 +191,7 @@ const CascadingRackPanel = ({
         <Input
           ref={searchInputRef}
           value={searchText}
-          onChange={(e) => {
+          onChange={e => {
             setSearchText(e.target.value);
             setFocusedIndex(-1);
           }}
@@ -243,13 +243,9 @@ const CascadingRackPanel = ({
                   gap: 8,
                   cursor: 'pointer',
                   background:
-                    activeRoomKey === room.key
-                      ? 'rgba(59, 130, 246, 0.1)'
-                      : 'transparent',
+                    activeRoomKey === room.key ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                 }}
-                onClick={() =>
-                  setActiveRoomKey(activeRoomKey === room.key ? null : room.key)
-                }
+                onClick={() => setActiveRoomKey(activeRoomKey === room.key ? null : room.key)}
               >
                 <DatabaseOutlined style={{ color: '#60a5fa', fontSize: 14 }} />
                 <span
@@ -285,9 +281,7 @@ const CascadingRackPanel = ({
               {activeRoomKey === room.key && (
                 <div style={{ paddingLeft: 16 }}>
                   {room.racks.map((rack, rackIndex) => {
-                    const globalIndex = flatRackList.findIndex(
-                      (r) => r.rackId === rack.rackId
-                    );
+                    const globalIndex = flatRackList.findIndex(r => r.rackId === rack.rackId);
                     const deviceCount = rack.Devices?.length || rack.deviceCount || 0;
                     const height = rack.height || 45;
                     const usedU = deviceCount * 2;
@@ -313,9 +307,7 @@ const CascadingRackPanel = ({
                           margin: '2px 8px',
                           transition: 'all 0.15s ease',
                           borderLeft: isSelected ? '3px solid #3b82f6' : '3px solid transparent',
-                          background: isHovered
-                            ? 'rgba(59, 130, 246, 0.15)'
-                            : 'transparent',
+                          background: isHovered ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
                         }}
                         onClick={() => handleRackSelect(rack, room)}
                         onMouseEnter={() => setHoveredRackId(rack.rackId)}

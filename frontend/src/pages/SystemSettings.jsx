@@ -68,7 +68,7 @@ const SystemSettings = () => {
   useEffect(() => {
     fetchSettings();
     fetchSystemInfo();
-    
+
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
     };
@@ -167,7 +167,9 @@ const SystemSettings = () => {
                   title: '正在重启前端服务',
                   content: (
                     <div>
-                      <p>前端服务正在重启，新端口：<strong>{newPort}</strong></p>
+                      <p>
+                        前端服务正在重启，新端口：<strong>{newPort}</strong>
+                      </p>
                       <p>页面将在3秒后自动跳转到新地址...</p>
                     </div>
                   ),
@@ -180,7 +182,11 @@ const SystemSettings = () => {
                 });
                 setTimeout(async () => {
                   try {
-                    await axios.post('/api/system-settings/frontend/restart', {}, { timeout: 5000 });
+                    await axios.post(
+                      '/api/system-settings/frontend/restart',
+                      {},
+                      { timeout: 5000 }
+                    );
                   } catch (error) {
                     console.log('重启请求已发送，服务正在重启...');
                   }
@@ -423,7 +429,7 @@ const SystemSettings = () => {
     },
   ];
 
-  const renderSettingGroup = (group) => {
+  const renderSettingGroup = group => {
     // 根据分组决定布局
     const isSiteInfo = group.title === '站点信息';
     const isTimeSetting = group.title === '时间设置';
@@ -442,24 +448,24 @@ const SystemSettings = () => {
       >
         {/* 居中的标题区 */}
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ 
-            width: 48, 
-            height: 48, 
-            borderRadius: '50%', 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 12,
-          }}>
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 12,
+            }}
+          >
             <span style={{ color: '#fff', fontSize: 24 }}>{group.icon}</span>
           </div>
           <div style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 6 }}>
             {group.title}
           </div>
-          <div style={{ fontSize: 14, color: '#666' }}>
-            {group.description}
-          </div>
+          <div style={{ fontSize: 14, color: '#666' }}>{group.description}</div>
         </div>
 
         <Divider style={{ margin: '0 0 24px 0' }} />
@@ -468,25 +474,28 @@ const SystemSettings = () => {
         {isSiteInfo && (
           <Row gutter={[32, 16]}>
             <Col xs={24} md={12}>
-              <Form.Item 
-                label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>网站名称</span>} 
+              <Form.Item
+                label={
+                  <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>网站名称</span>
+                }
                 name="site_name"
                 style={{ marginBottom: 0 }}
               >
-                <Input 
-                  placeholder="请输入网站名称" 
-                  style={{ height: 40, borderRadius: 8 }}
-                />
+                <Input placeholder="请输入网站名称" style={{ height: 40, borderRadius: 8 }} />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item 
-                label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>网站Logo URL</span>} 
+              <Form.Item
+                label={
+                  <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>
+                    网站Logo URL
+                  </span>
+                }
                 name="site_logo"
                 style={{ marginBottom: 0 }}
               >
-                <Input 
-                  placeholder="请输入Logo URL" 
+                <Input
+                  placeholder="请输入Logo URL"
                   style={{ height: 40, borderRadius: 8 }}
                   suffix={
                     <Button type="link" size="small" style={{ padding: 0 }}>
@@ -502,35 +511,43 @@ const SystemSettings = () => {
         {isTimeSetting && (
           <Row gutter={[32, 16]}>
             <Col xs={24} md={12}>
-              <Form.Item 
-                label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>时区设置</span>} 
+              <Form.Item
+                label={
+                  <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>时区设置</span>
+                }
                 name="timezone"
                 style={{ marginBottom: 0 }}
               >
-                <Select 
-                  placeholder="请选择时区" 
+                <Select
+                  placeholder="请选择时区"
                   style={{ width: '100%', height: 40 }}
                   dropdownStyle={{ borderRadius: 8 }}
                 >
                   {getSelectOptions('timezone').map(opt => (
-                    <Option key={opt.value} value={opt.value}>{opt.label}</Option>
+                    <Option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </Option>
                   ))}
                 </Select>
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item 
-                label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>日期格式</span>} 
+              <Form.Item
+                label={
+                  <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>日期格式</span>
+                }
                 name="date_format"
                 style={{ marginBottom: 0 }}
               >
-                <Select 
-                  placeholder="请选择日期格式" 
+                <Select
+                  placeholder="请选择日期格式"
                   style={{ width: '100%', height: 40 }}
                   dropdownStyle={{ borderRadius: 8 }}
                 >
                   {getSelectOptions('date_format').map(opt => (
-                    <Option key={opt.value} value={opt.value}>{opt.label}</Option>
+                    <Option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -541,43 +558,53 @@ const SystemSettings = () => {
         {isSecurity && (
           <Row gutter={[32, 16]} align="middle">
             <Col xs={24} md={8}>
-              <Form.Item 
-                label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>用户空闲超时时间</span>} 
+              <Form.Item
+                label={
+                  <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>
+                    用户空闲超时时间
+                  </span>
+                }
                 name="idle_timeout"
                 style={{ marginBottom: 0 }}
               >
-                <Input 
-                  type="number" 
-                  placeholder="请输入超时时间" 
+                <Input
+                  type="number"
+                  placeholder="请输入超时时间"
                   style={{ height: 40, borderRadius: 8 }}
                   suffix={<span style={{ color: '#999' }}>分钟</span>}
                 />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
-              <Form.Item 
-                label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>最大登录尝试次数</span>} 
+              <Form.Item
+                label={
+                  <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>
+                    最大登录尝试次数
+                  </span>
+                }
                 name="max_login_attempts"
                 style={{ marginBottom: 0 }}
               >
-                <Input 
-                  type="number" 
-                  placeholder="请输入次数" 
+                <Input
+                  type="number"
+                  placeholder="请输入次数"
                   style={{ height: 40, borderRadius: 8 }}
                   suffix={<span style={{ color: '#999' }}>次</span>}
                 />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
-              <Form.Item 
-                label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>维护模式</span>} 
+              <Form.Item
+                label={
+                  <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>维护模式</span>
+                }
                 name="maintenance_mode"
                 valuePropName="checked"
                 style={{ marginBottom: 0 }}
               >
                 <Tooltip title="开启后所有用户将无法登录">
-                  <Switch 
-                    checkedChildren="开启" 
+                  <Switch
+                    checkedChildren="开启"
                     unCheckedChildren="关闭"
                     style={{ marginTop: 8 }}
                   />
@@ -610,30 +637,32 @@ const SystemSettings = () => {
   };
 
   // 底部固定操作栏
-  const renderFixedFooter = (onSubmit) => (
-    <div style={{
-      position: 'sticky',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      background: '#fff',
-      borderTop: '1px solid #e8e8e8',
-      padding: '16px 24px',
-      display: 'flex',
-      justifyContent: 'center',
-      gap: 16,
-      boxShadow: '0 -2px 8px rgba(0,0,0,0.06)',
-      zIndex: 10,
-      marginTop: 24,
-    }}>
+  const renderFixedFooter = onSubmit => (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: '#fff',
+        borderTop: '1px solid #e8e8e8',
+        padding: '16px 24px',
+        display: 'flex',
+        justifyContent: 'center',
+        gap: 16,
+        boxShadow: '0 -2px 8px rgba(0,0,0,0.06)',
+        zIndex: 10,
+        marginTop: 24,
+      }}
+    >
       <Button
         type="primary"
         htmlType="submit"
         loading={saving}
         icon={<SaveOutlined />}
         size="large"
-        style={{ 
-          borderRadius: 8, 
+        style={{
+          borderRadius: 8,
           minWidth: 140,
           height: 44,
           fontSize: 15,
@@ -646,8 +675,8 @@ const SystemSettings = () => {
         onClick={() => fetchSettings()}
         icon={<ReloadOutlined />}
         size="large"
-        style={{ 
-          borderRadius: 8, 
+        style={{
+          borderRadius: 8,
           minWidth: 120,
           height: 44,
           fontSize: 15,
@@ -691,7 +720,7 @@ const SystemSettings = () => {
   const handleColorChange = (color, key) => {
     const hexColor = typeof color === 'string' ? color : color.toHexString();
     form.setFieldValue(key, hexColor);
-    
+
     const root = document.documentElement;
     if (key === 'primary_color') {
       root.style.setProperty('--primary-color', hexColor);
@@ -704,27 +733,27 @@ const SystemSettings = () => {
 
   const renderColorFormItem = (key, data) => {
     const currentValue = form.getFieldValue(key) || settings[key]?.value || '#667eea';
-    
+
     return (
-      <Form.Item 
-        key={key} 
+      <Form.Item
+        key={key}
         label={
           <Space>
             <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>
               {data.description || key}
             </span>
-            <div 
-              style={{ 
-                width: 20, 
-                height: 20, 
-                borderRadius: 4, 
+            <div
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: 4,
                 backgroundColor: currentValue,
                 border: '1px solid #d9d9d9',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-              }} 
+                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+              }}
             />
           </Space>
-        } 
+        }
         name={key}
         style={{ marginBottom: 0 }}
       >
@@ -734,8 +763,10 @@ const SystemSettings = () => {
   };
 
   const renderAppearanceSettings = () => {
-    const primaryColor = form.getFieldValue('primary_color') || settings.primary_color?.value || '#667eea';
-    const secondaryColor = form.getFieldValue('secondary_color') || settings.secondary_color?.value || '#764ba2';
+    const primaryColor =
+      form.getFieldValue('primary_color') || settings.primary_color?.value || '#667eea';
+    const secondaryColor =
+      form.getFieldValue('secondary_color') || settings.secondary_color?.value || '#764ba2';
 
     return (
       <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
@@ -747,7 +778,7 @@ const SystemSettings = () => {
             showIcon
             style={{ marginBottom: 24, borderRadius: 12 }}
           />
-          
+
           <Card
             style={{
               marginBottom: 24,
@@ -758,24 +789,24 @@ const SystemSettings = () => {
             bodyStyle={{ padding: '24px' }}
           >
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <div style={{ 
-                width: 48, 
-                height: 48, 
-                borderRadius: '50%', 
-                background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 12,
-              }}>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '50%',
+                  background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 12,
+                }}
+              >
                 <BgColorsOutlined style={{ color: '#fff', fontSize: 24 }} />
               </div>
               <div style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 6 }}>
                 主题颜色
               </div>
-              <div style={{ fontSize: 14, color: '#666' }}>
-                自定义系统主题配色方案
-              </div>
+              <div style={{ fontSize: 14, color: '#666' }}>自定义系统主题配色方案</div>
             </div>
 
             <Divider style={{ margin: '0 0 24px 0' }} />
@@ -783,7 +814,9 @@ const SystemSettings = () => {
             <Row gutter={[32, 24]}>
               <Col xs={24} md={12}>
                 <div style={{ marginBottom: 8 }}>
-                  <Text strong style={{ fontSize: 14, color: '#262626' }}>主色调</Text>
+                  <Text strong style={{ fontSize: 14, color: '#262626' }}>
+                    主色调
+                  </Text>
                   <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
                     用于按钮、链接等主要交互元素
                   </Text>
@@ -791,7 +824,7 @@ const SystemSettings = () => {
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <ColorPicker
                     value={primaryColor}
-                    onChange={(color) => handleColorChange(color, 'primary_color')}
+                    onChange={color => handleColorChange(color, 'primary_color')}
                     format="hex"
                     showText
                     presets={[
@@ -802,9 +835,9 @@ const SystemSettings = () => {
                     ]}
                     style={{ width: '100%' }}
                   />
-                  <Input 
+                  <Input
                     value={primaryColor}
-                    onChange={(e) => handleColorChange(e.target.value, 'primary_color')}
+                    onChange={e => handleColorChange(e.target.value, 'primary_color')}
                     placeholder="#667eea"
                     style={{ borderRadius: 8 }}
                     prefix={<BgColorsOutlined style={{ color: '#bfbfbf' }} />}
@@ -813,7 +846,9 @@ const SystemSettings = () => {
               </Col>
               <Col xs={24} md={12}>
                 <div style={{ marginBottom: 8 }}>
-                  <Text strong style={{ fontSize: 14, color: '#262626' }}>次色调</Text>
+                  <Text strong style={{ fontSize: 14, color: '#262626' }}>
+                    次色调
+                  </Text>
                   <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
                     用于渐变、悬停效果等辅助元素
                   </Text>
@@ -821,7 +856,7 @@ const SystemSettings = () => {
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <ColorPicker
                     value={secondaryColor}
-                    onChange={(color) => handleColorChange(color, 'secondary_color')}
+                    onChange={color => handleColorChange(color, 'secondary_color')}
                     format="hex"
                     showText
                     presets={[
@@ -832,9 +867,9 @@ const SystemSettings = () => {
                     ]}
                     style={{ width: '100%' }}
                   />
-                  <Input 
+                  <Input
                     value={secondaryColor}
-                    onChange={(e) => handleColorChange(e.target.value, 'secondary_color')}
+                    onChange={e => handleColorChange(e.target.value, 'secondary_color')}
                     placeholder="#764ba2"
                     style={{ borderRadius: 8 }}
                     prefix={<BgColorsOutlined style={{ color: '#bfbfbf' }} />}
@@ -845,46 +880,48 @@ const SystemSettings = () => {
 
             <Divider style={{ margin: '24px 0' }} />
 
-            <div style={{ 
-              padding: 16, 
-              background: '#fafafa', 
-              borderRadius: 8,
-              border: '1px solid #f0f0f0'
-            }}>
-              <Text strong style={{ fontSize: 13, color: '#595959', marginBottom: 12, display: 'block' }}>
+            <div
+              style={{
+                padding: 16,
+                background: '#fafafa',
+                borderRadius: 8,
+                border: '1px solid #f0f0f0',
+              }}
+            >
+              <Text
+                strong
+                style={{ fontSize: 13, color: '#595959', marginBottom: 12, display: 'block' }}
+              >
                 实时预览
               </Text>
               <Space size="middle" wrap>
-                <Button 
-                  type="primary" 
-                  style={{ 
+                <Button
+                  type="primary"
+                  style={{
                     background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
-                    border: 'none'
+                    border: 'none',
                   }}
                 >
                   主要按钮
                 </Button>
-                <Button 
-                  style={{ 
+                <Button
+                  style={{
                     borderColor: primaryColor,
-                    color: primaryColor
+                    color: primaryColor,
                   }}
                 >
                   次要按钮
                 </Button>
-                <Tag 
-                  color={primaryColor}
-                  style={{ borderRadius: 4 }}
-                >
+                <Tag color={primaryColor} style={{ borderRadius: 4 }}>
                   标签样式
                 </Tag>
-                <div 
-                  style={{ 
-                    width: 60, 
-                    height: 24, 
+                <div
+                  style={{
+                    width: 60,
+                    height: 24,
                     borderRadius: 4,
                     background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
-                  }} 
+                  }}
                 />
               </Space>
             </div>
@@ -900,72 +937,80 @@ const SystemSettings = () => {
             bodyStyle={{ padding: '24px' }}
           >
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <div style={{ 
-                width: 48, 
-                height: 48, 
-                borderRadius: '50%', 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 12,
-              }}>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 12,
+                }}
+              >
                 <DesktopOutlined style={{ color: '#fff', fontSize: 24 }} />
               </div>
               <div style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 6 }}>
                 界面布局
               </div>
-              <div style={{ fontSize: 14, color: '#666' }}>
-                调整界面显示密度和布局方式
-              </div>
+              <div style={{ fontSize: 14, color: '#666' }}>调整界面显示密度和布局方式</div>
             </div>
 
             <Divider style={{ margin: '0 0 24px 0' }} />
 
             <Row gutter={[32, 16]}>
               <Col xs={24} md={8}>
-                <Form.Item 
-                  label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>紧凑模式</span>} 
+                <Form.Item
+                  label={
+                    <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>
+                      紧凑模式
+                    </span>
+                  }
                   name="compact_mode"
                   valuePropName="checked"
                   style={{ marginBottom: 0 }}
                 >
                   <Tooltip title="开启后界面元素间距缩小，显示更多内容">
-                    <Switch 
-                      checkedChildren="开启" 
-                      unCheckedChildren="关闭"
-                    />
+                    <Switch checkedChildren="开启" unCheckedChildren="关闭" />
                   </Tooltip>
                 </Form.Item>
               </Col>
               <Col xs={24} md={8}>
-                <Form.Item 
-                  label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>侧边栏折叠</span>} 
+                <Form.Item
+                  label={
+                    <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>
+                      侧边栏折叠
+                    </span>
+                  }
                   name="sidebar_collapsed"
                   valuePropName="checked"
                   style={{ marginBottom: 0 }}
                 >
                   <Tooltip title="开启后侧边栏默认折叠为图标模式">
-                    <Switch 
-                      checkedChildren="开启" 
-                      unCheckedChildren="关闭"
-                    />
+                    <Switch checkedChildren="开启" unCheckedChildren="关闭" />
                   </Tooltip>
                 </Form.Item>
               </Col>
               <Col xs={24} md={8}>
-                <Form.Item 
-                  label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>表格行高度</span>} 
+                <Form.Item
+                  label={
+                    <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>
+                      表格行高度
+                    </span>
+                  }
                   name="table_row_height"
                   style={{ marginBottom: 0 }}
                 >
-                  <Select 
-                    placeholder="请选择" 
+                  <Select
+                    placeholder="请选择"
                     style={{ width: '100%', height: 40 }}
                     dropdownStyle={{ borderRadius: 8 }}
                   >
                     {getSelectOptions('table_row_height').map(opt => (
-                      <Option key={opt.value} value={opt.value}>{opt.label}</Option>
+                      <Option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </Option>
                     ))}
                   </Select>
                 </Form.Item>
@@ -983,41 +1028,42 @@ const SystemSettings = () => {
             bodyStyle={{ padding: '24px' }}
           >
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <div style={{ 
-                width: 48, 
-                height: 48, 
-                borderRadius: '50%', 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 12,
-              }}>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 12,
+                }}
+              >
                 <ThunderboltOutlined style={{ color: '#fff', fontSize: 24 }} />
               </div>
               <div style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 6 }}>
                 动画效果
               </div>
-              <div style={{ fontSize: 14, color: '#666' }}>
-                控制界面动画和过渡效果
-              </div>
+              <div style={{ fontSize: 14, color: '#666' }}>控制界面动画和过渡效果</div>
             </div>
 
             <Divider style={{ margin: '0 0 24px 0' }} />
 
             <Row gutter={[32, 16]}>
               <Col xs={24} md={12}>
-                <Form.Item 
-                  label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>启用动画</span>} 
+                <Form.Item
+                  label={
+                    <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>
+                      启用动画
+                    </span>
+                  }
                   name="animation_enabled"
                   valuePropName="checked"
                   style={{ marginBottom: 0 }}
                 >
                   <Tooltip title="关闭后可提升低配设备性能">
-                    <Switch 
-                      checkedChildren="开启" 
-                      unCheckedChildren="关闭"
-                    />
+                    <Switch checkedChildren="开启" unCheckedChildren="关闭" />
                   </Tooltip>
                 </Form.Item>
               </Col>
@@ -1059,7 +1105,10 @@ const SystemSettings = () => {
               </div>
             </Col>
             <Col xs={24} sm={18} md={19}>
-              <Title level={3} style={{ color: '#fff', margin: 0, marginBottom: 6, fontSize: '22px' }}>
+              <Title
+                level={3}
+                style={{ color: '#fff', margin: 0, marginBottom: 6, fontSize: '22px' }}
+              >
                 机柜管理系统
               </Title>
               <Space size={12} wrap style={{ color: 'rgba(255,255,255,0.9)' }}>
@@ -1067,7 +1116,14 @@ const SystemSettings = () => {
                 <span style={{ opacity: 0.5 }}>|</span>
                 <Badge status="success" text={<span style={{ color: '#fff' }}>运行正常</span>} />
               </Space>
-              <Paragraph style={{ color: 'rgba(255,255,255,0.85)', marginTop: 8, marginBottom: 0, fontSize: 13 }}>
+              <Paragraph
+                style={{
+                  color: 'rgba(255,255,255,0.85)',
+                  marginTop: 8,
+                  marginBottom: 0,
+                  fontSize: 13,
+                }}
+              >
                 专业的数据中心设备管理平台，提供机房、机柜、设备的全生命周期管理
               </Paragraph>
             </Col>
@@ -1081,8 +1137,14 @@ const SystemSettings = () => {
           >
             <div style={{ marginBottom: 16 }}>
               <Space size={10}>
-                <Avatar style={{ backgroundColor: '#52c41a', borderRadius: 8 }} icon={<CloudServerOutlined />} size={32} />
-                <Text strong style={{ fontSize: 15 }}>系统统计</Text>
+                <Avatar
+                  style={{ backgroundColor: '#52c41a', borderRadius: 8 }}
+                  icon={<CloudServerOutlined />}
+                  size={32}
+                />
+                <Text strong style={{ fontSize: 15 }}>
+                  系统统计
+                </Text>
               </Space>
             </div>
             <Row gutter={[12, 12]}>
@@ -1098,7 +1160,9 @@ const SystemSettings = () => {
                   <div style={{ fontSize: 24, fontWeight: 700, color: '#52c41a', marginBottom: 2 }}>
                     {systemInfo.statistics?.devices || 0}
                   </div>
-                  <Text type="secondary" style={{ fontSize: 12 }}>设备总数</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    设备总数
+                  </Text>
                 </div>
               </Col>
               <Col xs={12} sm={6}>
@@ -1113,7 +1177,9 @@ const SystemSettings = () => {
                   <div style={{ fontSize: 24, fontWeight: 700, color: '#1890ff', marginBottom: 2 }}>
                     {systemInfo.statistics?.racks || 0}
                   </div>
-                  <Text type="secondary" style={{ fontSize: 12 }}>机柜总数</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    机柜总数
+                  </Text>
                 </div>
               </Col>
               <Col xs={12} sm={6}>
@@ -1128,7 +1194,9 @@ const SystemSettings = () => {
                   <div style={{ fontSize: 24, fontWeight: 700, color: '#722ed1', marginBottom: 2 }}>
                     {systemInfo.statistics?.rooms || 0}
                   </div>
-                  <Text type="secondary" style={{ fontSize: 12 }}>机房总数</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    机房总数
+                  </Text>
                 </div>
               </Col>
               <Col xs={12} sm={6}>
@@ -1143,37 +1211,53 @@ const SystemSettings = () => {
                   <div style={{ fontSize: 24, fontWeight: 700, color: '#fa8c16', marginBottom: 2 }}>
                     {systemInfo.statistics?.users || 0}
                   </div>
-                  <Text type="secondary" style={{ fontSize: 12 }}>用户总数</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    用户总数
+                  </Text>
                 </div>
               </Col>
             </Row>
 
             <Divider style={{ margin: '20px 0' }} />
 
-            <Descriptions column={{ xs: 1, sm: 2, md: 3 }} size="small" labelStyle={{ fontWeight: 500, fontSize: 13 }}>
+            <Descriptions
+              column={{ xs: 1, sm: 2, md: 3 }}
+              size="small"
+              labelStyle={{ fontWeight: 500, fontSize: 13 }}
+            >
               <Descriptions.Item label="Node.js 版本">
-                <Tag color="blue" size="small">{systemInfo.system?.nodeVersion}</Tag>
+                <Tag color="blue" size="small">
+                  {systemInfo.system?.nodeVersion}
+                </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="运行平台">
-                <Text style={{ fontSize: 13 }}>{systemInfo.system?.platform} ({systemInfo.system?.arch})</Text>
+                <Text style={{ fontSize: 13 }}>
+                  {systemInfo.system?.platform} ({systemInfo.system?.arch})
+                </Text>
               </Descriptions.Item>
               <Descriptions.Item label="进程 ID">
                 <Tag size="small">{systemInfo.system?.pid}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label="运行时间">
-                <Text style={{ fontSize: 13 }}>{systemInfo.system?.uptime
-                  ? `${Math.floor(systemInfo.system.uptime / 3600)}小时${Math.floor((systemInfo.system.uptime % 3600) / 60)}分钟`
-                  : '-'}</Text>
+                <Text style={{ fontSize: 13 }}>
+                  {systemInfo.system?.uptime
+                    ? `${Math.floor(systemInfo.system.uptime / 3600)}小时${Math.floor((systemInfo.system.uptime % 3600) / 60)}分钟`
+                    : '-'}
+                </Text>
               </Descriptions.Item>
               <Descriptions.Item label="内存使用">
-                <Text style={{ fontSize: 13 }}>{systemInfo.system?.memoryUsage
-                  ? `${(systemInfo.system.memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`
-                  : '-'}</Text>
+                <Text style={{ fontSize: 13 }}>
+                  {systemInfo.system?.memoryUsage
+                    ? `${(systemInfo.system.memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`
+                    : '-'}
+                </Text>
               </Descriptions.Item>
               <Descriptions.Item label="系统时间">
-                <Text style={{ fontSize: 13 }}>{systemInfo.timestamp
-                  ? new Date(systemInfo.timestamp).toLocaleString('zh-CN')
-                  : '-'}</Text>
+                <Text style={{ fontSize: 13 }}>
+                  {systemInfo.timestamp
+                    ? new Date(systemInfo.timestamp).toLocaleString('zh-CN')
+                    : '-'}
+                </Text>
               </Descriptions.Item>
             </Descriptions>
           </Card>
@@ -1185,35 +1269,57 @@ const SystemSettings = () => {
         >
           <div style={{ marginBottom: 16 }}>
             <Space size={10}>
-              <Avatar style={{ backgroundColor: '#667eea', borderRadius: 8 }} icon={<FileTextOutlined />} size={32} />
-              <Text strong style={{ fontSize: 15 }}>公司信息</Text>
+              <Avatar
+                style={{ backgroundColor: '#667eea', borderRadius: 8 }}
+                icon={<FileTextOutlined />}
+                size={32}
+              />
+              <Text strong style={{ fontSize: 15 }}>
+                公司信息
+              </Text>
             </Space>
           </div>
           <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
             <Row gutter={[24, 8]}>
               <Col xs={24} sm={12}>
                 <Form.Item label="公司名称" name="company_name">
-                  <Input prefix={<GlobalOutlined style={{ color: '#bfbfbf' }} />} placeholder="请输入公司名称" />
+                  <Input
+                    prefix={<GlobalOutlined style={{ color: '#bfbfbf' }} />}
+                    placeholder="请输入公司名称"
+                  />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12}>
                 <Form.Item label="联系邮箱" name="contact_email">
-                  <Input prefix={<MailOutlined style={{ color: '#bfbfbf' }} />} placeholder="请输入联系邮箱" />
+                  <Input
+                    prefix={<MailOutlined style={{ color: '#bfbfbf' }} />}
+                    placeholder="请输入联系邮箱"
+                  />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12}>
                 <Form.Item label="联系电话" name="contact_phone">
-                  <Input prefix={<PhoneOutlined style={{ color: '#bfbfbf' }} />} placeholder="请输入联系电话" />
+                  <Input
+                    prefix={<PhoneOutlined style={{ color: '#bfbfbf' }} />}
+                    placeholder="请输入联系电话"
+                  />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12}>
                 <Form.Item label="公司地址" name="company_address">
-                  <Input prefix={<EnvironmentOutlined style={{ color: '#bfbfbf' }} />} placeholder="请输入公司地址" />
+                  <Input
+                    prefix={<EnvironmentOutlined style={{ color: '#bfbfbf' }} />}
+                    placeholder="请输入公司地址"
+                  />
                 </Form.Item>
               </Col>
               <Col span={24}>
                 <Form.Item label="系统描述" name="system_description">
-                  <Input.TextArea rows={3} placeholder="请输入系统描述" style={{ borderRadius: 8 }} />
+                  <Input.TextArea
+                    rows={3}
+                    placeholder="请输入系统描述"
+                    style={{ borderRadius: 8 }}
+                  />
                 </Form.Item>
               </Col>
             </Row>
@@ -1228,7 +1334,11 @@ const SystemSettings = () => {
               >
                 保存信息
               </Button>
-              <Button onClick={() => fetchSettings()} icon={<ReloadOutlined />} style={{ borderRadius: 8 }}>
+              <Button
+                onClick={() => fetchSettings()}
+                icon={<ReloadOutlined />}
+                style={{ borderRadius: 8 }}
+              >
                 重置
               </Button>
             </Space>
@@ -1253,15 +1363,17 @@ const SystemSettings = () => {
 
   // 顶部导航栏菜单
   const renderTopNav = () => (
-    <div style={{ 
-      display: 'flex', 
-      alignItems: 'center',
-      gap: '4px',
-      flexWrap: 'nowrap',
-      overflowX: 'auto',
-      scrollbarWidth: 'none',
-      msOverflowStyle: 'none',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        flexWrap: 'nowrap',
+        overflowX: 'auto',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+      }}
+    >
       {menuItems.map(item => (
         <div
           key={item.key}
@@ -1279,12 +1391,12 @@ const SystemSettings = () => {
             fontSize: 14,
             fontWeight: activeMenu === item.key ? 600 : 400,
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={e => {
             if (activeMenu !== item.key) {
               e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
             }
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={e => {
             if (activeMenu !== item.key) {
               e.currentTarget.style.backgroundColor = 'transparent';
             }
@@ -1301,7 +1413,7 @@ const SystemSettings = () => {
   const renderMobileNav = () => (
     <Select
       value={activeMenu}
-      onChange={(value) => setActiveMenu(value)}
+      onChange={value => setActiveMenu(value)}
       style={{ width: 140 }}
       bordered={false}
       dropdownStyle={{ borderRadius: 8 }}
@@ -1319,25 +1431,44 @@ const SystemSettings = () => {
   );
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f7fa', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#f5f7fa',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       {/* 顶部固定导航栏 */}
-      <div style={{ 
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        padding: '16px 24px',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-      }}>
-        <div style={{ maxWidth: '100%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          padding: '16px 24px',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '100%',
+            margin: '0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <Space align="center">
             <SettingOutlined style={{ fontSize: 20, color: '#fff' }} />
-            <Title level={4} style={{ margin: 0, color: '#fff', fontSize: 18 }}>系统设置</Title>
+            <Title level={4} style={{ margin: 0, color: '#fff', fontSize: 18 }}>
+              系统设置
+            </Title>
           </Space>
-          
+
           {/* 桌面端导航 */}
           {!isMobile && renderTopNav()}
-          
+
           {/* 移动端导航 */}
           {isMobile && renderMobileNav()}
         </div>
@@ -1345,9 +1476,7 @@ const SystemSettings = () => {
 
       {/* 主内容区 - 平铺填充 */}
       <div style={{ flex: 1, padding: '16px 24px' }}>
-        <div style={{ maxWidth: '100%' }}>
-          {renderContent()}
-        </div>
+        <div style={{ maxWidth: '100%' }}>{renderContent()}</div>
       </div>
     </div>
   );

@@ -179,44 +179,47 @@ function PortManagement() {
   const [serverNicCardPage, setServerNicCardPage] = useState(1);
   const serverNicCardPageSize = 12;
 
-  const fetchPorts = useCallback(async (page = 1, append = false) => {
-    const validPage = Number.isInteger(page) && page > 0 ? page : 1;
-    const validPageSize = Number.isInteger(portPageSize) && portPageSize > 0 ? portPageSize : 50;
-    try {
-      if (append) {
-        setPortLoadingMore(true);
-      } else {
-        setLoading(true);
+  const fetchPorts = useCallback(
+    async (page = 1, append = false) => {
+      const validPage = Number.isInteger(page) && page > 0 ? page : 1;
+      const validPageSize = Number.isInteger(portPageSize) && portPageSize > 0 ? portPageSize : 50;
+      try {
+        if (append) {
+          setPortLoadingMore(true);
+        } else {
+          setLoading(true);
+        }
+
+        const params = {
+          page: validPage,
+          pageSize: validPageSize,
+        };
+
+        if (filters.deviceId) params.deviceId = filters.deviceId;
+
+        const response = await api.get('/device-ports', { params });
+        const portsData = response.ports || [];
+        const total = response.total || 0;
+        const filteredPorts = portsData;
+
+        if (append) {
+          setPorts(prev => [...prev, ...filteredPorts]);
+        } else {
+          setPorts(filteredPorts);
+        }
+        setPortTotal(total);
+        setPortPage(page);
+        hasMoreRef.current = page * portPageSize < total;
+      } catch (error) {
+        message.error('获取端口列表失败');
+        console.error('获取端口列表失败:', error);
+      } finally {
+        setLoading(false);
+        setPortLoadingMore(false);
       }
-
-      const params = {
-        page: validPage,
-        pageSize: validPageSize,
-      };
-
-      if (filters.deviceId) params.deviceId = filters.deviceId;
-
-      const response = await api.get('/device-ports', { params });
-      const portsData = response.ports || [];
-      const total = response.total || 0;
-      const filteredPorts = portsData;
-
-      if (append) {
-        setPorts(prev => [...prev, ...filteredPorts]);
-      } else {
-        setPorts(filteredPorts);
-      }
-      setPortTotal(total);
-      setPortPage(page);
-      hasMoreRef.current = page * portPageSize < total;
-    } catch (error) {
-      message.error('获取端口列表失败');
-      console.error('获取端口列表失败:', error);
-    } finally {
-      setLoading(false);
-      setPortLoadingMore(false);
-    }
-  }, [filters, portPageSize]);
+    },
+    [filters, portPageSize]
+  );
 
   const fetchDevices = useCallback(async (keyword = '') => {
     try {
@@ -277,11 +280,14 @@ function PortManagement() {
     };
   }, [handleLoadMore, portLoadingMore]);
 
-  const handlePageSizeChange = useCallback((newPage, newPageSize) => {
-    setPortPageSize(newPageSize);
-    setPortPage(1);
-    fetchPorts(1, false);
-  }, [fetchPorts]);
+  const handlePageSizeChange = useCallback(
+    (newPage, newPageSize) => {
+      setPortPageSize(newPageSize);
+      setPortPage(1);
+      fetchPorts(1, false);
+    },
+    [fetchPorts]
+  );
 
   useEffect(() => {
     const grouped = {};
@@ -348,7 +354,7 @@ function PortManagement() {
     setPortAddGuideModalVisible(true);
   };
 
-  const handleGuideSelectType = (type) => {
+  const handleGuideSelectType = type => {
     setPortAddGuideModalVisible(false);
     setGuidedDeviceType(type);
     fetchDevices();
@@ -378,13 +384,14 @@ function PortManagement() {
     setServerNicListVisible(true);
     setServerNicLoading(true);
     try {
-      const [devicesResponse, portsResponse, nicsResponse, roomsData, racksData] = await Promise.all([
-        api.get('/devices/all', { params: { type: 'server' } }),
-        api.get('/device-ports', { params: { pageSize: 10000 } }),
-        api.get('/network-cards'),
-        roomAPI.list(),
-        api.get('/racks', { params: { pageSize: 1000 } }),
-      ]);
+      const [devicesResponse, portsResponse, nicsResponse, roomsData, racksData] =
+        await Promise.all([
+          api.get('/devices/all', { params: { type: 'server' } }),
+          api.get('/device-ports', { params: { pageSize: 10000 } }),
+          api.get('/network-cards'),
+          roomAPI.list(),
+          api.get('/racks', { params: { pageSize: 1000 } }),
+        ]);
       setRoomList(roomsData.rooms || roomsData || []);
       setRackList(racksData.racks || racksData || []);
 
@@ -405,7 +412,7 @@ function PortManagement() {
         portsCount: ports.length,
         nicsCount: allNics.length,
         sampleServer: servers[0],
-        sampleNic: allNics[0]
+        sampleNic: allNics[0],
       });
 
       const serversWithPorts = new Set(ports.map(p => p.deviceId));
@@ -421,7 +428,12 @@ function PortManagement() {
           return { ...server, nics: serverNics, nicCount: serverNics.length };
         });
 
-      console.log('[DEBUG] serversWithNics:', serversWithNics.length, 'serversNeedingAttention:', serversNeedingAttention.length);
+      console.log(
+        '[DEBUG] serversWithNics:',
+        serversWithNics.length,
+        'serversNeedingAttention:',
+        serversNeedingAttention.length
+      );
 
       setServerNicList(serversNeedingAttention);
     } catch (error) {
@@ -439,13 +451,16 @@ function PortManagement() {
     const deviceType = getDeviceType(device);
 
     if (deviceType === 'server') {
-      api.get(`/network-cards/device/${device.deviceId}`)
+      api
+        .get(`/network-cards/device/${device.deviceId}`)
         .then(nicList => {
           const validNicList = Array.isArray(nicList) ? nicList : [];
           if (validNicList.length === 0) {
             message.warning({
               content: '该服务器尚未添加网卡，请先在网卡管理中添加网卡',
-              icon: <ExclamationCircleOutlined style={{ color: designTokens.colors.warning.main }} />,
+              icon: (
+                <ExclamationCircleOutlined style={{ color: designTokens.colors.warning.main }} />
+              ),
               duration: 3,
             });
             handleManageNetworkCards(device);
@@ -477,13 +492,16 @@ function PortManagement() {
     const deviceType = getDeviceType(device);
 
     if (deviceType === 'server') {
-      api.get(`/network-cards/device/${device.deviceId}`)
+      api
+        .get(`/network-cards/device/${device.deviceId}`)
         .then(nicList => {
           const validNicList = Array.isArray(nicList) ? nicList : [];
           if (validNicList.length === 0) {
             message.warning({
               content: '该服务器尚未添加网卡，请先在网卡管理中添加网卡',
-              icon: <ExclamationCircleOutlined style={{ color: designTokens.colors.warning.main }} />,
+              icon: (
+                <ExclamationCircleOutlined style={{ color: designTokens.colors.warning.main }} />
+              ),
               duration: 3,
             });
             handleManageNetworkCards(device);
@@ -634,7 +652,9 @@ function PortManagement() {
         });
       } else {
         const portNames = parsePortRange(values.portName);
-        const targetDeviceId = selectedDeviceForPort ? selectedDeviceForPort.deviceId : values.deviceId;
+        const targetDeviceId = selectedDeviceForPort
+          ? selectedDeviceForPort.deviceId
+          : values.deviceId;
 
         if (portNames.length > 1) {
           const portsData = portNames.map((name, index) => ({
@@ -726,7 +746,7 @@ function PortManagement() {
           总行数: parsedData.length,
           有效数据: validatedResult.validData.length,
           错误数据: validatedResult.errors.length,
-          第一行数据: parsedData[0]
+          第一行数据: parsedData[0],
         });
         setImportPreview(validatedResult.validData);
         setImportErrors(validatedResult.errors);
@@ -867,7 +887,7 @@ function PortManagement() {
     if (row['网卡名称'] && row['设备ID']) {
       try {
         const nicResponse = await api.get('/network-cards/find', {
-          params: { deviceId: row['设备ID'], name: row['网卡名称'] }
+          params: { deviceId: row['设备ID'], name: row['网卡名称'] },
         });
         row._nicId = nicResponse.nicId || null;
       } catch (error) {
@@ -942,14 +962,14 @@ function PortManagement() {
         currentProgress = Math.min(currentProgress + Math.random() * 15, 85);
         setImportProgress(prev => ({
           ...prev,
-          current: Math.floor((currentProgress / 100) * importPreview.length)
+          current: Math.floor((currentProgress / 100) * importPreview.length),
         }));
       }, 200);
 
       const response = await api.post('/device-ports/batch', {
         ports: portsData,
         skipExisting,
-        updateExisting
+        updateExisting,
       });
       const { total, success, failed, skipped = 0, updated = 0, errors } = response;
 
@@ -1096,7 +1116,10 @@ function PortManagement() {
         ];
         worksheet['!cols'] = colWidths;
 
-        XLSX.writeFile(workbook, `端口导出_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`);
+        XLSX.writeFile(
+          workbook,
+          `端口导出_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`
+        );
       }
 
       message.success({
@@ -1120,7 +1143,7 @@ function PortManagement() {
     };
     const config = statusMap[status] || { color: 'default', text: status, icon: null };
     return (
-      <Tag 
+      <Tag
         color={config.color}
         icon={config.icon}
         style={{ borderRadius: '4px', padding: '2px 8px', fontSize: '12px' }}
@@ -1141,97 +1164,110 @@ function PortManagement() {
     };
     const config = typeMap[type] || { color: 'default', text: type };
     return (
-      <Tag color={config.color} style={{ borderRadius: '4px', padding: '2px 8px', fontSize: '12px' }}>
+      <Tag
+        color={config.color}
+        style={{ borderRadius: '4px', padding: '2px 8px', fontSize: '12px' }}
+      >
         {config.text}
       </Tag>
     );
   };
 
-  const portColumns = useMemo(() => [
-    {
-      title: '端口名称',
-      dataIndex: 'portName',
-      key: 'portName',
-      width: 120,
-      render: text => <span style={{ fontWeight: 500, color: designTokens.colors.neutral[800] }}>{text}</span>,
-    },
-    {
-      title: '所属网卡',
-      dataIndex: 'networkCard',
-      key: 'networkCard',
-      width: 120,
-      render: (nic, record) => {
-        const isServer = record.device?.type?.toLowerCase()?.includes('server');
-        if (!isServer) return <Text type="secondary">-</Text>;
-        if (!nic) return <Text type="secondary" style={{ color: '#ff4d4f' }}>未关联</Text>;
-        return <Text style={{ color: '#667eea' }}>{nic.name}</Text>;
+  const portColumns = useMemo(
+    () => [
+      {
+        title: '端口名称',
+        dataIndex: 'portName',
+        key: 'portName',
+        width: 120,
+        render: text => (
+          <span style={{ fontWeight: 500, color: designTokens.colors.neutral[800] }}>{text}</span>
+        ),
       },
-    },
-    {
-      title: '端口类型',
-      dataIndex: 'portType',
-      key: 'portType',
-      width: 100,
-      render: type => getPortTypeTag(type),
-    },
-    {
-      title: '端口速率',
-      dataIndex: 'portSpeed',
-      key: 'portSpeed',
-      width: 100,
-      render: text => <Text type="secondary">{text}</Text>,
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: status => getStatusTag(status),
-    },
-    {
-      title: 'VLAN ID',
-      dataIndex: 'vlanId',
-      key: 'vlanId',
-      width: 100,
-      render: vlanId => vlanId || <Text type="secondary">-</Text>,
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      ellipsis: true,
-      render: text => text || <Text type="secondary">-</Text>,
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 120,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="编辑">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-              style={{ color: designTokens.colors.primary.main }}
-            />
-          </Tooltip>
-          <Tooltip title="删除">
-            <Popconfirm
-              title="确定要删除这个端口吗？"
-              onConfirm={() => handleDelete(record.portId)}
-              okText="确定"
-              cancelText="取消"
-            >
-              <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-            </Popconfirm>
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ], []);
+      {
+        title: '所属网卡',
+        dataIndex: 'networkCard',
+        key: 'networkCard',
+        width: 120,
+        render: (nic, record) => {
+          const isServer = record.device?.type?.toLowerCase()?.includes('server');
+          if (!isServer) return <Text type="secondary">-</Text>;
+          if (!nic)
+            return (
+              <Text type="secondary" style={{ color: '#ff4d4f' }}>
+                未关联
+              </Text>
+            );
+          return <Text style={{ color: '#667eea' }}>{nic.name}</Text>;
+        },
+      },
+      {
+        title: '端口类型',
+        dataIndex: 'portType',
+        key: 'portType',
+        width: 100,
+        render: type => getPortTypeTag(type),
+      },
+      {
+        title: '端口速率',
+        dataIndex: 'portSpeed',
+        key: 'portSpeed',
+        width: 100,
+        render: text => <Text type="secondary">{text}</Text>,
+      },
+      {
+        title: '状态',
+        dataIndex: 'status',
+        key: 'status',
+        width: 100,
+        render: status => getStatusTag(status),
+      },
+      {
+        title: 'VLAN ID',
+        dataIndex: 'vlanId',
+        key: 'vlanId',
+        width: 100,
+        render: vlanId => vlanId || <Text type="secondary">-</Text>,
+      },
+      {
+        title: '描述',
+        dataIndex: 'description',
+        key: 'description',
+        ellipsis: true,
+        render: text => text || <Text type="secondary">-</Text>,
+      },
+      {
+        title: '操作',
+        key: 'action',
+        width: 120,
+        fixed: 'right',
+        render: (_, record) => (
+          <Space size="small">
+            <Tooltip title="编辑">
+              <Button
+                type="text"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => handleEdit(record)}
+                style={{ color: designTokens.colors.primary.main }}
+              />
+            </Tooltip>
+            <Tooltip title="删除">
+              <Popconfirm
+                title="确定要删除这个端口吗？"
+                onConfirm={() => handleDelete(record.portId)}
+                okText="确定"
+                cancelText="取消"
+              >
+                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>
+            </Tooltip>
+          </Space>
+        ),
+      },
+    ],
+    []
+  );
 
   // 获取设备图标
   const getDeviceIcon = device => {
@@ -1276,7 +1312,7 @@ function PortManagement() {
     return {
       list: filtered.slice(0, end),
       total: filtered.length,
-      hasMore
+      hasMore,
     };
   }, [devices, deviceFilterType, devicePage, rackList, selectedRoomId, selectedRackId]);
 
@@ -1288,7 +1324,9 @@ function PortManagement() {
         if (entries[0].isIntersecting && hasMoreRef.current && !isLoadingRef.current) {
           isLoadingRef.current = true;
           setDevicePage(p => p + 1);
-          setTimeout(() => { isLoadingRef.current = false; }, 200);
+          setTimeout(() => {
+            isLoadingRef.current = false;
+          }, 200);
         }
       },
       { threshold: 0.1 }
@@ -1304,9 +1342,9 @@ function PortManagement() {
       variants={animations.container}
       initial="hidden"
       animate="visible"
-      style={{ 
-        padding: '24px', 
-        background: designTokens.colors.neutral[50], 
+      style={{
+        padding: '24px',
+        background: designTokens.colors.neutral[50],
         minHeight: '100vh',
       }}
     >
@@ -1329,8 +1367,12 @@ function PortManagement() {
             <ApiOutlined />
           </div>
           <div>
-            <Title level={4} style={{ margin: 0, color: designTokens.colors.neutral[800] }}>端口管理</Title>
-            <Text type="secondary" style={{ fontSize: '13px' }}>管理设备的网络端口信息</Text>
+            <Title level={4} style={{ margin: 0, color: designTokens.colors.neutral[800] }}>
+              端口管理
+            </Title>
+            <Text type="secondary" style={{ fontSize: '13px' }}>
+              管理设备的网络端口信息
+            </Text>
           </div>
         </div>
       </motion.div>
@@ -1357,7 +1399,14 @@ function PortManagement() {
             >
               <Row gutter={[16, 16]} align="middle">
                 <Col xs={24} sm={24} md={10} lg={8}>
-                  <div style={{ marginBottom: '6px', fontSize: '13px', color: designTokens.colors.neutral[600], fontWeight: 500 }}>
+                  <div
+                    style={{
+                      marginBottom: '6px',
+                      fontSize: '13px',
+                      color: designTokens.colors.neutral[600],
+                      fontWeight: 500,
+                    }}
+                  >
                     设备筛选
                   </div>
                   <Select
@@ -1385,7 +1434,14 @@ function PortManagement() {
                 </Col>
 
                 <Col xs={24} sm={24} md={14} lg={16}>
-                  <div style={{ marginBottom: '6px', fontSize: '13px', color: designTokens.colors.neutral[600], fontWeight: 500 }}>
+                  <div
+                    style={{
+                      marginBottom: '6px',
+                      fontSize: '13px',
+                      color: designTokens.colors.neutral[600],
+                      fontWeight: 500,
+                    }}
+                  >
                     操作
                   </div>
                   <Space size="small" wrap>
@@ -1456,7 +1512,13 @@ function PortManagement() {
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description={
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '16px', color: designTokens.colors.neutral[600], marginBottom: '8px' }}>
+                    <div
+                      style={{
+                        fontSize: '16px',
+                        color: designTokens.colors.neutral[600],
+                        marginBottom: '8px',
+                      }}
+                    >
                       暂无端口数据
                     </div>
                     <div style={{ fontSize: '13px', color: designTokens.colors.neutral[400] }}>
@@ -1481,190 +1543,265 @@ function PortManagement() {
             </motion.div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {Object.entries(groupedPorts).slice((deviceCardPage - 1) * deviceCardPageSize, deviceCardPage * deviceCardPageSize).map(([deviceId, data], index) => {
-                const device = data.device;
-                const devicePorts = data.ports || [];
-                const freeCount = devicePorts.filter(p => p.status === 'free').length;
-                const occupiedCount = devicePorts.filter(p => p.status === 'occupied').length;
-                const faultCount = devicePorts.filter(p => p.status === 'fault').length;
-                const isExpanded = expandedKeys.includes(deviceId);
+              {Object.entries(groupedPorts)
+                .slice(
+                  (deviceCardPage - 1) * deviceCardPageSize,
+                  deviceCardPage * deviceCardPageSize
+                )
+                .map(([deviceId, data], index) => {
+                  const device = data.device;
+                  const devicePorts = data.ports || [];
+                  const freeCount = devicePorts.filter(p => p.status === 'free').length;
+                  const occupiedCount = devicePorts.filter(p => p.status === 'occupied').length;
+                  const faultCount = devicePorts.filter(p => p.status === 'fault').length;
+                  const isExpanded = expandedKeys.includes(deviceId);
 
-                return (
-                  <Card
-                    key={deviceId}
-                    style={{
-                      borderRadius: designTokens.borderRadius.lg,
-                      border: `1px solid ${designTokens.colors.neutral[200]}`,
-                      overflow: 'hidden',
-                    }}
-                    bodyStyle={{ padding: 0 }}
-                  >
-                    {/* 设备头部 */}
-                    <div
+                  return (
+                    <Card
+                      key={deviceId}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '16px 20px',
-                        background: isExpanded ? designTokens.colors.primary.light : '#fff',
-                        cursor: 'pointer',
-                        transition: 'background 0.2s',
+                        borderRadius: designTokens.borderRadius.lg,
+                        border: `1px solid ${designTokens.colors.neutral[200]}`,
+                        overflow: 'hidden',
                       }}
-                      onClick={() => {
-                        if (isExpanded) {
-                          setExpandedKeys(prev => prev.filter(key => key !== deviceId));
-                        } else {
-                          setExpandedKeys(prev => [...prev, deviceId]);
-                        }
-                      }}
+                      bodyStyle={{ padding: 0 }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <div
-                          style={{
-                            width: '48px',
-                            height: '48px',
-                            borderRadius: designTokens.borderRadius.md,
-                            background: isServerDevice(device)
-                              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                              : isSwitchDevice(device)
-                              ? 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
-                              : designTokens.colors.primary.gradient,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#fff',
-                            fontSize: '24px',
-                            boxShadow: designTokens.shadows.md,
-                          }}
-                        >
-                          {getDeviceIcon(device)}
-                        </div>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontWeight: 600, fontSize: '16px', color: designTokens.colors.neutral[800] }}>
-                              {device?.name || '未知设备'}
-                            </span>
-                            <Tag color={isServerDevice(device) ? 'blue' : isSwitchDevice(device) ? 'green' : 'default'} style={{ marginLeft: '4px' }}>
-                              {isServerDevice(device) ? '服务器' : isSwitchDevice(device) ? '交换机' : '设备'}
-                            </Tag>
+                      {/* 设备头部 */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '16px 20px',
+                          background: isExpanded ? designTokens.colors.primary.light : '#fff',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s',
+                        }}
+                        onClick={() => {
+                          if (isExpanded) {
+                            setExpandedKeys(prev => prev.filter(key => key !== deviceId));
+                          } else {
+                            setExpandedKeys(prev => [...prev, deviceId]);
+                          }
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div
+                            style={{
+                              width: '48px',
+                              height: '48px',
+                              borderRadius: designTokens.borderRadius.md,
+                              background: isServerDevice(device)
+                                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                                : isSwitchDevice(device)
+                                  ? 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
+                                  : designTokens.colors.primary.gradient,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#fff',
+                              fontSize: '24px',
+                              boxShadow: designTokens.shadows.md,
+                            }}
+                          >
+                            {getDeviceIcon(device)}
                           </div>
-                          <div style={{ fontSize: '13px', color: designTokens.colors.neutral[500], marginTop: '2px' }}>
-                            {device?.deviceId || '-'} · {device?.model || device?.type || '设备'}
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span
+                                style={{
+                                  fontWeight: 600,
+                                  fontSize: '16px',
+                                  color: designTokens.colors.neutral[800],
+                                }}
+                              >
+                                {device?.name || '未知设备'}
+                              </span>
+                              <Tag
+                                color={
+                                  isServerDevice(device)
+                                    ? 'blue'
+                                    : isSwitchDevice(device)
+                                      ? 'green'
+                                      : 'default'
+                                }
+                                style={{ marginLeft: '4px' }}
+                              >
+                                {isServerDevice(device)
+                                  ? '服务器'
+                                  : isSwitchDevice(device)
+                                    ? '交换机'
+                                    : '设备'}
+                              </Tag>
+                            </div>
+                            <div
+                              style={{
+                                fontSize: '13px',
+                                color: designTokens.colors.neutral[500],
+                                marginTop: '2px',
+                              }}
+                            >
+                              {device?.deviceId || '-'} · {device?.model || device?.type || '设备'}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <Space size="small">
-                          <Tooltip title="空闲">
-                            <Tag color="success" style={{ borderRadius: '4px', padding: '4px 12px' }} icon={<CheckCircleOutlined />}>
-                              {freeCount}
-                            </Tag>
-                          </Tooltip>
-                          <Tooltip title="占用">
-                            <Tag color="processing" style={{ borderRadius: '4px', padding: '4px 12px' }} icon={<AppstoreOutlined />}>
-                              {occupiedCount}
-                            </Tag>
-                          </Tooltip>
-                          {faultCount > 0 && (
-                            <Tooltip title="故障">
-                              <Tag color="error" style={{ borderRadius: '4px', padding: '4px 12px' }} icon={<ExclamationCircleOutlined />}>
-                                {faultCount}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <Space size="small">
+                            <Tooltip title="空闲">
+                              <Tag
+                                color="success"
+                                style={{ borderRadius: '4px', padding: '4px 12px' }}
+                                icon={<CheckCircleOutlined />}
+                              >
+                                {freeCount}
                               </Tag>
                             </Tooltip>
-                          )}
-                          <Tag color="blue" style={{ borderRadius: '4px', padding: '4px 12px', fontWeight: 500 }}>
-                            总计: {devicePorts.length}
-                          </Tag>
-                        </Space>
-                        <Divider type="vertical" style={{ height: '24px', margin: '0 8px' }} />
-                        <Space size="small">
-                          <Tooltip title={isServerDevice(device) ? '添加端口' : '添加端口（交换机端口无需关联网卡）'}>
-                            <Button
-                              type="text"
-                              icon={<PlusOutlined />}
-                              onClick={e => {
-                                e.stopPropagation();
-                                handleAddPortForDevice(device);
-                              }}
-                              style={{ color: designTokens.colors.primary.main }}
-                            />
-                          </Tooltip>
-                          {isServerDevice(device) && (
-                            <Tooltip title="网卡管理">
+                            <Tooltip title="占用">
+                              <Tag
+                                color="processing"
+                                style={{ borderRadius: '4px', padding: '4px 12px' }}
+                                icon={<AppstoreOutlined />}
+                              >
+                                {occupiedCount}
+                              </Tag>
+                            </Tooltip>
+                            {faultCount > 0 && (
+                              <Tooltip title="故障">
+                                <Tag
+                                  color="error"
+                                  style={{ borderRadius: '4px', padding: '4px 12px' }}
+                                  icon={<ExclamationCircleOutlined />}
+                                >
+                                  {faultCount}
+                                </Tag>
+                              </Tooltip>
+                            )}
+                            <Tag
+                              color="blue"
+                              style={{ borderRadius: '4px', padding: '4px 12px', fontWeight: 500 }}
+                            >
+                              总计: {devicePorts.length}
+                            </Tag>
+                          </Space>
+                          <Divider type="vertical" style={{ height: '24px', margin: '0 8px' }} />
+                          <Space size="small">
+                            <Tooltip
+                              title={
+                                isServerDevice(device)
+                                  ? '添加端口'
+                                  : '添加端口（交换机端口无需关联网卡）'
+                              }
+                            >
                               <Button
                                 type="text"
-                                icon={<CloudServerOutlined />}
+                                icon={<PlusOutlined />}
                                 onClick={e => {
                                   e.stopPropagation();
-                                  handleManageNetworkCards(device);
+                                  handleAddPortForDevice(device);
                                 }}
                                 style={{ color: designTokens.colors.primary.main }}
                               />
                             </Tooltip>
-                          )}
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={isExpanded ? <UpOutlined /> : <DownOutlined />}
-                            style={{ color: designTokens.colors.neutral[600], minWidth: '70px' }}
-                          >
-                            {isExpanded ? '收起' : '展开'}
-                          </Button>
-                        </Space>
-                      </div>
-                    </div>
-
-                    {/* 端口列表 */}
-                    {isExpanded && (
-                      <div style={{ padding: '16px 20px', borderTop: `1px solid ${designTokens.colors.neutral[200]}` }}>
-                        {devicePorts.length > 0 ? (
-                          <div>
-                            {selectedRowKeys.length > 0 && (
-                              <div style={{ marginBottom: '12px', padding: '8px 12px', background: designTokens.colors.error.bg, borderRadius: designTokens.borderRadius.sm, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Text type="secondary">已选择 {selectedRowKeys.length} 个端口</Text>
-                                <Button danger size="small" icon={<DeleteOutlined />} onClick={handleBatchDelete}>
-                                  批量删除
-                                </Button>
-                              </div>
+                            {isServerDevice(device) && (
+                              <Tooltip title="网卡管理">
+                                <Button
+                                  type="text"
+                                  icon={<CloudServerOutlined />}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    handleManageNetworkCards(device);
+                                  }}
+                                  style={{ color: designTokens.colors.primary.main }}
+                                />
+                              </Tooltip>
                             )}
-                            <Table
-                              columns={portColumns}
-                              dataSource={devicePorts}
-                              rowKey="portId"
-                              rowSelection={{
-                                selectedRowKeys,
-                                onChange: setSelectedRowKeys,
-                              }}
-                              pagination={{
-                                pageSize: 10,
-                                showSizeChanger: true,
-                                showTotal: total => `共 ${total} 个端口`,
-                                pageSizeOptions: ['10', '20', '50', '100'],
-                              }}
-                              size="middle"
-                              scroll={{ x: 1000 }}
-                            />
-                          </div>
-                        ) : (
-                          <Empty description="暂无端口数据" style={{ padding: '24px 0' }} />
-                        )}
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={isExpanded ? <UpOutlined /> : <DownOutlined />}
+                              style={{ color: designTokens.colors.neutral[600], minWidth: '70px' }}
+                            >
+                              {isExpanded ? '收起' : '展开'}
+                            </Button>
+                          </Space>
+                        </div>
                       </div>
-                    )}
-                  </Card>
-                );
-              })}
+
+                      {/* 端口列表 */}
+                      {isExpanded && (
+                        <div
+                          style={{
+                            padding: '16px 20px',
+                            borderTop: `1px solid ${designTokens.colors.neutral[200]}`,
+                          }}
+                        >
+                          {devicePorts.length > 0 ? (
+                            <div>
+                              {selectedRowKeys.length > 0 && (
+                                <div
+                                  style={{
+                                    marginBottom: '12px',
+                                    padding: '8px 12px',
+                                    background: designTokens.colors.error.bg,
+                                    borderRadius: designTokens.borderRadius.sm,
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                  }}
+                                >
+                                  <Text type="secondary">
+                                    已选择 {selectedRowKeys.length} 个端口
+                                  </Text>
+                                  <Button
+                                    danger
+                                    size="small"
+                                    icon={<DeleteOutlined />}
+                                    onClick={handleBatchDelete}
+                                  >
+                                    批量删除
+                                  </Button>
+                                </div>
+                              )}
+                              <Table
+                                columns={portColumns}
+                                dataSource={devicePorts}
+                                rowKey="portId"
+                                rowSelection={{
+                                  selectedRowKeys,
+                                  onChange: setSelectedRowKeys,
+                                }}
+                                pagination={{
+                                  pageSize: 10,
+                                  showSizeChanger: true,
+                                  showTotal: total => `共 ${total} 个端口`,
+                                  pageSizeOptions: ['10', '20', '50', '100'],
+                                }}
+                                size="middle"
+                                scroll={{ x: 1000 }}
+                              />
+                            </div>
+                          ) : (
+                            <Empty description="暂无端口数据" style={{ padding: '24px 0' }} />
+                          )}
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
               {deviceCardTotal > deviceCardPageSize && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 0' }}>
                   <Pagination
                     current={deviceCardPage}
                     pageSize={deviceCardPageSize}
                     total={deviceCardTotal}
-                    onChange={(page) => {
+                    onChange={page => {
                       setDeviceCardPage(page);
                       setExpandedKeys([]);
                     }}
                     showSizeChanger={false}
-                    showTotal={(total, range) => `第 ${range[0]}-${range[1]} 个，共 ${total} 个设备`}
+                    showTotal={(total, range) =>
+                      `第 ${range[0]}-${range[1]} 个，共 ${total} 个设备`
+                    }
                   />
                 </div>
               )}
@@ -1698,11 +1835,13 @@ function PortManagement() {
         style={{ borderRadius: '16px' }}
         styles={{ body: { padding: 0 } }}
       >
-        <div style={{
-          background: `linear-gradient(135deg, ${designTokens.colors.primary.main} 0%, ${designTokens.colors.primary.dark} 100%)`,
-          padding: '20px 24px',
-          borderRadius: '16px 16px 0 0',
-        }}>
+        <div
+          style={{
+            background: `linear-gradient(135deg, ${designTokens.colors.primary.main} 0%, ${designTokens.colors.primary.dark} 100%)`,
+            padding: '20px 24px',
+            borderRadius: '16px 16px 0 0',
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{
@@ -1722,12 +1861,14 @@ function PortManagement() {
               {editingPort ? '编辑端口' : '新增端口'}
             </span>
             {selectedDeviceForPort && (
-              <Tag style={{
-                background: 'rgba(255,255,255,0.2)',
-                border: 'none',
-                color: '#fff',
-                fontWeight: 500,
-              }}>
+              <Tag
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  color: '#fff',
+                  fontWeight: 500,
+                }}
+              >
                 {selectedDeviceForPort.name}
               </Tag>
             )}
@@ -1735,67 +1876,83 @@ function PortManagement() {
         </div>
 
         <div style={{ padding: '24px', background: '#fff' }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            marginBottom: '24px',
-            gap: '8px',
-          }}>
-            <div style={{
+          <div
+            style={{
               display: 'flex',
-              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '24px',
               gap: '8px',
-              padding: '8px 20px',
-              borderRadius: '20px',
-              fontSize: '14px',
-              fontWeight: 500,
-              background: designTokens.colors.primary.bg,
-              color: designTokens.colors.primary.main,
-            }}>
-              <div style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                background: designTokens.colors.primary.main,
-                color: '#fff',
+            }}
+          >
+            <div
+              style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '12px',
-                fontWeight: 600,
-              }}>1</div>
+                gap: '8px',
+                padding: '8px 20px',
+                borderRadius: '20px',
+                fontSize: '14px',
+                fontWeight: 500,
+                background: designTokens.colors.primary.bg,
+                color: designTokens.colors.primary.main,
+              }}
+            >
+              <div
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: designTokens.colors.primary.main,
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                }}
+              >
+                1
+              </div>
               <span>基本信息</span>
             </div>
-            <div style={{
-              width: '40px',
-              height: '2px',
-              background: designTokens.colors.primary.main,
-              alignSelf: 'center',
-            }} />
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 20px',
-              borderRadius: '20px',
-              fontSize: '14px',
-              fontWeight: 500,
-              background: designTokens.colors.neutral[100],
-              color: designTokens.colors.neutral[500],
-            }}>
-              <div style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                background: 'transparent',
-                color: designTokens.colors.neutral[500],
+            <div
+              style={{
+                width: '40px',
+                height: '2px',
+                background: designTokens.colors.primary.main,
+                alignSelf: 'center',
+              }}
+            />
+            <div
+              style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '12px',
-                fontWeight: 600,
-                border: `1px solid ${designTokens.colors.neutral[400]}`,
-              }}>2</div>
+                gap: '8px',
+                padding: '8px 20px',
+                borderRadius: '20px',
+                fontSize: '14px',
+                fontWeight: 500,
+                background: designTokens.colors.neutral[100],
+                color: designTokens.colors.neutral[500],
+              }}
+            >
+              <div
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'transparent',
+                  color: designTokens.colors.neutral[500],
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: `1px solid ${designTokens.colors.neutral[400]}`,
+                }}
+              >
+                2
+              </div>
               <span>高级配置</span>
             </div>
           </div>
@@ -1805,8 +1962,12 @@ function PortManagement() {
               message="格式说明"
               description={
                 <div style={{ fontSize: '12px', lineHeight: '1.8' }}>
-                  <div>• <strong>单个端口：</strong>eth0/1、gigabitethernet1/0/1</div>
-                  <div>• <strong>端口范围：</strong>1/0/1-1/0/48（创建 1/0/1 到 1/0/48 共48个端口）</div>
+                  <div>
+                    • <strong>单个端口：</strong>eth0/1、gigabitethernet1/0/1
+                  </div>
+                  <div>
+                    • <strong>端口范围：</strong>1/0/1-1/0/48（创建 1/0/1 到 1/0/48 共48个端口）
+                  </div>
                 </div>
               }
               type="info"
@@ -1819,42 +1980,66 @@ function PortManagement() {
               }}
             />
 
-            <div style={{
-              background: designTokens.colors.neutral[50],
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              border: `1px solid ${designTokens.colors.neutral[200]}`,
-            }}>
-              <div style={{
-                fontSize: '14px',
-                fontWeight: 600,
-                color: designTokens.colors.neutral[800],
+            <div
+              style={{
+                background: designTokens.colors.neutral[50],
+                borderRadius: '12px',
+                padding: '20px',
                 marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}>
+                border: `1px solid ${designTokens.colors.neutral[200]}`,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: designTokens.colors.neutral[800],
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
                 <TagOutlined style={{ color: designTokens.colors.primary.main }} />
                 端口标识
               </div>
 
               {selectedDeviceForPort ? (
                 <>
-                  <Form.Item label={<span style={{ fontSize: '13px', fontWeight: 500 }}>设备</span>}>
+                  <Form.Item
+                    label={<span style={{ fontSize: '13px', fontWeight: 500 }}>设备</span>}
+                  >
                     <Input
                       value={selectedDeviceForPort.name}
                       disabled
                       addonAfter={
-                        <span style={{ color: isServerDevice(selectedDeviceForPort) ? designTokens.colors.warning.main : designTokens.colors.success.main }}>
-                          {isServerDevice(selectedDeviceForPort) ? '服务器' : isSwitchDevice(selectedDeviceForPort) ? '交换机' : '设备'}
+                        <span
+                          style={{
+                            color: isServerDevice(selectedDeviceForPort)
+                              ? designTokens.colors.warning.main
+                              : designTokens.colors.success.main,
+                          }}
+                        >
+                          {isServerDevice(selectedDeviceForPort)
+                            ? '服务器'
+                            : isSwitchDevice(selectedDeviceForPort)
+                              ? '交换机'
+                              : '设备'}
                         </span>
                       }
                       style={{ borderRadius: '8px' }}
                     />
                   </Form.Item>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: isServerDevice(selectedDeviceForPort) ? '1fr 1fr' : '1fr', gap: '16px' }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: isServerDevice(selectedDeviceForPort)
+                        ? '1fr 1fr'
+                        : '1fr',
+                      gap: '16px',
+                    }}
+                  >
                     {isServerDevice(selectedDeviceForPort) && (
                       <Form.Item
                         name="nicId"
@@ -1868,11 +2053,23 @@ function PortManagement() {
                         >
                           {nicList.map(nic => (
                             <Option key={nic.nicId} value={nic.nicId}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  padding: '4px 0',
+                                }}
+                              >
                                 <div>
                                   <div style={{ fontWeight: 500 }}>{nic.name}</div>
                                   {nic.speed && (
-                                    <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500] }}>
+                                    <div
+                                      style={{
+                                        fontSize: '12px',
+                                        color: designTokens.colors.neutral[500],
+                                      }}
+                                    >
                                       {nic.speed}
                                     </div>
                                   )}
@@ -1895,7 +2092,9 @@ function PortManagement() {
                         prefix={<TagOutlined style={{ color: designTokens.colors.neutral[400] }} />}
                         suffix={
                           <Tooltip title="支持批量添加，例如: 1/0/1-1/0/48 将创建 48 个端口">
-                            <InfoCircleOutlined style={{ color: designTokens.colors.neutral[400] }} />
+                            <InfoCircleOutlined
+                              style={{ color: designTokens.colors.neutral[400] }}
+                            />
                           </Tooltip>
                         }
                         style={{ borderRadius: '8px' }}
@@ -1934,22 +2133,26 @@ function PortManagement() {
               )}
             </div>
 
-            <div style={{
-              background: designTokens.colors.neutral[50],
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              border: `1px solid ${designTokens.colors.neutral[200]}`,
-            }}>
-              <div style={{
-                fontSize: '14px',
-                fontWeight: 600,
-                color: designTokens.colors.neutral[800],
+            <div
+              style={{
+                background: designTokens.colors.neutral[50],
+                borderRadius: '12px',
+                padding: '20px',
                 marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}>
+                border: `1px solid ${designTokens.colors.neutral[200]}`,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: designTokens.colors.neutral[800],
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
                 <ThunderboltOutlined style={{ color: designTokens.colors.primary.main }} />
                 端口属性
               </div>
@@ -1964,37 +2167,79 @@ function PortManagement() {
                   <Select size="large" style={{ borderRadius: '8px' }}>
                     <Option value="RJ45">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: designTokens.colors.device.server }} />
+                        <div
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '2px',
+                            background: designTokens.colors.device.server,
+                          }}
+                        />
                         RJ45
                       </div>
                     </Option>
                     <Option value="SFP">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: designTokens.colors.device.switch }} />
+                        <div
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '2px',
+                            background: designTokens.colors.device.switch,
+                          }}
+                        />
                         SFP
                       </div>
                     </Option>
                     <Option value="SFP+">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: designTokens.colors.purple.main }} />
+                        <div
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '2px',
+                            background: designTokens.colors.purple.main,
+                          }}
+                        />
                         SFP+
                       </div>
                     </Option>
                     <Option value="SFP28">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: designTokens.colors.info.main }} />
+                        <div
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '2px',
+                            background: designTokens.colors.info.main,
+                          }}
+                        />
                         SFP28
                       </div>
                     </Option>
                     <Option value="QSFP">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: designTokens.colors.warning.main }} />
+                        <div
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '2px',
+                            background: designTokens.colors.warning.main,
+                          }}
+                        />
                         QSFP
                       </div>
                     </Option>
                     <Option value="QSFP28">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: designTokens.colors.secondary.main }} />
+                        <div
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '2px',
+                            background: designTokens.colors.secondary.main,
+                          }}
+                        />
                         QSFP28
                       </div>
                     </Option>
@@ -2016,18 +2261,28 @@ function PortManagement() {
               </div>
 
               {!editingPort && (
-                <div style={{
-                  background: designTokens.colors.success.bg,
-                  border: `1px solid ${designTokens.colors.success.light}`,
-                  borderRadius: '8px',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                }}>
-                  <CheckCircleOutlined style={{ color: designTokens.colors.success.main, fontSize: '18px' }} />
+                <div
+                  style={{
+                    background: designTokens.colors.success.bg,
+                    border: `1px solid ${designTokens.colors.success.light}`,
+                    borderRadius: '8px',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
+                  <CheckCircleOutlined
+                    style={{ color: designTokens.colors.success.main, fontSize: '18px' }}
+                  />
                   <div>
-                    <div style={{ fontSize: '14px', fontWeight: 500, color: designTokens.colors.success.dark }}>
+                    <div
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: designTokens.colors.success.dark,
+                      }}
+                    >
                       新建端口默认状态为空闲
                     </div>
                     <div style={{ fontSize: '12px', color: designTokens.colors.success.main }}>
@@ -2045,31 +2300,41 @@ function PortManagement() {
                     rules={[{ required: true, message: '请选择状态' }]}
                   >
                     <Select size="large" style={{ borderRadius: '8px' }}>
-                      <Option value="free"><Tag color="success">空闲</Tag></Option>
-                      <Option value="occupied"><Tag color="warning">占用</Tag></Option>
-                      <Option value="fault"><Tag color="error">故障</Tag></Option>
+                      <Option value="free">
+                        <Tag color="success">空闲</Tag>
+                      </Option>
+                      <Option value="occupied">
+                        <Tag color="warning">占用</Tag>
+                      </Option>
+                      <Option value="fault">
+                        <Tag color="error">故障</Tag>
+                      </Option>
                     </Select>
                   </Form.Item>
                 </div>
               )}
             </div>
 
-            <div style={{
-              background: designTokens.colors.neutral[50],
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              border: `1px solid ${designTokens.colors.neutral[200]}`,
-            }}>
-              <div style={{
-                fontSize: '14px',
-                fontWeight: 600,
-                color: designTokens.colors.neutral[800],
+            <div
+              style={{
+                background: designTokens.colors.neutral[50],
+                borderRadius: '12px',
+                padding: '20px',
                 marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}>
+                border: `1px solid ${designTokens.colors.neutral[200]}`,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: designTokens.colors.neutral[800],
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
                 <FileTextOutlined style={{ color: designTokens.colors.primary.main }} />
                 描述信息
               </div>
@@ -2084,15 +2349,17 @@ function PortManagement() {
           </Form>
         </div>
 
-        <div style={{
-          padding: '16px 24px',
-          background: designTokens.colors.neutral[50],
-          borderTop: `1px solid ${designTokens.colors.neutral[200]}`,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          borderRadius: '0 0 16px 16px',
-        }}>
+        <div
+          style={{
+            padding: '16px 24px',
+            background: designTokens.colors.neutral[50],
+            borderTop: `1px solid ${designTokens.colors.neutral[200]}`,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderRadius: '0 0 16px 16px',
+          }}
+        >
           <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500] }}>
             {editingPort ? '编辑模式下仅修改单个端口' : '支持批量创建端口'}
           </div>
@@ -2158,16 +2425,16 @@ function PortManagement() {
         }}
         width={900}
         footer={[
-          <Button 
-            key="cancel" 
+          <Button
+            key="cancel"
             onClick={() => setImportModalVisible(false)}
             style={{ borderRadius: designTokens.borderRadius.sm }}
           >
             取消
           </Button>,
-          <Button 
-            key="download" 
-            icon={<DownloadOutlined />} 
+          <Button
+            key="download"
+            icon={<DownloadOutlined />}
             onClick={handleDownloadTemplate}
             style={{ borderRadius: designTokens.borderRadius.sm }}
           >
@@ -2180,8 +2447,8 @@ function PortManagement() {
             onClick={handleBatchImport}
             loading={importing}
             disabled={importPreview.length === 0}
-            style={{ 
-              background: designTokens.colors.primary.gradient, 
+            style={{
+              background: designTokens.colors.primary.gradient,
               border: 'none',
               borderRadius: designTokens.borderRadius.sm,
             }}
@@ -2195,33 +2462,78 @@ function PortManagement() {
             message="操作说明"
             description={
               <div style={{ fontSize: '12px', lineHeight: '1.8' }}>
-                <div><strong>适用范围：</strong>批量导入端口适用于<span style={{ color: '#1890ff', fontWeight: 600 }}>所有设备类型</span>（交换机、服务器、路由器、存储等）</div>
-                <div style={{ marginTop: '8px' }}><strong>前置条件：</strong></div>
-                <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
-                  <div>• <strong>交换机端口：</strong>可直接导入，无需前置操作</div>
-                  <div>• <strong>服务器端口：</strong>必须先在<span style={{ color: '#1890ff', fontWeight: 600 }}>网卡管理</span>中添加网卡，服务器端口与网卡是<span style={{ color: '#ff4d4f', fontWeight: 600 }}>层级关系</span>：设备 → 网卡 → 端口</div>
+                <div>
+                  <strong>适用范围：</strong>批量导入端口适用于
+                  <span style={{ color: '#1890ff', fontWeight: 600 }}>所有设备类型</span>
+                  （交换机、服务器、路由器、存储等）
                 </div>
-                <div style={{ marginTop: '8px' }}><strong>操作步骤：</strong></div>
+                <div style={{ marginTop: '8px' }}>
+                  <strong>前置条件：</strong>
+                </div>
+                <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
+                  <div>
+                    • <strong>交换机端口：</strong>可直接导入，无需前置操作
+                  </div>
+                  <div>
+                    • <strong>服务器端口：</strong>必须先在
+                    <span style={{ color: '#1890ff', fontWeight: 600 }}>网卡管理</span>
+                    中添加网卡，服务器端口与网卡是
+                    <span style={{ color: '#ff4d4f', fontWeight: 600 }}>层级关系</span>：设备 → 网卡
+                    → 端口
+                  </div>
+                </div>
+                <div style={{ marginTop: '8px' }}>
+                  <strong>操作步骤：</strong>
+                </div>
                 <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
                   <div>1. 点击「下载模板」获取标准Excel/CSV文件</div>
-                  <div>2. 按模板格式填写端口信息，<span style={{ color: '#ff4d4f', fontWeight: 600 }}>设备ID</span>和<span style={{ color: '#ff4d4f', fontWeight: 600 }}>端口名称</span>为必填项</div>
-                  <div>3. 服务器端口可在「网卡名称」列填写对应的网卡名称（如eth0），不填则归入「未分组端口」</div>
+                  <div>
+                    2. 按模板格式填写端口信息，
+                    <span style={{ color: '#ff4d4f', fontWeight: 600 }}>设备ID</span>和
+                    <span style={{ color: '#ff4d4f', fontWeight: 600 }}>端口名称</span>为必填项
+                  </div>
+                  <div>
+                    3.
+                    服务器端口可在「网卡名称」列填写对应的网卡名称（如eth0），不填则归入「未分组端口」
+                  </div>
                   <div>4. 点击上传区域选择文件，或直接拖拽文件到上传区域</div>
                   <div>5. 系统自动校验数据，可预览前10条数据及错误详情</div>
                   <div>6. 选择导入策略（跳过/更新已存在），点击「开始导入」</div>
                 </div>
-                <div style={{ marginTop: '8px' }}><strong>字段说明：</strong></div>
-                <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
-                  <div>• <strong>设备ID</strong>（必填）：设备的唯一标识，如DEV001</div>
-                  <div>• <strong>端口名称</strong>（必填）：端口的名称或标识，如eth0/1、GigabitEthernet0/0/1</div>
-                  <div>• <strong>网卡名称</strong>（选填）：服务器端口所属的网卡名称，如eth0；交换机端口留空</div>
-                  <div>• <strong>端口类型</strong>（选填）：如RJ45、LC、SC、FC、SFP+、QSFP28等</div>
-                  <div>• <strong>端口速率</strong>（选填）：如1G、10G、25G、100G、40G等</div>
-                  <div>• <strong>状态</strong>（选填）：空闲/占用/故障，默认为空闲</div>
-                  <div>• <strong>VLAN ID</strong>（选填）：端口所属的VLAN编号，如100</div>
-                  <div>• <strong>描述</strong>（选填）：备注信息</div>
+                <div style={{ marginTop: '8px' }}>
+                  <strong>字段说明：</strong>
                 </div>
-                <div style={{ marginTop: '8px', color: '#faad14' }}><strong>注意事项：</strong></div>
+                <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
+                  <div>
+                    • <strong>设备ID</strong>（必填）：设备的唯一标识，如DEV001
+                  </div>
+                  <div>
+                    • <strong>端口名称</strong>
+                    （必填）：端口的名称或标识，如eth0/1、GigabitEthernet0/0/1
+                  </div>
+                  <div>
+                    • <strong>网卡名称</strong>
+                    （选填）：服务器端口所属的网卡名称，如eth0；交换机端口留空
+                  </div>
+                  <div>
+                    • <strong>端口类型</strong>（选填）：如RJ45、LC、SC、FC、SFP+、QSFP28等
+                  </div>
+                  <div>
+                    • <strong>端口速率</strong>（选填）：如1G、10G、25G、100G、40G等
+                  </div>
+                  <div>
+                    • <strong>状态</strong>（选填）：空闲/占用/故障，默认为空闲
+                  </div>
+                  <div>
+                    • <strong>VLAN ID</strong>（选填）：端口所属的VLAN编号，如100
+                  </div>
+                  <div>
+                    • <strong>描述</strong>（选填）：备注信息
+                  </div>
+                </div>
+                <div style={{ marginTop: '8px', color: '#faad14' }}>
+                  <strong>注意事项：</strong>
+                </div>
                 <div style={{ paddingLeft: '12px', marginTop: '4px', color: '#faad14' }}>
                   <div>• 同一设备下端口名称不可重复</div>
                   <div>• 批量导入支持最多50000条记录</div>
@@ -2255,7 +2567,10 @@ function PortManagement() {
             <p className="ant-upload-drag-icon">
               <UploadIcon style={{ fontSize: '48px', color: designTokens.colors.primary.main }} />
             </p>
-            <p className="ant-upload-text" style={{ fontSize: '16px', color: designTokens.colors.neutral[700] }}>
+            <p
+              className="ant-upload-text"
+              style={{ fontSize: '16px', color: designTokens.colors.neutral[700] }}
+            >
               点击或拖拽文件到此处上传
             </p>
             <p className="ant-upload-hint" style={{ color: designTokens.colors.neutral[500] }}>
@@ -2263,7 +2578,16 @@ function PortManagement() {
             </p>
           </Upload.Dragger>
 
-          <div style={{ display: 'flex', gap: '24px', marginTop: '16px', padding: '16px', background: designTokens.colors.neutral[50], borderRadius: designTokens.borderRadius.md }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: '24px',
+              marginTop: '16px',
+              padding: '16px',
+              background: designTokens.colors.neutral[50],
+              borderRadius: designTokens.borderRadius.md,
+            }}
+          >
             <Checkbox checked={skipExisting} onChange={e => setSkipExisting(e.target.checked)}>
               跳过已存在的端口
             </Checkbox>
@@ -2285,11 +2609,39 @@ function PortManagement() {
                   <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                     <Table
                       columns={[
-                        { title: '行号', dataIndex: 'row', key: 'row', width: 70, render: row => <Tag color="red">{row}</Tag> },
-                        { title: '字段', dataIndex: 'field', key: 'field', width: 100, render: field => <Text strong>{field}</Text> },
-                        { title: '错误值', dataIndex: 'value', key: 'value', width: 120, render: val => <Text code>{val}</Text> },
-                        { title: '错误原因', dataIndex: 'error', key: 'error', render: err => <Text type="danger">{err}</Text> },
-                        { title: '修正建议', dataIndex: 'suggestion', key: 'suggestion', render: sug => <Text type="secondary">{sug}</Text> },
+                        {
+                          title: '行号',
+                          dataIndex: 'row',
+                          key: 'row',
+                          width: 70,
+                          render: row => <Tag color="red">{row}</Tag>,
+                        },
+                        {
+                          title: '字段',
+                          dataIndex: 'field',
+                          key: 'field',
+                          width: 100,
+                          render: field => <Text strong>{field}</Text>,
+                        },
+                        {
+                          title: '错误值',
+                          dataIndex: 'value',
+                          key: 'value',
+                          width: 120,
+                          render: val => <Text code>{val}</Text>,
+                        },
+                        {
+                          title: '错误原因',
+                          dataIndex: 'error',
+                          key: 'error',
+                          render: err => <Text type="danger">{err}</Text>,
+                        },
+                        {
+                          title: '修正建议',
+                          dataIndex: 'suggestion',
+                          key: 'suggestion',
+                          render: sug => <Text type="secondary">{sug}</Text>,
+                        },
                       ]}
                       dataSource={importErrors}
                       rowKey={(record, index) => `error-${index}`}
@@ -2323,24 +2675,52 @@ function PortManagement() {
                 message={
                   <span>
                     成功解析 {importPreview.length} 条有效数据
-                    {importErrors.length > 0 && <span style={{ color: '#ff4d4f', marginLeft: 8 }}>（{importErrors.length} 条错误）</span>}
+                    {importErrors.length > 0 && (
+                      <span style={{ color: '#ff4d4f', marginLeft: 8 }}>
+                        （{importErrors.length} 条错误）
+                      </span>
+                    )}
                   </span>
                 }
                 type={importErrors.length > 0 ? 'warning' : 'success'}
                 showIcon
                 style={{ marginBottom: '16px', borderRadius: designTokens.borderRadius.md }}
               />
-              <div style={{ marginBottom: '8px', fontWeight: 500, color: designTokens.colors.neutral[700] }}>
+              <div
+                style={{
+                  marginBottom: '8px',
+                  fontWeight: 500,
+                  color: designTokens.colors.neutral[700],
+                }}
+              >
                 数据预览（前10条）
               </div>
               <Table
                 columns={[
                   { title: '设备ID', dataIndex: '设备ID', key: 'deviceId', width: 120 },
                   { title: '端口名称', dataIndex: '端口名称', key: 'portName', width: 120 },
-                  { title: '端口类型', dataIndex: '端口类型', key: 'portType', width: 100, render: type => getPortTypeTag(type) },
+                  {
+                    title: '端口类型',
+                    dataIndex: '端口类型',
+                    key: 'portType',
+                    width: 100,
+                    render: type => getPortTypeTag(type),
+                  },
                   { title: '端口速率', dataIndex: '端口速率', key: 'portSpeed', width: 100 },
-                  { title: '状态', dataIndex: '状态', key: 'status', width: 100, render: status => getStatusTag(status) },
-                  { title: 'VLAN ID', dataIndex: 'VLAN ID', key: 'vlanId', width: 100, render: vlanId => vlanId || '-' },
+                  {
+                    title: '状态',
+                    dataIndex: '状态',
+                    key: 'status',
+                    width: 100,
+                    render: status => getStatusTag(status),
+                  },
+                  {
+                    title: 'VLAN ID',
+                    dataIndex: 'VLAN ID',
+                    key: 'vlanId',
+                    width: 100,
+                    render: vlanId => vlanId || '-',
+                  },
                   { title: '描述', dataIndex: '描述', key: 'description', ellipsis: true },
                 ]}
                 dataSource={importPreview.slice(0, 10)}
@@ -2351,7 +2731,13 @@ function PortManagement() {
                 style={{ borderRadius: designTokens.borderRadius.md }}
               />
               {importPreview.length > 10 && (
-                <div style={{ textAlign: 'center', marginTop: '12px', color: designTokens.colors.neutral[500] }}>
+                <div
+                  style={{
+                    textAlign: 'center',
+                    marginTop: '12px',
+                    color: designTokens.colors.neutral[500],
+                  }}
+                >
                   仅显示前10条数据，共 {importPreview.length} 条
                 </div>
               )}
@@ -2434,9 +2820,10 @@ function PortManagement() {
             style={{
               margin: '0 -24px 16px',
               padding: '12px 24px',
-              background: guidedDeviceType === 'switch'
-                ? 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)'
-                : 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+              background:
+                guidedDeviceType === 'switch'
+                  ? 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)'
+                  : 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
               borderBottom: `1px solid ${guidedDeviceType === 'switch' ? '#bbf7d0' : '#c7d2fe'}`,
             }}
           >
@@ -2446,15 +2833,19 @@ function PortManagement() {
               ) : (
                 <CloudServerOutlined style={{ fontSize: '16px', color: '#6366f1' }} />
               )}
-              <span style={{
-                fontSize: '13px',
-                fontWeight: 500,
-                color: guidedDeviceType === 'switch' ? '#047857' : '#4f46e5',
-              }}>
+              <span
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: guidedDeviceType === 'switch' ? '#047857' : '#4f46e5',
+                }}
+              >
                 {guidedDeviceType === 'switch' ? '添加交换机端口' : '添加服务器端口'}
               </span>
               <span style={{ fontSize: '12px', color: '#666' }}>
-                {guidedDeviceType === 'switch' ? '（交换机端口可直接创建，无需关联网卡）' : '（服务器端口需关联网卡）'}
+                {guidedDeviceType === 'switch'
+                  ? '（交换机端口可直接创建，无需关联网卡）'
+                  : '（服务器端口需关联网卡）'}
               </span>
             </div>
           </div>
@@ -2520,7 +2911,8 @@ function PortManagement() {
             const type = getDeviceType(d);
             if (type !== 'switch' && type !== 'server') return false;
             if (selectedRackId && d.rackId !== selectedRackId) return false;
-            if (selectedRoomId && d.rackId && rackRoomMap[d.rackId] !== selectedRoomId) return false;
+            if (selectedRoomId && d.rackId && rackRoomMap[d.rackId] !== selectedRoomId)
+              return false;
             return true;
           });
           const switchCount = allDevices.filter(d => getDeviceType(d) === 'switch').length;
@@ -2541,7 +2933,10 @@ function PortManagement() {
             >
               {guidedDeviceType === null && (
                 <button
-                  onClick={() => { setDeviceFilterType('all'); setDevicePage(1); }}
+                  onClick={() => {
+                    setDeviceFilterType('all');
+                    setDevicePage(1);
+                  }}
                   style={{
                     flex: 1,
                     padding: '10px 16px',
@@ -2551,11 +2946,13 @@ function PortManagement() {
                     fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    background: deviceFilterType === 'all'
-                      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                      : 'transparent',
+                    background:
+                      deviceFilterType === 'all'
+                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                        : 'transparent',
                     color: deviceFilterType === 'all' ? '#fff' : '#666',
-                    boxShadow: deviceFilterType === 'all' ? '0 2px 8px rgba(102, 126, 234, 0.3)' : 'none',
+                    boxShadow:
+                      deviceFilterType === 'all' ? '0 2px 8px rgba(102, 126, 234, 0.3)' : 'none',
                   }}
                 >
                   全部 ({allDevices.length})
@@ -2563,7 +2960,10 @@ function PortManagement() {
               )}
               {showSwitchTab && (
                 <button
-                  onClick={() => { setDeviceFilterType('switch'); setDevicePage(1); }}
+                  onClick={() => {
+                    setDeviceFilterType('switch');
+                    setDevicePage(1);
+                  }}
                   style={{
                     flex: 1,
                     padding: '10px 16px',
@@ -2573,11 +2973,13 @@ function PortManagement() {
                     fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    background: deviceFilterType === 'switch'
-                      ? 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
-                      : 'transparent',
+                    background:
+                      deviceFilterType === 'switch'
+                        ? 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
+                        : 'transparent',
                     color: deviceFilterType === 'switch' ? '#fff' : '#666',
-                    boxShadow: deviceFilterType === 'switch' ? '0 2px 8px rgba(17, 153, 142, 0.3)' : 'none',
+                    boxShadow:
+                      deviceFilterType === 'switch' ? '0 2px 8px rgba(17, 153, 142, 0.3)' : 'none',
                   }}
                 >
                   交换机 ({switchCount})
@@ -2585,7 +2987,10 @@ function PortManagement() {
               )}
               {showServerTab && (
                 <button
-                  onClick={() => { setDeviceFilterType('server'); setDevicePage(1); }}
+                  onClick={() => {
+                    setDeviceFilterType('server');
+                    setDevicePage(1);
+                  }}
                   style={{
                     flex: 1,
                     padding: '10px 16px',
@@ -2595,11 +3000,13 @@ function PortManagement() {
                     fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    background: deviceFilterType === 'server'
-                      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                      : 'transparent',
+                    background:
+                      deviceFilterType === 'server'
+                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                        : 'transparent',
                     color: deviceFilterType === 'server' ? '#fff' : '#666',
-                    boxShadow: deviceFilterType === 'server' ? '0 2px 8px rgba(102, 126, 234, 0.3)' : 'none',
+                    boxShadow:
+                      deviceFilterType === 'server' ? '0 2px 8px rgba(102, 126, 234, 0.3)' : 'none',
                   }}
                 >
                   服务器 ({serverCount})
@@ -2609,11 +3016,15 @@ function PortManagement() {
           );
         })()}
 
-        <div style={{ maxHeight: '480px', overflowY: 'auto', margin: '0 -24px', padding: '0 16px' }}>
+        <div
+          style={{ maxHeight: '480px', overflowY: 'auto', margin: '0 -24px', padding: '0 16px' }}
+        >
           {deviceSearching ? (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
               <Spin size="large" />
-              <div style={{ marginTop: '16px', color: '#999', fontSize: '13px' }}>加载设备中...</div>
+              <div style={{ marginTop: '16px', color: '#999', fontSize: '13px' }}>
+                加载设备中...
+              </div>
             </div>
           ) : paginatedDevices.list.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -2636,13 +3047,20 @@ function PortManagement() {
                 {deviceFilterType === 'all'
                   ? '暂无可添加端口的设备'
                   : deviceFilterType === 'switch'
-                  ? '暂无可添加端口的交换机'
-                  : '暂无可添加端口的服务器'}
+                    ? '暂无可添加端口的交换机'
+                    : '暂无可添加端口的服务器'}
               </div>
             </div>
           ) : (
             <>
-              <div style={{ fontSize: '12px', color: '#999', marginBottom: '12px', paddingLeft: '4px' }}>
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: '#999',
+                  marginBottom: '12px',
+                  paddingLeft: '4px',
+                }}
+              >
                 共 {paginatedDevices.total} 个设备
               </div>
               {paginatedDevices.list.map(device => (
@@ -2787,7 +3205,10 @@ function PortManagement() {
                     }}
                   >
                     <span>点击加载更多</span>
-                    <span style={{ fontSize: '11px' }}>({Math.min(devicePage * 100, paginatedDevices.total)} / {paginatedDevices.total})</span>
+                    <span style={{ fontSize: '11px' }}>
+                      ({Math.min(devicePage * 100, paginatedDevices.total)} /{' '}
+                      {paginatedDevices.total})
+                    </span>
                   </div>
                 </div>
               )}
@@ -2884,9 +3305,7 @@ function PortManagement() {
             >
               <CloudServerOutlined />
             </div>
-            <span style={{ fontSize: '18px', fontWeight: 600 }}>
-              服务器网卡管理
-            </span>
+            <span style={{ fontSize: '18px', fontWeight: 600 }}>服务器网卡管理</span>
           </div>
         }
         open={serverNicListVisible}
@@ -2944,7 +3363,9 @@ function PortManagement() {
               >
                 <Option value="all">全部机房</Option>
                 {roomList.map(room => (
-                  <Option key={room.roomId} value={room.roomId}>{room.name}</Option>
+                  <Option key={room.roomId} value={room.roomId}>
+                    {room.name}
+                  </Option>
                 ))}
               </Select>
               <Select
@@ -2959,12 +3380,23 @@ function PortManagement() {
               >
                 <Option value="all">全部机柜</Option>
                 {rackList
-                  .filter(rack => serverNicRoomFilter === 'all' || rack.roomId === serverNicRoomFilter)
+                  .filter(
+                    rack => serverNicRoomFilter === 'all' || rack.roomId === serverNicRoomFilter
+                  )
                   .map(rack => (
-                    <Option key={rack.rackId} value={rack.rackId}>{rack.name}</Option>
+                    <Option key={rack.rackId} value={rack.rackId}>
+                      {rack.name}
+                    </Option>
                   ))}
               </Select>
-              <div style={{ marginLeft: 'auto', color: designTokens.colors.text.secondary, fontSize: '13px', alignSelf: 'center' }}>
+              <div
+                style={{
+                  marginLeft: 'auto',
+                  color: designTokens.colors.text.secondary,
+                  fontSize: '13px',
+                  alignSelf: 'center',
+                }}
+              >
                 共 {serverNicList.length} 台设备
               </div>
             </div>
@@ -2989,8 +3421,10 @@ function PortManagement() {
                         !serverNicSearchText ||
                         server.name?.toLowerCase().includes(serverNicSearchText.toLowerCase()) ||
                         server.deviceId?.toLowerCase().includes(serverNicSearchText.toLowerCase());
-                      const roomMatch = serverNicRoomFilter === 'all' || server.roomId === serverNicRoomFilter;
-                      const rackMatch = serverNicRackFilter === 'all' || server.rackId === serverNicRackFilter;
+                      const roomMatch =
+                        serverNicRoomFilter === 'all' || server.roomId === serverNicRoomFilter;
+                      const rackMatch =
+                        serverNicRackFilter === 'all' || server.rackId === serverNicRackFilter;
                       return searchMatch && roomMatch && rackMatch;
                     })
                     .slice(
@@ -3015,8 +3449,10 @@ function PortManagement() {
                     !serverNicSearchText ||
                     server.name?.toLowerCase().includes(serverNicSearchText.toLowerCase()) ||
                     server.deviceId?.toLowerCase().includes(serverNicSearchText.toLowerCase());
-                  const roomMatch = serverNicRoomFilter === 'all' || server.roomId === serverNicRoomFilter;
-                  const rackMatch = serverNicRackFilter === 'all' || server.rackId === serverNicRackFilter;
+                  const roomMatch =
+                    serverNicRoomFilter === 'all' || server.roomId === serverNicRoomFilter;
+                  const rackMatch =
+                    serverNicRackFilter === 'all' || server.rackId === serverNicRackFilter;
                   return searchMatch && roomMatch && rackMatch;
                 }).length > serverNicCardPageSize && (
                   <div
@@ -3031,14 +3467,21 @@ function PortManagement() {
                     <Pagination
                       current={serverNicCardPage}
                       pageSize={serverNicCardPageSize}
-                      total={serverNicList.filter(server => {
-                        const searchMatch =
-                          !serverNicSearchText ||
-                          server.name?.toLowerCase().includes(serverNicSearchText.toLowerCase()) ||
-                          server.deviceId?.toLowerCase().includes(serverNicSearchText.toLowerCase());
-                        const typeMatch = serverNicTypeFilter === 'all' || server.type === serverNicTypeFilter;
-                        return searchMatch && typeMatch;
-                      }).length}
+                      total={
+                        serverNicList.filter(server => {
+                          const searchMatch =
+                            !serverNicSearchText ||
+                            server.name
+                              ?.toLowerCase()
+                              .includes(serverNicSearchText.toLowerCase()) ||
+                            server.deviceId
+                              ?.toLowerCase()
+                              .includes(serverNicSearchText.toLowerCase());
+                          const typeMatch =
+                            serverNicTypeFilter === 'all' || server.type === serverNicTypeFilter;
+                          return searchMatch && typeMatch;
+                        }).length
+                      }
                       onChange={page => setServerNicCardPage(page)}
                       showSizeChanger={false}
                       showQuickJumper

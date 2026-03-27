@@ -1,6 +1,22 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Modal, Form, Input, Select, message, Space, Tooltip, Card, Alert, AutoComplete } from 'antd';
-import { CloudServerOutlined, InfoCircleOutlined, QuestionCircleOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import {
+  Modal,
+  Form,
+  Input,
+  Select,
+  message,
+  Space,
+  Tooltip,
+  Card,
+  Alert,
+  AutoComplete,
+} from 'antd';
+import {
+  CloudServerOutlined,
+  InfoCircleOutlined,
+  QuestionCircleOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons';
 import axios from 'axios';
 import { designTokens } from '../config/theme';
 import CloseButton from './CloseButton';
@@ -91,12 +107,14 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
       width={800}
       styles={{ body: { padding: '0 24px 24px' } }}
     >
-      <div style={{
-        margin: '0 -24px 20px',
-        padding: '16px 24px',
-        background: `linear-gradient(135deg, ${designTokens.colors.primary.main}18 0%, ${designTokens.colors.primary.light}18 100%)`,
-        borderBottom: `1px solid ${designTokens.colors.primary.light}30`,
-      }}>
+      <div
+        style={{
+          margin: '0 -24px 20px',
+          padding: '16px 24px',
+          background: `linear-gradient(135deg, ${designTokens.colors.primary.main}18 0%, ${designTokens.colors.primary.light}18 100%)`,
+          borderBottom: `1px solid ${designTokens.colors.primary.light}30`,
+        }}
+      >
         <div style={{ fontSize: '13px', color: designTokens.colors.neutral[700], lineHeight: 1.6 }}>
           为服务器添加新的网卡，网卡创建后可关联端口
         </div>
@@ -107,9 +125,15 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
           <div>
             <strong>插槽编号参考</strong>
             <ul style={{ margin: '8px 0 0', paddingLeft: '18px', lineHeight: 1.8 }}>
-              <li><strong>LOM (LAN on Motherboard)</strong>：主板集成网卡，编号通常为 0</li>
-              <li><strong>OCP (Open Compute Project)</strong>：服务器前端维护网卡专用槽位</li>
-              <li><strong>PCIe 插槽</strong>：从 1 开始编号，对应服务器物理插槽位置</li>
+              <li>
+                <strong>LOM (LAN on Motherboard)</strong>：主板集成网卡，编号通常为 0
+              </li>
+              <li>
+                <strong>OCP (Open Compute Project)</strong>：服务器前端维护网卡专用槽位
+              </li>
+              <li>
+                <strong>PCIe 插槽</strong>：从 1 开始编号，对应服务器物理插槽位置
+              </li>
             </ul>
           </div>
         }
@@ -122,10 +146,7 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
         }}
       />
 
-      <Form
-        form={form}
-        layout="vertical"
-      >
+      <Form form={form} layout="vertical">
         <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
           <Card
             size="small"
@@ -144,7 +165,11 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
           >
             <Form.Item
               name="name"
-              label={<span style={{ fontWeight: 500 }}>网卡名称 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+              label={
+                <span style={{ fontWeight: 500 }}>
+                  网卡名称 <span style={{ color: '#ff4d4f' }}>*</span>
+                </span>
+              }
               rules={[
                 { required: true, message: '请输入网卡名称' },
                 { max: 50, message: '名称不能超过50个字符' },
@@ -159,7 +184,9 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
                 <Space>
                   <span style={{ fontWeight: 500 }}>插槽位置</span>
                   <Tooltip title="参考上方提示选择或输入插槽位置">
-                    <InfoCircleOutlined style={{ color: designTokens.colors.neutral[400], cursor: 'help' }} />
+                    <InfoCircleOutlined
+                      style={{ color: designTokens.colors.neutral[400], cursor: 'help' }}
+                    />
                   </Tooltip>
                 </Space>
               }
@@ -181,7 +208,9 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
                 }))}
                 filterOption={(input, option) =>
                   option.value.toLowerCase().includes(input.toLowerCase()) ||
-                  option.label.props.children[0].props.children.toLowerCase().includes(input.toLowerCase())
+                  option.label.props.children[0].props.children
+                    .toLowerCase()
+                    .includes(input.toLowerCase())
                 }
               />
             </Form.Item>
@@ -203,7 +232,10 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
             styles={{ body: { padding: '16px 20px' } }}
           >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
-              <Form.Item name="manufacturer" label={<span style={{ fontWeight: 500 }}>制造商</span>}>
+              <Form.Item
+                name="manufacturer"
+                label={<span style={{ fontWeight: 500 }}>制造商</span>}
+              >
                 <AutoComplete
                   placeholder="选择或输入"
                   options={MANUFACTURER_OPTIONS.map(m => ({ value: m.value, label: m.label }))}

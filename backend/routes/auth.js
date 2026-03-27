@@ -4,7 +4,13 @@ const User = require('../models/User');
 const Role = require('../models/Role');
 const UserRole = require('../models/UserRole');
 const { generateToken, authMiddleware } = require('../middleware/auth');
-const { SALT_ROUNDS, MAX_LOGIN_ATTEMPTS, PASSWORD_MIN_LENGTH, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH } = require('../config');
+const {
+  SALT_ROUNDS,
+  MAX_LOGIN_ATTEMPTS,
+  PASSWORD_MIN_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_MAX_LENGTH,
+} = require('../config');
 
 const router = express.Router();
 
@@ -19,21 +25,21 @@ router.post('/register', async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({
         success: false,
-        message: '用户名和密码不能为空'
+        message: '用户名和密码不能为空',
       });
     }
 
     if (username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH) {
       return res.status(400).json({
         success: false,
-        message: `用户名长度必须在${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH}个字符之间`
+        message: `用户名长度必须在${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH}个字符之间`,
       });
     }
 
     if (password.length < PASSWORD_MIN_LENGTH) {
       return res.status(400).json({
         success: false,
-        message: `密码长度不能少于${PASSWORD_MIN_LENGTH}个字符`
+        message: `密码长度不能少于${PASSWORD_MIN_LENGTH}个字符`,
       });
     }
 
@@ -41,7 +47,7 @@ router.post('/register', async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: '用户名已存在'
+        message: '用户名已存在',
       });
     }
 
@@ -57,7 +63,7 @@ router.post('/register', async (req, res) => {
       email,
       phone,
       realName: realName || username,
-      status: isFirstUser ? 'active' : 'pending'
+      status: isFirstUser ? 'active' : 'pending',
     });
 
     if (isFirstUser) {
@@ -70,13 +76,13 @@ router.post('/register', async (req, res) => {
           roleCode: 'admin',
           description: '系统管理员，拥有所有权限',
           status: 'active',
-          permissions: []
+          permissions: [],
         });
       }
 
       await UserRole.create({
         UserId: user.userId,
-        RoleId: adminRole.roleId
+        RoleId: adminRole.roleId,
       });
 
       const token = generateToken(user);
@@ -89,11 +95,11 @@ router.post('/register', async (req, res) => {
             userId: user.userId,
             username: user.username,
             email: user.email,
-            realName: user.realName
+            realName: user.realName,
           },
           token,
-          isFirstUser: true
-        }
+          isFirstUser: true,
+        },
       });
     } else {
       const defaultRole = await Role.findOne({ where: { roleCode: 'viewer' } });
@@ -101,7 +107,7 @@ router.post('/register', async (req, res) => {
       if (defaultRole) {
         await UserRole.create({
           UserId: user.userId,
-          RoleId: defaultRole.roleId
+          RoleId: defaultRole.roleId,
         });
       }
 
@@ -113,11 +119,11 @@ router.post('/register', async (req, res) => {
             userId: user.userId,
             username: user.username,
             email: user.email,
-            realName: user.realName
+            realName: user.realName,
           },
           isFirstUser: false,
-          pendingApproval: true
-        }
+          pendingApproval: true,
+        },
       });
     }
   } catch (error) {
@@ -125,7 +131,7 @@ router.post('/register', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '注册失败',
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -137,7 +143,7 @@ router.post('/login', async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({
         success: false,
-        message: '用户名和密码不能为空'
+        message: '用户名和密码不能为空',
       });
     }
 
@@ -145,21 +151,21 @@ router.post('/login', async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: '用户名或密码错误'
+        message: '用户名或密码错误',
       });
     }
 
     if (user.status === 'locked') {
       return res.status(403).json({
         success: false,
-        message: '账户已被锁定，请联系管理员'
+        message: '账户已被锁定，请联系管理员',
       });
     }
 
     if (user.status === 'inactive') {
       return res.status(403).json({
         success: false,
-        message: '账户已禁用'
+        message: '账户已禁用',
       });
     }
 
@@ -167,7 +173,7 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({
         success: false,
         code: 'PENDING_APPROVAL',
-        message: '账户待审核，请联系管理员激活'
+        message: '账户待审核，请联系管理员激活',
       });
     }
 
@@ -178,10 +184,10 @@ router.post('/login', async (req, res) => {
         user.status = 'locked';
       }
       await user.save();
-      
+
       return res.status(401).json({
         success: false,
-        message: '用户名或密码错误'
+        message: '用户名或密码错误',
       });
     }
 
@@ -201,17 +207,17 @@ router.post('/login', async (req, res) => {
           username: user.username,
           email: user.email,
           realName: user.realName,
-          avatar: user.avatar
+          avatar: user.avatar,
         },
-        token
-      }
+        token,
+      },
     });
   } catch (error) {
     console.error('登录错误:', error);
     res.status(500).json({
       success: false,
       message: '登录失败',
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -219,22 +225,24 @@ router.post('/login', async (req, res) => {
 router.get('/profile', authMiddleware, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.userId, {
-      attributes: { exclude: ['password'] }
+      attributes: { exclude: ['password'] },
     });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: '用户不存在'
+        message: '用户不存在',
       });
     }
 
     const roles = await Role.findAll({
-      include: [{
-        model: User,
-        where: { userId: req.user.userId },
-        attributes: []
-      }]
+      include: [
+        {
+          model: User,
+          where: { userId: req.user.userId },
+          attributes: [],
+        },
+      ],
     });
 
     res.json({
@@ -244,15 +252,15 @@ router.get('/profile', authMiddleware, async (req, res) => {
         roles: roles.map(r => ({
           roleId: r.roleId,
           roleName: r.roleName,
-          roleCode: r.roleCode
-        }))
-      }
+          roleCode: r.roleCode,
+        })),
+      },
     });
   } catch (error) {
     console.error('获取profile错误:', error);
     res.status(500).json({
       success: false,
-      message: '获取用户信息失败'
+      message: '获取用户信息失败',
     });
   }
 });
@@ -265,14 +273,22 @@ router.put('/profile', authMiddleware, async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: '用户不存在'
+        message: '用户不存在',
       });
     }
 
-    if (email !== undefined) user.email = email;
-    if (phone !== undefined) user.phone = phone;
-    if (realName !== undefined) user.realName = realName;
-    if (avatar !== undefined) user.avatar = avatar;
+    if (email !== undefined) {
+      user.email = email;
+    }
+    if (phone !== undefined) {
+      user.phone = phone;
+    }
+    if (realName !== undefined) {
+      user.realName = realName;
+    }
+    if (avatar !== undefined) {
+      user.avatar = avatar;
+    }
 
     await user.save();
 
@@ -285,14 +301,14 @@ router.put('/profile', authMiddleware, async (req, res) => {
         email: user.email,
         phone: user.phone,
         realName: user.realName,
-        avatar: user.avatar
-      }
+        avatar: user.avatar,
+      },
     });
   } catch (error) {
     console.error('更新profile错误:', error);
     res.status(500).json({
       success: false,
-      message: '更新失败'
+      message: '更新失败',
     });
   }
 });
@@ -304,14 +320,14 @@ router.put('/password', authMiddleware, async (req, res) => {
     if (!oldPassword || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: '旧密码和新密码都不能为空'
+        message: '旧密码和新密码都不能为空',
       });
     }
 
     if (newPassword.length < PASSWORD_MIN_LENGTH) {
       return res.status(400).json({
         success: false,
-        message: `新密码长度不能少于${PASSWORD_MIN_LENGTH}个字符`
+        message: `新密码长度不能少于${PASSWORD_MIN_LENGTH}个字符`,
       });
     }
 
@@ -321,7 +337,7 @@ router.put('/password', authMiddleware, async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: '旧密码错误'
+        message: '旧密码错误',
       });
     }
 
@@ -330,13 +346,13 @@ router.put('/password', authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
-      message: '密码修改成功'
+      message: '密码修改成功',
     });
   } catch (error) {
     console.error('修改密码错误:', error);
     res.status(500).json({
       success: false,
-      message: '密码修改失败'
+      message: '密码修改失败',
     });
   }
 });
@@ -344,19 +360,19 @@ router.put('/password', authMiddleware, async (req, res) => {
 router.post('/check-admin', async (req, res) => {
   try {
     const userCount = await User.count();
-    
+
     res.json({
       success: true,
       data: {
         hasAdmin: userCount > 0,
-        userCount
-      }
+        userCount,
+      },
     });
   } catch (error) {
     console.error('检查管理员错误:', error);
     res.status(500).json({
       success: false,
-      message: '检查失败'
+      message: '检查失败',
     });
   }
 });
@@ -368,7 +384,7 @@ router.post('/unlock', async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({
         success: false,
-        message: '用户名和密码不能为空'
+        message: '用户名和密码不能为空',
       });
     }
 
@@ -376,14 +392,14 @@ router.post('/unlock', async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: '用户名或密码错误'
+        message: '用户名或密码错误',
       });
     }
 
     if (user.status !== 'locked') {
       return res.status(400).json({
         success: false,
-        message: '账户未被锁定'
+        message: '账户未被锁定',
       });
     }
 
@@ -391,7 +407,7 @@ router.post('/unlock', async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: '用户名或密码错误'
+        message: '用户名或密码错误',
       });
     }
 
@@ -402,14 +418,14 @@ router.post('/unlock', async (req, res) => {
 
     res.json({
       success: true,
-      message: '账户解锁成功'
+      message: '账户解锁成功',
     });
   } catch (error) {
     console.error('解锁账户错误:', error);
     res.status(500).json({
       success: false,
       message: '解锁失败',
-      error: error.message
+      error: error.message,
     });
   }
 });

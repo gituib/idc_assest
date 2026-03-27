@@ -10,42 +10,40 @@ router.get('/', async (req, res) => {
   try {
     const { consumableId, type, startDate, endDate, page = 1, pageSize = 10 } = req.query;
     const offset = (page - 1) * pageSize;
-    
+
     const where = {};
-    
+
     if (consumableId) {
       where.consumableId = consumableId;
     }
-    
+
     if (type && type !== 'all') {
       where.type = type;
     }
-    
+
     if (startDate && endDate) {
       where.createdAt = {
-        [Op.between]: [new Date(startDate), new Date(endDate)]
+        [Op.between]: [new Date(startDate), new Date(endDate)],
       };
     } else if (startDate) {
       where.createdAt = { [Op.gte]: new Date(startDate) };
     } else if (endDate) {
       where.createdAt = { [Op.lte]: new Date(endDate) };
     }
-    
+
     const { count, rows } = await ConsumableRecord.findAndCountAll({
       where,
-      include: [
-        { model: Consumable, as: 'consumable', attributes: ['name', 'category', 'unit'] }
-      ],
+      include: [{ model: Consumable, as: 'consumable', attributes: ['name', 'category', 'unit'] }],
       offset,
       limit: parseInt(pageSize),
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
     });
-    
+
     res.json({
       total: count,
       records: rows,
       page: parseInt(page),
-      pageSize: parseInt(pageSize)
+      pageSize: parseInt(pageSize),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -54,19 +52,19 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { consumableId, type, quantity, operator, reason, recipient, notes } = req.body;
-    
+
     const consumable = await Consumable.findByPk(consumableId);
     if (!consumable) {
       await transaction.rollback();
       return res.status(404).json({ error: '耗材不存在' });
     }
-    
+
     const previousStock = consumable.currentStock;
     let newStock;
-    
+
     if (type === 'in') {
       newStock = previousStock + quantity;
     } else if (type === 'out') {
@@ -79,41 +77,47 @@ router.post('/', async (req, res) => {
       await transaction.rollback();
       return res.status(400).json({ error: '操作类型无效' });
     }
-    
-    await consumable.update({ currentStock: newStock }, { transaction });
-    
-    const record = await ConsumableRecord.create({
-      consumableId,
-      type,
-      quantity,
-      previousStock,
-      currentStock: newStock,
-      operator,
-      reason,
-      recipient,
-      notes
-    }, { transaction });
 
-    await ConsumableLog.create({
-      consumableId,
-      consumableName: consumable.name,
-      operationType: type,
-      quantity: type === 'in' ? parseFloat(quantity) : -parseFloat(quantity),
-      previousStock,
-      currentStock: newStock,
-      operator,
-      reason,
-      notes
-    }, { transaction });
+    await consumable.update({ currentStock: newStock }, { transaction });
+
+    const record = await ConsumableRecord.create(
+      {
+        consumableId,
+        type,
+        quantity,
+        previousStock,
+        currentStock: newStock,
+        operator,
+        reason,
+        recipient,
+        notes,
+      },
+      { transaction }
+    );
+
+    await ConsumableLog.create(
+      {
+        consumableId,
+        consumableName: consumable.name,
+        operationType: type,
+        quantity: type === 'in' ? parseFloat(quantity) : -parseFloat(quantity),
+        previousStock,
+        currentStock: newStock,
+        operator,
+        reason,
+        notes,
+      },
+      { transaction }
+    );
 
     await transaction.commit();
-    
+
     res.status(201).json({
       record,
       consumable: {
         previousStock,
-        currentStock: newStock
-      }
+        currentStock: newStock,
+      },
     });
   } catch (error) {
     await transaction.rollback();
@@ -131,10 +135,10 @@ router.get('/statistics', async (req, res) => {
       const startDateTime = new Date(startDate);
       const endDateTime = new Date(endDate);
       endDateTime.setHours(23, 59, 59, 999); // 设置 endDate 为当天最后一刻
-      
+
       dateWhere.createdAt = {
         [Op.gte]: startDateTime,
-        [Op.lte]: endDateTime
+        [Op.lte]: endDateTime,
       };
     }
 
@@ -146,14 +150,14 @@ router.get('/statistics', async (req, res) => {
     const records = await ConsumableRecord.findAll({
       where: dateWhere,
       include: [
-        { 
-          model: Consumable, 
+        {
+          model: Consumable,
           as: 'consumable',
           attributes: ['name', 'category'],
-          where: Object.keys(consumableWhere).length > 0 ? consumableWhere : undefined
-        }
+          where: Object.keys(consumableWhere).length > 0 ? consumableWhere : undefined,
+        },
       ],
-      attributes: ['type', 'quantity']
+      attributes: ['type', 'quantity'],
     });
 
     let inCount = 0;
@@ -182,15 +186,15 @@ router.get('/statistics', async (req, res) => {
     const recentRecords = await ConsumableRecord.findAll({
       where: dateWhere,
       include: [
-        { 
-          model: Consumable, 
+        {
+          model: Consumable,
           as: 'consumable',
           attributes: ['name', 'category'],
-          where: Object.keys(consumableWhere).length > 0 ? consumableWhere : undefined
-        }
+          where: Object.keys(consumableWhere).length > 0 ? consumableWhere : undefined,
+        },
       ],
       order: [['createdAt', 'DESC']],
-      limit: 10
+      limit: 10,
     });
 
     res.json({
@@ -202,7 +206,7 @@ router.get('/statistics', async (req, res) => {
       byType: Object.entries(typeMap).map(([type, data]) => ({
         type,
         totalQuantity: data.totalQuantity,
-        count: data.count
+        count: data.count,
       })),
       recentRecords: recentRecords.map(record => ({
         recordId: record.recordId,
@@ -213,8 +217,8 @@ router.get('/statistics', async (req, res) => {
         consumableId: record.consumableId,
         consumableName: record.consumable?.name || '未知耗材',
         category: record.consumable?.category || null,
-        unit: record.consumable?.unit || '个'
-      }))
+        unit: record.consumable?.unit || '个',
+      })),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

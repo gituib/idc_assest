@@ -4,7 +4,7 @@ const {
   logOperation,
   logDeviceOperation,
   logUserOperation,
-  logRoleOperation
+  logRoleOperation,
 } = require('../utils/operationLogger');
 
 describe('operationLogger 工具函数测试', () => {
@@ -22,12 +22,12 @@ describe('operationLogger 工具函数测试', () => {
         user: {
           userId: 'user_test_001',
           realName: '测试用户',
-          roleName: '管理员'
+          roleName: '管理员',
         },
         headers: {
           'x-forwarded-for': '192.168.1.100',
-          'user-agent': 'Mozilla/5.0 Test Browser'
-        }
+          'user-agent': 'Mozilla/5.0 Test Browser',
+        },
       };
 
       await logOperation({
@@ -39,11 +39,11 @@ describe('operationLogger 工具函数测试', () => {
         beforeState: null,
         afterState: { name: '测试设备', status: 'running' },
         result: 'success',
-        req: mockReq
+        req: mockReq,
       });
 
       const logs = await OperationLog.findAll({
-        where: { targetId: 'DEV_TEST_001' }
+        where: { targetId: 'DEV_TEST_001' },
       });
 
       expect(logs.length).toBe(1);
@@ -63,7 +63,7 @@ describe('operationLogger 工具函数测试', () => {
     test('应该能够处理没有用户信息的请求', async () => {
       const mockReq = {
         user: null,
-        headers: {}
+        headers: {},
       };
 
       await logOperation({
@@ -73,11 +73,11 @@ describe('operationLogger 工具函数测试', () => {
         targetId: 'SYSTEM',
         targetName: '系统',
         result: 'success',
-        req: mockReq
+        req: mockReq,
       });
 
       const logs = await OperationLog.findAll({
-        where: { targetId: 'SYSTEM' }
+        where: { targetId: 'SYSTEM' },
       });
 
       expect(logs.length).toBe(1);
@@ -93,11 +93,11 @@ describe('operationLogger 工具函数测试', () => {
         targetId: 'DEV_NO_REQ',
         targetName: '无请求设备',
         result: 'success',
-        req: null
+        req: null,
       });
 
       const logs = await OperationLog.findAll({
-        where: { targetId: 'DEV_NO_REQ' }
+        where: { targetId: 'DEV_NO_REQ' },
       });
 
       expect(logs.length).toBe(1);
@@ -108,7 +108,7 @@ describe('operationLogger 工具函数测试', () => {
     test('应该能够记录失败的操作', async () => {
       const mockReq = {
         user: { userId: 'user_fail', realName: '失败用户' },
-        headers: {}
+        headers: {},
       };
 
       await logOperation({
@@ -119,11 +119,11 @@ describe('operationLogger 工具函数测试', () => {
         targetName: '失败设备',
         result: 'failed',
         req: mockReq,
-        metadata: { errorMessage: '设备不存在' }
+        metadata: { errorMessage: '设备不存在' },
       });
 
       const logs = await OperationLog.findAll({
-        where: { targetId: 'DEV_FAIL' }
+        where: { targetId: 'DEV_FAIL' },
       });
 
       expect(logs.length).toBe(1);
@@ -133,13 +133,13 @@ describe('operationLogger 工具函数测试', () => {
     test('应该使用提供的 metadata', async () => {
       const mockReq = {
         user: { userId: 'user_meta', realName: '元数据用户' },
-        headers: {}
+        headers: {},
       };
 
       const customMetadata = {
         batchCount: 10,
         source: 'import',
-        duration: 5000
+        duration: 5000,
       };
 
       await logOperation({
@@ -150,11 +150,11 @@ describe('operationLogger 工具函数测试', () => {
         targetName: '批量设备',
         result: 'success',
         req: mockReq,
-        metadata: customMetadata
+        metadata: customMetadata,
       });
 
       const logs = await OperationLog.findAll({
-        where: { targetId: 'DEV_BATCH' }
+        where: { targetId: 'DEV_BATCH' },
       });
 
       expect(logs[0].metadata).toEqual(customMetadata);
@@ -165,22 +165,18 @@ describe('operationLogger 工具函数测试', () => {
     test('应该记录设备创建日志', async () => {
       const mockReq = {
         user: { userId: 'user_dev', realName: '设备管理员' },
-        headers: { 'x-forwarded-for': '10.0.0.1' }
+        headers: { 'x-forwarded-for': '10.0.0.1' },
       };
 
-      await logDeviceOperation(
-        'create',
-        '创建设备 测试服务器 (DEV001)',
-        {
-          targetId: 'DEV001',
-          targetName: '测试服务器',
-          afterState: { deviceId: 'DEV001', name: '测试服务器', status: 'running' },
-          req: mockReq
-        }
-      );
+      await logDeviceOperation('create', '创建设备 测试服务器 (DEV001)', {
+        targetId: 'DEV001',
+        targetName: '测试服务器',
+        afterState: { deviceId: 'DEV001', name: '测试服务器', status: 'running' },
+        req: mockReq,
+      });
 
       const logs = await OperationLog.findAll({
-        where: { module: 'device', operationType: 'create' }
+        where: { module: 'device', operationType: 'create' },
       });
 
       expect(logs.length).toBe(1);
@@ -193,26 +189,22 @@ describe('operationLogger 工具函数测试', () => {
     test('应该记录设备更新日志并包含状态变更', async () => {
       const mockReq = {
         user: { userId: 'user_upd', realName: '更新操作员' },
-        headers: {}
+        headers: {},
       };
 
       const beforeState = { name: '旧名称', status: 'offline' };
       const afterState = { name: '新名称', status: 'running' };
 
-      await logDeviceOperation(
-        'update',
-        '更新设备 DEV002',
-        {
-          targetId: 'DEV002',
-          targetName: 'DEV002',
-          beforeState,
-          afterState,
-          req: mockReq
-        }
-      );
+      await logDeviceOperation('update', '更新设备 DEV002', {
+        targetId: 'DEV002',
+        targetName: 'DEV002',
+        beforeState,
+        afterState,
+        req: mockReq,
+      });
 
       const logs = await OperationLog.findAll({
-        where: { targetId: 'DEV002', operationType: 'update' }
+        where: { targetId: 'DEV002', operationType: 'update' },
       });
 
       expect(logs.length).toBe(1);
@@ -223,22 +215,18 @@ describe('operationLogger 工具函数测试', () => {
     test('应该记录设备删除日志', async () => {
       const mockReq = {
         user: { userId: 'user_del', realName: '删除操作员' },
-        headers: {}
+        headers: {},
       };
 
-      await logDeviceOperation(
-        'delete',
-        '删除设备 DEV003 (测试服务器)',
-        {
-          targetId: 'DEV003',
-          targetName: '测试服务器',
-          beforeState: { deviceId: 'DEV003', name: '测试服务器' },
-          req: mockReq
-        }
-      );
+      await logDeviceOperation('delete', '删除设备 DEV003 (测试服务器)', {
+        targetId: 'DEV003',
+        targetName: '测试服务器',
+        beforeState: { deviceId: 'DEV003', name: '测试服务器' },
+        req: mockReq,
+      });
 
       const logs = await OperationLog.findAll({
-        where: { targetId: 'DEV003', operationType: 'delete' }
+        where: { targetId: 'DEV003', operationType: 'delete' },
       });
 
       expect(logs.length).toBe(1);
@@ -247,27 +235,23 @@ describe('operationLogger 工具函数测试', () => {
     test('应该记录批量删除日志', async () => {
       const mockReq = {
         user: { userId: 'user_batch', realName: '批量操作员' },
-        headers: {}
+        headers: {},
       };
 
-      await logDeviceOperation(
-        'batch_delete',
-        '批量删除设备 3台 (DEV_A,DEV_B,DEV_C)',
-        {
-          targetId: 'DEV_A,DEV_B,DEV_C',
-          targetName: '3台设备',
-          beforeState: [
-            { deviceId: 'DEV_A', name: '设备A' },
-            { deviceId: 'DEV_B', name: '设备B' },
-            { deviceId: 'DEV_C', name: '设备C' }
-          ],
-          req: mockReq,
-          metadata: { count: 3 }
-        }
-      );
+      await logDeviceOperation('batch_delete', '批量删除设备 3台 (DEV_A,DEV_B,DEV_C)', {
+        targetId: 'DEV_A,DEV_B,DEV_C',
+        targetName: '3台设备',
+        beforeState: [
+          { deviceId: 'DEV_A', name: '设备A' },
+          { deviceId: 'DEV_B', name: '设备B' },
+          { deviceId: 'DEV_C', name: '设备C' },
+        ],
+        req: mockReq,
+        metadata: { count: 3 },
+      });
 
       const logs = await OperationLog.findAll({
-        where: { operationType: 'batch_delete' }
+        where: { operationType: 'batch_delete' },
       });
 
       expect(logs.length).toBe(1);
@@ -277,30 +261,26 @@ describe('operationLogger 工具函数测试', () => {
     test('应该记录状态变更日志', async () => {
       const mockReq = {
         user: { userId: 'user_status', realName: '状态管理员' },
-        headers: {}
+        headers: {},
       };
 
-      await logDeviceOperation(
-        'status_change',
-        '批量变更设备状态为"运行中"',
-        {
-          targetId: 'DEV_STATUS_1,DEV_STATUS_2',
-          targetName: '2台设备',
-          beforeState: [
-            { deviceId: 'DEV_STATUS_1', status: 'offline' },
-            { deviceId: 'DEV_STATUS_2', status: 'maintenance' }
-          ],
-          afterState: [
-            { deviceId: 'DEV_STATUS_1', status: 'running' },
-            { deviceId: 'DEV_STATUS_2', status: 'running' }
-          ],
-          req: mockReq,
-          metadata: { status: 'running', count: 2 }
-        }
-      );
+      await logDeviceOperation('status_change', '批量变更设备状态为"运行中"', {
+        targetId: 'DEV_STATUS_1,DEV_STATUS_2',
+        targetName: '2台设备',
+        beforeState: [
+          { deviceId: 'DEV_STATUS_1', status: 'offline' },
+          { deviceId: 'DEV_STATUS_2', status: 'maintenance' },
+        ],
+        afterState: [
+          { deviceId: 'DEV_STATUS_1', status: 'running' },
+          { deviceId: 'DEV_STATUS_2', status: 'running' },
+        ],
+        req: mockReq,
+        metadata: { status: 'running', count: 2 },
+      });
 
       const logs = await OperationLog.findAll({
-        where: { operationType: 'status_change' }
+        where: { operationType: 'status_change' },
       });
 
       expect(logs.length).toBe(1);
@@ -312,23 +292,19 @@ describe('operationLogger 工具函数测试', () => {
     test('应该记录用户创建日志', async () => {
       const mockReq = {
         user: { userId: 'admin', realName: '系统管理员' },
-        headers: {}
+        headers: {},
       };
 
-      await logUserOperation(
-        'create',
-        '创建用户 new_user',
-        {
-          targetId: 'user_new',
-          targetName: 'new_user',
-          afterState: { username: 'new_user', email: 'new@example.com' },
-          req: mockReq,
-          metadata: { roleIds: ['role_admin'] }
-        }
-      );
+      await logUserOperation('create', '创建用户 new_user', {
+        targetId: 'user_new',
+        targetName: 'new_user',
+        afterState: { username: 'new_user', email: 'new@example.com' },
+        req: mockReq,
+        metadata: { roleIds: ['role_admin'] },
+      });
 
       const logs = await OperationLog.findAll({
-        where: { module: 'user', operationType: 'create' }
+        where: { module: 'user', operationType: 'create' },
       });
 
       expect(logs.length).toBe(1);
@@ -339,24 +315,20 @@ describe('operationLogger 工具函数测试', () => {
     test('应该记录权限变更日志', async () => {
       const mockReq = {
         user: { userId: 'admin', realName: '管理员' },
-        headers: {}
+        headers: {},
       };
 
-      await logUserOperation(
-        'permission_change',
-        '变更用户 test_user 的角色',
-        {
-          targetId: 'user_test',
-          targetName: 'test_user',
-          beforeState: { roleIds: ['role_viewer'] },
-          afterState: { roleIds: ['role_admin'] },
-          req: mockReq,
-          metadata: { oldRoleIds: ['role_viewer'], newRoleIds: ['role_admin'] }
-        }
-      );
+      await logUserOperation('permission_change', '变更用户 test_user 的角色', {
+        targetId: 'user_test',
+        targetName: 'test_user',
+        beforeState: { roleIds: ['role_viewer'] },
+        afterState: { roleIds: ['role_admin'] },
+        req: mockReq,
+        metadata: { oldRoleIds: ['role_viewer'], newRoleIds: ['role_admin'] },
+      });
 
       const logs = await OperationLog.findAll({
-        where: { operationType: 'permission_change' }
+        where: { operationType: 'permission_change' },
       });
 
       expect(logs.length).toBe(1);
@@ -367,22 +339,18 @@ describe('operationLogger 工具函数测试', () => {
     test('应该记录用户删除日志', async () => {
       const mockReq = {
         user: { userId: 'admin', realName: '管理员' },
-        headers: {}
+        headers: {},
       };
 
-      await logUserOperation(
-        'delete',
-        '删除用户 deleted_user',
-        {
-          targetId: 'user_deleted',
-          targetName: 'deleted_user',
-          beforeState: { username: 'deleted_user', email: 'deleted@example.com' },
-          req: mockReq
-        }
-      );
+      await logUserOperation('delete', '删除用户 deleted_user', {
+        targetId: 'user_deleted',
+        targetName: 'deleted_user',
+        beforeState: { username: 'deleted_user', email: 'deleted@example.com' },
+        req: mockReq,
+      });
 
       const logs = await OperationLog.findAll({
-        where: { module: 'user', operationType: 'delete' }
+        where: { module: 'user', operationType: 'delete' },
       });
 
       expect(logs.length).toBe(1);
@@ -393,23 +361,19 @@ describe('operationLogger 工具函数测试', () => {
     test('应该记录角色创建日志', async () => {
       const mockReq = {
         user: { userId: 'admin', realName: '管理员' },
-        headers: {}
+        headers: {},
       };
 
-      await logRoleOperation(
-        'create',
-        '创建角色 测试角色',
-        {
-          targetId: 'role_test',
-          targetName: '测试角色',
-          afterState: { roleName: '测试角色', permissions: ['read', 'write'] },
-          req: mockReq,
-          metadata: { roleCode: 'test_role', permissions: ['read', 'write'] }
-        }
-      );
+      await logRoleOperation('create', '创建角色 测试角色', {
+        targetId: 'role_test',
+        targetName: '测试角色',
+        afterState: { roleName: '测试角色', permissions: ['read', 'write'] },
+        req: mockReq,
+        metadata: { roleCode: 'test_role', permissions: ['read', 'write'] },
+      });
 
       const logs = await OperationLog.findAll({
-        where: { module: 'role', operationType: 'create' }
+        where: { module: 'role', operationType: 'create' },
       });
 
       expect(logs.length).toBe(1);
@@ -420,27 +384,23 @@ describe('operationLogger 工具函数测试', () => {
     test('应该记录角色更新日志', async () => {
       const mockReq = {
         user: { userId: 'admin', realName: '管理员' },
-        headers: {}
+        headers: {},
       };
 
       const beforeState = { roleName: '旧角色', permissions: ['read'] };
       const afterState = { roleName: '新角色', permissions: ['read', 'write', 'delete'] };
 
-      await logRoleOperation(
-        'update',
-        '更新角色 角色A',
-        {
-          targetId: 'role_a',
-          targetName: '角色A',
-          beforeState,
-          afterState,
-          req: mockReq,
-          metadata: { oldRoleName: '旧角色', oldPermissions: ['read'] }
-        }
-      );
+      await logRoleOperation('update', '更新角色 角色A', {
+        targetId: 'role_a',
+        targetName: '角色A',
+        beforeState,
+        afterState,
+        req: mockReq,
+        metadata: { oldRoleName: '旧角色', oldPermissions: ['read'] },
+      });
 
       const logs = await OperationLog.findAll({
-        where: { module: 'role', operationType: 'update' }
+        where: { module: 'role', operationType: 'update' },
       });
 
       expect(logs.length).toBe(1);
@@ -451,23 +411,19 @@ describe('operationLogger 工具函数测试', () => {
     test('应该记录角色删除日志', async () => {
       const mockReq = {
         user: { userId: 'admin', realName: '管理员' },
-        headers: {}
+        headers: {},
       };
 
-      await logRoleOperation(
-        'delete',
-        '删除角色 测试角色B',
-        {
-          targetId: 'role_b',
-          targetName: '测试角色B',
-          beforeState: { roleName: '测试角色B', userCount: 0 },
-          req: mockReq,
-          metadata: { userCount: 0 }
-        }
-      );
+      await logRoleOperation('delete', '删除角色 测试角色B', {
+        targetId: 'role_b',
+        targetName: '测试角色B',
+        beforeState: { roleName: '测试角色B', userCount: 0 },
+        req: mockReq,
+        metadata: { userCount: 0 },
+      });
 
       const logs = await OperationLog.findAll({
-        where: { module: 'role', operationType: 'delete' }
+        where: { module: 'role', operationType: 'delete' },
       });
 
       expect(logs.length).toBe(1);
