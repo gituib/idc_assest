@@ -26,6 +26,7 @@ import {
   Alert,
   Typography,
   Divider,
+  Pagination,
 } from 'antd';
 import {
   PlusOutlined,
@@ -53,11 +54,17 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import api from '../api';
+import { roomAPI, rackAPI } from '../api/cache';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
 import NetworkCardPanel from '../components/NetworkCardPanel';
 import NetworkCardCreateModal from '../components/NetworkCardCreateModal';
+import NetworkCardImportModal from '../components/NetworkCardImportModal';
+import BatchImportModal from '../components/BatchImportModal';
+import PortAddGuideModal from '../components/PortAddGuideModal';
+import ServerNicCard from '../components/ServerNicCard';
+import PortExportModal from '../components/PortExportModal';
 import { designTokens } from '../config/theme';
 import CloseButton from '../components/CloseButton';
 import { debounce } from '../utils/common';
@@ -100,10 +107,6 @@ function PortManagement() {
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
     deviceId: '',
-    status: 'all',
-    portType: 'all',
-    portSpeed: 'all',
-    searchText: '',
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingPort, setEditingPort] = useState(null);
@@ -111,6 +114,7 @@ function PortManagement() {
 
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importPreview, setImportPreview] = useState([]);
+  const [importErrors, setImportErrors] = useState([]);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [importing, setImporting] = useState(false);
   const [skipExisting, setSkipExisting] = useState(false);
@@ -127,6 +131,10 @@ function PortManagement() {
   const [portCreateModalVisible, setPortCreateModalVisible] = useState(false);
   const [selectedDeviceForNic, setSelectedDeviceForNic] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [networkCardImportModalVisible, setNetworkCardImportModalVisible] = useState(false);
+  const [batchImportModalVisible, setBatchImportModalVisible] = useState(false);
+  const [portAddGuideModalVisible, setPortAddGuideModalVisible] = useState(false);
+  const [portExportModalVisible, setPortExportModalVisible] = useState(false);
 
   // 展开的设备
   const [expandedKeys, setExpandedKeys] = useState([]);
@@ -139,45 +147,76 @@ function PortManagement() {
 
   // 设备选择弹窗 Tab 状态
   const [deviceFilterType, setDeviceFilterType] = useState('all');
+  const [guidedDeviceType, setGuidedDeviceType] = useState(null);
   const [devicePage, setDevicePage] = useState(1);
+
+  // 机房机柜筛选状态
+  const [roomList, setRoomList] = useState([]);
+  const [rackList, setRackList] = useState([]);
+  const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const [selectedRackId, setSelectedRackId] = useState(null);
+
   const loadMoreRef = useRef(null);
   const hasMoreRef = useRef(true);
   const isLoadingRef = useRef(false);
 
-  const fetchPorts = useCallback(async () => {
+  // 设备卡片分页状态
+  const [deviceCardPage, setDeviceCardPage] = useState(1);
+  const deviceCardPageSize = 10;
+  const [deviceCardTotal, setDeviceCardTotal] = useState(0);
+
+  // 分页和懒加载状态
+  const [portPage, setPortPage] = useState(1);
+  const [portPageSize, setPortPageSize] = useState(50);
+  const [portTotal, setPortTotal] = useState(0);
+  const [portLoading, setPortLoading] = useState(false);
+  const [portLoadingMore, setPortLoadingMore] = useState(false);
+
+  // 服务器网卡卡片列表状态
+  const [serverNicSearchText, setServerNicSearchText] = useState('');
+  const [serverNicRoomFilter, setServerNicRoomFilter] = useState('all');
+  const [serverNicRackFilter, setServerNicRackFilter] = useState('all');
+  const [serverNicCardPage, setServerNicCardPage] = useState(1);
+  const serverNicCardPageSize = 12;
+
+  const fetchPorts = useCallback(async (page = 1, append = false) => {
+    const validPage = Number.isInteger(page) && page > 0 ? page : 1;
+    const validPageSize = Number.isInteger(portPageSize) && portPageSize > 0 ? portPageSize : 50;
     try {
-      setLoading(true);
+      if (append) {
+        setPortLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
       const params = {
-        pageSize: 1000,
+        page: validPage,
+        pageSize: validPageSize,
       };
 
       if (filters.deviceId) params.deviceId = filters.deviceId;
-      if (filters.status !== 'all') params.status = filters.status;
-      if (filters.portType !== 'all') params.portType = filters.portType;
-      if (filters.portSpeed !== 'all') params.portSpeed = filters.portSpeed;
 
       const response = await api.get('/device-ports', { params });
-      const portsData = response.ports || response || [];
-      
-      // 搜索过滤
-      let filteredPorts = portsData;
-      if (filters.searchText) {
-        const searchLower = filters.searchText.toLowerCase();
-        filteredPorts = portsData.filter(port => 
-          port.portName?.toLowerCase().includes(searchLower) ||
-          port.portType?.toLowerCase().includes(searchLower) ||
-          port.description?.toLowerCase().includes(searchLower)
-        );
+      const portsData = response.ports || [];
+      const total = response.total || 0;
+      const filteredPorts = portsData;
+
+      if (append) {
+        setPorts(prev => [...prev, ...filteredPorts]);
+      } else {
+        setPorts(filteredPorts);
       }
-      
-      setPorts(filteredPorts);
+      setPortTotal(total);
+      setPortPage(page);
+      hasMoreRef.current = page * portPageSize < total;
     } catch (error) {
       message.error('获取端口列表失败');
       console.error('获取端口列表失败:', error);
     } finally {
       setLoading(false);
+      setPortLoadingMore(false);
     }
-  }, [filters]);
+  }, [filters, portPageSize]);
 
   const fetchDevices = useCallback(async (keyword = '') => {
     try {
@@ -206,9 +245,43 @@ function PortManagement() {
   );
 
   useEffect(() => {
-    fetchPorts();
+    fetchPorts(1, false);
     fetchDevices();
   }, [fetchPorts, fetchDevices]);
+
+  const handleLoadMore = useCallback(() => {
+    if (!hasMoreRef.current || isLoadingRef.current || portLoadingMore) return;
+    isLoadingRef.current = true;
+    const nextPage = portPage + 1;
+    fetchPorts(nextPage, true).then(() => {
+      isLoadingRef.current = false;
+    });
+  }, [portPage, portLoadingMore, fetchPorts]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMoreRef.current && !portLoadingMore) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    observer.observe(loadMoreRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [handleLoadMore, portLoadingMore]);
+
+  const handlePageSizeChange = useCallback((newPage, newPageSize) => {
+    setPortPageSize(newPageSize);
+    setPortPage(1);
+    fetchPorts(1, false);
+  }, [fetchPorts]);
 
   useEffect(() => {
     const grouped = {};
@@ -242,46 +315,98 @@ function PortManagement() {
     });
 
     setGroupedPorts(grouped);
-    
-    // 自动展开前5个
+
     const deviceIds = Object.keys(grouped);
-    setExpandedKeys(deviceIds.slice(0, 5));
-  }, [ports, devices]);
+    const newTotal = deviceIds.length;
+    setDeviceCardTotal(newTotal);
+    if (deviceCardPage > Math.ceil(newTotal / deviceCardPageSize)) {
+      setDeviceCardPage(1);
+    }
+    setExpandedKeys([]);
+  }, [ports, devices, deviceCardPage, deviceCardPageSize]);
 
-  const handleSearch = () => {
-    fetchPorts();
-  };
+  const handleSearch = useCallback(() => {
+    setPortPage(1);
+    setDeviceCardPage(1);
+    hasMoreRef.current = true;
+    fetchPorts(1, false);
+  }, [fetchPorts]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setFilters({
       deviceId: '',
-      status: 'all',
-      portType: 'all',
-      portSpeed: 'all',
-      searchText: '',
     });
-  };
+    setPortPage(1);
+    setDeviceCardPage(1);
+    hasMoreRef.current = true;
+    fetchPorts(1, false);
+  }, [fetchPorts]);
 
   const handleAdd = () => {
     setEditingPort(null);
     form.resetFields();
+    setPortAddGuideModalVisible(true);
+  };
+
+  const handleGuideSelectType = (type) => {
+    setPortAddGuideModalVisible(false);
+    setGuidedDeviceType(type);
     fetchDevices();
+    fetchRoomsAndRacks();
+    if (type === 'switch') {
+      setDeviceFilterType('switch');
+    } else if (type === 'server') {
+      setDeviceFilterType('server');
+    }
     setSelectDeviceModalVisible(true);
+  };
+
+  const fetchRoomsAndRacks = async () => {
+    try {
+      const [roomsData, racksData] = await Promise.all([
+        roomAPI.list(),
+        api.get('/racks', { params: { pageSize: 1000 } }),
+      ]);
+      setRoomList(roomsData.rooms || roomsData || []);
+      setRackList(racksData.racks || racksData || []);
+    } catch (error) {
+      console.error('获取机房机柜数据失败:', error);
+    }
   };
 
   const handleManageServerNics = async () => {
     setServerNicListVisible(true);
     setServerNicLoading(true);
     try {
-      const [devicesResponse, portsResponse, nicsResponse] = await Promise.all([
+      const [devicesResponse, portsResponse, nicsResponse, roomsData, racksData] = await Promise.all([
         api.get('/devices/all', { params: { type: 'server' } }),
         api.get('/device-ports', { params: { pageSize: 10000 } }),
         api.get('/network-cards'),
+        roomAPI.list(),
+        api.get('/racks', { params: { pageSize: 1000 } }),
       ]);
+      setRoomList(roomsData.rooms || roomsData || []);
+      setRackList(racksData.racks || racksData || []);
 
       const servers = devicesResponse.devices || devicesResponse || [];
       const ports = portsResponse.ports || portsResponse || [];
-      const allNics = nicsResponse.data || nicsResponse || [];
+      let allNics = [];
+
+      if (Array.isArray(nicsResponse)) {
+        allNics = nicsResponse;
+      } else if (nicsResponse && Array.isArray(nicsResponse.data)) {
+        allNics = nicsResponse.data;
+      } else if (nicsResponse && Array.isArray(nicsResponse.networkCards)) {
+        allNics = nicsResponse.networkCards;
+      }
+
+      console.log('[DEBUG] handleManageServerNics:', {
+        serversCount: servers.length,
+        portsCount: ports.length,
+        nicsCount: allNics.length,
+        sampleServer: servers[0],
+        sampleNic: allNics[0]
+      });
 
       const serversWithPorts = new Set(ports.map(p => p.deviceId));
       const serversWithNics = servers.filter(server => {
@@ -295,6 +420,8 @@ function PortManagement() {
           const serverNics = allNics.filter(nic => nic.deviceId === server.deviceId);
           return { ...server, nics: serverNics, nicCount: serverNics.length };
         });
+
+      console.log('[DEBUG] serversWithNics:', serversWithNics.length, 'serversNeedingAttention:', serversNeedingAttention.length);
 
       setServerNicList(serversNeedingAttention);
     } catch (error) {
@@ -395,7 +522,7 @@ function PortManagement() {
       icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
     });
     setRefreshTrigger(prev => prev + 1);
-    fetchPorts();
+    fetchPorts(1, false);
   };
 
   const handleEdit = port => {
@@ -427,7 +554,7 @@ function PortManagement() {
             content: '删除成功',
             icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
           });
-          fetchPorts();
+          fetchPorts(1, false);
         } catch (error) {
           const errorMsg = error.response?.data?.error || '';
           if (errorMsg.includes('关联的接线记录')) {
@@ -463,7 +590,7 @@ function PortManagement() {
             icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
           });
           setSelectedRowKeys([]);
-          fetchPorts();
+          fetchPorts(1, false);
         } catch (error) {
           const errorMsg = error.response?.data?.error || '';
           if (errorMsg.includes('关联的接线记录')) {
@@ -553,7 +680,7 @@ function PortManagement() {
       setModalVisible(false);
       form.resetFields();
       setSelectedDeviceForPort(null);
-      fetchPorts();
+      fetchPorts(1, false);
     } catch (error) {
       message.error(error.response?.data?.error || editingPort ? '更新失败' : '创建失败');
       console.error('提交失败:', error);
@@ -566,9 +693,8 @@ function PortManagement() {
     setImportProgress({ current: 0, total: 0 });
   };
 
-  const handleFileUpload = info => {
-    const { file } = info;
-
+  const handleFileUpload = (file, onSuccess) => {
+    console.log('handleFileUpload 被调用', file.name, file.size);
     const reader = new FileReader();
     reader.onload = async e => {
       try {
@@ -581,90 +707,203 @@ function PortManagement() {
           const worksheet = workbook.Sheets[sheetName];
           parsedData = XLSX.utils.sheet_to_json(worksheet);
         } else if (file.name.endsWith('.csv')) {
-          Papa.parse(data, {
+          parsedData = Papa.parse(data, {
             header: true,
             skipEmptyLines: true,
-            complete: results => {
-              parsedData = results.data;
-            },
-          });
+          }).data;
         } else {
           message.error('不支持的文件格式，请上传 .xlsx 或 .csv 文件');
           return;
         }
 
-        const validatedData = await validateImportData(parsedData);
-        setImportPreview(validatedData);
-        setImportProgress({ current: 0, total: validatedData.length });
+        if (parsedData.length === 0) {
+          message.warning('文件内容为空，请检查文件内容');
+          return;
+        }
+
+        const validatedResult = await validateImportData(parsedData);
+        console.log('文件解析结果:', {
+          总行数: parsedData.length,
+          有效数据: validatedResult.validData.length,
+          错误数据: validatedResult.errors.length,
+          第一行数据: parsedData[0]
+        });
+        setImportPreview(validatedResult.validData);
+        setImportErrors(validatedResult.errors);
+        setImportProgress({ current: 0, total: validatedResult.validData.length });
+        if (onSuccess) onSuccess();
       } catch (error) {
         message.error('文件解析失败');
         console.error('文件解析失败:', error);
       }
     };
 
-    reader.readAsBinaryString(file);
+    if (file.name.endsWith('.csv')) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsBinaryString(file);
+    }
   };
 
   const validateImportData = async data => {
-    const validatedData = [];
-    const errors = [];
+    const validData = [];
+    const allErrors = [];
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
-      const error = await validatePortRow(row, i);
+      const result = await validatePortRow(row, i);
 
-      if (error) {
-        errors.push(error);
+      if (result.valid) {
+        validData.push(row);
       } else {
-        validatedData.push(row);
+        allErrors.push(...result.errors.map(err => ({ ...err, originalRow: row })));
       }
     }
 
-    if (errors.length > 0) {
-      message.warning(`发现 ${errors.length} 条数据错误，已跳过`);
+    if (allErrors.length > 0) {
+      message.warning({
+        content: `发现 ${allErrors.length} 个数据错误，请查看错误详情并修正后重新导入`,
+        duration: 5,
+      });
     }
 
-    return validatedData;
+    return { validData, errors: allErrors };
   };
 
   const validatePortRow = async (row, index) => {
-    if (!row['设备ID'] || !row['端口名称']) {
-      return { valid: false, error: `第 ${index + 1} 行：缺少必填字段（设备ID或端口名称）` };
+    const rowNum = index + 2;
+    const errors = [];
+
+    if (!row['设备ID']) {
+      errors.push({
+        row: rowNum,
+        field: '设备ID',
+        value: row['设备ID'] || '(空)',
+        error: '缺少必填字段',
+        suggestion: '请填写设备ID，格式如：DEV001',
+      });
     }
 
-    const device = devices.find(d => d.deviceId === row['设备ID']);
-    if (!device) {
-      return { valid: false, error: `第 ${index + 1} 行：设备不存在` };
+    if (!row['端口名称']) {
+      errors.push({
+        row: rowNum,
+        field: '端口名称',
+        value: row['端口名称'] || '(空)',
+        error: '缺少必填字段',
+        suggestion: '请填写端口名称，格式如：eth0/1 或 GigabitEthernet0/0/1',
+      });
+    }
+
+    if (row['设备ID']) {
+      const device = devices.find(d => d.deviceId === row['设备ID']);
+      if (!device) {
+        errors.push({
+          row: rowNum,
+          field: '设备ID',
+          value: row['设备ID'],
+          error: '设备不存在',
+          suggestion: `设备ID "${row['设备ID']}" 未在系统中注册，请先在设备管理中添加该设备`,
+        });
+      }
     }
 
     const validPortTypes = ['RJ45', 'SFP', 'SFP+', 'SFP28', 'QSFP', 'QSFP28'];
-    if (!validPortTypes.includes(row['端口类型'])) {
-      return { valid: false, error: `第 ${index + 1} 行：无效的端口类型` };
+    if (row['端口类型'] && !validPortTypes.includes(row['端口类型'])) {
+      errors.push({
+        row: rowNum,
+        field: '端口类型',
+        value: row['端口类型'],
+        error: '无效的端口类型',
+        suggestion: `端口类型 "${row['端口类型']}" 不支持。可选值：${validPortTypes.join('、')}`,
+      });
     }
 
     const validPortSpeeds = ['100M', '1G', '10G', '25G', '40G', '100G'];
-    if (!validPortSpeeds.includes(row['端口速率'])) {
-      return { valid: false, error: `第 ${index + 1} 行：无效的端口速率` };
+    if (row['端口速率'] && !validPortSpeeds.includes(row['端口速率'])) {
+      errors.push({
+        row: rowNum,
+        field: '端口速率',
+        value: row['端口速率'],
+        error: '无效的端口速率',
+        suggestion: `端口速率 "${row['端口速率']}" 不支持。可选值：${validPortSpeeds.join('、')}`,
+      });
     }
 
     const validStatuses = ['空闲', '占用', '故障'];
-    if (!validStatuses.includes(row['状态'])) {
-      return { valid: false, error: `第 ${index + 1} 行：无效的状态` };
+    if (row['状态'] && !validStatuses.includes(row['状态'])) {
+      errors.push({
+        row: rowNum,
+        field: '状态',
+        value: row['状态'],
+        error: '无效的状态值',
+        suggestion: `状态 "${row['状态']}" 不支持。可选值：${validStatuses.join('、')}`,
+      });
     }
 
-    let nicId = null;
-    if (row['网卡名称']) {
+    if (row['VLAN ID']) {
+      const vlanPattern = /^\d+$/;
+      if (!vlanPattern.test(row['VLAN ID'])) {
+        errors.push({
+          row: rowNum,
+          field: 'VLAN ID',
+          value: row['VLAN ID'],
+          error: 'VLAN ID 格式错误',
+          suggestion: 'VLAN ID 必须为数字，如：100、200',
+        });
+      } else {
+        const vlanNum = parseInt(row['VLAN ID']);
+        if (vlanNum < 1 || vlanNum > 4094) {
+          errors.push({
+            row: rowNum,
+            field: 'VLAN ID',
+            value: row['VLAN ID'],
+            error: 'VLAN ID 范围超限',
+            suggestion: 'VLAN ID 必须介于 1-4094 之间',
+          });
+        }
+      }
+    }
+
+    if (row['网卡名称'] && row['设备ID']) {
       try {
         const nicResponse = await api.get('/network-cards/find', {
           params: { deviceId: row['设备ID'], name: row['网卡名称'] }
         });
-        nicId = nicResponse.nicId || null;
+        row._nicId = nicResponse.nicId || null;
       } catch (error) {
-        nicId = null;
+        row._nicId = null;
       }
     }
 
-    row._nicId = nicId;
+    if (row['设备ID']) {
+      const device = devices.find(d => d.deviceId === row['设备ID']);
+      if (device) {
+        const isServer = device.type && device.type.toLowerCase().includes('server');
+        if (isServer) {
+          if (!row['网卡名称'] && !row._nicId) {
+            errors.push({
+              row: rowNum,
+              field: '网卡名称',
+              value: row['网卡名称'] || '(空)',
+              error: '服务器端口必须关联网卡',
+              suggestion: `服务器 "${device.name}" 的端口必须关联到网卡，请先在网卡管理中添加网卡，或在导入模板中填写网卡名称`,
+            });
+          } else if (row['网卡名称'] && !row._nicId) {
+            errors.push({
+              row: rowNum,
+              field: '网卡名称',
+              value: row['网卡名称'],
+              error: '网卡不存在',
+              suggestion: `服务器 "${device.name}" 的网卡"${row['网卡名称']}"不存在，请先在网卡管理中添加该网卡`,
+            });
+          }
+        }
+      }
+    }
+
+    if (errors.length > 0) {
+      return { valid: false, errors };
+    }
     return { valid: true };
   };
 
@@ -741,7 +980,7 @@ function PortManagement() {
         });
       }
 
-      fetchPorts();
+      fetchPorts(1, false);
       setImportModalVisible(false);
       setImportPreview([]);
     } catch (error) {
@@ -774,55 +1013,100 @@ function PortManagement() {
     XLSX.writeFile(workbook, '端口导入模板.xlsx');
   };
 
-  const handleExport = () => {
-    if (ports.length === 0) {
-      message.warning('没有可导出的端口数据');
-      return;
+  const handleExport = async ({ scope, format }) => {
+    try {
+      let exportData = [];
+      let totalCount = 0;
+
+      if (scope === 'all') {
+        const params = {
+          pageSize: 50000,
+        };
+        const response = await api.get('/device-ports/export/all', { params });
+        exportData = response.ports || [];
+        totalCount = response.total || exportData.length;
+      } else if (scope === 'filtered') {
+        const params = {
+          deviceId: filters.deviceId || undefined,
+          pageSize: 50000,
+        };
+        const response = await api.get('/device-ports/export/all', { params });
+        exportData = response.ports || [];
+        totalCount = response.total || exportData.length;
+      } else {
+        exportData = ports.map(port => {
+          const device = devices.find(d => d.deviceId === port.deviceId);
+          const statusMap = { free: '空闲', occupied: '占用', fault: '故障' };
+          return {
+            端口ID: port.portId,
+            设备ID: port.deviceId,
+            设备名称: device?.name || '-',
+            设备类型: device?.type || '-',
+            机房: '-',
+            机架: '-',
+            网卡名称: port.nicId || '-',
+            端口名称: port.portName,
+            端口类型: port.portType,
+            端口速率: port.portSpeed,
+            状态: statusMap[port.status] || port.status,
+            VLAN_ID: port.vlanId || '-',
+            描述: port.description || '-',
+            创建时间: port.createdAt ? new Date(port.createdAt).toLocaleString('zh-CN') : '-',
+          };
+        });
+        totalCount = exportData.length;
+      }
+
+      if (exportData.length === 0) {
+        message.warning('没有可导出的端口数据');
+        return;
+      }
+
+      if (format === 'csv') {
+        const csvContent = Papa.unparse(exportData);
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `端口导出_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, '端口数据');
+
+        const colWidths = [
+          { wch: 20 },
+          { wch: 15 },
+          { wch: 20 },
+          { wch: 12 },
+          { wch: 10 },
+          { wch: 12 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 10 },
+          { wch: 8 },
+          { wch: 10 },
+          { wch: 10 },
+          { wch: 25 },
+          { wch: 20 },
+        ];
+        worksheet['!cols'] = colWidths;
+
+        XLSX.writeFile(workbook, `端口导出_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`);
+      }
+
+      message.success({
+        content: `成功导出 ${totalCount} 个端口`,
+        icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+      });
+    } catch (error) {
+      console.error('导出失败:', error);
+      message.error('导出失败，请重试');
     }
-
-    const statusMap = {
-      free: '空闲',
-      occupied: '占用',
-      fault: '故障',
-    };
-
-    const exportData = ports.map(port => {
-      const device = devices.find(d => d.deviceId === port.deviceId);
-      return {
-        '设备ID': port.deviceId,
-        '设备名称': device?.name || '-',
-        '端口名称': port.portName,
-        '端口类型': port.portType,
-        '端口速率': port.portSpeed,
-        '状态': statusMap[port.status] || port.status,
-        'VLAN ID': port.vlanId || '-',
-        '描述': port.description || '-',
-      };
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, '端口数据');
-
-    const colWidths = [
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 15 },
-      { wch: 10 },
-      { wch: 10 },
-      { wch: 8 },
-      { wch: 10 },
-      { wch: 25 },
-    ];
-    worksheet['!cols'] = colWidths;
-
-    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    XLSX.writeFile(workbook, `端口导出_${timestamp}.xlsx`);
-
-    message.success({
-      content: `成功导出 ${ports.length} 个端口`,
-      icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
-    });
   };
 
   const getStatusTag = status => {
@@ -972,10 +1256,17 @@ function PortManagement() {
 
   // 过滤后的设备列表（带分页）
   const paginatedDevices = useMemo(() => {
+    const rackRoomMap = {};
+    rackList.forEach(rack => {
+      rackRoomMap[rack.rackId] = rack.roomId;
+    });
+
     const filtered = devices.filter(d => {
       const type = getDeviceType(d);
       if (type !== 'switch' && type !== 'server') return false;
       if (deviceFilterType !== 'all' && type !== deviceFilterType) return false;
+      if (selectedRackId && d.rackId !== selectedRackId) return false;
+      if (selectedRoomId && d.rackId && rackRoomMap[d.rackId] !== selectedRoomId) return false;
       return true;
     });
     const pageSize = 100;
@@ -987,7 +1278,7 @@ function PortManagement() {
       total: filtered.length,
       hasMore
     };
-  }, [devices, deviceFilterType, devicePage]);
+  }, [devices, deviceFilterType, devicePage, rackList, selectedRoomId, selectedRackId]);
 
   useEffect(() => {
     if (!loadMoreRef.current) return;
@@ -1054,7 +1345,7 @@ function PortManagement() {
           }}
           bodyStyle={{ padding: '24px' }}
         >
-          {/* 过滤器区域 */}
+          {/* 功能区：过滤 + 操作按钮 */}
           <div style={{ marginBottom: '24px' }}>
             <Card
               style={{
@@ -1065,9 +1356,9 @@ function PortManagement() {
               bodyStyle={{ padding: '16px' }}
             >
               <Row gutter={[16, 16]} align="middle">
-                <Col xs={24} sm={12} md={6} lg={5}>
+                <Col xs={24} sm={24} md={10} lg={8}>
                   <div style={{ marginBottom: '6px', fontSize: '13px', color: designTokens.colors.neutral[600], fontWeight: 500 }}>
-                    设备
+                    设备筛选
                   </div>
                   <Select
                     placeholder="输入关键词搜索设备"
@@ -1093,96 +1384,54 @@ function PortManagement() {
                   </Select>
                 </Col>
 
-                <Col xs={24} sm={12} md={5} lg={4}>
+                <Col xs={24} sm={24} md={14} lg={16}>
                   <div style={{ marginBottom: '6px', fontSize: '13px', color: designTokens.colors.neutral[600], fontWeight: 500 }}>
-                    端口类型
+                    操作
                   </div>
-                  <Select
-                    placeholder="端口类型"
-                    style={{ width: '100%' }}
-                    value={filters.portType}
-                    onChange={value => setFilters(prev => ({ ...prev, portType: value }))}
-                  >
-                    <Option value="all">全部类型</Option>
-                    <Option value="RJ45">RJ45</Option>
-                    <Option value="SFP">SFP</Option>
-                    <Option value="SFP+">SFP+</Option>
-                    <Option value="SFP28">SFP28</Option>
-                    <Option value="QSFP">QSFP</Option>
-                    <Option value="QSFP28">QSFP28</Option>
-                  </Select>
-                </Col>
-
-                <Col xs={24} sm={12} md={5} lg={4}>
-                  <div style={{ marginBottom: '6px', fontSize: '13px', color: designTokens.colors.neutral[600], fontWeight: 500 }}>
-                    端口速率
-                  </div>
-                  <Select
-                    placeholder="端口速率"
-                    style={{ width: '100%' }}
-                    value={filters.portSpeed}
-                    onChange={value => setFilters(prev => ({ ...prev, portSpeed: value }))}
-                  >
-                    <Option value="all">全部速率</Option>
-                    <Option value="100M">100M</Option>
-                    <Option value="1G">1G</Option>
-                    <Option value="10G">10G</Option>
-                    <Option value="25G">25G</Option>
-                    <Option value="40G">40G</Option>
-                    <Option value="100G">100G</Option>
-                  </Select>
-                </Col>
-
-                <Col xs={24} sm={12} md={5} lg={4}>
-                  <div style={{ marginBottom: '6px', fontSize: '13px', color: designTokens.colors.neutral[600], fontWeight: 500 }}>
-                    状态
-                  </div>
-                  <Select
-                    placeholder="状态"
-                    style={{ width: '100%' }}
-                    value={filters.status}
-                    onChange={value => setFilters(prev => ({ ...prev, status: value }))}
-                  >
-                    <Option value="all">全部状态</Option>
-                    <Option value="free">空闲</Option>
-                    <Option value="occupied">占用</Option>
-                    <Option value="fault">故障</Option>
-                  </Select>
-                </Col>
-
-                <Col xs={24} sm={12} md={8} lg={4}>
-                  <div style={{ marginBottom: '6px', fontSize: '13px', color: designTokens.colors.neutral[600], fontWeight: 500 }}>
-                    搜索
-                  </div>
-                  <Input
-                    placeholder="搜索端口名称..."
-                    value={filters.searchText}
-                    onChange={e => setFilters(prev => ({ ...prev, searchText: e.target.value }))}
-                    onPressEnter={handleSearch}
-                    prefix={<SearchOutlined style={{ color: designTokens.colors.neutral[400] }} />}
-                    allowClear
-                  />
-                </Col>
-
-                <Col xs={24} sm={12} md={4} lg={3}>
-                  <div style={{ marginBottom: '6px', fontSize: '13px', color: 'transparent' }}>操作</div>
-                  <Space>
+                  <Space size="small" wrap>
                     <Button
                       type="primary"
-                      icon={<FilterOutlined />}
-                      onClick={handleSearch}
-                      style={{ 
-                        background: designTokens.colors.primary.gradient, 
+                      icon={<PlusOutlined />}
+                      onClick={handleAdd}
+                      size="middle"
+                      style={{
+                        background: designTokens.colors.primary.gradient,
                         border: 'none',
                         borderRadius: designTokens.borderRadius.sm,
                       }}
                     >
-                      筛选
+                      新增端口
                     </Button>
-                    <Tooltip title="重置筛选条件">
-                      <Button 
-                        icon={<ClearOutlined />} 
-                        onClick={handleReset}
+                    <Button
+                      icon={<CloudServerOutlined />}
+                      onClick={handleManageServerNics}
+                      size="middle"
+                      style={{ borderRadius: designTokens.borderRadius.sm }}
+                    >
+                      管理网卡
+                    </Button>
+                    <Button
+                      icon={<ImportOutlined />}
+                      onClick={() => setBatchImportModalVisible(true)}
+                      size="middle"
+                      style={{ borderRadius: designTokens.borderRadius.sm }}
+                    >
+                      批量导入
+                    </Button>
+                    <Button
+                      icon={<ExportOutlined />}
+                      onClick={() => setPortExportModalVisible(true)}
+                      size="middle"
+                      style={{ borderRadius: designTokens.borderRadius.sm }}
+                    >
+                      导出
+                    </Button>
+                    <Tooltip title="刷新数据">
+                      <Button
+                        icon={<ReloadOutlined />}
+                        onClick={fetchPorts}
+                        loading={loading}
+                        size="middle"
                         style={{ borderRadius: designTokens.borderRadius.sm }}
                       />
                     </Tooltip>
@@ -1190,61 +1439,6 @@ function PortManagement() {
                 </Col>
               </Row>
             </Card>
-          </div>
-
-          {/* 操作按钮区域 */}
-          <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Space size="middle">
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleAdd}
-                size="large"
-                style={{
-                  background: designTokens.colors.primary.gradient,
-                  border: 'none',
-                  borderRadius: designTokens.borderRadius.sm,
-                  boxShadow: designTokens.shadows.md,
-                }}
-              >
-                新增端口
-              </Button>
-              <Button
-                icon={<CloudServerOutlined />}
-                onClick={handleManageServerNics}
-                size="large"
-                style={{ borderRadius: designTokens.borderRadius.sm }}
-              >
-                管理网卡
-              </Button>
-              <Button
-                icon={<ImportOutlined />}
-                onClick={handleImport}
-                size="large"
-                style={{ borderRadius: designTokens.borderRadius.sm }}
-              >
-                批量导入
-              </Button>
-              <Button
-                icon={<ExportOutlined />}
-                size="large"
-                onClick={handleExport}
-                style={{ borderRadius: designTokens.borderRadius.sm }}
-              >
-                导出
-              </Button>
-            </Space>
-
-            <Space>
-              <Tooltip title="刷新数据">
-                <Button 
-                  icon={<ReloadOutlined />} 
-                  onClick={fetchPorts}
-                  loading={loading}
-                  style={{ borderRadius: designTokens.borderRadius.sm }}
-                />
-              </Tooltip>
-            </Space>
           </div>
 
           {/* 数据展示区域 */}
@@ -1287,7 +1481,7 @@ function PortManagement() {
             </motion.div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {Object.entries(groupedPorts).map(([deviceId, data], index) => {
+              {Object.entries(groupedPorts).slice((deviceCardPage - 1) * deviceCardPageSize, deviceCardPage * deviceCardPageSize).map(([deviceId, data], index) => {
                 const device = data.device;
                 const devicePorts = data.ports || [];
                 const freeCount = devicePorts.filter(p => p.status === 'free').length;
@@ -1459,6 +1653,31 @@ function PortManagement() {
                   </Card>
                 );
               })}
+              {deviceCardTotal > deviceCardPageSize && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 0' }}>
+                  <Pagination
+                    current={deviceCardPage}
+                    pageSize={deviceCardPageSize}
+                    total={deviceCardTotal}
+                    onChange={(page) => {
+                      setDeviceCardPage(page);
+                      setExpandedKeys([]);
+                    }}
+                    showSizeChanger={false}
+                    showTotal={(total, range) => `第 ${range[0]}-${range[1]} 个，共 ${total} 个设备`}
+                  />
+                </div>
+              )}
+              {hasMoreRef.current && (
+                <div ref={loadMoreRef} style={{ textAlign: 'center', padding: '20px' }}>
+                  {portLoadingMore && <Spin tip="加载更多端口..." />}
+                </div>
+              )}
+              {!hasMoreRef.current && ports.length > 0 && (
+                <div style={{ textAlign: 'center', padding: '16px', color: '#999' }}>
+                  已加载全部 {portTotal} 个端口
+                </div>
+              )}
             </div>
           )}
         </Card>
@@ -1934,6 +2153,7 @@ function PortManagement() {
         onCancel={() => {
           setImportModalVisible(false);
           setImportPreview([]);
+          setImportErrors([]);
           setImportProgress({ current: 0, total: 0 });
         }}
         width={900}
@@ -1974,9 +2194,10 @@ function PortManagement() {
           <Upload.Dragger
             name="file"
             accept=".xlsx,.xls,.csv"
-            beforeUpload={() => false}
-            customRequest={({ file, onSuccess }) => {
-              handleFileUpload({ file, onSuccess });
+            showUploadList={false}
+            beforeUpload={file => {
+              handleFileUpload(file, null);
+              return false;
             }}
             style={{
               borderRadius: designTokens.borderRadius.lg,
@@ -2004,6 +2225,46 @@ function PortManagement() {
             </Checkbox>
           </div>
 
+          {importErrors.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              style={{ marginTop: '16px' }}
+            >
+              <Alert
+                message={`发现 ${importErrors.length} 个错误`}
+                description={
+                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    <Table
+                      columns={[
+                        { title: '行号', dataIndex: 'row', key: 'row', width: 70, render: row => <Tag color="red">{row}</Tag> },
+                        { title: '字段', dataIndex: 'field', key: 'field', width: 100, render: field => <Text strong>{field}</Text> },
+                        { title: '错误值', dataIndex: 'value', key: 'value', width: 120, render: val => <Text code>{val}</Text> },
+                        { title: '错误原因', dataIndex: 'error', key: 'error', render: err => <Text type="danger">{err}</Text> },
+                        { title: '修正建议', dataIndex: 'suggestion', key: 'suggestion', render: sug => <Text type="secondary">{sug}</Text> },
+                      ]}
+                      dataSource={importErrors}
+                      rowKey={(record, index) => `error-${index}`}
+                      pagination={{
+                        pageSize: 5,
+                        size: 'small',
+                        showSizeChanger: false,
+                        showTotal: total => `共 ${total} 条错误`,
+                      }}
+                      size="small"
+                      scroll={{ x: 600 }}
+                      style={{ marginTop: '8px' }}
+                    />
+                  </div>
+                }
+                type="error"
+                showIcon
+                style={{ borderRadius: designTokens.borderRadius.md }}
+              />
+            </motion.div>
+          )}
+
           {importPreview.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -2012,8 +2273,13 @@ function PortManagement() {
               style={{ marginTop: '24px' }}
             >
               <Alert
-                message={`成功解析 ${importPreview.length} 条数据`}
-                type="success"
+                message={
+                  <span>
+                    成功解析 {importPreview.length} 条有效数据
+                    {importErrors.length > 0 && <span style={{ color: '#ff4d4f', marginLeft: 8 }}>（{importErrors.length} 条错误）</span>}
+                  </span>
+                }
+                type={importErrors.length > 0 ? 'warning' : 'success'}
                 showIcon
                 style={{ marginBottom: '16px', borderRadius: designTokens.borderRadius.md }}
               />
@@ -2107,86 +2373,113 @@ function PortManagement() {
           setDeviceFilterType('all');
           setDevicePage(1);
           setSelectedRowKeys([]);
+          setGuidedDeviceType(null);
+          setSelectedRoomId(null);
+          setSelectedRackId(null);
         }}
         footer={null}
         width={620}
         style={{ top: 100 }}
         bodyStyle={{ padding: '0 24px 24px' }}
       >
-        <div
-          style={{
-            margin: '0 -24px 20px',
-            padding: '16px 24px',
-            background: 'linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%)',
-            borderBottom: '1px solid #e8ecf4',
-          }}
-        >
-          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+        {guidedDeviceType && (
+          <div
+            style={{
+              margin: '0 -24px 16px',
+              padding: '12px 24px',
+              background: guidedDeviceType === 'switch'
+                ? 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)'
+                : 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+              borderBottom: `1px solid ${guidedDeviceType === 'switch' ? '#bbf7d0' : '#c7d2fe'}`,
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#fff',
-                }}
-              >
-                <ApiOutlined style={{ fontSize: '14px' }} />
-              </div>
-              <div>
-                <div style={{ fontSize: '12px', color: '#666' }}>交换机</div>
-                <div style={{ fontSize: '11px', color: '#999' }}>可直接创建端口</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#fff',
-                }}
-              >
-                <CloudServerOutlined style={{ fontSize: '14px' }} />
-              </div>
-              <div>
-                <div style={{ fontSize: '12px', color: '#666' }}>服务器</div>
-                <div style={{ fontSize: '11px', color: '#999' }}>需先添加网卡</div>
-              </div>
+              {guidedDeviceType === 'switch' ? (
+                <ApiOutlined style={{ fontSize: '16px', color: '#059669' }} />
+              ) : (
+                <CloudServerOutlined style={{ fontSize: '16px', color: '#6366f1' }} />
+              )}
+              <span style={{
+                fontSize: '13px',
+                fontWeight: 500,
+                color: guidedDeviceType === 'switch' ? '#047857' : '#4f46e5',
+              }}>
+                {guidedDeviceType === 'switch' ? '添加交换机端口' : '添加服务器端口'}
+              </span>
+              <span style={{ fontSize: '12px', color: '#666' }}>
+                {guidedDeviceType === 'switch' ? '（交换机端口可直接创建，无需关联网卡）' : '（服务器端口需关联网卡）'}
+              </span>
             </div>
           </div>
-        </div>
+        )}
 
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
           <Input
             placeholder="搜索设备名称、IP或位置..."
             prefix={<SearchOutlined style={{ color: '#999' }} />}
             allowClear
             onChange={e => handleDeviceSearch(e.target.value)}
             style={{
+              flex: 1,
               borderRadius: '10px',
               border: '1px solid #e8ecf4',
-              height: '44px',
+              height: '40px',
               fontSize: '14px',
             }}
           />
+          <Select
+            placeholder="按机房筛选"
+            allowClear
+            value={selectedRoomId}
+            onChange={value => {
+              setSelectedRoomId(value);
+              setSelectedRackId(null);
+            }}
+            style={{ width: 140 }}
+            size="middle"
+          >
+            {roomList.map(room => (
+              <Select.Option key={room.roomId} value={room.roomId}>
+                {room.name}
+              </Select.Option>
+            ))}
+          </Select>
+          <Select
+            placeholder="按机柜筛选"
+            allowClear
+            value={selectedRackId}
+            onChange={value => setSelectedRackId(value)}
+            style={{ width: 140 }}
+            size="middle"
+            disabled={!selectedRoomId}
+          >
+            {rackList
+              .filter(rack => !selectedRoomId || rack.roomId === selectedRoomId)
+              .map(rack => (
+                <Select.Option key={rack.rackId} value={rack.rackId}>
+                  {rack.name}
+                </Select.Option>
+              ))}
+          </Select>
         </div>
 
         {(() => {
+          const rackRoomMap = {};
+          rackList.forEach(rack => {
+            rackRoomMap[rack.rackId] = rack.roomId;
+          });
+
           const allDevices = devices.filter(d => {
             const type = getDeviceType(d);
-            return type === 'switch' || type === 'server';
+            if (type !== 'switch' && type !== 'server') return false;
+            if (selectedRackId && d.rackId !== selectedRackId) return false;
+            if (selectedRoomId && d.rackId && rackRoomMap[d.rackId] !== selectedRoomId) return false;
+            return true;
           });
           const switchCount = allDevices.filter(d => getDeviceType(d) === 'switch').length;
           const serverCount = allDevices.filter(d => getDeviceType(d) === 'server').length;
+          const showSwitchTab = guidedDeviceType === null || guidedDeviceType === 'switch';
+          const showServerTab = guidedDeviceType === null || guidedDeviceType === 'server';
 
           return (
             <div
@@ -2199,66 +2492,72 @@ function PortManagement() {
                 borderRadius: '12px',
               }}
             >
-              <button
-                onClick={() => { setDeviceFilterType('all'); setDevicePage(1); }}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: deviceFilterType === 'all'
-                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                    : 'transparent',
-                  color: deviceFilterType === 'all' ? '#fff' : '#666',
-                  boxShadow: deviceFilterType === 'all' ? '0 2px 8px rgba(102, 126, 234, 0.3)' : 'none',
-                }}
-              >
-                全部 ({allDevices.length})
-              </button>
-              <button
-                onClick={() => { setDeviceFilterType('switch'); setDevicePage(1); }}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: deviceFilterType === 'switch'
-                    ? 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
-                    : 'transparent',
-                  color: deviceFilterType === 'switch' ? '#fff' : '#666',
-                  boxShadow: deviceFilterType === 'switch' ? '0 2px 8px rgba(17, 153, 142, 0.3)' : 'none',
-                }}
-              >
-                交换机 ({switchCount})
-              </button>
-              <button
-                onClick={() => { setDeviceFilterType('server'); setDevicePage(1); }}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: deviceFilterType === 'server'
-                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                    : 'transparent',
-                  color: deviceFilterType === 'server' ? '#fff' : '#666',
-                  boxShadow: deviceFilterType === 'server' ? '0 2px 8px rgba(102, 126, 234, 0.3)' : 'none',
-                }}
-              >
-                服务器 ({serverCount})
-              </button>
+              {guidedDeviceType === null && (
+                <button
+                  onClick={() => { setDeviceFilterType('all'); setDevicePage(1); }}
+                  style={{
+                    flex: 1,
+                    padding: '10px 16px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    background: deviceFilterType === 'all'
+                      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                      : 'transparent',
+                    color: deviceFilterType === 'all' ? '#fff' : '#666',
+                    boxShadow: deviceFilterType === 'all' ? '0 2px 8px rgba(102, 126, 234, 0.3)' : 'none',
+                  }}
+                >
+                  全部 ({allDevices.length})
+                </button>
+              )}
+              {showSwitchTab && (
+                <button
+                  onClick={() => { setDeviceFilterType('switch'); setDevicePage(1); }}
+                  style={{
+                    flex: 1,
+                    padding: '10px 16px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    background: deviceFilterType === 'switch'
+                      ? 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
+                      : 'transparent',
+                    color: deviceFilterType === 'switch' ? '#fff' : '#666',
+                    boxShadow: deviceFilterType === 'switch' ? '0 2px 8px rgba(17, 153, 142, 0.3)' : 'none',
+                  }}
+                >
+                  交换机 ({switchCount})
+                </button>
+              )}
+              {showServerTab && (
+                <button
+                  onClick={() => { setDeviceFilterType('server'); setDevicePage(1); }}
+                  style={{
+                    flex: 1,
+                    padding: '10px 16px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    background: deviceFilterType === 'server'
+                      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                      : 'transparent',
+                    color: deviceFilterType === 'server' ? '#fff' : '#666',
+                    boxShadow: deviceFilterType === 'server' ? '0 2px 8px rgba(102, 126, 234, 0.3)' : 'none',
+                  }}
+                >
+                  服务器 ({serverCount})
+                </button>
+              )}
             </div>
           );
         })()}
@@ -2529,7 +2828,7 @@ function PortManagement() {
                 width: '36px',
                 height: '36px',
                 borderRadius: designTokens.borderRadius.md,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: designTokens.colors.primary.gradient,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -2548,9 +2847,13 @@ function PortManagement() {
         onCancel={() => {
           setServerNicListVisible(false);
           setServerNicList([]);
+          setServerNicSearchText('');
+          setServerNicRoomFilter('all');
+          setServerNicRackFilter('all');
+          setServerNicCardPage(1);
         }}
         footer={null}
-        width={600}
+        width={900}
         destroyOnClose
       >
         {serverNicLoading ? (
@@ -2558,111 +2861,190 @@ function PortManagement() {
             <Spin size="large" />
             <div style={{ marginTop: '16px', color: '#999' }}>加载中...</div>
           </div>
-        ) : serverNicList.length === 0 ? (
-          <Empty description="所有有网卡的服务器都已添加端口" />
         ) : (
-          <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-            {serverNicList.map(server => (
-              <div
-                key={server.deviceId}
-                style={{
-                  padding: '16px',
-                  marginBottom: '12px',
-                  borderRadius: '12px',
-                  border: `1px solid ${designTokens.colors.neutral[200]}`,
-                  background: designTokens.colors.neutral[50],
+          <>
+            <div
+              style={{
+                display: 'flex',
+                gap: '12px',
+                marginBottom: '16px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <Input
+                placeholder="搜索服务器名称或ID..."
+                prefix={<SearchOutlined style={{ color: designTokens.colors.primary.main }} />}
+                value={serverNicSearchText}
+                onChange={e => {
+                  setServerNicSearchText(e.target.value);
+                  setServerNicCardPage(1);
                 }}
+                allowClear
+                style={{
+                  width: '260px',
+                  borderRadius: designTokens.borderRadius.md,
+                }}
+              />
+              <Select
+                value={serverNicRoomFilter}
+                onChange={value => {
+                  setServerNicRoomFilter(value);
+                  setServerNicRackFilter('all');
+                  setServerNicCardPage(1);
+                }}
+                style={{ width: '140px' }}
+                placeholder="选择机房"
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '10px',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#fff',
-                        fontSize: '18px',
-                      }}
-                    >
-                      <CloudServerOutlined />
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: '14px', color: designTokens.colors.neutral[800] }}>
-                        {server.name}
-                      </div>
-                      <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500] }}>
-                        {server.deviceId}
-                      </div>
-                    </div>
-                  </div>
-                  <Tag
-                    style={{
-                      background: server.nicCount > 0 ? designTokens.colors.success.bg : designTokens.colors.neutral[200],
-                      color: server.nicCount > 0 ? designTokens.colors.success.main : designTokens.colors.neutral[600],
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '4px 12px',
-                    }}
-                  >
-                    {server.nicCount > 0 ? `${server.nicCount} 个网卡` : '暂无网卡'}
-                  </Tag>
-                </div>
+                <Option value="all">全部机房</Option>
+                {roomList.map(room => (
+                  <Option key={room.roomId} value={room.roomId}>{room.name}</Option>
+                ))}
+              </Select>
+              <Select
+                value={serverNicRackFilter}
+                onChange={value => {
+                  setServerNicRackFilter(value);
+                  setServerNicCardPage(1);
+                }}
+                style={{ width: '140px' }}
+                placeholder="选择机柜"
+                disabled={serverNicRoomFilter === 'all'}
+              >
+                <Option value="all">全部机柜</Option>
+                {rackList
+                  .filter(rack => serverNicRoomFilter === 'all' || rack.roomId === serverNicRoomFilter)
+                  .map(rack => (
+                    <Option key={rack.rackId} value={rack.rackId}>{rack.name}</Option>
+                  ))}
+              </Select>
+              <div style={{ marginLeft: 'auto', color: designTokens.colors.text.secondary, fontSize: '13px', alignSelf: 'center' }}>
+                共 {serverNicList.length} 台设备
+              </div>
+            </div>
 
-                {server.nics && server.nics.length > 0 && (
-                  <div style={{ marginBottom: '8px' }}>
-                    {server.nics.map(nic => (
-                      <div
-                        key={nic.nicId}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '8px 12px',
-                          background: '#fff',
-                          borderRadius: '6px',
-                          marginBottom: '4px',
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontSize: '13px', fontWeight: 500 }}>{nic.name}</div>
-                          {nic.slotNumber && (
-                            <div style={{ fontSize: '11px', color: designTokens.colors.neutral[500] }}>
-                              插槽 {nic.slotNumber}
-                            </div>
-                          )}
-                        </div>
-                        <Tag color="blue" style={{ borderRadius: '4px' }}>{nic.portCount || 0} 端口</Tag>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <Button
-                  type="primary"
-                  size="small"
-                  icon={<PlusOutlined />}
-                  onClick={() => {
-                    setSelectedDeviceForNic(server);
-                    setServerNicListVisible(false);
-                    setNetworkCardModalVisible(true);
-                  }}
+            {serverNicList.length === 0 ? (
+              <Empty description="暂无服务器数据" />
+            ) : (
+              <>
+                <div
                   style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    border: 'none',
-                    borderRadius: '6px',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: '16px',
+                    maxHeight: '520px',
+                    overflowY: 'auto',
+                    padding: '4px',
                   }}
                 >
-                  {server.nicCount > 0 ? '管理网卡' : '添加网卡'}
-                </Button>
-              </div>
-            ))}
-          </div>
+                  {serverNicList
+                    .filter(server => {
+                      const searchMatch =
+                        !serverNicSearchText ||
+                        server.name?.toLowerCase().includes(serverNicSearchText.toLowerCase()) ||
+                        server.deviceId?.toLowerCase().includes(serverNicSearchText.toLowerCase());
+                      const roomMatch = serverNicRoomFilter === 'all' || server.roomId === serverNicRoomFilter;
+                      const rackMatch = serverNicRackFilter === 'all' || server.rackId === serverNicRackFilter;
+                      return searchMatch && roomMatch && rackMatch;
+                    })
+                    .slice(
+                      (serverNicCardPage - 1) * serverNicCardPageSize,
+                      serverNicCardPage * serverNicCardPageSize
+                    )
+                    .map(server => (
+                      <ServerNicCard
+                        key={server.deviceId}
+                        server={server}
+                        onManage={() => {
+                          setSelectedDeviceForNic(server);
+                          setServerNicListVisible(false);
+                          setNetworkCardModalVisible(true);
+                        }}
+                      />
+                    ))}
+                </div>
+
+                {serverNicList.filter(server => {
+                  const searchMatch =
+                    !serverNicSearchText ||
+                    server.name?.toLowerCase().includes(serverNicSearchText.toLowerCase()) ||
+                    server.deviceId?.toLowerCase().includes(serverNicSearchText.toLowerCase());
+                  const roomMatch = serverNicRoomFilter === 'all' || server.roomId === serverNicRoomFilter;
+                  const rackMatch = serverNicRackFilter === 'all' || server.rackId === serverNicRackFilter;
+                  return searchMatch && roomMatch && rackMatch;
+                }).length > serverNicCardPageSize && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      marginTop: '16px',
+                      paddingTop: '12px',
+                      borderTop: `1px solid ${designTokens.colors.border.light}`,
+                    }}
+                  >
+                    <Pagination
+                      current={serverNicCardPage}
+                      pageSize={serverNicCardPageSize}
+                      total={serverNicList.filter(server => {
+                        const searchMatch =
+                          !serverNicSearchText ||
+                          server.name?.toLowerCase().includes(serverNicSearchText.toLowerCase()) ||
+                          server.deviceId?.toLowerCase().includes(serverNicSearchText.toLowerCase());
+                        const typeMatch = serverNicTypeFilter === 'all' || server.type === serverNicTypeFilter;
+                        return searchMatch && typeMatch;
+                      }).length}
+                      onChange={page => setServerNicCardPage(page)}
+                      showSizeChanger={false}
+                      showQuickJumper
+                      size="small"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </>
         )}
       </Modal>
+
+      {/* 批量导入选择弹窗 */}
+      <BatchImportModal
+        visible={batchImportModalVisible}
+        onClose={() => setBatchImportModalVisible(false)}
+        onImportNetworkCard={() => setNetworkCardImportModalVisible(true)}
+        onImportPort={() => {
+          handleImport();
+        }}
+      />
+
+      {/* 网卡批量导入弹窗 */}
+      <NetworkCardImportModal
+        visible={networkCardImportModalVisible}
+        onClose={() => setNetworkCardImportModalVisible(false)}
+        onSuccess={() => {
+          message.success({
+            content: '网卡导入成功',
+            icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+          });
+          setRefreshTrigger(prev => prev + 1);
+        }}
+      />
+
+      {/* 端口新增引导弹窗 */}
+      <PortAddGuideModal
+        visible={portAddGuideModalVisible}
+        onClose={() => setPortAddGuideModalVisible(false)}
+        onSelectType={handleGuideSelectType}
+      />
+
+      {/* 端口导出弹窗 */}
+      <PortExportModal
+        visible={portExportModalVisible}
+        filters={filters}
+        totalCount={portTotal}
+        currentPageCount={ports.length}
+        selectedCount={selectedRowKeys.length}
+        onExport={handleExport}
+        onCancel={() => setPortExportModalVisible(false)}
+      />
     </motion.div>
   );
 }

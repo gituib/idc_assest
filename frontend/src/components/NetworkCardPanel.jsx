@@ -426,6 +426,8 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
         }}
         onSuccess={handleCreatePortSuccess}
         defaultNicId={selectedCard?.nicId}
+        networkCard={selectedCard}
+        disableNicChange={true}
       />
     </div>
   );

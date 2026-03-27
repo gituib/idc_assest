@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Table,
   Button,
@@ -13,6 +13,7 @@ import {
   Tag,
   Row,
   Col,
+  Spin,
 } from 'antd';
 import {
   PlusOutlined,
@@ -130,10 +131,19 @@ function DeviceManagement() {
 
   const debouncedKeyword = useDebounce(keyword, DEBOUNCE_DELAY);
 
+  const loadMoreRef = useRef(null);
+  const hasMoreRef = useRef(true);
+  const isLoadingRef = useRef(false);
+  const [deviceLoadingMore, setDeviceLoadingMore] = useState(false);
+
   const fetchDevices = useCallback(
-    async (page = 1, pageSize = 10, forceRefresh = false) => {
+    async (page = 1, pageSize = 50, append = false) => {
       try {
-        setLoading(true);
+        if (append) {
+          setDeviceLoadingMore(true);
+        } else {
+          setLoading(true);
+        }
 
         const params = {
           page,
@@ -150,13 +160,19 @@ function DeviceManagement() {
 
         const processedDevices = deviceList.map(processDeviceData);
 
-        setAllDevices(processedDevices);
+        if (append) {
+          setAllDevices(prev => [...prev, ...processedDevices]);
+        } else {
+          setAllDevices(processedDevices);
+        }
         setPagination((prev) => ({ ...prev, current: page, pageSize, total }));
+        hasMoreRef.current = page * pageSize < total;
       } catch (error) {
         message.error('获取设备列表失败');
         console.error('获取设备列表失败:', error);
       } finally {
         setLoading(false);
+        setDeviceLoadingMore(false);
       }
     },
     [debouncedKeyword, status, type, roomId, rackId]
@@ -257,6 +273,39 @@ function DeviceManagement() {
     }
   }, [allDevices, pagination.current, pagination.pageSize]);
 
+  const handleLoadMoreDevices = useCallback(() => {
+    if (!hasMoreRef.current || isLoadingRef.current || deviceLoadingMore) return;
+    if (debouncedKeyword || status !== 'all' || type !== 'all' || roomId !== 'all' || rackId !== 'all') {
+      return;
+    }
+    isLoadingRef.current = true;
+    const nextPage = pagination.current + 1;
+    fetchDevices(nextPage, pagination.pageSize, true).then(() => {
+      isLoadingRef.current = false;
+    });
+  }, [pagination.current, pagination.pageSize, debouncedKeyword, status, type, roomId, rackId, deviceLoadingMore, fetchDevices]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMoreRef.current && !deviceLoadingMore) {
+          if (!debouncedKeyword && status === 'all' && type === 'all' && roomId === 'all' && rackId === 'all') {
+            handleLoadMoreDevices();
+          }
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    observer.observe(loadMoreRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [handleLoadMoreDevices, deviceLoadingMore, debouncedKeyword, status, type, roomId, rackId]);
+
   const showModal = (device = null) => {
     setEditingDevice(device);
     setModalVisible(true);
@@ -278,7 +327,7 @@ function DeviceManagement() {
       }
 
       setModalVisible(false);
-      fetchDevices();
+      fetchDevices(1, pagination.pageSize, false);
       setEditingDevice(null);
     } catch (error) {
       const errorMsg = error.response?.data?.error || error.message || '未知错误';
@@ -322,7 +371,7 @@ function DeviceManagement() {
     const currentPageData = allDevices.slice(start, end);
     setCurrentPageDevices(currentPageData);
 
-    fetchDevices(newPagination.current, newPagination.pageSize);
+    fetchDevices(newPagination.current, newPagination.pageSize, false);
   };
 
   const handleBatchDelete = async () => {
@@ -340,7 +389,7 @@ function DeviceManagement() {
           message.success(response.data.message || '批量删除成功');
           setSelectedDevices([]);
           setSelectAll(false);
-          fetchDevices(1, 10, true);
+          fetchDevices(1, 50, false);
         } catch (error) {
           message.error('批量删除失败');
           console.error('批量删除设备失败:', error);
@@ -367,7 +416,7 @@ function DeviceManagement() {
           message.success(response.data.message || '成功删除所有设备');
           setSelectedDevices([]);
           setSelectAll(false);
-          fetchDevices(1, 10, true);
+          fetchDevices(1, 50, false);
         } catch (error) {
           message.error('删除所有设备失败');
           console.error('删除所有设备失败:', error);
@@ -395,7 +444,7 @@ function DeviceManagement() {
           message.success(response.data.message || '设备已标记为空闲');
           setSelectedDevices([]);
           setSelectAll(false);
-          fetchDevices(1, 10, true);
+          fetchDevices(1, 50, false);
         } catch (error) {
           message.error(error.response?.data?.error || '标记为空闲失败');
           console.error('标记为空闲失败:', error);
@@ -415,7 +464,7 @@ function DeviceManagement() {
         try {
           await axios.delete(`/api/devices/${deviceId}`);
           message.success('设备删除成功');
-          fetchDevices();
+          fetchDevices(1, pagination.pageSize, false);
         } catch (error) {
           message.error('设备删除失败');
           console.error('设备删除失败:', error);
@@ -461,7 +510,7 @@ function DeviceManagement() {
       setBatchStatusModalVisible(false);
       setSelectedDevices([]);
       setSelectAll(false);
-      fetchDevices();
+      fetchDevices(1, pagination.pageSize, false);
     } catch (error) {
       message.error('批量状态变更失败');
       console.error('批量状态变更失败:', error);
@@ -552,7 +601,7 @@ function DeviceManagement() {
       }
 
       setTimeout(() => {
-        fetchDevices();
+        fetchDevices(1, pagination.pageSize, false);
       }, 1000);
     } catch (error) {
       let errorMessage = '导入失败';
@@ -1055,7 +1104,7 @@ function DeviceManagement() {
               </Space>
               <Button
                 icon={<ReloadOutlined />}
-                onClick={() => fetchDevices(1, pagination.pageSize, true)}
+                onClick={() => fetchDevices(1, pagination.pageSize, false)}
                 style={{
                   borderRadius: designTokens.borderRadius.medium,
                   border: `1px solid ${designTokens.colors.border.light}`,
@@ -1234,6 +1283,16 @@ function DeviceManagement() {
                 return index % 2 === 0 ? 'ant-table-row-even' : 'ant-table-row-odd';
               }}
             />
+            {hasMoreRef.current && !debouncedKeyword && status === 'all' && type === 'all' && roomId === 'all' && rackId === 'all' && (
+              <div ref={loadMoreRef} style={{ textAlign: 'center', padding: '20px' }}>
+                {deviceLoadingMore && <Spin tip="加载更多设备..." />}
+              </div>
+            )}
+            {!hasMoreRef.current && allDevices.length > 0 && (
+              <div style={{ textAlign: 'center', padding: '16px', color: '#999' }}>
+                已加载全部 {pagination.total} 个设备
+              </div>
+            )}
           </div>
         )}
       </Card>

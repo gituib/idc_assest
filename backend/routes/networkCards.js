@@ -231,6 +231,111 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.post('/batch', async (req, res) => {
+  try {
+    const { networkCards, skipExisting = false, updateExisting = false } = req.body;
+
+    if (!networkCards || !Array.isArray(networkCards) || networkCards.length === 0) {
+      return res.status(400).json({ error: '请提供有效的网卡数据' });
+    }
+
+    const results = {
+      total: networkCards.length,
+      success: 0,
+      failed: 0,
+      skipped: 0,
+      updated: 0,
+      errors: []
+    };
+
+    const transaction = await NetworkCard.sequelize.transaction();
+
+    try {
+      for (let i = 0; i < networkCards.length; i++) {
+        const cardData = networkCards[i];
+
+        try {
+          if (!cardData.deviceId || !cardData.name) {
+            throw new Error('缺少必填字段：设备ID和网卡名称');
+          }
+
+          const device = await Device.findByPk(cardData.deviceId, { transaction });
+          if (!device) {
+            throw new Error(`设备 ${cardData.deviceId} 不存在`);
+          }
+
+          const isServer = device.type && device.type.toLowerCase().includes('server');
+          const isSwitch = device.type && device.type.toLowerCase().includes('switch');
+          if (!isServer && !isSwitch) {
+            throw new Error(`设备类型 ${device.type} 不支持网卡管理`);
+          }
+
+          const existingCard = await NetworkCard.findOne({
+            where: { deviceId: cardData.deviceId, name: cardData.name },
+            transaction
+          });
+
+          if (existingCard) {
+            if (skipExisting) {
+              results.skipped++;
+              continue;
+            }
+            if (updateExisting) {
+              await NetworkCard.update({
+                slotNumber: cardData.slotNumber !== undefined ? cardData.slotNumber : existingCard.slotNumber,
+                model: cardData.model !== undefined ? cardData.model : existingCard.model,
+                manufacturer: cardData.manufacturer !== undefined ? cardData.manufacturer : existingCard.manufacturer,
+                description: cardData.description !== undefined ? cardData.description : existingCard.description,
+                status: cardData.status || existingCard.status
+              }, {
+                where: { nicId: existingCard.nicId },
+                transaction
+              });
+              results.updated++;
+              results.success++;
+              continue;
+            }
+            throw new Error('该设备已存在同名网卡');
+          }
+
+          const autoNicId = cardData.nicId || `NIC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+          await NetworkCard.create({
+            nicId: autoNicId,
+            deviceId: cardData.deviceId,
+            name: cardData.name,
+            slotNumber: cardData.slotNumber,
+            model: cardData.model,
+            manufacturer: cardData.manufacturer,
+            description: cardData.description,
+            status: cardData.status || 'normal',
+            portCount: 0
+          }, { transaction });
+
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({
+            index: i + 1,
+            deviceId: cardData.deviceId,
+            name: cardData.name,
+            error: error.message
+          });
+        }
+      }
+
+      await transaction.commit();
+      res.json(results);
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  } catch (error) {
+    console.error('批量创建网卡失败:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.put('/:nicId', async (req, res) => {
   try {
     const [updated] = await NetworkCard.update(req.body, {

@@ -262,14 +262,14 @@ const AppLayout = ({ children }) => {
           label: <Link to="/fields">字段管理</Link>,
         },
         {
-          key: 'cables',
-          icon: <ApiOutlined style={{ fontSize: '16px' }} />,
-          label: <Link to="/cables">接线管理</Link>,
-        },
-        {
           key: 'ports',
           icon: <PartitionOutlined style={{ fontSize: '16px' }} />,
           label: <Link to="/ports">端口管理</Link>,
+        },
+        {
+          key: 'cables',
+          icon: <ApiOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/cables">接线管理</Link>,
         },
       ],
     },

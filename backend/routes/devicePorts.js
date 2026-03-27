@@ -60,7 +60,8 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('获取端口列表失败:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error name:', error.name);
+    res.status(500).json({ error: error.message, errorType: error.name });
   }
 });
 
@@ -167,6 +168,48 @@ router.post('/batch', async (req, res) => {
             throw new Error('缺少必填字段');
           }
 
+          const device = await Device.findByPk(portData.deviceId, { transaction });
+          if (!device) {
+            throw new Error(`设备 ${portData.deviceId} 不存在`);
+          }
+
+          const isServer = device.type && device.type.toLowerCase().includes('server');
+
+          if (isServer) {
+            if (!portData.nicId && !portData.网卡名称) {
+              throw new Error(`服务器 ${portData.deviceId} 的端口必须关联网卡，请先在网卡管理中添加网卡`);
+            }
+
+            let nicId = portData.nicId;
+
+            if (!nicId && portData.网卡名称) {
+              const networkCard = await NetworkCard.findOne({
+                where: { deviceId: portData.deviceId, name: portData.网卡名称 },
+                transaction
+              });
+              if (!networkCard) {
+                throw new Error(`服务器 ${portData.deviceId} 的网卡"${portData.网卡名称}"不存在，请先在网卡管理中添加该网卡`);
+              }
+              nicId = networkCard.nicId;
+            }
+
+            if (nicId) {
+              const networkCard = await NetworkCard.findByPk(nicId, { transaction });
+              if (!networkCard) {
+                throw new Error(`网卡 ${nicId} 不存在`);
+              }
+              if (networkCard.deviceId !== portData.deviceId) {
+                throw new Error(`网卡 ${nicId} 不属于设备 ${portData.deviceId}`);
+              }
+            }
+
+            portData.nicId = nicId;
+          } else {
+            if (portData.nicId || portData.网卡名称) {
+              portData.nicId = null;
+            }
+          }
+
           const existingPort = await DevicePort.findOne({
             where: { deviceId: portData.deviceId, portName: portData.portName },
             transaction
@@ -183,7 +226,8 @@ router.post('/batch', async (req, res) => {
                 portSpeed: portData.portSpeed || existingPort.portSpeed,
                 status: portData.status || existingPort.status,
                 vlanId: portData.vlanId !== undefined ? portData.vlanId : existingPort.vlanId,
-                description: portData.description !== undefined ? portData.description : existingPort.description
+                description: portData.description !== undefined ? portData.description : existingPort.description,
+                nicId: portData.nicId !== undefined ? portData.nicId : existingPort.nicId
               }, {
                 where: { portId: existingPort.portId },
                 transaction
@@ -213,6 +257,8 @@ router.post('/batch', async (req, res) => {
           results.errors.push({
             index: i + 1,
             portId: portData.portId,
+            deviceId: portData.deviceId,
+            portName: portData.portName,
             error: error.message
           });
         }
@@ -351,14 +397,130 @@ router.get('/:portId', async (req, res) => {
         }
       ]
     });
-    
+
     if (!port) {
       return res.status(404).json({ error: '端口不存在' });
     }
-    
+
     res.json(port);
   } catch (error) {
     console.error('获取端口详情失败:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/export/all', async (req, res) => {
+  try {
+    const { keyword, status, portType, portSpeed, deviceId, page = 1, pageSize = 5000 } = req.query;
+
+    const parsedPage = Math.max(1, parseInt(page) || 1);
+    const parsedPageSize = Math.min(10000, Math.max(1, parseInt(pageSize) || 5000));
+    const offset = (parsedPage - 1) * parsedPageSize;
+
+    const where = {};
+
+    if (deviceId) {
+      where.deviceId = deviceId;
+    }
+
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+
+    if (portType && portType !== 'all') {
+      where.portType = portType;
+    }
+
+    if (portSpeed && portSpeed !== 'all') {
+      where.portSpeed = portSpeed;
+    }
+
+    const timeoutMs = 30000;
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('查询超时，请尝试缩小查询范围或减少pageSize')), timeoutMs);
+    });
+
+    const countResult = await Promise.race([
+      DevicePort.findAll({
+        where,
+        include: [
+          {
+            model: Device,
+            as: 'device',
+            attributes: ['deviceId', 'name', 'type', 'rackId'],
+            include: [
+              {
+                model: require('../models/Rack'),
+                as: 'rack',
+                attributes: ['rackId', 'name'],
+                include: [
+                  {
+                    model: require('../models/Room'),
+                    as: 'room',
+                    attributes: ['roomId', 'name']
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            model: NetworkCard,
+            as: 'networkCard',
+            attributes: ['nicId', 'name']
+          }
+        ],
+        order: [['createdAt', 'DESC']],
+        limit: parsedPageSize,
+        offset: offset,
+        subQuery: false
+      }),
+      timeoutPromise
+    ]);
+
+    const ports = countResult;
+
+    const statusMap = {
+      free: '空闲',
+      occupied: '占用',
+      fault: '故障'
+    };
+
+    const exportData = ports.map(port => ({
+      端口ID: port.portId,
+      设备ID: port.deviceId,
+      设备名称: port.device?.name || '-',
+      设备类型: port.device?.type || '-',
+      机房: port.device?.rack?.room?.name || '-',
+      机架: port.device?.rack?.name || '-',
+      网卡名称: port.networkCard?.name || '-',
+      端口名称: port.portName,
+      端口类型: port.portType,
+      端口速率: port.portSpeed,
+      状态: statusMap[port.status] || port.status,
+      VLAN_ID: port.vlanId || '-',
+      描述: port.description || '-',
+      创建时间: port.createdAt ? new Date(port.createdAt).toLocaleString('zh-CN') : '-'
+    }));
+
+    let filteredExportData = exportData;
+    if (keyword) {
+      const searchLower = keyword.toLowerCase();
+      filteredExportData = exportData.filter(item =>
+        item.端口名称?.toLowerCase().includes(searchLower) ||
+        item.端口类型?.toLowerCase().includes(searchLower) ||
+        item.设备名称?.toLowerCase().includes(searchLower) ||
+        item.描述?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    res.json({
+      page: parsedPage,
+      pageSize: parsedPageSize,
+      total: filteredExportData.length,
+      ports: filteredExportData
+    });
+  } catch (error) {
+    console.error('导出端口失败:', error);
     res.status(500).json({ error: error.message });
   }
 });
