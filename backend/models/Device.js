@@ -103,6 +103,9 @@ const Device = sequelize.define(
       { fields: ['createdAt'] },
       { fields: ['status', 'type'] },
       { fields: ['name'] },
+      // 优化位置冲突检测的复合索引
+      { fields: ['rackId', 'position'] },
+      { fields: ['rackId', 'position', 'isIdle'] },
     ],
   }
 );

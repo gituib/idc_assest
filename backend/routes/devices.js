@@ -63,6 +63,8 @@ async function checkPositionAvailable(
 
   if (transaction) {
     queryOptions.transaction = transaction;
+    // 使用悲观锁防止竞态条件
+    queryOptions.lock = transaction.LOCK ? transaction.LOCK.UPDATE : 'UPDATE';
   }
 
   const existingDevices = await Device.findAll(queryOptions);
@@ -126,6 +128,8 @@ async function checkBatchPositions(rackId, devices, excludeDeviceIds = [], trans
 
   if (transaction) {
     queryOptions.transaction = transaction;
+    // 使用悲观锁防止竞态条件
+    queryOptions.lock = transaction.LOCK ? transaction.LOCK.UPDATE : 'UPDATE';
   }
 
   const existingDevices = await Device.findAll(queryOptions);

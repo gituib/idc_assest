@@ -26,6 +26,8 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.15.0",
     "react-transition-group": "^4.4.5",
+    "react-virtualized-auto-sizer": "^2.0.3",
+    "react-window": "^2.2.7",
     "reactflow": "^11.11.4",
     "styled-components": "^6.3.9",
     "swr": "^2.4.0",
