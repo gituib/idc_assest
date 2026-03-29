@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message, Modal } from 'antd';
+import secureStorage, { TOKEN_KEY, USER_KEY } from '../utils/secureStorage';
 
 /**
  * 用户空闲超时检测 Hook
@@ -43,8 +44,8 @@ const useIdleTimeout = ({
     clearTimers();
 
     // 清除登录状态
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    secureStorage.remove(TOKEN_KEY);
+    secureStorage.remove(USER_KEY);
 
     // 执行自定义登出回调
     if (onLogout) {

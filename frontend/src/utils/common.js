@@ -1,3 +1,5 @@
+import secureStorage, { USER_KEY } from './secureStorage';
+
 export const debounce = (func, wait) => {
   let timeout;
   return function executedFunction(...args) {
@@ -23,8 +25,8 @@ export const throttle = (func, limit) => {
 
 export const getUserFromStorage = () => {
   try {
-    const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : {};
+    const user = secureStorage.get(USER_KEY);
+    return user || {};
   } catch (e) {
     return {};
   }

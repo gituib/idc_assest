@@ -172,14 +172,22 @@ router.get('/:nicId/ports', async (req, res) => {
 
 router.get('/find', async (req, res) => {
   try {
-    const { deviceId, name } = req.query;
+    const { deviceId, deviceSn, name } = req.query;
 
-    if (!deviceId || !name) {
-      return res.status(400).json({ error: '缺少设备ID或网卡名称' });
+    if ((!deviceId && !deviceSn) || !name) {
+      return res.status(400).json({ error: '缺少设备ID/SN或网卡名称' });
+    }
+
+    let device;
+    if (deviceSn) {
+      device = await Device.findOne({ where: { serialNumber: deviceSn } });
+      if (!device) {
+        return res.json({ nicId: null });
+      }
     }
 
     const networkCard = await NetworkCard.findOne({
-      where: { deviceId, name },
+      where: { deviceId: device ? device.deviceId : deviceId, name },
     });
 
     if (!networkCard) {
@@ -265,13 +273,22 @@ router.post('/batch', async (req, res) => {
         const cardData = networkCards[i];
 
         try {
-          if (!cardData.deviceId || !cardData.name) {
-            throw new Error('缺少必填字段：设备ID和网卡名称');
+          if (!(cardData.deviceId || cardData.deviceSn) || !cardData.name) {
+            throw new Error('缺少必填字段：设备ID/SN和网卡名称');
           }
 
-          const device = await Device.findByPk(cardData.deviceId, { transaction });
-          if (!device) {
-            throw new Error(`设备 ${cardData.deviceId} 不存在`);
+          let device;
+          if (cardData.deviceSn) {
+            device = await Device.findOne({ where: { serialNumber: cardData.deviceSn }, transaction });
+            if (!device) {
+              throw new Error(`设备SN ${cardData.deviceSn} 不存在`);
+            }
+            cardData.deviceId = device.deviceId;
+          } else {
+            device = await Device.findByPk(cardData.deviceId, { transaction });
+            if (!device) {
+              throw new Error(`设备ID ${cardData.deviceId} 不存在`);
+            }
           }
 
           const isServer = device.type && device.type.toLowerCase().includes('server');

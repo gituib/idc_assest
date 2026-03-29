@@ -135,6 +135,7 @@ function PortManagement() {
   const [batchImportModalVisible, setBatchImportModalVisible] = useState(false);
   const [portAddGuideModalVisible, setPortAddGuideModalVisible] = useState(false);
   const [portExportModalVisible, setPortExportModalVisible] = useState(false);
+  const [importDeviceType, setImportDeviceType] = useState(null);
 
   // 展开的设备
   const [expandedKeys, setExpandedKeys] = useState([]);
@@ -707,7 +708,7 @@ function PortManagement() {
     }
   };
 
-  const handleImport = () => {
+  const handleImport = (deviceType = 'all') => {
     setImportModalVisible(true);
     setImportPreview([]);
     setImportProgress({ current: 0, total: 0 });
@@ -720,12 +721,24 @@ function PortManagement() {
       try {
         const data = e.target.result;
         let parsedData = [];
+        let networkCardData = [];
 
         if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
           const workbook = XLSX.read(data, { type: 'binary' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          parsedData = XLSX.utils.sheet_to_json(worksheet);
+          
+          if (importDeviceType === 'server' && workbook.SheetNames.length >= 2) {
+            // 服务器设备：解析两张表格
+            const networkCardSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const portSheet = workbook.Sheets[workbook.SheetNames[1]];
+            
+            networkCardData = XLSX.utils.sheet_to_json(networkCardSheet);
+            parsedData = XLSX.utils.sheet_to_json(portSheet);
+          } else {
+            // 其他设备：只解析第一张表格
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            parsedData = XLSX.utils.sheet_to_json(worksheet);
+          }
         } else if (file.name.endsWith('.csv')) {
           parsedData = Papa.parse(data, {
             header: true,
@@ -741,13 +754,81 @@ function PortManagement() {
           return;
         }
 
-        const validatedResult = await validateImportData(parsedData);
+        // 保存网卡数据，供后续导入使用
+        if (networkCardData.length > 0) {
+          // 验证网卡数据
+          const validatedNicData = [];
+          const nicErrors = [];
+          
+          for (let i = 0; i < networkCardData.length; i++) {
+            const row = networkCardData[i];
+            const rowNum = i + 2;
+            const errors = [];
+            
+            if (!row['设备SN']) {
+              errors.push({
+                row: rowNum,
+                field: '设备SN',
+                value: row['设备SN'] || '(空)',
+                error: '缺少必填字段',
+                suggestion: '请填写设备SN，格式如：SNAA0001',
+              });
+            }
+            
+            if (!row['网卡名称']) {
+              errors.push({
+                row: rowNum,
+                field: '网卡名称',
+                value: row['网卡名称'] || '(空)',
+                error: '缺少必填字段',
+                suggestion: '请填写网卡名称，格式如：网卡1、eth0',
+              });
+            }
+            
+            if (row['插槽编号']) {
+              const validSlotValues = ['LOM', 'OCP', '1', '2', '3', '4'];
+              const slotValue = row['插槽编号'].toString().trim();
+              if (!validSlotValues.includes(slotValue) && !/^\d+$/.test(slotValue)) {
+                errors.push({
+                  row: rowNum,
+                  field: '插槽编号',
+                  value: row['插槽编号'],
+                  error: '插槽编号格式错误',
+                  suggestion: '插槽编号必须为数字或预选项（LOM、OCP、1-4）',
+                });
+              }
+            }
+            
+            if (errors.length > 0) {
+              nicErrors.push(...errors.map(err => ({ ...err, originalRow: row })));
+            } else {
+              validatedNicData.push(row);
+            }
+          }
+          
+          if (nicErrors.length > 0) {
+            message.warning({
+              content: `发现 ${nicErrors.length} 个网卡数据错误，请查看错误详情并修正后重新导入`,
+              duration: 5,
+            });
+            setImportErrors(nicErrors);
+            return;
+          }
+          
+          sessionStorage.setItem('networkCardImportData', JSON.stringify(validatedNicData));
+        }
+        
+        // 验证并处理数据
+        // 对于服务器设备，跳过网卡存在性验证，因为网卡还没有被导入
+        const validatedResult = await validateImportData(parsedData, importDeviceType === 'server');
         console.log('文件解析结果:', {
           总行数: parsedData.length,
           有效数据: validatedResult.validData.length,
           错误数据: validatedResult.errors.length,
           第一行数据: parsedData[0],
+          网卡数据行数: networkCardData.length,
         });
+        
         setImportPreview(validatedResult.validData);
         setImportErrors(validatedResult.errors);
         setImportProgress({ current: 0, total: validatedResult.validData.length });
@@ -765,13 +846,13 @@ function PortManagement() {
     }
   };
 
-  const validateImportData = async data => {
+  const validateImportData = async (data, skipNicValidation = false) => {
     const validData = [];
     const allErrors = [];
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
-      const result = await validatePortRow(row, i);
+      const result = await validatePortRow(row, i, skipNicValidation);
 
       if (result.valid) {
         validData.push(row);
@@ -790,17 +871,17 @@ function PortManagement() {
     return { validData, errors: allErrors };
   };
 
-  const validatePortRow = async (row, index) => {
+  const validatePortRow = async (row, index, skipNicValidation = false) => {
     const rowNum = index + 2;
     const errors = [];
 
-    if (!row['设备ID']) {
+    if (!row['设备SN']) {
       errors.push({
         row: rowNum,
-        field: '设备ID',
-        value: row['设备ID'] || '(空)',
+        field: '设备SN',
+        value: row['设备SN'] || '(空)',
         error: '缺少必填字段',
-        suggestion: '请填写设备ID，格式如：DEV001',
+        suggestion: '请填写设备SN，格式如：SNAA0001',
       });
     }
 
@@ -814,15 +895,15 @@ function PortManagement() {
       });
     }
 
-    if (row['设备ID']) {
-      const device = devices.find(d => d.deviceId === row['设备ID']);
+    if (row['设备SN']) {
+      const device = devices.find(d => d.serialNumber === row['设备SN']);
       if (!device) {
         errors.push({
           row: rowNum,
-          field: '设备ID',
-          value: row['设备ID'],
+          field: '设备SN',
+          value: row['设备SN'],
           error: '设备不存在',
-          suggestion: `设备ID "${row['设备ID']}" 未在系统中注册，请先在设备管理中添加该设备`,
+          suggestion: `设备SN "${row['设备SN']}" 未在系统中注册，请先在设备管理中添加该设备`,
         });
       }
     }
@@ -884,10 +965,10 @@ function PortManagement() {
       }
     }
 
-    if (row['网卡名称'] && row['设备ID']) {
+    if (!skipNicValidation && row['网卡名称'] && row['设备SN']) {
       try {
         const nicResponse = await api.get('/network-cards/find', {
-          params: { deviceId: row['设备ID'], name: row['网卡名称'] },
+          params: { deviceSn: row['设备SN'], name: row['网卡名称'] },
         });
         row._nicId = nicResponse.nicId || null;
       } catch (error) {
@@ -895,8 +976,8 @@ function PortManagement() {
       }
     }
 
-    if (row['设备ID']) {
-      const device = devices.find(d => d.deviceId === row['设备ID']);
+    if (row['设备SN']) {
+      const device = devices.find(d => d.serialNumber === row['设备SN']) || devices.find(d => d.sn === row['设备SN']);
       if (device) {
         const isServer = device.type && device.type.toLowerCase().includes('server');
         if (isServer) {
@@ -908,7 +989,7 @@ function PortManagement() {
               error: '服务器端口必须关联网卡',
               suggestion: `服务器 "${device.name}" 的端口必须关联到网卡，请先在网卡管理中添加网卡，或在导入模板中填写网卡名称`,
             });
-          } else if (row['网卡名称'] && !row._nicId) {
+          } else if (!skipNicValidation && row['网卡名称'] && !row._nicId) {
             errors.push({
               row: rowNum,
               field: '网卡名称',
@@ -940,6 +1021,44 @@ function PortManagement() {
     let currentProgress = 0;
 
     try {
+      // 检查是否有网卡数据需要导入
+      let networkCardImportResult = null;
+      const networkCardDataStr = sessionStorage.getItem('networkCardImportData');
+      
+      if (networkCardDataStr) {
+        const networkCardData = JSON.parse(networkCardDataStr);
+        if (networkCardData.length > 0) {
+          // 先导入网卡数据
+          console.log('开始导入网卡数据:', networkCardData.length, '条');
+          
+          // 生成网卡ID
+          const networkCardsData = networkCardData.map((card, index) => ({
+            nicId: `NIC-${Date.now()}-${index}`,
+            deviceSn: card['设备SN'],
+            name: card['网卡名称'],
+            slotNumber: card['插槽编号'] ? parseInt(card['插槽编号']) : null,
+            model: card['网卡型号'] || null,
+            manufacturer: card['制造商'] || null,
+            description: card['描述'] || null,
+          }));
+          
+          const nicResponse = await api.post('/network-cards/batch', {
+            networkCards: networkCardsData,
+            skipExisting: true,
+            updateExisting: false,
+          });
+          
+          networkCardImportResult = nicResponse;
+          console.log('网卡导入结果:', nicResponse);
+          
+          // 重新获取设备列表，确保包含最新数据
+          await fetchDevices();
+        }
+        
+        // 清除保存的网卡数据
+        sessionStorage.removeItem('networkCardImportData');
+      }
+
       const statusMap = {
         空闲: 'free',
         占用: 'occupied',
@@ -948,8 +1067,9 @@ function PortManagement() {
 
       const portsData = importPreview.map((row, index) => ({
         portId: generateUniquePortId(),
-        deviceId: row['设备ID'],
+        deviceSn: row['设备SN'],
         nicId: row._nicId || null,
+        '网卡名称': row['网卡名称'],
         portName: row['端口名称'],
         portType: row['端口类型'],
         portSpeed: row['端口速率'],
@@ -977,17 +1097,26 @@ function PortManagement() {
       setImportProgress({ current: importPreview.length, total: importPreview.length });
 
       let msgContent = '';
+      if (networkCardImportResult) {
+        const { success: nicSuccess, failed: nicFailed } = networkCardImportResult;
+        if (nicSuccess > 0) {
+          msgContent += `网卡导入成功 ${nicSuccess} 个，`;
+        }
+        if (nicFailed > 0) {
+          msgContent += `网卡导入失败 ${nicFailed} 个，`;
+        }
+      }
       if (updated > 0) {
-        msgContent += `更新 ${updated} 个，`;
+        msgContent += `端口更新 ${updated} 个，`;
       }
       if (skipped > 0) {
-        msgContent += `跳过 ${skipped} 个，`;
+        msgContent += `端口跳过 ${skipped} 个，`;
       }
       if (success > 0) {
-        msgContent += `新增 ${success - updated} 个，`;
+        msgContent += `端口新增 ${success - updated} 个，`;
       }
       if (failed > 0) {
-        msgContent += `失败 ${failed} 个`;
+        msgContent += `端口失败 ${failed} 个`;
         console.error('导入错误:', errors);
       }
 
@@ -1010,27 +1139,107 @@ function PortManagement() {
     } finally {
       clearInterval(progressInterval);
       setImporting(false);
+      // 确保清除保存的网卡数据
+      sessionStorage.removeItem('networkCardImportData');
     }
   };
 
   const handleDownloadTemplate = () => {
-    const templateData = [
-      {
-        设备ID: 'DEV001',
-        端口名称: 'eth0/1',
-        网卡名称: '',
-        端口类型: 'RJ45',
-        端口速率: '1G',
-        状态: '空闲',
-        'VLAN ID': '100',
-        描述: '示例端口',
-      },
-    ];
-
-    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    let fileName = '端口导入模板.xlsx';
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, '端口数据');
-    XLSX.writeFile(workbook, '端口导入模板.xlsx');
+    
+    if (importDeviceType === 'server') {
+      // 网卡数据表格
+      const networkCardTemplateData = [
+        {
+          '设备SN': 'SN-20230001',
+          '网卡名称': '网卡1',
+          '插槽编号': 'LOM',
+          '网卡型号': 'Intel X710',
+          '制造商': 'Intel',
+          '描述': '板载网卡',
+        },
+        {
+          '设备SN': 'SN-20230001',
+          '网卡名称': '网卡2',
+          '插槽编号': 'OCP',
+          '网卡型号': 'Intel X710',
+          '制造商': 'Intel',
+          '描述': 'OCP网卡',
+        },
+        {
+          '设备SN': 'SN-20230001',
+          '网卡名称': '网卡3',
+          '插槽编号': '1',
+          '网卡型号': 'Intel X710',
+          '制造商': 'Intel',
+          '描述': 'PCIe插槽1',
+        },
+      ];
+      
+      // 端口数据表格
+      const portTemplateData = [
+        {
+          '设备SN': 'SN-20230001',
+          '网卡名称': '网卡1',
+          '端口名称': 'eth0/1',
+          '端口类型': 'RJ45',
+          '端口速率': '1G',
+          '状态': '空闲',
+          'VLAN ID': '100',
+          '描述': '服务器端口',
+        },
+        {
+          '设备SN': 'SN-20230001',
+          '网卡名称': '网卡2',
+          '端口名称': 'eth0/2',
+          '端口类型': 'RJ45',
+          '端口速率': '1G',
+          '状态': '空闲',
+          'VLAN ID': '200',
+          '描述': '服务器端口',
+        },
+      ];
+      
+      const networkCardWorksheet = XLSX.utils.json_to_sheet(networkCardTemplateData);
+      const portWorksheet = XLSX.utils.json_to_sheet(portTemplateData);
+      
+      XLSX.utils.book_append_sheet(workbook, networkCardWorksheet, '网卡数据');
+      XLSX.utils.book_append_sheet(workbook, portWorksheet, '端口数据');
+      fileName = '服务器设备导入模板.xlsx';
+    } else if (importDeviceType === 'switch') {
+      const templateData = [
+        {
+          '设备SN': 'SW-20230001',
+          '端口名称': 'GigabitEthernet0/0/1',
+          '端口类型': 'RJ45',
+          '端口速率': '1G',
+          '状态': '空闲',
+          'VLAN ID': '100',
+          '描述': '交换机端口',
+        },
+      ];
+      const worksheet = XLSX.utils.json_to_sheet(templateData);
+      XLSX.utils.book_append_sheet(workbook, worksheet, '端口数据');
+      fileName = '交换机端口导入模板.xlsx';
+    } else {
+      const templateData = [
+        {
+          '设备SN': 'DEV-20230001',
+          '端口名称': 'eth0/1',
+          '网卡名称': '',
+          '端口类型': 'RJ45',
+          '端口速率': '1G',
+          '状态': '空闲',
+          'VLAN ID': '100',
+          '描述': '示例端口',
+        },
+      ];
+      const worksheet = XLSX.utils.json_to_sheet(templateData);
+      XLSX.utils.book_append_sheet(workbook, worksheet, '端口数据');
+    }
+
+    XLSX.writeFile(workbook, fileName);
   };
 
   const handleExport = async ({ scope, format }) => {
@@ -2412,7 +2621,9 @@ function PortManagement() {
             >
               <ImportOutlined />
             </div>
-            <span style={{ fontSize: '18px', fontWeight: 600 }}>批量导入端口</span>
+            <span style={{ fontSize: '18px', fontWeight: 600 }}>
+              {importDeviceType === 'server' ? '服务器批量导入' : '交换机批量导入'}
+            </span>
           </div>
         }
         open={importModalVisible}
@@ -2459,61 +2670,78 @@ function PortManagement() {
       >
         <div style={{ padding: '16px 0' }}>
           <Alert
-            message="操作说明"
+            message="导入说明"
             description={
               <div style={{ fontSize: '12px', lineHeight: '1.8' }}>
-                <div>
-                  <strong>适用范围：</strong>批量导入端口适用于
-                  <span style={{ color: '#1890ff', fontWeight: 600 }}>所有设备类型</span>
-                  （交换机、服务器、路由器、存储等）
-                </div>
-                <div style={{ marginTop: '8px' }}>
-                  <strong>前置条件：</strong>
-                </div>
-                <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
-                  <div>
-                    • <strong>交换机端口：</strong>可直接导入，无需前置操作
-                  </div>
-                  <div>
-                    • <strong>服务器端口：</strong>必须先在
-                    <span style={{ color: '#1890ff', fontWeight: 600 }}>网卡管理</span>
-                    中添加网卡，服务器端口与网卡是
-                    <span style={{ color: '#ff4d4f', fontWeight: 600 }}>层级关系</span>：设备 → 网卡
-                    → 端口
-                  </div>
-                </div>
                 <div style={{ marginTop: '8px' }}>
                   <strong>操作步骤：</strong>
                 </div>
                 <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
-                  <div>1. 点击「下载模板」获取标准Excel/CSV文件</div>
+                  <div>1. 点击「下载模板」获取{importDeviceType === 'server' ? '服务器批量导入' : '交换机批量导入'}模板</div>
                   <div>
-                    2. 按模板格式填写端口信息，
-                    <span style={{ color: '#ff4d4f', fontWeight: 600 }}>设备ID</span>和
-                    <span style={{ color: '#ff4d4f', fontWeight: 600 }}>端口名称</span>为必填项
+                    2. 按模板格式填写数据：
                   </div>
-                  <div>
-                    3.
-                    服务器端口可在「网卡名称」列填写对应的网卡名称（如eth0），不填则归入「未分组端口」
+                  <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
+                    {importDeviceType === 'server' ? (
+                      <>
+                        <div>
+                          - <strong>第一张表格（网卡数据）：</strong>填写服务器的网卡信息
+                        </div>
+                        <div>
+                          - <strong>第二张表格（端口数据）：</strong>填写网卡对应的端口信息
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        - <strong>端口数据：</strong>填写交换机的端口信息
+                      </div>
+                    )}
                   </div>
-                  <div>4. 点击上传区域选择文件，或直接拖拽文件到上传区域</div>
-                  <div>5. 系统自动校验数据，可预览前10条数据及错误详情</div>
-                  <div>6. 选择导入策略（跳过/更新已存在），点击「开始导入」</div>
+                  <div>3. 点击上传区域选择文件，或直接拖拽文件到上传区域</div>
+                  <div>4. 系统自动校验数据，可预览前10条数据及错误详情</div>
+                  <div>5. 选择导入策略（跳过/更新已存在），点击「开始导入」</div>
                 </div>
+                {importDeviceType === 'server' && (
+                  <>
+                    <div style={{ marginTop: '8px' }}>
+                      <strong>网卡数据字段说明：</strong>
+                    </div>
+                    <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
+                      <div>
+                        • <strong>设备SN</strong>（必填）：服务器的唯一序列号，如SN-20230001
+                      </div>
+                      <div>
+                        • <strong>网卡名称</strong>（必填）：网卡的名称或标识，如网卡1、eth0
+                      </div>
+                      <div>
+                        • <strong>插槽编号</strong>（选填）：网卡所在的插槽位置，可选择预选项（LOM、OCP、1-4）或填写其他数字
+                      </div>
+                      <div>
+                        • <strong>网卡型号</strong>（选填）：如Intel X710、BCM57414
+                      </div>
+                      <div>
+                        • <strong>制造商</strong>（选填）：如Intel、Mellanox
+                      </div>
+                      <div>
+                        • <strong>描述</strong>（选填）：备注信息
+                      </div>
+                    </div>
+                  </>
+                )}
                 <div style={{ marginTop: '8px' }}>
-                  <strong>字段说明：</strong>
+                  <strong>端口数据字段说明：</strong>
                 </div>
                 <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
                   <div>
-                    • <strong>设备ID</strong>（必填）：设备的唯一标识，如DEV001
+                    • <strong>设备SN</strong>（必填）：{importDeviceType === 'server' ? '服务器' : '交换机'}的唯一序列号，如{importDeviceType === 'server' ? 'SN-20230001' : 'SW-20230001'}
                   </div>
+                  {importDeviceType === 'server' && (
+                    <div>
+                      • <strong>网卡名称</strong>（必填）：端口所属的网卡名称，必须与网卡数据中的网卡名称对应
+                    </div>
+                  )}
                   <div>
-                    • <strong>端口名称</strong>
-                    （必填）：端口的名称或标识，如eth0/1、GigabitEthernet0/0/1
-                  </div>
-                  <div>
-                    • <strong>网卡名称</strong>
-                    （选填）：服务器端口所属的网卡名称，如eth0；交换机端口留空
+                    • <strong>端口名称</strong>（必填）：端口的名称或标识，如{importDeviceType === 'server' ? 'eth0/1' : 'GigabitEthernet0/0/1'}
                   </div>
                   <div>
                     • <strong>端口类型</strong>（选填）：如RJ45、LC、SC、FC、SFP+、QSFP28等
@@ -2535,9 +2763,15 @@ function PortManagement() {
                   <strong>注意事项：</strong>
                 </div>
                 <div style={{ paddingLeft: '12px', marginTop: '4px', color: '#faad14' }}>
+                  {importDeviceType === 'server' && (
+                    <div>• 同一设备下网卡名称不可重复</div>
+                  )}
                   <div>• 同一设备下端口名称不可重复</div>
                   <div>• 批量导入支持最多50000条记录</div>
                   <div>• 状态字段请使用：空闲/占用/故障，勿使用其他值</div>
+                  {importDeviceType === 'server' && (
+                    <div>• 端口数据的网卡名称必须与网卡数据中的网卡名称对应</div>
+                  )}
                 </div>
               </div>
             }
@@ -2697,7 +2931,7 @@ function PortManagement() {
               </div>
               <Table
                 columns={[
-                  { title: '设备ID', dataIndex: '设备ID', key: 'deviceId', width: 120 },
+                  { title: '设备SN', dataIndex: '设备SN', key: 'deviceSn', width: 120 },
                   { title: '端口名称', dataIndex: '端口名称', key: 'portName', width: 120 },
                   {
                     title: '端口类型',
@@ -3499,8 +3733,12 @@ function PortManagement() {
       <BatchImportModal
         visible={batchImportModalVisible}
         onClose={() => setBatchImportModalVisible(false)}
-        onImportNetworkCard={() => setNetworkCardImportModalVisible(true)}
+        onImportNetworkCard={() => {
+          setImportDeviceType('server');
+          handleImport();
+        }}
         onImportPort={() => {
+          setImportDeviceType('switch');
           handleImport();
         }}
       />
@@ -3509,12 +3747,21 @@ function PortManagement() {
       <NetworkCardImportModal
         visible={networkCardImportModalVisible}
         onClose={() => setNetworkCardImportModalVisible(false)}
-        onSuccess={() => {
+        onSuccess={async () => {
           message.success({
             content: '网卡导入成功',
             icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
           });
           setRefreshTrigger(prev => prev + 1);
+          // 重新获取设备列表，确保包含最新数据
+          await fetchDevices();
+          // 服务器设备导入网卡后自动进入端口导入
+          if (importDeviceType === 'server') {
+            setTimeout(() => {
+              setNetworkCardImportModalVisible(false);
+              handleImport();
+            }, 1000);
+          }
         }}
       />
 

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_CONFIG } from '../config/api';
+import secureStorage, { TOKEN_KEY } from '../utils/secureStorage';
 
 const api = axios.create({
   baseURL: API_CONFIG.baseURL,
@@ -11,7 +12,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
   config => {
-    const token = localStorage.getItem('token');
+    const token = secureStorage.get(TOKEN_KEY);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -47,8 +48,8 @@ api.interceptors.response.use(
         const currentPath = window.location.pathname;
 
         if (!currentPath.startsWith('/login')) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          secureStorage.remove(TOKEN_KEY);
+          secureStorage.remove('user');
           window.location.href = '/login';
         }
       }

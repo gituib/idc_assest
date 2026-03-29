@@ -165,13 +165,22 @@ router.post('/batch', async (req, res) => {
         const portData = ports[i];
 
         try {
-          if (!portData.portId || !portData.deviceId || !portData.portName) {
+          if (!portData.portId || !(portData.deviceId || portData.deviceSn) || !portData.portName) {
             throw new Error('缺少必填字段');
           }
 
-          const device = await Device.findByPk(portData.deviceId, { transaction });
-          if (!device) {
-            throw new Error(`设备 ${portData.deviceId} 不存在`);
+          let device;
+          if (portData.deviceSn) {
+            device = await Device.findOne({ where: { serialNumber: portData.deviceSn }, transaction });
+            if (!device) {
+              throw new Error(`设备SN ${portData.deviceSn} 不存在`);
+            }
+            portData.deviceId = device.deviceId;
+          } else {
+            device = await Device.findByPk(portData.deviceId, { transaction });
+            if (!device) {
+              throw new Error(`设备ID ${portData.deviceId} 不存在`);
+            }
           }
 
           const isServer = device.type && device.type.toLowerCase().includes('server');

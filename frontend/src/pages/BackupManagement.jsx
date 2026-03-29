@@ -45,6 +45,7 @@ import {
 import api, { backupAPI } from '../api';
 import CloseButton from '../components/CloseButton';
 import { useNavigate } from 'react-router-dom';
+import secureStorage, { TOKEN_KEY } from '../utils/secureStorage';
 
 const { Title, Text } = Typography;
 
@@ -605,7 +606,7 @@ const BackupManagement = () => {
     setRestoreProgress(0);
     setRestoreStatus('正在初始化...');
 
-    const token = localStorage.getItem('token');
+    const token = secureStorage.get(TOKEN_KEY);
     const options = {
       overwriteExisting: true,
       skipFiles: false,

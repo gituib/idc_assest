@@ -2,14 +2,14 @@ import React from 'react';
 import { Modal, Button, Typography, Divider } from 'antd';
 import {
   ImportOutlined,
-  CloudServerOutlined,
-  ApiOutlined,
   InfoCircleOutlined,
+  CloudServerOutlined as ServerOutlined,
+  SwapOutlined as SwitcherOutlined,
 } from '@ant-design/icons';
 import { designTokens } from '../config/theme';
 import CloseButton from './CloseButton';
 
-const { Text, Paragraph } = Typography;
+const { Paragraph } = Typography;
 
 function BatchImportModal({ visible, onClose, onImportNetworkCard, onImportPort }) {
   return (
@@ -49,7 +49,7 @@ function BatchImportModal({ visible, onClose, onImportNetworkCard, onImportPort 
         >
           <Button
             size="large"
-            icon={<CloudServerOutlined />}
+            icon={<ServerOutlined />}
             onClick={() => {
               onClose();
               onImportNetworkCard();
@@ -65,17 +65,17 @@ function BatchImportModal({ visible, onClose, onImportNetworkCard, onImportPort 
               gap: '8px',
             }}
           >
-            <div style={{ fontSize: '16px', fontWeight: 600 }}>批量导入网卡</div>
+            <div style={{ fontSize: '16px', fontWeight: 600 }}>服务器批量导入</div>
             <div
               style={{ fontSize: '12px', color: designTokens.colors.neutral[500], fontWeight: 400 }}
             >
-              用于服务器设备
+              同时导入网卡和端口
             </div>
           </Button>
 
           <Button
             size="large"
-            icon={<ApiOutlined />}
+            icon={<SwitcherOutlined />}
             onClick={() => {
               onClose();
               onImportPort();
@@ -91,11 +91,11 @@ function BatchImportModal({ visible, onClose, onImportNetworkCard, onImportPort 
               gap: '8px',
             }}
           >
-            <div style={{ fontSize: '16px', fontWeight: 600 }}>批量导入端口</div>
+            <div style={{ fontSize: '16px', fontWeight: 600 }}>交换机设备</div>
             <div
               style={{ fontSize: '12px', color: designTokens.colors.neutral[500], fontWeight: 400 }}
             >
-              用于所有设备
+              直接导入端口
             </div>
           </Button>
         </div>
@@ -127,7 +127,7 @@ function BatchImportModal({ visible, onClose, onImportNetworkCard, onImportPort 
                   marginBottom: '8px',
                 }}
               >
-                交换机与服务器导入说明
+                导入流程说明
               </div>
               <Paragraph
                 style={{
@@ -138,11 +138,20 @@ function BatchImportModal({ visible, onClose, onImportNetworkCard, onImportPort 
                 }}
               >
                 <div style={{ marginBottom: '4px' }}>
-                  <strong>交换机端口：</strong>可直接批量导入端口，无需先导入网卡
+                  <strong>服务器批量导入：</strong>通过一个模板文件同时导入网卡和端口数据。
+                  系统会先导入网卡数据，再导入端口数据，自动关联网卡。
                 </div>
-                <div>
-                  <strong>服务器端口：</strong>必须先在"网卡管理"中添加网卡，才能导入端口。
-                  服务器的网卡和端口是层级关系：设备 → 网卡 → 端口
+                <div style={{ marginBottom: '4px' }}>
+                  <strong>交换机设备：</strong>可直接批量导入端口，无需先导入网卡
+                </div>
+                <div style={{ marginTop: '8px' }}>
+                  <strong>操作步骤：</strong>
+                </div>
+                <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
+                  <div>1. 点击对应设备类型的按钮</div>
+                  <div>2. 下载导入模板并填写数据</div>
+                  <div>3. 上传模板文件并开始导入</div>
+                  <div>4. 查看导入结果</div>
                 </div>
               </Paragraph>
             </div>

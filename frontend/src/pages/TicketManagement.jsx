@@ -47,6 +47,7 @@ import CloseButton from '../components/CloseButton';
 import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router-dom';
 import { debounce, getUserFromStorage } from '../utils/common';
+import secureStorage, { TICKET_COLUMNS_KEY } from '../utils/secureStorage';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -715,7 +716,7 @@ function TicketManagement() {
           message.success('工单更新成功');
         } else {
           const user = getUserFromStorage();
-          ticketData.reporterId = user.userId || localStorage.getItem('userId') || 'USER001';
+          ticketData.reporterId = user.userId || 'USER001';
           ticketData.reporterName = user.username || '系统用户';
           await axios.post('/api/tickets', ticketData);
           message.success('工单创建成功');
@@ -767,7 +768,7 @@ function TicketManagement() {
         const user = getUserFromStorage();
         await axios.put(`/api/tickets/${selectedTicket.ticketId}/process`, {
           ...values,
-          operatorId: localStorage.getItem('userId'),
+          operatorId: user.userId,
           operatorName: user.username,
         });
         message.success('工单处理完成');
@@ -787,7 +788,7 @@ function TicketManagement() {
         const user = getUserFromStorage();
         await axios.put(`/api/tickets/${ticketId}/status`, {
           status: newStatus,
-          operatorId: localStorage.getItem('userId'),
+          operatorId: user.userId,
           operatorName: user.username,
         });
         message.success('状态更新成功');
@@ -1128,7 +1129,7 @@ function TicketManagement() {
           scroll={{ x: 1200 }}
           columnsState={{
             onChange: ({ visibleColumns }) => {
-              localStorage.setItem('ticketVisibleColumns', JSON.stringify(visibleColumns));
+              secureStorage.set(TICKET_COLUMNS_KEY, visibleColumns);
             },
           }}
         />

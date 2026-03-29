@@ -32,23 +32,11 @@ import {
   CloudUploadOutlined,
   CloudServerOutlined,
 } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { designTokens } from '../config/theme';
 import CloseButton from '../components/CloseButton';
-
-const api = axios.create({
-  baseURL: '/api',
-});
-
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
 
 const PendingDeviceManagement = () => {
   const navigate = useNavigate();

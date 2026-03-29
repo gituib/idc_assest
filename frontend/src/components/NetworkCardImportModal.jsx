@@ -115,13 +115,13 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
     const rowNum = index + 2;
     const errors = [];
 
-    if (!row['设备ID']) {
+    if (!row['设备SN']) {
       errors.push({
         row: rowNum,
-        field: '设备ID',
-        value: row['设备ID'] || '(空)',
+        field: '设备SN',
+        value: row['设备SN'] || '(空)',
         error: '缺少必填字段',
-        suggestion: '请填写设备ID，格式如：DEV001',
+        suggestion: '请填写设备SN，格式如：SNAA0001',
       });
     }
 
@@ -169,7 +169,7 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
     try {
       const networkCardsData = importPreview.map((row, index) => ({
         nicId: generateUniqueNicId(),
-        deviceId: row['设备ID'],
+        deviceSn: row['设备SN'],
         name: row['网卡名称'],
         slotNumber: row['插槽编号'] ? parseInt(row['插槽编号']) : null,
         model: row['网卡型号'] || null,
@@ -208,11 +208,28 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
       }
       if (failed > 0) {
         msgContent += `失败 ${failed} 个`;
-        console.error('导入错误:', errors);
+        Modal.error({
+          title: '导入失败详情',
+          content: (
+            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              <Table
+                columns={[
+                  { title: '行号', dataIndex: 'index', key: 'index' },
+                  { title: '网卡名称', dataIndex: 'name', key: 'name' },
+                  { title: '失败原因', dataIndex: 'error', key: 'error' },
+                ]}
+                dataSource={errors}
+                rowKey="index"
+                pagination={false}
+              />
+            </div>
+          ),
+          width: 600,
+        });
       }
 
-      if (failed > 0 && success === 0 && skipped === 0 && updated === 0) {
-        message.error(`导入失败！${msgContent}`);
+      if (failed > 0) {
+        message.warning(`导入完成，但有 ${failed} 个失败。${msgContent}`);
       } else {
         message.success({
           content: `导入完成！${msgContent}`,
@@ -239,7 +256,7 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
   const handleDownloadTemplate = () => {
     const templateData = [
       {
-        设备ID: 'DEV001',
+        设备SN: 'SN-20230001',
         网卡名称: '网卡1',
         插槽编号: '1',
         网卡型号: 'Intel X710',
@@ -247,7 +264,7 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
         描述: '主网卡',
       },
       {
-        设备ID: 'DEV001',
+        设备SN: 'SN-20230001',
         网卡名称: '网卡2',
         插槽编号: '2',
         网卡型号: 'Intel X710',
@@ -342,7 +359,7 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
               <div style={{ marginTop: '8px' }}>
                 <strong>前置条件：</strong>请先在
                 <span style={{ color: '#1890ff', fontWeight: 600 }}>设备管理</span>
-                中添加目标服务器，确保设备ID已存在
+                中添加目标服务器，确保设备SN已存在
               </div>
               <div style={{ marginTop: '8px' }}>
                 <strong>操作步骤：</strong>
@@ -351,7 +368,7 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
                 <div>1. 点击「下载模板」获取标准Excel/CSV文件</div>
                 <div>
                   2. 按模板格式填写网卡信息，
-                  <span style={{ color: '#ff4d4f', fontWeight: 600 }}>设备ID</span>和
+                  <span style={{ color: '#ff4d4f', fontWeight: 600 }}>设备SN</span>和
                   <span style={{ color: '#ff4d4f', fontWeight: 600 }}>网卡名称</span>为必填项
                 </div>
                 <div>3. 点击上传区域选择文件，或直接拖拽文件到上传区域</div>
@@ -363,7 +380,7 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
               </div>
               <div style={{ paddingLeft: '12px', marginTop: '4px' }}>
                 <div>
-                  • <strong>设备ID</strong>（必填）：服务器的唯一标识，如DEV001
+                  • <strong>设备SN</strong>（必填）：服务器的唯一序列号，如SN-20230001
                 </div>
                 <div>
                   • <strong>网卡名称</strong>（必填）：网卡的名称或标识，如eth0、网卡1
@@ -537,7 +554,7 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
             </div>
             <Table
               columns={[
-                { title: '设备ID', dataIndex: '设备ID', key: 'deviceId', width: 120 },
+                { title: '设备SN', dataIndex: '设备SN', key: 'deviceSn', width: 120 },
                 { title: '网卡名称', dataIndex: '网卡名称', key: 'name', width: 120 },
                 { title: '插槽编号', dataIndex: '插槽编号', key: 'slotNumber', width: 100 },
                 { title: '网卡型号', dataIndex: '网卡型号', key: 'model', width: 120 },
