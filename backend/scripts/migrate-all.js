@@ -24,6 +24,8 @@ console.log(`  DB_TYPE (from env): ${DB_TYPE}`);
 console.log(`  dbDialect (actual): ${dbDialect}`);
 console.log(`  sequelize.getDialect(): ${sequelize.getDialect()}`);
 
+const { migrateCableFields } = require('./migrate-cable-fields');
+
 const migrations = [
   {
     name: 'v2.0 - 网卡和端口表',
@@ -99,6 +101,11 @@ const migrations = [
     name: '设备位置索引优化',
     description: '为 devices 表添加复合索引，优化位置冲突检测和悲观锁性能',
     migrate: migrateDevicePositionIndexes,
+  },
+  {
+    name: '线缆表新增字段',
+    description: '为 cables 表添加 cableLabel、cableColor 等新字段',
+    migrate: migrateCableFields,
   },
   {
     name: '耗材日志设备关联',
