@@ -41,9 +41,11 @@ import {
   DatabaseOutlined,
   EnvironmentOutlined,
   TagOutlined,
+  ExportOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import CloseButton from '../components/CloseButton';
+import TicketExportModal from '../components/TicketExportModal';
 import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router-dom';
 import { debounce, getUserFromStorage } from '../utils/common';
@@ -246,6 +248,8 @@ function TicketManagement() {
   const [modalVisible, setModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [processingModalVisible, setProcessingModalVisible] = useState(false);
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [editingTicket, setEditingTicket] = useState(null);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [operationRecords, setOperationRecords] = useState([]);
@@ -815,6 +819,69 @@ function TicketManagement() {
     fetchTickets(1, pagination.pageSize, {});
   }, [fetchTickets, pagination.pageSize]);
 
+  const handleExport = useCallback(
+    async ({ format, scope }) => {
+      try {
+        let ticketIds = [];
+
+        if (scope === 'selected') {
+          ticketIds = selectedRowKeys;
+        } else if (scope === 'currentPage') {
+          ticketIds = tickets.map(t => t.ticketId);
+        } else {
+          ticketIds = tickets.map(t => t.ticketId);
+        }
+
+        if (ticketIds.length === 0) {
+          message.warning('没有可导出的工单');
+          return;
+        }
+
+        const params = new URLSearchParams();
+        ticketIds.forEach(id => params.append('ticketIds', id));
+        params.append('format', format);
+        Object.entries(searchFilters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            params.append(key, value);
+          }
+        });
+
+        const response = await axios.get(`/api/tickets/export?${params.toString()}`, {
+          responseType: 'blob',
+        });
+
+        let mimeType;
+        let filename;
+        if (format === 'json') {
+          mimeType = 'application/json';
+          filename = `tickets_${Date.now()}.json`;
+        } else if (format === 'xlsx') {
+          mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          filename = `tickets_${Date.now()}.xlsx`;
+        } else {
+          mimeType = 'text/csv;charset=utf-8';
+          filename = `tickets_${Date.now()}.csv`;
+        }
+
+        const blob = new Blob([response.data], { type: mimeType });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        message.success(`成功导出 ${ticketIds.length} 个工单`);
+      } catch (error) {
+        console.error('导出失败:', error);
+        message.error('导出失败');
+      }
+    },
+    [searchFilters, selectedRowKeys, tickets]
+  );
+
   const handleTableChange = useCallback(
     paginationInfo => {
       setPagination(paginationInfo);
@@ -1070,9 +1137,14 @@ function TicketManagement() {
       <Card
         title="工单管理"
         extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
-            创建工单
-          </Button>
+          <Space>
+            <Button icon={<ExportOutlined />} onClick={() => setExportModalVisible(true)}>
+              导出
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
+              创建工单
+            </Button>
+          </Space>
         }
       >
         <Form
@@ -1127,6 +1199,10 @@ function TicketManagement() {
           loading={loading}
           onChange={handleTableChange}
           scroll={{ x: 1200 }}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+          }}
           columnsState={{
             onChange: ({ visibleColumns }) => {
               secureStorage.set(TICKET_COLUMNS_KEY, visibleColumns);
@@ -1952,6 +2028,15 @@ function TicketManagement() {
           </Tabs>
         )}
       </Modal>
+
+      <TicketExportModal
+        visible={exportModalVisible}
+        onExport={handleExport}
+        onCancel={() => setExportModalVisible(false)}
+        selectedCount={selectedRowKeys.length}
+        currentPageCount={tickets.length}
+        totalCount={pagination.total}
+      />
     </div>
   );
 }

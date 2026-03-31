@@ -8,6 +8,10 @@ const User = require('../models/User');
 const Rack = require('../models/Rack');
 const Room = require('../models/Room');
 const { dbDialect } = require('../db');
+const { createObjectCsvWriter } = require('csv-writer');
+const XLSX = require('xlsx');
+const path = require('path');
+const fs = require('fs');
 
 // 获取工单统计 (必须定义在 /:ticketId 之前)
 router.get('/stats', async (req, res) => {
@@ -647,6 +651,161 @@ router.post('/:ticketId/evaluate', async (req, res) => {
     res.json(ticket);
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+const TICKET_EXPORT_FIELDS = [
+  { fieldName: 'ticketId', displayName: '工单编号' },
+  { fieldName: 'title', displayName: '标题' },
+  { fieldName: 'deviceName', displayName: '设备名称' },
+  { fieldName: 'deviceModel', displayName: '设备型号' },
+  { fieldName: 'serialNumber', displayName: '设备序列号' },
+  { fieldName: 'faultCategory', displayName: '故障分类' },
+  { fieldName: 'faultSubCategory', displayName: '故障子分类' },
+  { fieldName: 'priority', displayName: '优先级' },
+  { fieldName: 'status', displayName: '状态' },
+  { fieldName: 'description', displayName: '故障描述' },
+  { fieldName: 'expectedCompletionDate', displayName: '期望完成时间' },
+  { fieldName: 'reporterId', displayName: '报告人ID' },
+  { fieldName: 'reporterName', displayName: '报告人' },
+  { fieldName: 'assigneeId', displayName: '处理人ID' },
+  { fieldName: 'assigneeName', displayName: '处理人' },
+  { fieldName: 'location', displayName: '设备位置' },
+  { fieldName: 'resolution', displayName: '解决方案' },
+  { fieldName: 'completionDate', displayName: '完成时间' },
+  { fieldName: 'evaluation', displayName: '评价' },
+  { fieldName: 'evaluationRating', displayName: '评价星级' },
+  { fieldName: 'createdAt', displayName: '创建时间' },
+  { fieldName: 'updatedAt', displayName: '更新时间' },
+];
+
+router.get('/export', async (req, res) => {
+  try {
+    const { keyword, status, priority, faultCategory, deviceId, format = 'csv', ticketIds } = req.query;
+
+    const where = {};
+
+    if (ticketIds) {
+      const ids = Array.isArray(ticketIds) ? ticketIds : [ticketIds];
+      where.ticketId = { [Op.in]: ids };
+    } else {
+      if (keyword) {
+        where[Op.or] = [
+          { ticketId: { [Op.like]: `%${keyword}%` } },
+          { title: { [Op.like]: `%${keyword}%` } },
+          { deviceName: { [Op.like]: `%${keyword}%` } },
+          { serialNumber: { [Op.like]: `%${keyword}%` } },
+          { description: { [Op.like]: `%${keyword}%` } },
+        ];
+      }
+
+      if (status && status !== 'all') {
+        where.status = status;
+      }
+
+      if (priority && priority !== 'all') {
+        where.priority = priority;
+      }
+
+      if (faultCategory && faultCategory !== 'all') {
+        where.faultCategory = faultCategory;
+      }
+
+      if (deviceId && deviceId !== 'all') {
+        where.deviceId = deviceId;
+      }
+    }
+
+    const tickets = await Ticket.findAll({
+      where,
+      include: [
+        { model: User, as: 'reporter', attributes: ['userId', 'username'] },
+        { model: Device, attributes: ['deviceId', 'name', 'type', 'model', 'serialNumber'] },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+
+    const exportData = tickets.map(ticket => {
+      const item = {};
+      TICKET_EXPORT_FIELDS.forEach(({ fieldName, displayName }) => {
+        let value = ticket[fieldName];
+
+        if (fieldName === 'priority') {
+          const priorityMap = { low: '低', medium: '中', high: '高', urgent: '紧急' };
+          value = priorityMap[value] || value;
+        } else if (fieldName === 'status') {
+          const statusMap = { pending: '待处理', in_progress: '处理中', completed: '已完成', closed: '已关闭' };
+          value = statusMap[value] || value;
+        } else if (fieldName === 'expectedCompletionDate' || fieldName === 'completionDate' || fieldName === 'createdAt' || fieldName === 'updatedAt') {
+          value = value ? new Date(value).toLocaleString('zh-CN') : '';
+        }
+
+        item[displayName] = value !== null && value !== undefined ? String(value) : '';
+      });
+
+      if (ticket.metadata && typeof ticket.metadata === 'object') {
+        Object.entries(ticket.metadata).forEach(([key, val]) => {
+          const customDisplayName = key;
+          item[customDisplayName] = val !== null && val !== undefined ? String(val) : '';
+        });
+      }
+
+      return item;
+    });
+
+    if (format === 'json') {
+      return res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        .setHeader('Content-Disposition', `attachment; filename=tickets_${Date.now()}.json`)
+        .json({ success: true, data: exportData, total: exportData.length });
+    }
+
+    if (format === 'xlsx') {
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, '工单数据');
+      const xlsxBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=tickets_${Date.now()}.xlsx`);
+      return res.send(xlsxBuffer);
+    }
+
+    const headers = [
+      ...TICKET_EXPORT_FIELDS.map(f => ({ id: f.displayName, title: f.displayName })),
+    ];
+
+    if (tickets.length > 0 && tickets[0].metadata && typeof tickets[0].metadata === 'object') {
+      Object.keys(tickets[0].metadata).forEach(key => {
+        headers.push({ id: key, title: key });
+      });
+    }
+
+    if (!fs.existsSync(path.join(__dirname, '../temp'))) {
+      fs.mkdirSync(path.join(__dirname, '../temp'));
+    }
+
+    const tempFilePath = path.join(__dirname, `../temp/tickets_export_${Date.now()}.csv`);
+
+    const csvWriter = createObjectCsvWriter({
+      path: tempFilePath,
+      header: headers,
+      encoding: 'utf8',
+    });
+
+    await csvWriter.writeRecords(exportData);
+
+    const csvContent = fs.readFileSync(tempFilePath, 'utf8');
+    const bom = '\uFEFF';
+    const csvWithBom = bom + csvContent;
+
+    fs.unlinkSync(tempFilePath);
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=tickets_${Date.now()}.csv`);
+    return res.send(csvWithBom);
+  } catch (error) {
+    console.error('导出工单失败:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
