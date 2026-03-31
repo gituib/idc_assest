@@ -251,6 +251,9 @@ const operationLogsRoutes = require('./routes/operationLogs');
 const idleDeviceRoutes = require('./routes/idleDevices');
 const warehouseRoutes = require('./routes/warehouses');
 const dangerousOperationsRoutes = require('./routes/dangerousOperations');
+const consumableImportRoutes = require('./routes/consumableImport');
+
+app.use('/api', consumableImportRoutes);
 
 app.use('/api/devices', deviceRoutes);
 app.use('/api/racks', rackRoutes);

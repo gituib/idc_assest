@@ -96,6 +96,36 @@ const ConsumableLog = sequelize.define(
       defaultValue: [],
       comment: '本次操作的SN序列号列表',
     },
+    deviceId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: '目标设备ID（出库时关联）',
+    },
+    deviceName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: '目标设备名称',
+    },
+    rackId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: '机柜ID',
+    },
+    rackName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: '机柜名称',
+    },
+    roomId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: '机房ID',
+    },
+    roomName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: '机房名称',
+    },
   },
   {
     tableName: 'consumable_logs',
@@ -109,6 +139,7 @@ const ConsumableLog = sequelize.define(
       { fields: ['originalLogId'] },
       { fields: ['isEditable'] },
       { fields: ['isConsumableDeleted'] },
+      { fields: ['deviceId'] },
     ],
   }
 );

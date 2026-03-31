@@ -257,6 +257,11 @@ router.post('/', async (req, res) => {
       cableLength,
       status,
       description,
+      cableLabel,
+      cableColor,
+      installedBy,
+      installedAt,
+      lastTestedAt,
       force,
     } = req.body;
 
@@ -321,6 +326,11 @@ router.post('/', async (req, res) => {
       cableLength,
       status: status || 'normal',
       description,
+      cableLabel: cableLabel || null,
+      cableColor: cableColor || null,
+      installedBy: installedBy || null,
+      installedAt: installedAt || null,
+      lastTestedAt: lastTestedAt || null,
     });
 
     const createdCable = await Cable.findByPk(cable.cableId, {

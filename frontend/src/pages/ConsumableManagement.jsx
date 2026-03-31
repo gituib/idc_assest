@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useDebounce } from '../hooks/useDebounce';
+import { useDebounce, useDebouncedCallback } from '../hooks/useDebounce';
 import {
   Table,
   Button,
@@ -27,6 +27,9 @@ import {
   Alert,
   Typography,
   Divider,
+  AutoComplete,
+  Avatar,
+  Statistic,
 } from 'antd';
 import {
   PlusOutlined,
@@ -51,6 +54,8 @@ import {
   DownloadOutlined,
   WarningOutlined,
   InfoCircleOutlined,
+  QrcodeOutlined,
+  DesktopOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -140,6 +145,32 @@ function ConsumableManagement() {
   const [scannedSnList, setScannedSnList] = useState([]);
   const [selectedScanInConsumable, setSelectedScanInConsumable] = useState(null);
   const scanInputRef = React.useRef(null);
+  const [quickOutModalVisible, setQuickOutModalVisible] = useState(false);
+  const [quickOutConsumable, setQuickOutConsumable] = useState(null);
+  const [quickOutDevice, setQuickOutDevice] = useState(null);
+  const [quickOutDeviceSearch, setQuickOutDeviceSearch] = useState('');
+  const [quickOutDeviceList, setQuickOutDeviceList] = useState([]);
+  const [quickOutDeviceLoading, setQuickOutDeviceLoading] = useState(false);
+  const [quickOutQuantity, setQuickOutQuantity] = useState(1);
+  const [quickOutReason, setQuickOutReason] = useState('');
+  const [quickOutSnList, setQuickOutSnList] = useState([]);
+  const [quickOutSubmitting, setQuickOutSubmitting] = useState(false);
+  const [pendingOutItems, setPendingOutItems] = useState([]);
+  const [batchOutModalVisible, setBatchOutModalVisible] = useState(false);
+  const [batchOutDevice, setBatchOutDevice] = useState(null);
+  const [batchOutDeviceSearch, setBatchOutDeviceSearch] = useState('');
+  const [batchOutDeviceList, setBatchOutDeviceList] = useState([]);
+  const [batchOutDeviceLoading, setBatchOutDeviceLoading] = useState(false);
+  const [batchOutReason, setBatchOutReason] = useState('');
+  const [batchOutSubmitting, setBatchOutSubmitting] = useState(false);
+  const [importJobId, setImportJobId] = useState(null);
+  const [importJobStatus, setImportJobStatus] = useState(null);
+  const [fieldMappings, setFieldMappings] = useState({});
+  const [availableFields, setAvailableFields] = useState([]);
+  const [detectedHeaders, setDetectedHeaders] = useState([]);
+  const [showFieldMapping, setShowFieldMapping] = useState(false);
+  const [pollingInterval, setPollingInterval] = useState(null);
+  const importProgressRef = React.useRef(null);
 
   const fetchConsumables = useCallback(
     async (page = 1, pageSize = 10) => {
@@ -373,7 +404,7 @@ function ConsumableManagement() {
           const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
           if (jsonData.length < 2) {
-            resolve([]);
+            resolve({ data: [], headers: [] });
             return;
           }
 
@@ -391,7 +422,7 @@ function ConsumableManagement() {
             }
           }
 
-          resolve(result);
+          resolve({ data: result, headers });
         } catch (error) {
           reject(error);
         }
@@ -399,6 +430,31 @@ function ConsumableManagement() {
       reader.onerror = () => reject(new Error('文件读取失败'));
       reader.readAsArrayBuffer(file);
     });
+  };
+
+  const detectFieldMappings = (headers, availableFields) => {
+    const mappings = {};
+    const normalizedAvailableFields = availableFields.map(f => ({
+      source: f.source,
+      target: f.target,
+      normalizedSource: f.source.toLowerCase(),
+      normalizedTarget: f.target.toLowerCase(),
+    }));
+
+    headers.forEach(header => {
+      const normalizedHeader = header.toLowerCase().replace(/[_\s]/g, '');
+      const match = normalizedAvailableFields.find(
+        f =>
+          f.normalizedSource.replace(/[_\s]/g, '') === normalizedHeader ||
+          f.normalizedTarget.replace(/[_\s]/g, '') === normalizedHeader ||
+          f.source === header
+      );
+      if (match) {
+        mappings[header] = match.target;
+      }
+    });
+
+    return mappings;
   };
 
   const validateImportData = (data, validCategories) => {
@@ -425,6 +481,78 @@ function ConsumableManagement() {
     return errors;
   };
 
+  const fetchFieldMappings = async () => {
+    try {
+      const response = await axios.get('/api/consumables/field-mappings');
+      if (response.data && response.data.aliases) {
+        setAvailableFields(response.data.aliases);
+      }
+    } catch (error) {
+      console.error('获取字段映射信息失败:', error);
+    }
+  };
+
+  const pollImportProgress = async jobId => {
+    try {
+      const response = await axios.get(`/api/consumables/progress/${jobId}`);
+      const progress = response.data;
+      setImportJobStatus(progress);
+      setImportProgress(progress.progressPercent || 0);
+
+      if (progress.status === 'completed') {
+        if (pollingInterval) {
+          clearInterval(pollingInterval);
+          setPollingInterval(null);
+        }
+        setImportPhase('导入完成');
+        fetchImportResult(jobId);
+      } else if (progress.status === 'failed') {
+        if (pollingInterval) {
+          clearInterval(pollingInterval);
+          setPollingInterval(null);
+        }
+        setImportPhase('导入失败');
+        setImporting(false);
+        message.error(progress.error || '导入失败');
+      } else if (progress.status === 'cancelled') {
+        if (pollingInterval) {
+          clearInterval(pollingInterval);
+          setPollingInterval(null);
+        }
+        setImportPhase('导入已取消');
+        setImporting(false);
+      }
+    } catch (error) {
+      console.error('获取导入进度失败:', error);
+    }
+  };
+
+  const fetchImportResult = async jobId => {
+    try {
+      const response = await axios.get(`/api/consumables/result/${jobId}`);
+      if (response.data && response.data.result) {
+        setImportResult(response.data.result);
+        setImportStep('result');
+      }
+      setImporting(false);
+      fetchConsumables();
+    } catch (error) {
+      console.error('获取导入结果失败:', error);
+      setImporting(false);
+    }
+  };
+
+  const handleCancelImport = async () => {
+    if (!importJobId) return;
+    try {
+      await axios.post(`/api/consumables/cancel/${importJobId}`);
+      message.info('正在取消导入任务...');
+    } catch (error) {
+      console.error('取消导入失败:', error);
+      message.error('取消导入失败');
+    }
+  };
+
   const handleFileChange = async info => {
     const file = info.fileList[info.fileList.length - 1];
     if (file && file.originFileObj) {
@@ -432,12 +560,19 @@ function ConsumableManagement() {
         setImporting(true);
         setImportPhase('正在解析文件...');
 
-        const parsedData = await parseFile(file.originFileObj);
+        const { data: parsedData, headers: detectedHeadersList } = await parseFile(file.originFileObj);
 
         if (parsedData.length === 0) {
           message.warning('文件中没有有效数据');
           setImporting(false);
           return;
+        }
+
+        setDetectedHeaders(detectedHeadersList || []);
+
+        if (availableFields.length > 0 && detectedHeadersList.length > 0) {
+          const autoMappings = detectFieldMappings(detectedHeadersList, availableFields);
+          setFieldMappings(autoMappings);
         }
 
         const validationErrors = validateImportData(parsedData, categories);
@@ -469,6 +604,17 @@ function ConsumableManagement() {
     setImportMode('create');
     setImportValidationErrors([]);
     setImportResult(null);
+    setFieldMappings({});
+    setDetectedHeaders([]);
+    setImportJobId(null);
+    setImportJobStatus(null);
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
+    if (availableFields.length === 0) {
+      fetchFieldMappings();
+    }
   };
 
   const handleImportCancel = () => {
@@ -480,6 +626,14 @@ function ConsumableManagement() {
     setImportResult(null);
     setImportStep('upload');
     setImportValidationErrors([]);
+    setFieldMappings({});
+    setDetectedHeaders([]);
+    setImportJobId(null);
+    setImportJobStatus(null);
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
   };
 
   const handleImport = async () => {
@@ -489,50 +643,74 @@ function ConsumableManagement() {
     }
 
     setImporting(true);
-    setImportProgress(10);
+    setImportProgress(0);
     setImportPhase('准备导入数据...');
     setImportResult(null);
+    setImportStep('importing');
+
+    const useBackgroundMode = importPreview.length > 500;
 
     try {
-      setImportProgress(30);
-      setImportPhase('正在提交到服务器...');
+      if (useBackgroundMode) {
+        setImportPhase('正在创建后台任务...');
 
-      const response = await axios.post('/api/consumables/import', {
-        items: importPreview,
-        mode: importMode,
-      });
-
-      setImportProgress(70);
-      setImportPhase('处理导入结果...');
-
-      const results = response.data.results;
-      setImportResult(results);
-      setImportStep('result');
-      setImportProgress(100);
-      setImportPhase('导入完成');
-
-      if (results.failed > 0) {
-        message.warning(response.data.message);
-      } else {
-        message.success({
-          content: response.data.message,
-          icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+        const response = await axios.post('/api/consumables/background', {
+          items: importPreview,
+          mode: importMode,
+          fieldMapping: fieldMappings,
         });
-      }
 
-      fetchConsumables();
+        const { jobId } = response.data;
+        setImportJobId(jobId);
+        setImportProgress(5);
+        setImportPhase('后台任务已创建，正在导入...');
+
+        const interval = setInterval(() => {
+          pollImportProgress(jobId);
+        }, 1000);
+        setPollingInterval(interval);
+      } else {
+        setImportProgress(30);
+        setImportPhase('正在提交到服务器...');
+
+        const response = await axios.post('/api/consumables/import', {
+          items: importPreview,
+          mode: importMode,
+        });
+
+        setImportProgress(70);
+        setImportPhase('处理导入结果...');
+
+        const results = response.data.results;
+        setImportResult(results);
+        setImportStep('result');
+        setImportProgress(100);
+        setImportPhase('导入完成');
+
+        if (results.failed > 0) {
+          message.warning(response.data.message);
+        } else {
+          message.success({
+            content: response.data.message,
+            icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+          });
+        }
+
+        fetchConsumables();
+        setImporting(false);
+      }
     } catch (error) {
       message.error('导入失败，请检查网络连接或服务器状态');
       console.error('导入耗材失败:', error);
-    } finally {
       setImporting(false);
+      setImportStep('preview');
     }
   };
 
   const downloadTemplate = () => {
     const template = [
       {
-        耗材ID: '',
+        耗材ID: 'CON001',
         名称: '示例耗材-网络模块',
         分类: '光模块',
         单位: '个',
@@ -548,12 +726,117 @@ function ConsumableManagement() {
       },
     ];
 
-    const ws = XLSX.utils.json_to_sheet(template);
+    const fieldDescription = [
+      {
+        字段名: '耗材ID',
+        系统字段: 'consumableId',
+        必填: '否',
+        说明: '耗材唯一标识符，留空自动生成；填写后可识别并更新现有耗材',
+        示例: 'CON001',
+      },
+      {
+        字段名: '名称',
+        系统字段: 'name',
+        必填: '是',
+        说明: '耗材名称',
+        示例: '光纤跳线',
+      },
+      {
+        字段名: '分类',
+        系统字段: 'category',
+        必填: '是',
+        说明: '耗材分类，如"光模块"或"光纤跳线"，需先在系统中创建该分类',
+        示例: '光模块',
+      },
+      {
+        字段名: '单位',
+        系统字段: 'unit',
+        必填: '否',
+        说明: '计量单位，如"个"、"根"、"箱"，默认"个"',
+        示例: '个',
+      },
+      {
+        字段名: '当前库存',
+        系统字段: 'currentStock',
+        必填: '否',
+        说明: '当前库存数量，数字类型',
+        示例: '100',
+      },
+      {
+        字段名: '最小库存',
+        系统字段: 'minStock',
+        必填: '否',
+        说明: '安全库存阈值，低于此值会触发预警',
+        示例: '10',
+      },
+      {
+        字段名: '最大库存',
+        系统字段: 'maxStock',
+        必填: '否',
+        说明: '最大库存限制，0表示无限制',
+        示例: '500',
+      },
+      {
+        字段名: '单价',
+        系统字段: 'unitPrice',
+        必填: '否',
+        说明: '耗材单价，数字类型',
+        示例: '5.00',
+      },
+      {
+        字段名: '供应商',
+        系统字段: 'supplier',
+        必填: '否',
+        说明: '耗材供应商名称',
+        示例: 'XX科技有限公司',
+      },
+      {
+        字段名: '存放位置',
+        系统字段: 'location',
+        必填: '否',
+        说明: '仓库内存放位置，如"A柜-01层"',
+        示例: 'A柜-01层',
+      },
+      {
+        字段名: '描述',
+        系统字段: 'description',
+        必填: '否',
+        说明: '耗材的详细描述或备注',
+        示例: '这是一条测试数据',
+      },
+      {
+        字段名: 'SN序列号',
+        系统字段: 'snList',
+        必填: '否',
+        说明: '多个SN用逗号、分号或换行分隔，如"SN001,SN002"或"SN001\\nSN002"',
+        示例: 'SN001,SN002,SN003',
+      },
+      {
+        字段名: '状态',
+        系统字段: 'status',
+        必填: '否',
+        说明: '"active"启用，"inactive"停用，默认启用',
+        示例: 'active',
+      },
+    ];
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '耗材导入模板');
+
+    const ws1 = XLSX.utils.json_to_sheet(template);
+    XLSX.utils.book_append_sheet(wb, ws1, '耗材导入模板');
+
+    const ws2 = XLSX.utils.json_to_sheet(fieldDescription);
+    XLSX.utils.book_append_sheet(wb, ws2, '字段说明');
+
+    const ws3 = XLSX.utils.json_to_sheet([{ 注意: '请删除示例数据后填写您的实际数据' }]);
+    XLSX.utils.book_append_sheet(wb, ws3, '使用说明');
+
     XLSX.writeFile(wb, '耗材导入模板.xlsx');
 
-    message.success('模板下载成功');
+    message.success({
+      content: '模板下载成功（包含3个工作表）',
+      icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+    });
   };
 
   const downloadFailedRecords = () => {
@@ -655,6 +938,37 @@ function ConsumableManagement() {
     setScanChecking(false);
   }, []);
 
+  const addToPendingOut = (consumable, snList = []) => {
+    const existingIndex = pendingOutItems.findIndex(
+      item => item.consumable.consumableId === consumable.consumableId
+    );
+
+    if (existingIndex >= 0) {
+      const updated = [...pendingOutItems];
+      const existing = updated[existingIndex];
+      const newSnList = [...new Set([...existing.snList, ...snList])];
+      updated[existingIndex] = {
+        ...existing,
+        quantity: newSnList.length > 0 ? newSnList.length : existing.quantity + 1,
+        snList: newSnList,
+      };
+      setPendingOutItems(updated);
+    } else {
+      setPendingOutItems([
+        ...pendingOutItems,
+        {
+          consumable,
+          quantity: snList.length > 0 ? snList.length : 1,
+          snList,
+        },
+      ]);
+    }
+  };
+
+  const removeFromPendingOut = consumableId => {
+    setPendingOutItems(pendingOutItems.filter(item => item.consumable.consumableId !== consumableId));
+  };
+
   const handleScanKeyDown = useCallback(
     async e => {
       if (e.key === 'Enter' && scanValue.trim()) {
@@ -727,10 +1041,38 @@ function ConsumableManagement() {
           try {
             const res = await axios.get(`/api/consumables/by-sn/${encodeURIComponent(code)}`);
             if (res.data.found) {
-              handleScanCancel();
-              showStockModal(res.data.consumable, 'out');
-              setSelectedSnList([code]);
-              stockForm.setFieldsValue({ quantity: 1 });
+              const consumable = res.data.consumable;
+              const existingItem = pendingOutItems.find(
+                item => item.consumable.consumableId === consumable.consumableId
+              );
+              if (existingItem) {
+                if (!existingItem.snList.includes(code)) {
+                  const updated = [...pendingOutItems];
+                  const index = updated.findIndex(
+                    item => item.consumable.consumableId === consumable.consumableId
+                  );
+                  updated[index] = {
+                    ...updated[index],
+                    quantity: updated[index].quantity + 1,
+                    snList: [...updated[index].snList, code],
+                  };
+                  setPendingOutItems(updated);
+                  message.success({
+                    content: `已添加 ${consumable.name} (SN: ${code}) 到出库列表`,
+                    icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+                  });
+                } else {
+                  message.warning(`SN已在列表中: ${code}`);
+                }
+              } else {
+                addToPendingOut(consumable, [code]);
+                message.success({
+                  content: `已添加 ${consumable.name} (SN: ${code}) 到出库列表`,
+                  icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+                });
+              }
+              setScanValue('');
+              scanInputRef.current?.focus();
             } else {
               message.warning('未找到该SN对应的耗材');
               setScanValue('');
@@ -754,6 +1096,8 @@ function ConsumableManagement() {
       form,
       showStockModal,
       stockForm,
+      pendingOutItems,
+      addToPendingOut,
     ]
   );
 
@@ -785,6 +1129,178 @@ function ConsumableManagement() {
     },
     [scannedSnList, handleScanCancel, fetchConsumables]
   );
+
+  const searchDevices = useCallback(async keyword => {
+    if (!keyword || keyword.length < 1) {
+      setQuickOutDeviceList([]);
+      return;
+    }
+    setQuickOutDeviceLoading(true);
+    try {
+      const response = await axios.get('/api/consumables/devices/search', {
+        params: { keyword, limit: 20 },
+      });
+      setQuickOutDeviceList(response.data.devices || []);
+    } catch (error) {
+      console.error('搜索设备失败:', error);
+      setQuickOutDeviceList([]);
+    } finally {
+      setQuickOutDeviceLoading(false);
+    }
+  }, []);
+
+  const debouncedDeviceSearch = useDebouncedCallback(searchDevices, 300);
+
+  const handleQuickOutDeviceSearch = value => {
+    setQuickOutDeviceSearch(value);
+    debouncedDeviceSearch(value);
+  };
+
+  const searchBatchDevices = useCallback(async keyword => {
+    if (!keyword || keyword.length < 1) {
+      setBatchOutDeviceList([]);
+      return;
+    }
+    setBatchOutDeviceLoading(true);
+    try {
+      const response = await axios.get('/api/consumables/devices/search', {
+        params: { keyword, limit: 20 },
+      });
+      setBatchOutDeviceList(response.data.devices || []);
+    } catch (error) {
+      console.error('搜索设备失败:', error);
+      setBatchOutDeviceList([]);
+    } finally {
+      setBatchOutDeviceLoading(false);
+    }
+  }, []);
+
+  const debouncedBatchDeviceSearch = useDebouncedCallback(searchBatchDevices, 300);
+
+  const handleBatchOutDeviceSearch = value => {
+    setBatchOutDeviceSearch(value);
+    debouncedBatchDeviceSearch(value);
+  };
+
+  const openQuickOutModal = (consumable, sn = null) => {
+    setQuickOutConsumable(consumable);
+    setQuickOutDevice(null);
+    setQuickOutDeviceSearch('');
+    setQuickOutDeviceList([]);
+    setQuickOutQuantity(1);
+    setQuickOutReason('');
+    setQuickOutSnList(sn ? [sn] : []);
+    setQuickOutModalVisible(true);
+  };
+
+  const handleQuickOutSubmit = async () => {
+    if (!quickOutConsumable) {
+      message.warning('请选择耗材');
+      return;
+    }
+    if (quickOutQuantity < 1) {
+      message.warning('出库数量必须大于0');
+      return;
+    }
+    if (quickOutQuantity > quickOutConsumable.currentStock) {
+      message.warning('出库数量不能超过当前库存');
+      return;
+    }
+
+    setQuickOutSubmitting(true);
+    try {
+      const response = await axios.post('/api/consumables/quick-inout', {
+        consumableId: quickOutConsumable.consumableId,
+        type: 'out',
+        quantity: quickOutQuantity,
+        operator: '系统管理员',
+        reason: quickOutReason,
+        notes: quickOutDevice ? `出库至设备: ${quickOutDevice.name}` : '',
+        snList: quickOutSnList,
+        deviceId: quickOutDevice?.deviceId || null,
+      });
+
+      message.success({
+        content: `成功出库 ${quickOutQuantity} 个${quickOutDevice ? `至设备 ${quickOutDevice.name}` : ''}`,
+        icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+      });
+
+      setQuickOutModalVisible(false);
+      fetchConsumables();
+    } catch (error) {
+      message.error(error.response?.data?.error || '出库操作失败');
+      console.error('出库失败:', error);
+    } finally {
+      setQuickOutSubmitting(false);
+    }
+  };
+
+  const openBatchOutModal = () => {
+    if (pendingOutItems.length === 0) {
+      message.warning('没有待出库的耗材');
+      return;
+    }
+    setBatchOutDevice(null);
+    setBatchOutDeviceSearch('');
+    setBatchOutDeviceList([]);
+    setBatchOutReason('');
+    setBatchOutModalVisible(true);
+  };
+
+  const handleBatchOutSubmit = async () => {
+    if (pendingOutItems.length === 0) {
+      message.warning('没有待出库的耗材');
+      return;
+    }
+
+    setBatchOutSubmitting(true);
+    let successCount = 0;
+    let failCount = 0;
+    const errors = [];
+
+    for (const item of pendingOutItems) {
+      try {
+        await axios.post('/api/consumables/quick-inout', {
+          consumableId: item.consumable.consumableId,
+          type: 'out',
+          quantity: item.quantity,
+          operator: '系统管理员',
+          reason: batchOutReason || '批量出库',
+          notes: batchOutDevice ? `出库至设备: ${batchOutDevice.name}` : '',
+          snList: item.snList,
+          deviceId: batchOutDevice?.deviceId || null,
+        });
+        successCount++;
+      } catch (error) {
+        failCount++;
+        errors.push(`${item.consumable.name}: ${error.response?.data?.error || error.message}`);
+      }
+    }
+
+    setBatchOutSubmitting(false);
+    setBatchOutModalVisible(false);
+    setPendingOutItems([]);
+    setBatchOutDevice(null);
+    setBatchOutDeviceSearch('');
+    setBatchOutReason('');
+
+    if (failCount === 0) {
+      message.success({
+        content: `成功出库 ${successCount} 项${batchOutDevice ? `至设备 ${batchOutDevice.name}` : ''}`,
+        icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+      });
+    } else {
+      message.warning({
+        content: `出库完成: 成功 ${successCount} 项, 失败 ${failCount} 项`,
+        icon: <ExclamationCircleOutlined style={{ color: designTokens.colors.warning.main }} />,
+      });
+      if (errors.length > 0) {
+        console.error('出库失败详情:', errors);
+      }
+    }
+
+    fetchConsumables();
+  };
 
   const columns = useMemo(
     () => [
@@ -2344,7 +2860,7 @@ function ConsumableManagement() {
                     点击或拖拽文件到此处上传
                   </Text>
                   <Text type="secondary" style={{ fontSize: '13px' }}>
-                    支持 .xlsx、.xls、.csv 格式，文件大小不超过 10MB
+                    支持 Excel (.xlsx/.xls)、CSV (.csv) 格式，文件大小不超过 10MB
                   </Text>
                   <div
                     style={{
@@ -2582,6 +3098,110 @@ function ConsumableManagement() {
                   style={{ borderRadius: '12px' }}
                 />
               </Card>
+            </motion.div>
+          )}
+
+          {/* 导入中状态 */}
+          {importStep === 'importing' && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              style={{
+                textAlign: 'center',
+                padding: '48px 24px',
+              }}
+            >
+              <div
+                style={{
+                  width: '100px',
+                  height: '100px',
+                  borderRadius: '50%',
+                  background: `linear-gradient(135deg, ${designTokens.colors.primary.main} 0%, ${designTokens.colors.info.main} 100%)`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 24px',
+                  boxShadow: `0 8px 24px ${designTokens.colors.primary.main}40`,
+                  animation: 'pulse 2s infinite',
+                }}
+              >
+                <ImportOutlined style={{ fontSize: '48px', color: '#fff' }} />
+              </div>
+              <Title level={4} style={{ margin: 0, marginBottom: '8px', fontSize: '20px' }}>
+                {importJobStatus?.status === 'processing' ? '正在导入中...' : '准备导入...'}
+              </Title>
+              <Text type="secondary" style={{ fontSize: '14px', display: 'block', marginBottom: '24px' }}>
+                {importPhase}
+              </Text>
+
+              {importJobStatus && (
+                <div style={{ marginBottom: '24px' }}>
+                  <Row gutter={16} style={{ maxWidth: '400px', margin: '0 auto' }}>
+                    <Col span={8}>
+                      <Card size="small" style={{ textAlign: 'center', borderRadius: '12px' }} bodyStyle={{ padding: '12px' }}>
+                        <div style={{ fontSize: '24px', fontWeight: 700, color: designTokens.colors.success.main }}>
+                          {importJobStatus.successCount || 0}
+                        </div>
+                        <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500] }}>成功</div>
+                      </Card>
+                    </Col>
+                    <Col span={8}>
+                      <Card size="small" style={{ textAlign: 'center', borderRadius: '12px' }} bodyStyle={{ padding: '12px' }}>
+                        <div style={{ fontSize: '24px', fontWeight: 700, color: designTokens.colors.warning.main }}>
+                          {importJobStatus.skippedCount || 0}
+                        </div>
+                        <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500] }}>跳过</div>
+                      </Card>
+                    </Col>
+                    <Col span={8}>
+                      <Card size="small" style={{ textAlign: 'center', borderRadius: '12px' }} bodyStyle={{ padding: '12px' }}>
+                        <div style={{ fontSize: '24px', fontWeight: 700, color: designTokens.colors.error.main }}>
+                          {importJobStatus.failedCount || 0}
+                        </div>
+                        <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500] }}>失败</div>
+                      </Card>
+                    </Col>
+                  </Row>
+                  <div style={{ marginTop: '16px', color: designTokens.colors.neutral[500], fontSize: '13px' }}>
+                    已处理 {importJobStatus.processedItems || 0} / {importJobStatus.totalItems || 0} 条
+                  </div>
+                </div>
+              )}
+
+              <Progress
+                percent={importProgress}
+                status={importProgress === 100 ? 'success' : 'active'}
+                strokeColor={{
+                  '0%': designTokens.colors.primary.main,
+                  '100%': designTokens.colors.success.main,
+                }}
+                style={{ width: '280px', margin: '0 auto 24px' }}
+              />
+
+              <Space>
+                <Button
+                  danger
+                  onClick={handleCancelImport}
+                  disabled={!importJobId || !importJobStatus?.canCancel}
+                  style={{ borderRadius: '10px' }}
+                >
+                  取消导入
+                </Button>
+                <Button
+                  onClick={handleImportCancel}
+                  style={{ borderRadius: '10px' }}
+                >
+                  关闭
+                </Button>
+              </Space>
+
+              <style>{`
+                @keyframes pulse {
+                  0% { transform: scale(1); }
+                  50% { transform: scale(1.05); }
+                  100% { transform: scale(1); }
+                }
+              `}</style>
             </motion.div>
           )}
 
@@ -3262,9 +3882,491 @@ function ConsumableManagement() {
             </div>
           )}
 
+          {scanMode === 'out' && pendingOutItems.length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              <div
+                style={{
+                  marginBottom: '8px',
+                  fontWeight: 500,
+                  color: designTokens.colors.neutral[700],
+                }}
+              >
+                待出库列表 ({pendingOutItems.length} 项)
+              </div>
+              <div
+                style={{
+                  maxHeight: '150px',
+                  overflowY: 'auto',
+                  border: `1px solid ${designTokens.colors.neutral[200]}`,
+                  borderRadius: designTokens.borderRadius.sm,
+                  padding: '8px',
+                }}
+              >
+                {pendingOutItems.map(item => (
+                  <Tag
+                    key={item.consumable.consumableId}
+                    closable
+                    onClose={() => removeFromPendingOut(item.consumable.consumableId)}
+                    color="red"
+                    style={{ marginBottom: '4px', marginRight: '8px' }}
+                  >
+                    {item.consumable.name} × {item.quantity}
+                    {item.snList.length > 0 && ` (${item.snList.length} SN)`}
+                  </Tag>
+                ))}
+              </div>
+              <Button
+                type="primary"
+                style={{
+                  width: '100%',
+                  marginTop: '12px',
+                  background: designTokens.colors.error.gradient,
+                  border: 'none',
+                  borderRadius: designTokens.borderRadius.sm,
+                }}
+                onClick={() => {
+                  setScanModalVisible(false);
+                  openBatchOutModal();
+                }}
+              >
+                批量出库确认 ({pendingOutItems.length} 项)
+              </Button>
+            </div>
+          )}
+
           <Text type="secondary" style={{ fontSize: '12px' }}>
             💡 提示：也可手动输入条码后按回车键确认
           </Text>
+        </div>
+      </Modal>
+
+      {/* 扫码快速出库到设备弹窗 */}
+      <Modal
+        title={
+          <Space>
+            <QrcodeOutlined style={{ color: designTokens.colors.primary.main }} />
+            <span>扫码出库</span>
+          </Space>
+        }
+        open={quickOutModalVisible}
+        closeIcon={<CloseButton />}
+        onCancel={() => setQuickOutModalVisible(false)}
+        footer={null}
+        width={520}
+        destroyOnClose
+      >
+        {quickOutConsumable && (
+          <div style={{ padding: '16px 0' }}>
+            <Card
+              size="small"
+              style={{
+                marginBottom: '16px',
+                borderRadius: '12px',
+                border: `1px solid ${designTokens.colors.primary.main}30`,
+                background: `linear-gradient(135deg, ${designTokens.colors.primary.main}08 0%, ${designTokens.colors.info.main}05 100%)`,
+              }}
+              bodyStyle={{ padding: '12px 16px' }}
+            >
+              <Row gutter={16} align="middle">
+                <Col flex="none">
+                  <Avatar
+                    size={48}
+                    style={{
+                      background: designTokens.colors.primary.gradient,
+                      fontSize: '20px',
+                    }}
+                  >
+                    {quickOutConsumable.category?.charAt(0) || '耗'}
+                  </Avatar>
+                </Col>
+                <Col flex="auto">
+                  <div style={{ fontWeight: 600, fontSize: '15px', color: designTokens.colors.text.primary }}>
+                    {quickOutConsumable.name}
+                  </div>
+                  <div style={{ fontSize: '12px', color: designTokens.colors.text.secondary }}>
+                    {quickOutConsumable.category} · 库存: {quickOutConsumable.currentStock} {quickOutConsumable.unit}
+                  </div>
+                  {quickOutConsumable.location && (
+                    <div style={{ fontSize: '12px', color: designTokens.colors.text.secondary }}>
+                      📍 {quickOutConsumable.location}
+                    </div>
+                  )}
+                </Col>
+              </Row>
+            </Card>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontWeight: 500, marginBottom: '8px', display: 'block', color: designTokens.colors.text.primary }}>
+                出库数量
+              </label>
+              <InputNumber
+                min={1}
+                max={quickOutConsumable.currentStock}
+                value={quickOutQuantity}
+                onChange={setQuickOutQuantity}
+                style={{ width: '100%', borderRadius: '8px' }}
+                size="large"
+              />
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontWeight: 500, marginBottom: '8px', display: 'block', color: designTokens.colors.text.primary }}>
+                目标设备（可选）
+              </label>
+              <AutoComplete
+                value={quickOutDeviceSearch}
+                options={quickOutDeviceList.map(d => ({
+                  value: d.name,
+                  label: (
+                    <div style={{ padding: '4px 0' }}>
+                      <div style={{ fontWeight: 500 }}>{d.name}</div>
+                      <div style={{ fontSize: '11px', color: '#888' }}>
+                        {d.type} · {d.location ? `${d.location.rackName || ''} ${d.location.roomName || ''}` : '未绑定机柜'}
+                      </div>
+                    </div>
+                  ),
+                }))}
+                onSearch={handleQuickOutDeviceSearch}
+                onSelect={(value, option) => {
+                  const device = quickOutDeviceList.find(d => d.name === value);
+                  setQuickOutDevice(device);
+                  setQuickOutDeviceSearch(device?.name || '');
+                }}
+                onChange={value => {
+                  setQuickOutDeviceSearch(value);
+                  if (!value) {
+                    setQuickOutDevice(null);
+                  }
+                }}
+                placeholder="搜索设备名称/ID/序列号"
+                style={{ width: '100%' }}
+                loading={quickOutDeviceLoading}
+              />
+              {quickOutDevice && (
+                <div
+                  style={{
+                    marginTop: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: designTokens.colors.success.main + '15',
+                    border: `1px solid ${designTokens.colors.success.main}30`,
+                  }}
+                >
+                  <Space>
+                    <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />
+                    <span style={{ color: designTokens.colors.success.main, fontWeight: 500 }}>
+                      已选择: {quickOutDevice.name}
+                    </span>
+                  </Space>
+                  {quickOutDevice.location && (
+                    <div style={{ fontSize: '12px', color: designTokens.colors.text.secondary, marginTop: '4px' }}>
+                      📍 {quickOutDevice.location.roomName} · {quickOutDevice.location.rackName}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontWeight: 500, marginBottom: '8px', display: 'block', color: designTokens.colors.text.primary }}>
+                出库原因
+              </label>
+              <Input.TextArea
+                value={quickOutReason}
+                onChange={e => setQuickOutReason(e.target.value)}
+                placeholder="请输入出库原因"
+                autoSize={{ minRows: 2, maxRows: 4 }}
+                style={{ borderRadius: '8px' }}
+              />
+            </div>
+
+            {quickOutSnList.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontWeight: 500, marginBottom: '8px', display: 'block', color: designTokens.colors.text.primary }}>
+                  SN序列号 ({quickOutSnList.length}个)
+                </label>
+                <div
+                  style={{
+                    maxHeight: '100px',
+                    overflowY: 'auto',
+                    border: `1px solid ${designTokens.colors.neutral[200]}`,
+                    borderRadius: '8px',
+                    padding: '8px',
+                  }}
+                >
+                  {quickOutSnList.map((sn, index) => (
+                    <Tag key={index} color="purple" style={{ marginBottom: '4px' }}>
+                      {sn}
+                    </Tag>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div
+              style={{
+                padding: '12px',
+                borderRadius: '8px',
+                background: designTokens.colors.neutral[50],
+                marginBottom: '16px',
+              }}
+            >
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Statistic
+                    title="出库数量"
+                    value={quickOutQuantity}
+                    valueStyle={{ fontSize: '20px', color: designTokens.colors.error.main }}
+                  />
+                </Col>
+                <Col span={8}>
+                  <Statistic
+                    title="操作前库存"
+                    value={quickOutConsumable.currentStock}
+                    valueStyle={{ fontSize: '20px' }}
+                  />
+                </Col>
+                <Col span={8}>
+                  <Statistic
+                    title="操作后库存"
+                    value={quickOutConsumable.currentStock - quickOutQuantity}
+                    valueStyle={{ fontSize: '20px', color: designTokens.colors.success.main }}
+                  />
+                </Col>
+              </Row>
+            </div>
+
+            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+              <Button onClick={() => setQuickOutModalVisible(false)} style={{ borderRadius: '8px' }}>
+                取消
+              </Button>
+              <Button
+                type="primary"
+                loading={quickOutSubmitting}
+                onClick={handleQuickOutSubmit}
+                disabled={quickOutQuantity < 1 || quickOutQuantity > quickOutConsumable.currentStock}
+                style={{
+                  borderRadius: '8px',
+                  background: designTokens.colors.primary.gradient,
+                  border: 'none',
+                }}
+              >
+                确认出库
+              </Button>
+            </Space>
+          </div>
+        )}
+      </Modal>
+
+      {/* 批量出库确认弹窗 */}
+      <Modal
+        title={
+          <Space>
+            <QrcodeOutlined style={{ color: designTokens.colors.primary.main }} />
+            <span>批量出库确认 ({pendingOutItems.length} 项)</span>
+          </Space>
+        }
+        open={batchOutModalVisible}
+        closeIcon={<CloseButton />}
+        onCancel={() => setBatchOutModalVisible(false)}
+        footer={null}
+        width={600}
+        destroyOnClose
+      >
+        <div style={{ padding: '16px 0' }}>
+          <Alert
+            message="请确认出库信息"
+            description="扫描耗材SN后，需要确认目标设备和出库原因才能完成出库"
+            type="info"
+            showIcon
+            style={{ marginBottom: '16px', borderRadius: '8px' }}
+          />
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ fontWeight: 500, marginBottom: '8px', display: 'block', color: designTokens.colors.text.primary }}>
+              待出库耗材 ({pendingOutItems.length} 项)
+            </label>
+            <div
+              style={{
+                maxHeight: '200px',
+                overflowY: 'auto',
+                border: `1px solid ${designTokens.colors.neutral[200]}`,
+                borderRadius: '8px',
+                padding: '8px',
+              }}
+            >
+              {pendingOutItems.map((item, index) => (
+                <Card
+                  key={item.consumable.consumableId}
+                  size="small"
+                  style={{
+                    marginBottom: index < pendingOutItems.length - 1 ? '8px' : 0,
+                    borderRadius: '8px',
+                  }}
+                  bodyStyle={{ padding: '8px 12px' }}
+                >
+                  <Row align="middle" gutter={12}>
+                    <Col flex="auto">
+                      <div style={{ fontWeight: 500 }}>{item.consumable.name}</div>
+                      <div style={{ fontSize: '12px', color: designTokens.colors.text.secondary }}>
+                        {item.consumable.category} · 库存: {item.consumable.currentStock}
+                        {item.snList.length > 0 && ` · SN: ${item.snList.length}个`}
+                      </div>
+                      {item.snList.length > 0 && (
+                        <div style={{ marginTop: '4px' }}>
+                          {item.snList.slice(0, 5).map((sn, i) => (
+                            <Tag key={i} color="purple" style={{ marginBottom: '2px' }}>
+                              {sn}
+                            </Tag>
+                          ))}
+                          {item.snList.length > 5 && (
+                            <Tag color="default">+{item.snList.length - 5} 更多</Tag>
+                          )}
+                        </div>
+                      )}
+                    </Col>
+                    <Col flex="none">
+                      <Tag color="blue" style={{ borderRadius: '6px' }}>
+                        × {item.quantity}
+                      </Tag>
+                    </Col>
+                    <Col flex="none">
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        onClick={() => removeFromPendingOut(item.consumable.consumableId)}
+                      />
+                    </Col>
+                  </Row>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ fontWeight: 500, marginBottom: '8px', display: 'block', color: designTokens.colors.text.primary }}>
+              目标设备（可选）
+            </label>
+            <AutoComplete
+              value={batchOutDeviceSearch}
+              options={batchOutDeviceList.map(d => ({
+                value: d.name,
+                label: (
+                  <div style={{ padding: '4px 0' }}>
+                    <div style={{ fontWeight: 500 }}>{d.name}</div>
+                    <div style={{ fontSize: '11px', color: '#888' }}>
+                      {d.type} · {d.location ? `${d.location.rackName || ''} ${d.location.roomName || ''}` : '未绑定机柜'}
+                    </div>
+                  </div>
+                ),
+              }))}
+              onSearch={handleBatchOutDeviceSearch}
+              onSelect={(value, option) => {
+                const device = batchOutDeviceList.find(d => d.name === value);
+                setBatchOutDevice(device);
+                setBatchOutDeviceSearch(device?.name || '');
+              }}
+              onChange={value => {
+                setBatchOutDeviceSearch(value);
+                if (!value) {
+                  setBatchOutDevice(null);
+                }
+              }}
+              placeholder="搜索设备名称/ID/序列号"
+              style={{ width: '100%' }}
+              loading={batchOutDeviceLoading}
+            />
+            {batchOutDevice && (
+              <div
+                style={{
+                  marginTop: '8px',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  background: designTokens.colors.success.main + '15',
+                  border: `1px solid ${designTokens.colors.success.main}30`,
+                }}
+              >
+                <Space>
+                  <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />
+                  <span style={{ color: designTokens.colors.success.main, fontWeight: 500 }}>
+                    已选择: {batchOutDevice.name}
+                  </span>
+                </Space>
+                {batchOutDevice.location && (
+                  <div style={{ fontSize: '12px', color: designTokens.colors.text.secondary, marginTop: '4px' }}>
+                    📍 {batchOutDevice.location.roomName} · {batchOutDevice.location.rackName}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ fontWeight: 500, marginBottom: '8px', display: 'block', color: designTokens.colors.text.primary }}>
+              出库原因
+            </label>
+            <Input.TextArea
+              value={batchOutReason}
+              onChange={e => setBatchOutReason(e.target.value)}
+              placeholder="请输入出库原因"
+              autoSize={{ minRows: 2, maxRows: 4 }}
+              style={{ borderRadius: '8px' }}
+            />
+          </div>
+
+          <div
+            style={{
+              padding: '12px',
+              borderRadius: '8px',
+              background: designTokens.colors.neutral[50],
+              marginBottom: '16px',
+            }}
+          >
+            <Row gutter={16}>
+              <Col span={8}>
+                <Statistic
+                  title="耗材种类"
+                  value={pendingOutItems.length}
+                  valueStyle={{ fontSize: '20px' }}
+                />
+              </Col>
+              <Col span={8}>
+                <Statistic
+                  title="总数量"
+                  value={pendingOutItems.reduce((sum, item) => sum + item.quantity, 0)}
+                  valueStyle={{ fontSize: '20px', color: designTokens.colors.error.main }}
+                />
+              </Col>
+              <Col span={8}>
+                <Statistic
+                  title="SN数量"
+                  value={pendingOutItems.reduce((sum, item) => sum + item.snList.length, 0)}
+                  valueStyle={{ fontSize: '20px', color: designTokens.colors.primary.main }}
+                />
+              </Col>
+            </Row>
+          </div>
+
+          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <Button onClick={() => setBatchOutModalVisible(false)} style={{ borderRadius: '8px' }}>
+              取消
+            </Button>
+            <Button
+              type="primary"
+              loading={batchOutSubmitting}
+              onClick={handleBatchOutSubmit}
+              disabled={pendingOutItems.length === 0}
+              style={{
+                borderRadius: '8px',
+                background: designTokens.colors.primary.gradient,
+                border: 'none',
+              }}
+            >
+              确认出库 ({pendingOutItems.length} 项)
+            </Button>
+          </Space>
         </div>
       </Modal>
     </motion.div>

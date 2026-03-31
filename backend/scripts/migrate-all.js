@@ -100,6 +100,11 @@ const migrations = [
     description: '为 devices 表添加复合索引，优化位置冲突检测和悲观锁性能',
     migrate: migrateDevicePositionIndexes,
   },
+  {
+    name: '耗材日志设备关联',
+    description: '为 consumable_logs 表添加 deviceId、deviceName、rackId、rackName、roomId、roomName 字段',
+    migrate: migrateConsumableLogDeviceAssociation,
+  },
 ];
 
 async function runMigrations() {
@@ -738,37 +743,68 @@ async function migrateDevicePositionIndexes() {
     return;
   }
 
-  console.log(`   → 为 ${tableName} 表添加复合索引 rackId_position...`);
-  try {
-    if (dialect === 'sqlite') {
-      await sequelize.query(`CREATE INDEX IF NOT EXISTS devices_rackId_position ON ${tableName}(rackId, position)`);
-    } else {
-      await sequelize.query(`CREATE INDEX IF NOT EXISTS \`devices_rackId_position\` ON \`${tableName}\`(\`rackId\`, \`position\`)`);
+  const indexesToCreate = [
+    { name: 'devices_rackId_position', fields: ['rackId', 'position'] },
+    { name: 'devices_rackId_position_isIdle', fields: ['rackId', 'position', 'isIdle'] },
+  ];
+
+  for (const idx of indexesToCreate) {
+    console.log(`   → 为 ${tableName} 表添加复合索引 ${idx.name}...`);
+    try {
+      const existingIndexes = await sequelize.query(`SHOW INDEX FROM ${tableName}`, {
+        type: sequelize.QueryTypes.SELECT,
+      });
+      const indexExists = existingIndexes.some(
+        existing => existing.Key_name === idx.name
+      );
+
+      if (indexExists) {
+        console.log('     → 索引已存在，跳过');
+      } else {
+        if (dialect === 'sqlite') {
+          await sequelize.query(
+            `CREATE INDEX IF NOT EXISTS ${idx.name} ON ${tableName}(${idx.fields.join(', ')})`
+          );
+        } else {
+          await sequelize.query(
+            `CREATE INDEX \`${idx.name}\` ON \`${tableName}\`(\`${idx.fields.join('`, `')}\`)`
+          );
+        }
+        console.log('     ✓ 索引创建成功');
+      }
+    } catch (error) {
+      if (error.message.includes('already exists') || error.message.includes('Duplicate key name')) {
+        console.log('     → 索引已存在，跳过');
+      } else {
+        throw error;
+      }
     }
-    console.log('     ✓ 索引创建成功');
-  } catch (error) {
-    if (error.message.includes('already exists') || error.message.includes('Duplicate key name')) {
-      console.log('     → 索引已存在，跳过');
-    } else {
-      throw error;
-    }
+  }
+}
+
+async function migrateConsumableLogDeviceAssociation() {
+  const tableName = 'consumable_logs';
+
+  if (!(await tableExists(tableName))) {
+    console.log(`    ${tableName} 表不存在，跳过`);
+    return;
   }
 
-  console.log(`   → 为 ${tableName} 表添加复合索引 rackId_position_isIdle...`);
-  try {
-    if (dialect === 'sqlite') {
-      await sequelize.query(`CREATE INDEX IF NOT EXISTS devices_rackId_position_isIdle ON ${tableName}(rackId, position, isIdle)`);
-    } else {
-      await sequelize.query(`CREATE INDEX IF NOT EXISTS \`devices_rackId_position_isIdle\` ON \`${tableName}\`(\`rackId\`, \`position\`, \`isIdle\`)`);
-    }
-    console.log('     ✓ 索引创建成功');
-  } catch (error) {
-    if (error.message.includes('already exists') || error.message.includes('Duplicate key name')) {
-      console.log('     → 索引已存在，跳过');
-    } else {
-      throw error;
-    }
+  const columns = await getTableColumns(tableName);
+  const newColumns = [
+    { name: 'deviceId', def: 'VARCHAR(255)' },
+    { name: 'deviceName', def: 'VARCHAR(255)' },
+    { name: 'rackId', def: 'VARCHAR(255)' },
+    { name: 'rackName', def: 'VARCHAR(255)' },
+    { name: 'roomId', def: 'VARCHAR(255)' },
+    { name: 'roomName', def: 'VARCHAR(255)' },
+  ];
+
+  for (const col of newColumns) {
+    await addColumnIfNotExists(tableName, col.name, col.def);
   }
+
+  console.log('    耗材日志设备关联迁移完成');
 }
 
 // 执行迁移

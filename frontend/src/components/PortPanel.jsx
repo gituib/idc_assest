@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tooltip, Badge, Divider, Pagination } from 'antd';
-import { LinkOutlined, SwapRightOutlined, AimOutlined, NodeIndexOutlined } from '@ant-design/icons';
+import { LinkOutlined, SwapRightOutlined, AimOutlined, NodeIndexOutlined, CheckCircleOutlined } from '@ant-design/icons';
 
 const PortPanel = ({
   ports,
@@ -10,6 +10,7 @@ const PortPanel = ({
   devices = [],
   onPortClick,
   compact = false,
+  selectedPort = null,
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(48); // 默认每页48个端口
@@ -420,6 +421,7 @@ const PortPanel = ({
           const statusColor = getPortStatusColor(port.status);
           const isClickable = onPortClick && port.status !== 'disabled';
           const cable = findPortCable(port);
+          const isSelected = selectedPort?.portId === port.portId || selectedPort?.portName === port.portName;
 
           return (
             <Tooltip
@@ -433,27 +435,71 @@ const PortPanel = ({
               }}
             >
               <div
-                onClick={() => isClickable && onPortClick(port)}
+                onClick={() => {
+                  console.log('Port clicked:', port);
+                  if (isClickable) {
+                    console.log('Port is clickable, calling onPortClick');
+                    onPortClick(port);
+                  }
+                }}
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  padding: '4px',
+                  padding: '6px 4px',
                   cursor: isClickable ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                   position: 'relative',
                   minWidth: '0',
+                  pointerEvents: isClickable ? 'auto' : 'none',
+                  transform: isSelected ? 'scale(1.08)' : 'scale(1)',
+                  boxShadow: isSelected
+                    ? '0 0 0 4px rgba(24,144,255,0.15), 0 8px 25px rgba(24,144,255,0.25)'
+                    : isClickable
+                    ? '0 0 0 0 rgba(24,144,255,0)'
+                    : 'none',
                 }}
               >
+                {/* 选中状态标记 - 更明显的视觉反馈 */}
+                {isSelected && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '-4px',
+                      right: '-4px',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+                      border: '3px solid #fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 20,
+                      boxShadow: '0 4px 12px rgba(24,144,255,0.4), 0 2px 6px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    <CheckCircleOutlined
+                      style={{
+                        color: '#fff',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                      }}
+                    />
+                  </div>
+                )}
                 {/* LED 指示灯 - 在端口上方 */}
                 <div
                   style={{
-                    width: '6px',
-                    height: '6px',
+                    width: isSelected ? '8px' : '6px',
+                    height: isSelected ? '8px' : '6px',
                     borderRadius: '50%',
-                    background: statusColor,
-                    boxShadow: `0 0 6px ${statusColor}, 0 0 12px ${statusColor}50`,
-                    marginBottom: '4px',
+                    background: isSelected ? '#1890ff' : statusColor,
+                    boxShadow: isSelected
+                      ? `0 0 8px #1890ff, 0 0 16px #1890ff50`
+                      : `0 0 6px ${statusColor}, 0 0 12px ${statusColor}50`,
+                    marginBottom: '6px',
+                    transition: 'all 0.2s ease',
                     animation: port.status === 'fault' ? 'pulse 1.5s infinite' : 'none',
                   }}
                 />
@@ -463,22 +509,28 @@ const PortPanel = ({
                   style={{
                     width: '100%',
                     aspectRatio: '1 / 1.2',
-                    background: 'linear-gradient(180deg, #2a3441 0%, #1e2530 100%)',
-                    border: `2px solid ${statusColor}`,
-                    borderRadius: '2px',
+                    background: isSelected
+                      ? 'linear-gradient(180deg, #e6f7ff 0%, #bae7ff 100%)'
+                      : 'linear-gradient(180deg, #2a3441 0%, #1e2530 100%)',
+                    border: `2px solid ${isSelected ? '#1890ff' : statusColor}`,
+                    borderRadius: '4px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     position: 'relative',
-                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.3)`,
+                    boxShadow: isSelected
+                      ? 'inset 0 2px 4px rgba(24,144,255,0.2), 0 4px 12px rgba(24,144,255,0.15)'
+                      : 'inset 0 1px 0 rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.3)',
+                    transition: 'all 0.2s ease',
                   }}
                 >
                   {/* 端口内部图标 */}
                   <div
                     style={{
-                      fontSize: '10px',
-                      color: statusColor,
-                      opacity: 0.8,
+                      fontSize: isSelected ? '12px' : '10px',
+                      color: isSelected ? '#1890ff' : statusColor,
+                      opacity: 0.9,
+                      transition: 'all 0.2s ease',
                     }}
                   >
                     {getPortTypeIcon(port.portType)}
@@ -504,15 +556,16 @@ const PortPanel = ({
                 {/* 端口名称 - 在端口下方 */}
                 <div
                   style={{
-                    fontSize: '9px',
-                    fontWeight: 500,
-                    color: 'rgba(255, 255, 255, 0.7)',
+                    fontSize: isSelected ? '11px' : '9px',
+                    fontWeight: isSelected ? 600 : 500,
+                    color: isSelected ? '#1890ff' : 'rgba(255, 255, 255, 0.7)',
                     textAlign: 'center',
-                    marginTop: '3px',
+                    marginTop: '4px',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     maxWidth: '100%',
+                    transition: 'all 0.2s ease',
                   }}
                 >
                   {getPortDisplayName(port.portName)}

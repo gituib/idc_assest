@@ -54,6 +54,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { designTokens } from '../config/theme';
 import { debounce } from '../utils/common';
 import CloseButton from '../components/CloseButton';
+import CableWizardModal from '../components/CableWizardModal';
 
 const { Option } = Select;
 const { Panel } = Collapse;
@@ -126,6 +127,9 @@ function CableManagement() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCable, setEditingCable] = useState(null);
   const [form] = Form.useForm();
+
+  const [wizardVisible, setWizardVisible] = useState(false);
+  const [wizardInitialSourceDevice, setWizardInitialSourceDevice] = useState(null);
 
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importFileList, setImportFileList] = useState([]);
@@ -284,24 +288,14 @@ function CableManagement() {
   };
 
   const handleAdd = () => {
-    setEditingCable(null);
-    form.resetFields();
-    setModalVisible(true);
+    setWizardInitialSourceDevice(null);
+    setWizardVisible(true);
   };
 
   const handleEdit = cable => {
     setEditingCable(cable);
-    form.setFieldsValue({
-      sourceDeviceId: cable.sourceDeviceId,
-      sourcePort: cable.sourcePort,
-      targetDeviceId: cable.targetDeviceId,
-      targetPort: cable.targetPort,
-      cableType: cable.cableType,
-      cableLength: cable.cableLength,
-      status: cable.status,
-      description: cable.description,
-    });
-    setModalVisible(true);
+    setWizardInitialSourceDevice(null);
+    setWizardVisible(true);
   };
 
   const handleDelete = async cableId => {
@@ -1243,9 +1237,8 @@ function CableManagement() {
                             type="text"
                             icon={<PlusOutlined />}
                             onClick={() => {
-                              setEditingCable(null);
-                              form.setFieldsValue({ sourceDeviceId: switchId });
-                              setModalVisible(true);
+                              setWizardInitialSourceDevice(switchData.switch);
+                              setWizardVisible(true);
                             }}
                             style={{ color: designTokens.colors.primary.main }}
                           />
@@ -1509,6 +1502,22 @@ function CableManagement() {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* 向导式接线创建弹窗 */}
+      <CableWizardModal
+        visible={wizardVisible}
+        onClose={() => {
+          setWizardVisible(false);
+          setWizardInitialSourceDevice(null);
+          setEditingCable(null);
+        }}
+        onSuccess={() => {
+          setEditingCable(null);
+          fetchCables();
+        }}
+        initialSourceDevice={wizardInitialSourceDevice}
+        editingCable={editingCable}
+      />
 
       {/* 批量导入弹窗 */}
       <Modal

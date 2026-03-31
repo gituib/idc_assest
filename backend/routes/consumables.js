@@ -459,12 +459,54 @@ router.post('/quick-inout', async (req, res) => {
   while (attempt < RETRY.MAX_RETRIES) {
     const transaction = await sequelize.transaction();
     try {
-      const { consumableId, type, quantity, operator, reason, notes, snList } = req.body;
+      const {
+        consumableId,
+        type,
+        quantity,
+        operator,
+        reason,
+        notes,
+        snList,
+        deviceId,
+      } = req.body;
 
       const consumable = await Consumable.findByPk(consumableId, { transaction });
       if (!consumable) {
         await transaction.rollback();
         return res.status(404).json({ error: '耗材不存在' });
+      }
+
+      let deviceInfo = {};
+      if (deviceId && type === 'out') {
+        const Device = require('../models/Device');
+        const Rack = require('../models/Rack');
+        const Room = require('../models/Room');
+
+        const device = await Device.findByPk(deviceId, { transaction });
+        if (device) {
+          deviceInfo = {
+            deviceId: device.deviceId,
+            deviceName: device.name,
+            rackId: device.rackId,
+            rackName: null,
+            roomId: null,
+            roomName: null,
+          };
+
+          if (device.rackId) {
+            const rack = await Rack.findByPk(device.rackId, { transaction });
+            if (rack) {
+              deviceInfo.rackName = rack.name;
+              if (rack.roomId) {
+                const room = await Room.findByPk(rack.roomId, { transaction });
+                if (room) {
+                  deviceInfo.roomId = room.roomId;
+                  deviceInfo.roomName = room.name;
+                }
+              }
+            }
+          }
+        }
       }
 
       const previousStock = parseFloat(consumable.currentStock);
@@ -554,6 +596,12 @@ router.post('/quick-inout', async (req, res) => {
           notes,
           isEditable: false,
           snList: operationSnList,
+          deviceId: deviceInfo.deviceId || null,
+          deviceName: deviceInfo.deviceName || null,
+          rackId: deviceInfo.rackId || null,
+          rackName: deviceInfo.rackName || null,
+          roomId: deviceInfo.roomId || null,
+          roomName: deviceInfo.roomName || null,
           consumableSnapshot: {
             category: consumable.category,
             unit: consumable.unit,
@@ -571,6 +619,7 @@ router.post('/quick-inout', async (req, res) => {
         message: '操作成功',
         record,
         consumable: await Consumable.findByPk(consumableId),
+        deviceInfo: Object.keys(deviceInfo).length > 0 ? deviceInfo : null,
       });
       return;
     } catch (error) {
@@ -589,12 +638,56 @@ router.post('/inout', async (req, res) => {
   while (attempt < RETRY.MAX_RETRIES) {
     const transaction = await sequelize.transaction();
     try {
-      const { consumableId, type, quantity, operator, reason, recipient, notes, snList } = req.body;
+      const {
+        consumableId,
+        type,
+        quantity,
+        operator,
+        reason,
+        recipient,
+        notes,
+        snList,
+        deviceId,
+        deviceName,
+      } = req.body;
 
       const consumable = await Consumable.findByPk(consumableId, { transaction });
       if (!consumable) {
         await transaction.rollback();
         return res.status(404).json({ error: '耗材不存在' });
+      }
+
+      let deviceInfo = {};
+      if (deviceId && type === 'out') {
+        const Device = require('../models/Device');
+        const Rack = require('../models/Rack');
+        const Room = require('../models/Room');
+
+        const device = await Device.findByPk(deviceId, { transaction });
+        if (device) {
+          deviceInfo = {
+            deviceId: device.deviceId,
+            deviceName: device.name,
+            rackId: device.rackId,
+            rackName: null,
+            roomId: null,
+            roomName: null,
+          };
+
+          if (device.rackId) {
+            const rack = await Rack.findByPk(device.rackId, { transaction });
+            if (rack) {
+              deviceInfo.rackName = rack.name;
+              if (rack.roomId) {
+                const room = await Room.findByPk(rack.roomId, { transaction });
+                if (room) {
+                  deviceInfo.roomId = room.roomId;
+                  deviceInfo.roomName = room.name;
+                }
+              }
+            }
+          }
+        }
       }
 
       const previousStock = parseFloat(consumable.currentStock);
@@ -682,6 +775,12 @@ router.post('/inout', async (req, res) => {
           notes,
           isEditable: false,
           snList: operationSnList,
+          deviceId: deviceInfo.deviceId || null,
+          deviceName: deviceInfo.deviceName || null,
+          rackId: deviceInfo.rackId || null,
+          rackName: deviceInfo.rackName || null,
+          roomId: deviceInfo.roomId || null,
+          roomName: deviceInfo.roomName || null,
           consumableSnapshot: {
             category: consumable.category,
             unit: consumable.unit,
@@ -699,6 +798,7 @@ router.post('/inout', async (req, res) => {
         message: '操作成功',
         record,
         consumable: await Consumable.findByPk(consumableId),
+        deviceInfo: Object.keys(deviceInfo).length > 0 ? deviceInfo : null,
       });
       return;
     } catch (error) {
@@ -1310,6 +1410,99 @@ router.get('/logs/:id/history', async (req, res) => {
       history: history,
     });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/devices/search', async (req, res) => {
+  try {
+    const { keyword, limit = 20 } = req.query;
+
+    if (!keyword) {
+      return res.json({ devices: [] });
+    }
+
+    const Device = require('../models/Device');
+    const Rack = require('../models/Rack');
+    const Room = require('../models/Room');
+
+    const escapedKeyword = keyword.replace(/'/g, "''");
+
+    const devices = await Device.findAll({
+      where: {
+        [Op.or]: [
+          { deviceId: { [Op.like]: `%${escapedKeyword}%` } },
+          { name: { [Op.like]: `%${escapedKeyword}%` } },
+          { serialNumber: { [Op.like]: `%${escapedKeyword}%` } },
+        ],
+      },
+      include: [
+        {
+          model: Rack,
+          as: 'rack',
+          include: [{ model: Room, as: 'room' }],
+        },
+      ],
+      limit: parseInt(limit),
+      order: [['name', 'ASC']],
+    });
+
+    const result = devices.map(device => ({
+      deviceId: device.deviceId,
+      name: device.name,
+      type: device.type,
+      model: device.model,
+      serialNumber: device.serialNumber,
+      status: device.status,
+      location: device.rack
+        ? {
+            rackId: device.rack.rackId,
+            rackName: device.rack.name,
+            roomId: device.rack.room ? device.rack.room.roomId : null,
+            roomName: device.rack.room ? device.rack.room.name : null,
+          }
+        : null,
+    }));
+
+    res.json({ devices: result });
+  } catch (error) {
+    console.error('搜索设备失败:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/devices/by-sn/:sn', async (req, res) => {
+  try {
+    const { sn } = req.params;
+    const Device = require('../models/Device');
+
+    const device = await Device.findOne({
+      where: {
+        [Op.or]: [
+          { deviceId: { [Op.like]: `%${sn}%` } },
+          { serialNumber: { [Op.like]: `%${sn}%` } },
+          { name: { [Op.like]: `%${sn}%` } },
+        ],
+      },
+    });
+
+    if (!device) {
+      return res.json({ found: false, device: null });
+    }
+
+    res.json({
+      found: true,
+      device: {
+        deviceId: device.deviceId,
+        name: device.name,
+        type: device.type,
+        model: device.model,
+        serialNumber: device.serialNumber,
+        status: device.status,
+      },
+    });
+  } catch (error) {
+    console.error('查询设备失败:', error);
     res.status(500).json({ error: error.message });
   }
 });

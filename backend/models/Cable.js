@@ -53,6 +53,31 @@ const Cable = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    cableLabel: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: '线缆标签/编号',
+    },
+    cableColor: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: '线缆颜色（便于识别）',
+    },
+    installedBy: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: '安装人',
+    },
+    installedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: '安装时间',
+    },
+    lastTestedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: '上次测试时间',
+    },
   },
   {
     tableName: 'cables',
@@ -63,6 +88,7 @@ const Cable = sequelize.define(
       { fields: ['status'] },
       { fields: ['cableType'] },
       { fields: ['sourceDeviceId', 'targetDeviceId'] },
+      { fields: ['cableLabel'] },
     ],
   }
 );
