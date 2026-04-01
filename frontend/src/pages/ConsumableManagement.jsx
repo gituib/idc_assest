@@ -103,6 +103,7 @@ const animations = {
 
 function ConsumableManagement() {
   const [consumables, setConsumables] = useState([]);
+  const [allConsumablesForScan, setAllConsumablesForScan] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingConsumable, setEditingConsumable] = useState(null);
@@ -182,6 +183,8 @@ function ConsumableManagement() {
         const data = response.data.consumables || [];
         setConsumables(data);
         setPagination(prev => ({ ...prev, current: page, pageSize, total: response.data.total }));
+        // 同步刷新扫码入库用的全量列表
+        fetchAllConsumablesForScan();
       } catch (error) {
         message.error('获取耗材列表失败');
         console.error('获取耗材列表失败:', error);
@@ -189,7 +192,7 @@ function ConsumableManagement() {
         setLoading(false);
       }
     },
-    [debouncedKeyword, category, status]
+    [debouncedKeyword, category, status, fetchAllConsumablesForScan]
   );
 
   const fetchCategories = useCallback(async () => {
@@ -201,10 +204,23 @@ function ConsumableManagement() {
     }
   }, []);
 
+  // 获取全部耗材（用于扫码入库下拉框，不受分页限制）
+  const fetchAllConsumablesForScan = useCallback(async () => {
+    try {
+      const response = await axios.get('/api/consumables', {
+        params: { page: 1, pageSize: 9999, status: 'active' },
+      });
+      setAllConsumablesForScan(response.data.consumables || []);
+    } catch (error) {
+      console.error('获取全部耗材失败:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchConsumables();
     fetchCategories();
-  }, [fetchConsumables, fetchCategories]);
+    fetchAllConsumablesForScan();
+  }, [fetchConsumables, fetchCategories, fetchAllConsumablesForScan]);
 
   const showModal = useCallback(
     (consumable = null) => {
@@ -3845,15 +3861,13 @@ function ConsumableManagement() {
                   placeholder="选择要入库的耗材"
                   style={{ width: '100%' }}
                   showSearch
-                  optionFilterProp="children"
-                  filterOption={(input, option) =>
-                    option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                  }
+                  optionFilterProp="label"
                   value={selectedScanInConsumable}
                   onChange={value => setSelectedScanInConsumable(value)}
+                  filterOption={true}
                 >
-                  {consumables.map(item => (
-                    <Option key={item.consumableId} value={item.consumableId}>
+                  {allConsumablesForScan.map(item => (
+                    <Option key={item.consumableId} value={item.consumableId} label={`${item.name} ${item.category}`}>
                       {item.name} ({item.category}) - 库存: {item.currentStock}
                     </Option>
                   ))}
