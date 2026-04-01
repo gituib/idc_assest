@@ -224,6 +224,7 @@ async function initializeApp() {
 const swaggerUi = require('swagger-ui-express');
 const { specs, customCSS } = require('./swagger');
 const { authMiddleware } = require('./middleware/auth');
+const loadRoutes = require('./utils/routeLoader');
 
 initializeApp();
 
@@ -249,60 +250,7 @@ app.use('/api', (req, res, next) => {
   return authMiddleware(req, res, next);
 });
 
-const deviceRoutes = require('./routes/devices');
-const rackRoutes = require('./routes/racks');
-const roomRoutes = require('./routes/rooms');
-const deviceFieldRoutes = require('./routes/deviceFields');
-const backgroundRoutes = require('./routes/background');
-const consumableRoutes = require('./routes/consumables');
-const consumableRecordRoutes = require('./routes/consumableRecords');
-const consumableCategoryRoutes = require('./routes/consumableCategories');
-const authRoutes = require('./routes/auth');
-const usersRoutes = require('./routes/users');
-const rolesRoutes = require('./routes/roles');
-const ticketRoutes = require('./routes/tickets');
-const ticketCategoryRoutes = require('./routes/ticketCategories');
-const ticketFieldRoutes = require('./routes/ticketFields');
-const systemSettingsRoutes = require('./routes/systemSettings');
-const cableRoutes = require('./routes/cables');
-const devicePortRoutes = require('./routes/devicePorts');
-const networkCardRoutes = require('./routes/networkCards');
-const inventoryRoutes = require('./routes/inventory');
-const backupRoutes = require('./routes/backup');
-const statisticsRoutes = require('./routes/statistics');
-const operationLogsRoutes = require('./routes/operationLogs');
-const idleDeviceRoutes = require('./routes/idleDevices');
-const warehouseRoutes = require('./routes/warehouses');
-const dangerousOperationsRoutes = require('./routes/dangerousOperations');
-const consumableImportRoutes = require('./routes/consumableImport');
-
-app.use('/api', consumableImportRoutes);
-
-app.use('/api/devices', deviceRoutes);
-app.use('/api/racks', rackRoutes);
-app.use('/api/rooms', roomRoutes);
-app.use('/api/deviceFields', deviceFieldRoutes);
-app.use('/api/background', backgroundRoutes);
-app.use('/api/consumables', consumableRoutes);
-app.use('/api/consumable-records', consumableRecordRoutes);
-app.use('/api/consumable-categories', consumableCategoryRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/roles', rolesRoutes);
-app.use('/api/tickets', ticketRoutes);
-app.use('/api/ticket-categories', ticketCategoryRoutes);
-app.use('/api/ticket-fields', ticketFieldRoutes);
-app.use('/api/system-settings', systemSettingsRoutes);
-app.use('/api/cables', cableRoutes);
-app.use('/api/device-ports', devicePortRoutes);
-app.use('/api/network-cards', networkCardRoutes);
-app.use('/api/inventory', inventoryRoutes);
-app.use('/api/backup', backupRoutes);
-app.use('/api/statistics', statisticsRoutes);
-app.use('/api/operation-logs', operationLogsRoutes);
-app.use('/api/idle-devices', idleDeviceRoutes);
-app.use('/api/warehouses', warehouseRoutes);
-app.use('/api/dangerous-operations', dangerousOperationsRoutes);
+loadRoutes(app);
 
 app.use('/uploads', express.static('uploads'));
 
