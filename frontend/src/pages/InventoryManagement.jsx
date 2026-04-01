@@ -79,10 +79,10 @@ const InventoryManagement = () => {
         ...searchParamsObj,
       };
       const res = await api.get('/inventory/plans', { params });
-      setPlans(res.data.plans || []);
+      setPlans(res.plans || []);
       setPagination(prev => ({
         ...prev,
-        total: res.data.total || 0,
+        total: res.total || 0,
       }));
     } catch (error) {
       message.error('获取盘点计划失败');
@@ -95,9 +95,9 @@ const InventoryManagement = () => {
     try {
       const res = await api.get('/inventory/stats/dashboard');
       setStats({
-        totalPlans: res.data.totalPlans || 0,
-        completedPlans: res.data.completedPlans || 0,
-        inProgressPlans: res.data.inProgressPlans || 0,
+        totalPlans: res.totalPlans || 0,
+        completedPlans: res.completedPlans || 0,
+        inProgressPlans: res.inProgressPlans || 0,
       });
     } catch (error) {
       console.error('获取统计失败', error);
@@ -107,7 +107,7 @@ const InventoryManagement = () => {
   const fetchRooms = async () => {
     try {
       const res = await api.get('/rooms', { params: { pageSize: 1000 } });
-      setRooms(Array.isArray(res.data) ? res.data : res.data.rooms || []);
+      setRooms(Array.isArray(res) ? res : res.rooms || []);
     } catch (error) {
       console.error('获取机房失败', error);
     }
@@ -116,7 +116,7 @@ const InventoryManagement = () => {
   const fetchRacks = async () => {
     try {
       const res = await api.get('/racks', { params: { pageSize: 1000 } });
-      const allRacks = Array.isArray(res.data) ? res.data : res.data.racks || [];
+      const allRacks = Array.isArray(res) ? res : res.racks || [];
       setRacks(allRacks);
       setFilteredRacks(allRacks);
     } catch (error) {

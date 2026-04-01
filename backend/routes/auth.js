@@ -193,6 +193,13 @@ router.post('/login', async (req, res) => {
 
     const token = generateToken(user);
 
+    // 查询用户角色（通过 UserRole 中间表）
+    const userRoles = await UserRole.findAll({
+      where: { UserId: user.userId },
+      include: [{ model: Role }],
+    });
+    const roles = userRoles.map(ur => ur.Role || ur);
+
     user.lastLoginTime = new Date();
     user.lastLoginIp = req.ip || req.connection.remoteAddress;
     user.loginCount = 0;
@@ -208,6 +215,11 @@ router.post('/login', async (req, res) => {
           email: user.email,
           realName: user.realName,
           avatar: user.avatar,
+          roles: roles.map(r => ({
+            roleId: r.roleId,
+            roleName: r.roleName,
+            roleCode: r.roleCode,
+          })),
         },
         token,
       },

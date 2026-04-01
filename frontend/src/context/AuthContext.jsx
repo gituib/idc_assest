@@ -116,7 +116,13 @@ export const AuthProvider = ({ children }) => {
 
   const hasPermission = permission => {
     if (!user) return false;
-    return true;
+    const roles = user.roles || [];
+    // 管理员拥有所有权限
+    if (roles.some(r => r.roleCode === 'admin')) return true;
+    // 检查具体权限
+    if (permission === 'admin') return roles.some(r => r.roleCode === 'admin');
+    // roleCode 格式的权限直接匹配
+    return roles.some(r => r.roleCode === permission);
   };
 
   const value = {
