@@ -177,7 +177,7 @@ function ConsumableManagement() {
   const fetchAllConsumablesForScan = useCallback(async () => {
     try {
       const response = await axios.get('/api/consumables', {
-        params: { page: 1, pageSize: 9999, status: 'active' },
+        params: { page: 1, pageSize: 9999 },
       });
       setAllConsumablesForScan(response.data.consumables || []);
     } catch (error) {
