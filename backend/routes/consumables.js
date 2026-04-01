@@ -122,8 +122,12 @@ router.post('/', async (req, res) => {
       ...req.body,
       consumableId: req.body.consumableId || `CON${Date.now()}`,
     };
-    if (Array.isArray(consumableData.snList)) {
-      consumableData.currentStock = consumableData.snList.length;
+    // SN 列表非空时，取手动填写的库存和 SN 数量中的较大值
+    if (Array.isArray(consumableData.snList) && consumableData.snList.length > 0) {
+      consumableData.currentStock = Math.max(
+        Number(consumableData.currentStock) || 0,
+        consumableData.snList.length
+      );
     }
     const consumable = await Consumable.create(consumableData, { transaction });
 
