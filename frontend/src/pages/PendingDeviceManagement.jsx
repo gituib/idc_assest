@@ -199,7 +199,7 @@ const PendingDeviceManagement = () => {
   const fetchDeviceFields = async () => {
     try {
       const res = await api.get('/deviceFields');
-      const sortedFields = res.data.sort((a, b) => a.order - b.order);
+      const sortedFields = (Array.isArray(res) ? res : res.data || []).sort((a, b) => a.order - b.order);
       setDeviceFields(sortedFields);
     } catch (error) {
       console.error('获取字段配置失败:', error);
@@ -222,8 +222,8 @@ const PendingDeviceManagement = () => {
       });
 
       const res = await api.get('/inventory/pending-devices', { params });
-      setPendingDevices(res.data.pendingDevices || []);
-      setPagination(prev => ({ ...prev, total: res.data.total }));
+      setPendingDevices(res.pendingDevices || []);
+      setPagination(prev => ({ ...prev, total: res.total }));
     } catch (error) {
       message.error('获取暂存设备列表失败');
     } finally {
@@ -234,7 +234,7 @@ const PendingDeviceManagement = () => {
   const fetchStats = async () => {
     try {
       const res = await api.get('/inventory/pending-devices/stats');
-      setStats(res.data);
+      setStats(res.data || res);
     } catch (error) {
       console.error('获取统计失败', error);
     }
@@ -243,7 +243,7 @@ const PendingDeviceManagement = () => {
   const fetchRooms = async () => {
     try {
       const res = await api.get('/rooms');
-      setRooms(res.data.rooms || res.data || []);
+      setRooms(res.rooms || res || []);
     } catch (error) {
       console.error('获取机房列表失败', error);
     }
@@ -252,7 +252,7 @@ const PendingDeviceManagement = () => {
   const fetchRacks = async () => {
     try {
       const res = await api.get('/racks', { params: { pageSize: 1000 } });
-      setRacks(res.data.racks || res.data || []);
+      setRacks(res.racks || res || []);
     } catch (error) {
       console.error('获取机柜列表失败', error);
     }
@@ -261,7 +261,7 @@ const PendingDeviceManagement = () => {
   const fetchPlans = async () => {
     try {
       const res = await api.get('/inventory/plans', { params: { pageSize: 100 } });
-      setPlans(res.data.plans || []);
+      setPlans(res.plans || []);
     } catch (error) {
       console.error('获取盘点计划列表失败', error);
     }
@@ -286,7 +286,7 @@ const PendingDeviceManagement = () => {
   const handleSync = async pendingId => {
     try {
       const res = await api.post(`/inventory/pending-devices/${pendingId}/sync`);
-      message.success(res.data.message);
+      message.success(res.message);
       fetchPendingDevices();
       fetchStats();
     } catch (error) {
@@ -304,7 +304,7 @@ const PendingDeviceManagement = () => {
       const res = await api.post('/inventory/pending-devices/batch-sync', {
         pendingIds: selectedRowKeys,
       });
-      message.success(res.data.message);
+      message.success(res.message);
       setSelectedRowKeys([]);
       fetchPendingDevices();
       fetchStats();
