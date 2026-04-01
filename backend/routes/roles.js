@@ -332,7 +332,7 @@ router.delete('/:roleId', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/init-roles', async (req, res) => {
+router.post('/init-roles', authMiddleware, async (req, res) => {
   try {
     const defaultRoles = [
       {

@@ -91,7 +91,7 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  checkAdmin: () => api.get('/auth/check-admin'),
+  checkAdmin: () => api.post('/auth/check-admin'),
   register: data => api.post('/auth/register', data),
   login: data => api.post('/auth/login', data),
   unlock: data => api.post('/auth/unlock', data),
@@ -185,7 +185,7 @@ export const backupAPI = {
   create: (data = {}) => api.post('/backup', data),
   validate: filename => api.get(`/backup/validate/${filename}`),
   restore: (filename, options = {}) => api.post('/backup/restore', { filename, options }),
-  download: filename => `/api/backup/download/${filename}`,
+  download: filename => api.get(`/backup/download/${filename}`, { responseType: 'blob' }),
   delete: filename => api.delete(`/backup/${filename}`),
   upload: file => {
     const formData = new FormData();

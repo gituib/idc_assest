@@ -56,7 +56,18 @@ router.post('/', async (req, res) => {
   try {
     const { consumableId, type, quantity, operator, reason, recipient, notes } = req.body;
 
-    const consumable = await Consumable.findByPk(consumableId);
+    // 确保 quantity 为数值
+    const numQuantity = parseFloat(quantity);
+    if (isNaN(numQuantity) || numQuantity <= 0) {
+      await transaction.rollback();
+      return res.status(400).json({ error: '数量必须为正数' });
+    }
+
+    // 使用 SELECT ... FOR UPDATE 行级锁，防止并发修改
+    const consumable = await Consumable.findByPk(consumableId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
     if (!consumable) {
       await transaction.rollback();
       return res.status(404).json({ error: '耗材不存在' });
@@ -66,13 +77,13 @@ router.post('/', async (req, res) => {
     let newStock;
 
     if (type === 'in') {
-      newStock = previousStock + quantity;
+      newStock = previousStock + numQuantity;
     } else if (type === 'out') {
-      if (previousStock < quantity) {
+      if (previousStock < numQuantity) {
         await transaction.rollback();
         return res.status(400).json({ error: '库存不足' });
       }
-      newStock = previousStock - quantity;
+      newStock = previousStock - numQuantity;
     } else {
       await transaction.rollback();
       return res.status(400).json({ error: '操作类型无效' });
@@ -84,7 +95,7 @@ router.post('/', async (req, res) => {
       {
         consumableId,
         type,
-        quantity,
+        quantity: numQuantity,
         previousStock,
         currentStock: newStock,
         operator,
@@ -100,7 +111,7 @@ router.post('/', async (req, res) => {
         consumableId,
         consumableName: consumable.name,
         operationType: type,
-        quantity: type === 'in' ? parseFloat(quantity) : -parseFloat(quantity),
+        quantity: type === 'in' ? numQuantity : -numQuantity,
         previousStock,
         currentStock: newStock,
         operator,

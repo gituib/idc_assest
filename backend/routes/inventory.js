@@ -385,9 +385,9 @@ router.post('/records/:recordId/check', async (req, res) => {
         abnormalType = 'serial_mismatch';
       } else if (actualRackId && actualRackId !== record.rackId) {
         abnormalType = 'position_mismatch';
-      } else if (status === 'not_found') {
-        abnormalType = 'device_missing';
       }
+    } else if (status === 'not_found') {
+      abnormalType = 'device_missing';
     }
 
     await record.update({

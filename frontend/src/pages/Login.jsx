@@ -49,7 +49,9 @@ const Login = () => {
         }
       }
     } catch (error) {
-      console.error('检查用户状态失败:', error);
+      // 静默处理：登录页调用 check-admin 失败是正常的（未登录状态）
+      // 不显示错误信息，避免触发 401 重定向循环
+      console.log('检查管理员状态:', error);
     }
   };
 

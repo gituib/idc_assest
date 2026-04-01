@@ -127,13 +127,23 @@ router.get('/list', async (req, res) => {
         };
 
         try {
-          // 读取文件头部的元数据信息
+          // 只读取文件头部（前 4KB）提取元数据，避免大文件内存溢出
           let content;
           if (isCompressed) {
             const compressed = fs.readFileSync(filePath);
+            // 限制解压大小，超过 1MB 的备份不解析元数据
+            if (compressed.length > 1024 * 1024) {
+              metadata.description = '(文件过大，跳过元数据解析)';
+              return metadata;
+            }
             content = zlib.gunzipSync(compressed).toString('utf8');
           } else {
-            content = fs.readFileSync(filePath, 'utf8');
+            // 只读取前 4KB
+            const fd = fs.openSync(filePath, 'r');
+            const buf = Buffer.alloc(4096);
+            const bytesRead = fs.readSync(fd, buf, 0, 4096, 0);
+            fs.closeSync(fd);
+            content = buf.slice(0, bytesRead).toString('utf8');
           }
 
           const backupData = JSON.parse(content);

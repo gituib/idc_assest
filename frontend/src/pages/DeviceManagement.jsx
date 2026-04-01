@@ -552,7 +552,7 @@ function DeviceManagement() {
     if (scope === 'selected') {
       deviceIds = selectedDevices;
     } else if (scope === 'currentPage') {
-      deviceIds = allDevices.map(device => device.deviceId);
+      deviceIds = currentPageDevices.map(device => device.deviceId);
     } else if (scope === 'all') {
       deviceIds = allDevices.map(device => device.deviceId);
     }

@@ -605,7 +605,24 @@ router.put('/:ticketId', async (req, res) => {
     const beforeState = ticket.toJSON();
     const { operatorId, operatorName, operatorRole } = req.body;
 
-    await ticket.update(req.body);
+    // 白名单过滤：只允许更新安全字段，防止覆盖 ticketId/createdAt 等关键字段
+    const ALLOWED_UPDATE_FIELDS = [
+      'title', 'description', 'category', 'priority', 'location',
+      'contactPerson', 'contactPhone', 'contactEmail',
+      'expectedDate', 'attachments', 'customFields',
+    ];
+    const updateData = {};
+    ALLOWED_UPDATE_FIELDS.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: '没有可更新的字段' });
+    }
+
+    await ticket.update(updateData);
 
     await TicketOperationRecord.create({
       recordId: uuidv4(),
@@ -630,9 +647,28 @@ router.put('/:ticketId/status', async (req, res) => {
   try {
     const { status, operatorId, operatorName, operatorRole, resolution } = req.body;
 
+    if (!status) {
+      return res.status(400).json({ error: '请提供目标状态' });
+    }
+
     const ticket = await Ticket.findByPk(req.params.ticketId);
     if (!ticket) {
       return res.status(404).json({ error: '工单不存在' });
+    }
+
+    // 状态机校验：定义合法的状态流转
+    const STATUS_TRANSITIONS = {
+      pending: ['processing', 'closed'],
+      processing: ['completed', 'closed'],
+      completed: ['closed'],
+      closed: [],
+    };
+
+    const allowedTransitions = STATUS_TRANSITIONS[ticket.status] || [];
+    if (!allowedTransitions.includes(status)) {
+      return res.status(400).json({
+        error: `不允许从 "${ticket.status}" 变更为 "${status}"，合法目标状态: ${allowedTransitions.join(', ') || '无'}`,
+      });
     }
 
     const beforeState = ticket.toJSON();

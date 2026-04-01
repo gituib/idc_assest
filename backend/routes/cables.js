@@ -273,13 +273,16 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: '源设备和目标设备不能相同' });
     }
 
-    // 如果不是强制模式，检查冲突
+    // 如果不是强制模式，检查冲突（包括反向端口分配）
     if (!force) {
       const existingCable = await Cable.findOne({
         where: {
           [Op.or]: [
             { sourceDeviceId, sourcePort },
             { targetDeviceId, targetPort },
+            // 反向检查：已有接线的目标端口恰好是当前源端口
+            { sourceDeviceId: targetDeviceId, sourcePort: targetPort },
+            { targetDeviceId: sourceDeviceId, targetPort: sourcePort },
           ],
         },
       });

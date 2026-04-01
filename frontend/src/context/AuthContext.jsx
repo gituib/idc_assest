@@ -34,7 +34,8 @@ export const AuthProvider = ({ children }) => {
       if (currentUser && JSON.stringify(currentUser) !== JSON.stringify(user)) {
         setUser(currentUser);
       }
-      setInitialized(true);
+      // 有 token 时调用 fetchProfile 验证有效性并刷新用户信息
+      fetchProfile();
     } else if (!currentToken) {
       setToken(null);
       setUser(null);
@@ -49,6 +50,7 @@ export const AuthProvider = ({ children }) => {
     const currentToken = secureStorage.get(TOKEN_KEY);
     if (!currentToken) {
       setLoading(false);
+      setInitialized(true);
       return;
     }
 
@@ -60,8 +62,14 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('获取用户信息失败:', error);
+      // Token 无效，清除登录状态
+      secureStorage.remove(TOKEN_KEY);
+      secureStorage.remove(USER_KEY);
+      setToken(null);
+      setUser(null);
     } finally {
       setLoading(false);
+      setInitialized(true);
     }
   }, []);
 
@@ -78,7 +86,8 @@ export const AuthProvider = ({ children }) => {
       }
       return { success: false, message: response.message, code: response.code };
     } catch (error) {
-      return { success: false, message: error };
+      const message = error?.response?.data?.message || error?.message || '登录失败，请稍后重试';
+      return { success: false, message };
     }
   };
 
@@ -97,7 +106,8 @@ export const AuthProvider = ({ children }) => {
       }
       return { success: false, message: response.message };
     } catch (error) {
-      return { success: false, message: error };
+      const message = error?.response?.data?.message || error?.message || '注册失败，请稍后重试';
+      return { success: false, message };
     }
   };
 

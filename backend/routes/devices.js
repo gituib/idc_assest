@@ -719,29 +719,21 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// 生成设备ID的辅助函数
+// 生成设备ID的辅助函数（使用 MAX 聚合查询避免竞态条件）
 async function generateDeviceId() {
-  // 获取当前最大的设备ID序号
-  const devices = await Device.findAll({
+  const result = await Device.findOne({
     where: {
       deviceId: {
-        [require('sequelize').Op.like]: 'DEV%',
+        [Op.like]: 'DEV%',
       },
     },
+    attributes: [
+      [sequelize.fn('MAX', sequelize.literal("CAST(SUBSTR(deviceId, 4) AS INTEGER)")), 'maxNum'],
+    ],
+    raw: true,
   });
 
-  let maxNumber = 0;
-  devices.forEach(device => {
-    const match = device.deviceId.match(/^DEV(\d+)$/);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (num > maxNumber) {
-        maxNumber = num;
-      }
-    }
-  });
-
-  // 生成新的设备ID，序号+1，至少3位数字
+  const maxNumber = (result && result.maxNum) ? parseInt(result.maxNum, 10) : 0;
   const newNumber = maxNumber + 1;
   return `DEV${String(newNumber).padStart(3, '0')}`;
 }
@@ -1678,19 +1670,23 @@ router.put('/batch-status', async (req, res) => {
 
 // 批量移动设备
 router.put('/batch-move', async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
     const { deviceIds, targetRackId, startPosition } = req.body;
 
     if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      await transaction.rollback();
       return res.status(400).json({ error: '请提供有效的设备ID列表' });
     }
 
     if (!targetRackId) {
+      await transaction.rollback();
       return res.status(400).json({ error: '请提供目标机柜ID' });
     }
 
-    const targetRack = await Rack.findByPk(targetRackId);
+    const targetRack = await Rack.findByPk(targetRackId, { transaction });
     if (!targetRack) {
+      await transaction.rollback();
       return res.status(404).json({ error: '目标机柜不存在' });
     }
 
@@ -1708,6 +1704,7 @@ router.put('/batch-move', async (req, res) => {
         'height',
         'powerConsumption',
       ],
+      transaction,
     });
 
     const deviceDetails = devicesToMove.map(d => d.toJSON());
@@ -1756,6 +1753,7 @@ router.put('/batch-move', async (req, res) => {
           position: { [Op.ne]: null },
         },
         attributes: ['deviceId', 'position', 'height'],
+        transaction,
       });
 
       for (const newDevice of devicesToCheck) {
@@ -1808,6 +1806,7 @@ router.put('/batch-move', async (req, res) => {
 
       const [updated] = await Device.update(updateData, {
         where: { deviceId },
+        transaction,
       });
 
       if (updated) {
@@ -1824,7 +1823,7 @@ router.put('/batch-move', async (req, res) => {
         const safePower = Number(powerChange) || 0;
         await Rack.update(
           { currentPower: sequelize.literal(`currentPower + ${safePower}`) },
-          { where: { rackId } }
+          { where: { rackId }, transaction }
         );
       }
     }
@@ -1837,7 +1836,7 @@ router.put('/batch-move', async (req, res) => {
       const safeTargetPower = Number(targetRackPowerChange.change) || 0;
       await Rack.update(
         { currentPower: sequelize.literal(`currentPower + ${safeTargetPower}`) },
-        { where: { rackId: targetRackId } }
+        { where: { rackId: targetRackId }, transaction }
       );
     }
 
@@ -1860,11 +1859,14 @@ router.put('/batch-move', async (req, res) => {
       },
     });
 
+    await transaction.commit();
+
     res.json({
       message: `批量移动成功，已将 ${movedCount} 个设备移动到机柜 ${targetRackId}`,
       movedCount,
     });
   } catch (error) {
+    await transaction.rollback();
     res.status(500).json({ error: error.message });
   }
 });
@@ -2238,7 +2240,6 @@ router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
 
     if (updated) {
       const oldRackId = oldDevice.rackId;
-      const newRackId = req.body.rackId;
       const oldPower = oldDevice.powerConsumption || 0;
       const newPower =
         req.body.powerConsumption !== undefined ? req.body.powerConsumption : oldPower;

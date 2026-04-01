@@ -318,7 +318,15 @@ router.post('/import', async (req, res) => {
 router.get('/by-sn/:sn', async (req, res) => {
   try {
     const sn = req.params.sn;
-    const consumables = await Consumable.findAll();
+    // 使用数据库 LIKE 查询替代全表扫描
+    const consumables = await Consumable.findAll({
+      where: {
+        snList: {
+          [Op.like]: `%${sn}%`,
+        },
+      },
+    });
+    // 精确匹配 SN（JSON 数组中的元素）
     const consumable = consumables.find(c => {
       const snList = Array.isArray(c.snList) ? c.snList : [];
       return snList.includes(sn);
