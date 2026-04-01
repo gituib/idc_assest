@@ -2,6 +2,31 @@ import axios from 'axios';
 import { API_CONFIG } from '../config/api';
 import secureStorage, { TOKEN_KEY } from '../utils/secureStorage';
 
+// 给全局 axios 默认实例添加 Token 拦截器
+// 确保所有页面中直接使用 axios.get/post 的请求也能自动携带 Token
+axios.interceptors.request.use(config => {
+  const token = secureStorage.get(TOKEN_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+axios.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.status === 401) {
+      const currentPath = window.location.pathname;
+      if (!currentPath.startsWith('/login')) {
+        secureStorage.remove(TOKEN_KEY);
+        secureStorage.remove('user');
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 const api = axios.create({
   baseURL: API_CONFIG.baseURL,
   timeout: API_CONFIG.timeout,
