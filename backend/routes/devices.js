@@ -1628,6 +1628,12 @@ router.put('/batch-status', async (req, res) => {
       .map(d => `${d.name}(编号:${d.deviceId}${d.rackName ? `,机柜:${d.rackName}` : ''})`)
       .join('、');
 
+    // 执行批量状态更新
+    const [affectedCount] = await Device.update(
+      { status },
+      { where: { deviceId: { [Op.in]: deviceIds } } }
+    );
+
     const statusChangeDesc = `批量变更${affectedCount}台设备状态：${deviceSummary} → ${statusText[status]}`;
 
     await logDeviceOperation('status_change', statusChangeDesc, {
