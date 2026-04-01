@@ -500,36 +500,7 @@ router.put('/:cableId', async (req, res) => {
   }
 });
 
-router.delete('/:cableId', async (req, res) => {
-  try {
-    // 先获取接线信息，用于后续恢复端口状态
-    const cable = await Cable.findByPk(req.params.cableId);
-
-    if (!cable) {
-      return res.status(404).json({ error: '接线不存在' });
-    }
-
-    const { sourceDeviceId, sourcePort, targetDeviceId, targetPort } = cable;
-
-    const deleted = await Cable.destroy({
-      where: { cableId: req.params.cableId },
-    });
-
-    if (deleted) {
-      // 自动将源端口和目标端口状态恢复为free
-      await freePort(sourceDeviceId, sourcePort);
-      await freePort(targetDeviceId, targetPort);
-
-      res.status(204).json();
-    } else {
-      res.status(404).json({ error: '接线不存在' });
-    }
-  } catch (error) {
-    console.error('删除接线失败:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
+// 批量删除接线
 router.delete('/batch', async (req, res) => {
   try {
     const { cableIds } = req.body;
@@ -559,6 +530,37 @@ router.delete('/batch', async (req, res) => {
     });
   } catch (error) {
     console.error('批量删除接线失败:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 删除单个接线
+router.delete('/:cableId', async (req, res) => {
+  try {
+    // 先获取接线信息，用于后续恢复端口状态
+    const cable = await Cable.findByPk(req.params.cableId);
+
+    if (!cable) {
+      return res.status(404).json({ error: '接线不存在' });
+    }
+
+    const { sourceDeviceId, sourcePort, targetDeviceId, targetPort } = cable;
+
+    const deleted = await Cable.destroy({
+      where: { cableId: req.params.cableId },
+    });
+
+    if (deleted) {
+      // 自动将源端口和目标端口状态恢复为free
+      await freePort(sourceDeviceId, sourcePort);
+      await freePort(targetDeviceId, targetPort);
+
+      res.status(204).json();
+    } else {
+      res.status(404).json({ error: '接线不存在' });
+    }
+  } catch (error) {
+    console.error('删除接线失败:', error);
     res.status(500).json({ error: error.message });
   }
 });

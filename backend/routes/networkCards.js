@@ -131,6 +131,39 @@ router.get('/device/:deviceId/with-ports', async (req, res) => {
   }
 });
 
+// 查询网卡
+router.get('/find', async (req, res) => {
+  try {
+    const { deviceId, deviceSn, name } = req.query;
+
+    if ((!deviceId && !deviceSn) || !name) {
+      return res.status(400).json({ error: '缺少设备ID/SN或网卡名称' });
+    }
+
+    let device;
+    if (deviceSn) {
+      device = await Device.findOne({ where: { serialNumber: deviceSn } });
+      if (!device) {
+        return res.json({ nicId: null });
+      }
+    }
+
+    const networkCard = await NetworkCard.findOne({
+      where: { deviceId: device ? device.deviceId : deviceId, name },
+    });
+
+    if (!networkCard) {
+      return res.json({ nicId: null });
+    }
+
+    res.json(networkCard);
+  } catch (error) {
+    console.error('查找网卡失败:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 获取单个网卡
 router.get('/:nicId', async (req, res) => {
   try {
     const networkCard = await NetworkCard.findByPk(req.params.nicId, {
@@ -166,37 +199,6 @@ router.get('/:nicId/ports', async (req, res) => {
     res.json(ports);
   } catch (error) {
     console.error('获取网卡端口失败:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/find', async (req, res) => {
-  try {
-    const { deviceId, deviceSn, name } = req.query;
-
-    if ((!deviceId && !deviceSn) || !name) {
-      return res.status(400).json({ error: '缺少设备ID/SN或网卡名称' });
-    }
-
-    let device;
-    if (deviceSn) {
-      device = await Device.findOne({ where: { serialNumber: deviceSn } });
-      if (!device) {
-        return res.json({ nicId: null });
-      }
-    }
-
-    const networkCard = await NetworkCard.findOne({
-      where: { deviceId: device ? device.deviceId : deviceId, name },
-    });
-
-    if (!networkCard) {
-      return res.json({ nicId: null });
-    }
-
-    res.json(networkCard);
-  } catch (error) {
-    console.error('查找网卡失败:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -223,8 +223,31 @@ async function initializeApp() {
 
 const swaggerUi = require('swagger-ui-express');
 const { specs, customCSS } = require('./swagger');
+const { authMiddleware } = require('./middleware/auth');
 
 initializeApp();
+
+const PUBLIC_PATHS = [
+  '/auth',
+  '/health',
+  '/docs',
+  '/api-docs',
+  '/api-docs.json',
+];
+
+const isPublicPath = (path) => {
+  if (path === '' || path === '/') {
+    return true;
+  }
+  return PUBLIC_PATHS.some((publicPath) => path === publicPath || path.startsWith(publicPath + '/'));
+};
+
+app.use('/api', (req, res, next) => {
+  if (isPublicPath(req.path)) {
+    return next();
+  }
+  return authMiddleware(req, res, next);
+});
 
 const deviceRoutes = require('./routes/devices');
 const rackRoutes = require('./routes/racks');

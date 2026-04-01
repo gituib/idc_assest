@@ -1116,6 +1116,59 @@ router.post('/logs/import', async (req, res) => {
   }
 });
 
+// 查询归档记录列表
+router.get('/archives', async (req, res) => {
+  try {
+    const { keyword, page = 1, pageSize = 10 } = req.query;
+    const offset = (page - 1) * pageSize;
+
+    const where = {};
+
+    if (keyword) {
+      where[Op.or] = [
+        { consumableId: { [Op.like]: `%${keyword}%` } },
+        { consumableName: { [Op.like]: `%${keyword}%` } },
+        { archiveId: { [Op.like]: `%${keyword}%` } },
+      ];
+    }
+
+    const { count, rows } = await ConsumableLogArchive.findAndCountAll({
+      where,
+      offset,
+      limit: parseInt(pageSize),
+      order: [['deletedAt', 'DESC']],
+    });
+
+    res.json({
+      total: count,
+      archives: rows,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 查询单个归档记录详情
+router.get('/archives/:archiveId', async (req, res) => {
+  try {
+    const { archiveId } = req.params;
+
+    const archive = await ConsumableLogArchive.findOne({
+      where: { archiveId },
+    });
+
+    if (!archive) {
+      return res.status(404).json({ error: '归档记录不存在' });
+    }
+
+    res.json(archive);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const consumable = await Consumable.findByPk(req.params.id);
@@ -1282,59 +1335,6 @@ router.delete('/:id', async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 查询归档记录列表
-router.get('/archives', async (req, res) => {
-  try {
-    const { keyword, page = 1, pageSize = 10 } = req.query;
-    const offset = (page - 1) * pageSize;
-
-    const where = {};
-
-    if (keyword) {
-      where[Op.or] = [
-        { consumableId: { [Op.like]: `%${keyword}%` } },
-        { consumableName: { [Op.like]: `%${keyword}%` } },
-        { archiveId: { [Op.like]: `%${keyword}%` } },
-      ];
-    }
-
-    const { count, rows } = await ConsumableLogArchive.findAndCountAll({
-      where,
-      offset,
-      limit: parseInt(pageSize),
-      order: [['deletedAt', 'DESC']],
-    });
-
-    res.json({
-      total: count,
-      archives: rows,
-      page: parseInt(page),
-      pageSize: parseInt(pageSize),
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 查询单个归档记录详情
-router.get('/archives/:archiveId', async (req, res) => {
-  try {
-    const { archiveId } = req.params;
-
-    const archive = await ConsumableLogArchive.findOne({
-      where: { archiveId },
-    });
-
-    if (!archive) {
-      return res.status(404).json({ error: '归档记录不存在' });
-    }
-
-    res.json(archive);
-  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
