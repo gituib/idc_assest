@@ -532,7 +532,12 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
       console.log('数据库类型:', dbDialect);
 
       // 转义关键词中的特殊字符，防止SQL注入
-      const escapedKeyword = keyword.replace(/'/g, "''");
+      // 转义单引号（SQL注入）和 LIKE 通配符（%、_）
+      const escapedKeyword = keyword
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "''")
+        .replace(/%/g, '\\%')
+        .replace(/_/g, '\\_');
 
       // 基础字段搜索条件（只包含文本类型字段）
       const searchConditions = [
@@ -562,15 +567,20 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
       if (customFields.length > 0) {
         // 使用原始SQL查询JSON字段
         const jsonConditions = customFields.map(field => {
-          const fieldName = field.fieldName;
+          // 转义 fieldName 中的特殊字符，防止通过字段名注入
+          const safeFieldName = field.fieldName
+            .replace(/\\/g, '\\\\')
+            .replace(/"/g, '\\"')
+            .replace(/'/g, "''");
+
           // 使用 sequelize.literal 构建原始SQL条件
           if (dbDialect === 'mysql') {
             return sequelize.literal(
-              `JSON_EXTRACT(customFields, '$."${fieldName}"') LIKE '%${escapedKeyword}%'`
+              `JSON_EXTRACT(customFields, '$."${safeFieldName}"') LIKE '%${escapedKeyword}%' ESCAPE '\\\\'`
             );
           } else {
             return sequelize.literal(
-              `json_extract(customFields, '$.${fieldName}') LIKE '%${escapedKeyword}%'`
+              `json_extract(customFields, '$.${safeFieldName}') LIKE '%${escapedKeyword}%' ESCAPE '\\'`
             );
           }
         });
@@ -1485,8 +1495,10 @@ router.post('/import', async (req, res) => {
         });
 
         for (const [rackId, powerToAdd] of rackPowerMap) {
+          // 确保功率值为合法数字，防止SQL注入
+          const safePower = Number(powerToAdd) || 0;
           await Rack.update(
-            { currentPower: sequelize.literal(`currentPower + ${powerToAdd}`) },
+            { currentPower: sequelize.literal(`currentPower + ${safePower}`) },
             { where: { rackId }, transaction: t }
           );
         }
@@ -1809,8 +1821,9 @@ router.put('/batch-move', async (req, res) => {
 
     for (const [rackId, powerChange] of sourceRackPowerChanges) {
       if (rackId !== targetRackId) {
+        const safePower = Number(powerChange) || 0;
         await Rack.update(
-          { currentPower: sequelize.literal(`currentPower + ${powerChange}`) },
+          { currentPower: sequelize.literal(`currentPower + ${safePower}`) },
           { where: { rackId } }
         );
       }
@@ -1821,8 +1834,9 @@ router.put('/batch-move', async (req, res) => {
     }
 
     if (targetRackPowerChange.change !== 0) {
+      const safeTargetPower = Number(targetRackPowerChange.change) || 0;
       await Rack.update(
-        { currentPower: sequelize.literal(`currentPower + ${targetRackPowerChange.change}`) },
+        { currentPower: sequelize.literal(`currentPower + ${safeTargetPower}`) },
         { where: { rackId: targetRackId } }
       );
     }
@@ -1972,8 +1986,7 @@ router.get('/enhanced-export', async (req, res) => {
       const headerSet = new Set();
 
       // 添加机房字段（如果存在）
-      const hasRoomField = allFields.some(f => f.fieldName === 'roomName');
-      if (!hasRoomField) {
+      if (!allFields.some(f => f.fieldName === 'roomName')) {
         headerSet.add('所在机房');
       }
 

@@ -4,6 +4,34 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { authMiddleware } = require('../middleware/auth');
+
+/**
+ * 安全解析备份文件路径，防止路径遍历攻击
+ * @param {string} filename - 用户提供的文件名
+ * @param {string} backupPath - 备份目录的绝对路径
+ * @returns {{ safePath: string, error: string|null }}
+ */
+function resolveBackupPath(filename, backupPath) {
+  if (!filename || typeof filename !== 'string') {
+    return { safePath: null, error: '请提供备份文件名' };
+  }
+  // 拒绝包含路径分隔符或上级目录引用的文件名
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return { safePath: null, error: '文件名包含非法字符' };
+  }
+  // 只允许备份文件扩展名
+  if (!filename.endsWith('.json') && !filename.endsWith('.json.gz')) {
+    return { safePath: null, error: '文件名格式不正确' };
+  }
+  const safePath = path.join(backupPath, filename);
+  // 二次校验：解析后的路径必须在备份目录内
+  const resolvedPath = path.resolve(safePath);
+  const resolvedBackupDir = path.resolve(backupPath);
+  if (!resolvedPath.startsWith(resolvedBackupDir + path.sep)) {
+    return { safePath: null, error: '文件路径不合法' };
+  }
+  return { safePath: resolvedPath, error: null };
+}
 const {
   getBackupPath,
   ensureBackupDir,
@@ -150,7 +178,11 @@ router.get('/validate/:filename', async (req, res) => {
   try {
     const { filename } = req.params;
     const backupPath = getBackupPath();
-    const filePath = path.join(backupPath, filename);
+    const { safePath, error } = resolveBackupPath(filename, backupPath);
+    if (error) {
+      return res.status(400).json({ success: false, message: error });
+    }
+    const filePath = safePath;
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
@@ -179,15 +211,12 @@ router.get('/restore-progress/:filename', authMiddleware, async (req, res) => {
   const { filename } = req.params;
   const options = req.query.options ? JSON.parse(req.query.options) : {};
 
-  if (!filename) {
-    return res.status(400).json({
-      success: false,
-      message: '请提供备份文件名',
-    });
-  }
-
   const backupPath = getBackupPath();
-  const filePath = path.join(backupPath, filename);
+  const { safePath, error } = resolveBackupPath(filename, backupPath);
+  if (error) {
+    return res.status(400).json({ success: false, message: error });
+  }
+  const filePath = safePath;
 
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({
@@ -296,15 +325,12 @@ router.post('/restore', async (req, res) => {
   try {
     const { filename, options = {} } = req.body;
 
-    if (!filename) {
-      return res.status(400).json({
-        success: false,
-        message: '请提供备份文件名',
-      });
-    }
-
     const backupPath = getBackupPath();
-    const filePath = path.join(backupPath, filename);
+    const { safePath, error } = resolveBackupPath(filename, backupPath);
+    if (error) {
+      return res.status(400).json({ success: false, message: error });
+    }
+    const filePath = safePath;
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
@@ -411,7 +437,11 @@ router.get('/download/:filename', (req, res) => {
   try {
     const { filename } = req.params;
     const backupPath = getBackupPath();
-    const filePath = path.join(backupPath, filename);
+    const { safePath, error } = resolveBackupPath(filename, backupPath);
+    if (error) {
+      return res.status(400).json({ success: false, message: error });
+    }
+    const filePath = safePath;
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
@@ -439,7 +469,11 @@ router.delete('/:filename', (req, res) => {
   try {
     const { filename } = req.params;
     const backupPath = getBackupPath();
-    const filePath = path.join(backupPath, filename);
+    const { safePath, error } = resolveBackupPath(filename, backupPath);
+    if (error) {
+      return res.status(400).json({ success: false, message: error });
+    }
+    const filePath = safePath;
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
@@ -971,15 +1005,12 @@ router.post('/remote/upload', async (req, res) => {
   try {
     const { filename, targetIds } = req.body;
 
-    if (!filename) {
-      return res.status(400).json({
-        success: false,
-        message: '请提供备份文件名',
-      });
-    }
-
     const backupPath = getBackupPath();
-    const filePath = path.join(backupPath, filename);
+    const { safePath, error } = resolveBackupPath(filename, backupPath);
+    if (error) {
+      return res.status(400).json({ success: false, message: error });
+    }
+    const filePath = safePath;
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({

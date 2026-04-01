@@ -58,8 +58,29 @@ router.post('/upload', (req, res) => {
     }
 
     const file = req.files.file;
-    const fileName = `${Date.now()}_${file.name}`;
-    const filePath = path.join(UPLOAD_DIR, fileName);
+
+    // 安全检查：拒绝路径遍历字符
+    if (file.name.includes('..') || file.name.includes('/') || file.name.includes('\\')) {
+      return res.status(400).json({ error: '文件名包含非法字符' });
+    }
+
+    // 白名单校验文件扩展名，只允许图片格式
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+    const ext = path.extname(file.name).toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+      return res.status(400).json({ error: '只允许上传图片文件（jpg/png/gif/webp/svg/bmp）' });
+    }
+
+    // 使用随机文件名，仅保留安全扩展名
+    const safeName = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}${ext}`;
+    const filePath = path.join(UPLOAD_DIR, safeName);
+
+    // 二次校验：确保路径在 uploads 目录内
+    const resolvedPath = path.resolve(filePath);
+    const resolvedUploadDir = path.resolve(UPLOAD_DIR);
+    if (!resolvedPath.startsWith(resolvedUploadDir + path.sep)) {
+      return res.status(400).json({ error: '文件路径不合法' });
+    }
 
     file.mv(filePath, err => {
       if (err) {
@@ -67,7 +88,7 @@ router.post('/upload', (req, res) => {
         return res.status(500).json({ error: '文件保存失败' });
       }
 
-      const fileUrl = `/uploads/${fileName}`;
+      const fileUrl = `/uploads/${safeName}`;
       res.json({ path: fileUrl });
     });
   } catch (error) {

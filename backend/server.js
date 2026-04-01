@@ -226,7 +226,14 @@ const { specs, customCSS } = require('./swagger');
 const { authMiddleware } = require('./middleware/auth');
 const loadRoutes = require('./utils/routeLoader');
 
-initializeApp();
+initializeApp().then(() => {
+  app.listen(PORT, () => {
+    console.log(`服务器运行在 http://localhost:${PORT}`);
+  });
+}).catch(err => {
+  console.error('应用初始化失败:', err);
+  process.exit(1);
+});
 
 const PUBLIC_PATHS = [
   '/auth',
@@ -234,6 +241,7 @@ const PUBLIC_PATHS = [
   '/docs',
   '/api-docs',
   '/api-docs.json',
+  '/system-settings/system/info',
 ];
 
 const isPublicPath = (path) => {
@@ -318,6 +326,4 @@ app.get('/health', async (req, res) => {
   res.status(statusCode).json(health);
 });
 
-app.listen(PORT, () => {
-  console.log(`服务器运行在 http://localhost:${PORT}`);
-});
+// app.listen 已在 initializeApp().then() 中调用

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { authMiddleware } = require('../middleware/auth');
 const {
   logDangerousOperation,
   getDangerousOperationsLogs,
@@ -8,6 +9,9 @@ const {
   RISK_LEVELS,
   calculateRiskLevel,
 } = require('../utils/dangerousOperationLogger');
+
+// 全局认证中间件
+router.use(authMiddleware);
 
 router.post('/log', async (req, res) => {
   try {
@@ -103,7 +107,16 @@ router.delete('/logs/clean', async (req, res) => {
   try {
     const { daysToKeep = 90 } = req.query;
 
-    if (!req.user || req.user.role !== 'admin') {
+    // 通过关联表查询用户角色，判断是否为管理员
+    const UserRole = require('../models/UserRole');
+    const Role = require('../models/Role');
+    const userRole = await UserRole.findOne({
+      where: { UserId: req.user.userId },
+      include: [{ model: Role }],
+    });
+    const isAdmin = userRole && userRole.Role && userRole.Role.roleCode === 'admin';
+
+    if (!isAdmin) {
       return res.status(403).json({ error: '只有管理员才能清理日志' });
     }
 

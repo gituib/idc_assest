@@ -250,23 +250,8 @@ router.post('/plans/:planId/start', async (req, res) => {
     }
 
     if (recordsToCreate.length > 0) {
-      const now =
-        dbDialect === 'mysql'
-          ? new Date().toISOString().replace('T', ' ').replace('Z', '')
-          : new Date().toISOString();
-      const placeholders = recordsToCreate
-        .map(
-          r =>
-            `('${r.recordId}', '${r.taskId}', '${r.planId}', '${r.deviceId}', '${r.deviceName}', '${r.deviceType}', '${r.serialNumber || ''}', '${r.rackId}', ${r.position}, 'pending', '${now}', '${now}')`
-        )
-        .join(',');
-
-      if (placeholders) {
-        await sequelize.query(`
-          INSERT INTO inventory_records (recordId, taskId, planId, deviceId, deviceName, deviceType, serialNumber, rackId, position, status, createdAt, updatedAt)
-          VALUES ${placeholders}
-        `);
-      }
+      // 使用 Sequelize bulkCreate 替代原始 SQL，自动参数化防止 SQL 注入
+      await InventoryRecord.bulkCreate(recordsToCreate, { individualHooks: false });
     }
 
     await plan.update({

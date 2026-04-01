@@ -3,6 +3,19 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const { Op } = require('sequelize');
+const { authMiddleware } = require('../middleware/auth');
+
+// 公开路由（无需认证）- 使用 originalUrl 匹配，兼容子路由挂载
+const publicRoutes = ['/system/info'];
+
+// 全局认证中间件：所有路由默认需要认证
+router.use((req, res, next) => {
+  const fullPath = req.originalUrl || req.path;
+  if (publicRoutes.some(p => fullPath.endsWith(p))) {
+    return next();
+  }
+  return authMiddleware(req, res, next);
+});
 const SystemSetting = require('../models/SystemSetting');
 const { FRONTEND } = require('../config');
 
