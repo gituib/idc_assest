@@ -173,6 +173,18 @@ function ConsumableManagement() {
   const [pollingInterval, setPollingInterval] = useState(null);
   const importProgressRef = React.useRef(null);
 
+  // 获取全部耗材（用于扫码入库下拉框，不受分页限制）
+  const fetchAllConsumablesForScan = useCallback(async () => {
+    try {
+      const response = await axios.get('/api/consumables', {
+        params: { page: 1, pageSize: 9999, status: 'active' },
+      });
+      setAllConsumablesForScan(response.data.consumables || []);
+    } catch (error) {
+      console.error('获取全部耗材失败:', error);
+    }
+  }, []);
+
   const fetchConsumables = useCallback(
     async (page = 1, pageSize = 10) => {
       try {
@@ -204,23 +216,10 @@ function ConsumableManagement() {
     }
   }, []);
 
-  // 获取全部耗材（用于扫码入库下拉框，不受分页限制）
-  const fetchAllConsumablesForScan = useCallback(async () => {
-    try {
-      const response = await axios.get('/api/consumables', {
-        params: { page: 1, pageSize: 9999, status: 'active' },
-      });
-      setAllConsumablesForScan(response.data.consumables || []);
-    } catch (error) {
-      console.error('获取全部耗材失败:', error);
-    }
-  }, []);
-
   useEffect(() => {
     fetchConsumables();
     fetchCategories();
-    fetchAllConsumablesForScan();
-  }, [fetchConsumables, fetchCategories, fetchAllConsumablesForScan]);
+  }, [fetchConsumables, fetchCategories]);
 
   const showModal = useCallback(
     (consumable = null) => {
