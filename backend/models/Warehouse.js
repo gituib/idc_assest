@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
+const { generateId } = require('../utils/idGenerator');
 
 const Warehouse = sequelize.define(
   'Warehouse',
@@ -7,7 +8,7 @@ const Warehouse = sequelize.define(
     warehouseId: {
       type: DataTypes.STRING,
       primaryKey: true,
-      allowNull: false,
+      allowNull: true,
       unique: true,
     },
     name: {
@@ -36,6 +37,13 @@ const Warehouse = sequelize.define(
     tableName: 'warehouses',
     timestamps: true,
     indexes: [{ fields: ['status'] }, { fields: ['name'] }],
+    hooks: {
+      beforeCreate: (warehouse) => {
+        if (!warehouse.warehouseId) {
+          warehouse.warehouseId = generateId({ prefix: 'WH' });
+        }
+      },
+    },
   }
 );
 

@@ -5,12 +5,9 @@ const UserRole = require('../models/UserRole');
 const User = require('../models/User');
 const { authMiddleware } = require('../middleware/auth');
 const { logRoleOperation } = require('../utils/operationLogger');
+const { generateId } = require('../utils/idGenerator');
 
 const router = express.Router();
-
-const generateId = () => {
-  return 'role_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-};
 
 const { Op } = require('sequelize');
 
@@ -129,7 +126,7 @@ router.post('/', authMiddleware, async (req, res) => {
     }
 
     const role = await Role.create({
-      roleId: generateId(),
+      roleId: generateId({ prefix: 'ROLE' }),
       roleName,
       roleCode,
       description,

@@ -778,9 +778,9 @@ function RoomManagement() {
               <Form.Item
                 name="roomId"
                 label="机房ID"
-                rules={[{ required: true, message: '请输入机房ID' }]}
+                rules={[]}
               >
-                <Input placeholder="请输入机房ID" style={{ borderRadius: '8px' }} />
+                <Input placeholder="不填写则自动生成" style={{ borderRadius: '8px' }} />
               </Form.Item>
             </Col>
             <Col span={12}>

@@ -471,16 +471,7 @@ router.post('/quick-inout', async (req, res) => {
   while (attempt < RETRY.MAX_RETRIES) {
     const transaction = await sequelize.transaction();
     try {
-      const {
-        consumableId,
-        type,
-        quantity,
-        operator,
-        reason,
-        notes,
-        snList,
-        deviceId,
-      } = req.body;
+      const { consumableId, type, quantity, operator, reason, notes, snList, deviceId } = req.body;
 
       const consumable = await Consumable.findByPk(consumableId, { transaction });
       if (!consumable) {

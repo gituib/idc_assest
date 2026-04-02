@@ -4,11 +4,11 @@ const routesConfig = require('../config/routes');
 function loadRoutes(app) {
   const routesDir = path.join(__dirname, '../routes');
 
-  routesConfig.forEach((routeConfig) => {
+  routesConfig.forEach(routeConfig => {
     try {
       const routerPath = path.join(routesDir, routeConfig.file);
       const router = require(routerPath);
-      
+
       if (typeof router === 'function') {
         app.use(routeConfig.path, router);
         console.log(`路由已加载: ${routeConfig.path} -> ${routeConfig.file}`);

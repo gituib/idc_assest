@@ -8,6 +8,7 @@ const cors = require('cors');
 const fileUpload = require('express-fileupload');
 const { sequelize } = require('./db');
 const { FILE_UPLOAD } = require('./config');
+const { generateId } = require('./utils/idGenerator');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -175,7 +176,7 @@ async function initFaultCategories() {
   for (const cat of defaultCategories) {
     const existing = await FaultCategory.findOne({ where: { name: cat.name } });
     if (!existing) {
-      const categoryId = `CAT${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+      const categoryId = generateId({ prefix: 'CAT' });
       await FaultCategory.create({
         categoryId,
         ...cat,
@@ -226,14 +227,16 @@ const { specs, customCSS } = require('./swagger');
 const { authMiddleware } = require('./middleware/auth');
 const loadRoutes = require('./utils/routeLoader');
 
-initializeApp().then(() => {
-  app.listen(PORT, () => {
-    console.log(`服务器运行在 http://localhost:${PORT}`);
+initializeApp()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`服务器运行在 http://localhost:${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('应用初始化失败:', err);
+    process.exit(1);
   });
-}).catch(err => {
-  console.error('应用初始化失败:', err);
-  process.exit(1);
-});
 
 const PUBLIC_PATHS = [
   '/auth',
@@ -244,11 +247,11 @@ const PUBLIC_PATHS = [
   '/system-settings/system/info',
 ];
 
-const isPublicPath = (path) => {
+const isPublicPath = path => {
   if (path === '' || path === '/') {
     return true;
   }
-  return PUBLIC_PATHS.some((publicPath) => path === publicPath || path.startsWith(publicPath + '/'));
+  return PUBLIC_PATHS.some(publicPath => path === publicPath || path.startsWith(publicPath + '/'));
 };
 
 app.use('/api', (req, res, next) => {

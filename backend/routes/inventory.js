@@ -12,6 +12,7 @@ const User = require('../models/User');
 const PendingDevice = require('../models/PendingDevice');
 const { authMiddleware, authorize } = require('../middleware/auth');
 const { PAGINATION } = require('../config');
+const { generateId } = require('../utils/idGenerator');
 
 InventoryTask.belongsTo(InventoryPlan, { foreignKey: 'planId', as: 'Plan' });
 InventoryPlan.hasMany(InventoryTask, { foreignKey: 'planId', as: 'Tasks' });
@@ -23,20 +24,16 @@ InventoryPlan.hasMany(InventoryRecord, { foreignKey: 'planId', as: 'Records' });
 InventoryRecord.belongsTo(Device, { foreignKey: 'deviceId', as: 'Device' });
 InventoryRecord.belongsTo(User, { foreignKey: 'checkedBy', as: 'Checker' });
 
-function generateId(prefix) {
-  return `${prefix}${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-}
-
 function generatePlanId() {
-  return `PLAN${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+  return generateId({ prefix: 'PLAN' });
 }
 
 function generateTaskId() {
-  return `TASK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+  return generateId({ prefix: 'TASK' });
 }
 
 function generateRecordId() {
-  return `REC${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+  return generateId({ prefix: 'REC' });
 }
 
 router.use(authMiddleware);

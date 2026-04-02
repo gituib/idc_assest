@@ -11,12 +11,9 @@ const {
   USERNAME_MIN_LENGTH,
   USERNAME_MAX_LENGTH,
 } = require('../config');
+const { generateId } = require('../utils/idGenerator');
 
 const router = express.Router();
-
-const generateId = () => {
-  return 'user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-};
 
 router.post('/register', async (req, res) => {
   try {
@@ -57,7 +54,7 @@ router.post('/register', async (req, res) => {
     const isFirstUser = userCount === 0;
 
     const user = await User.create({
-      userId: generateId(),
+      userId: generateId({ prefix: 'USR' }),
       username,
       password: hashedPassword,
       email,

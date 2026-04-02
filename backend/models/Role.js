@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
+const { generateId } = require('../utils/idGenerator');
 
 const Role = sequelize.define(
   'Role',
@@ -7,7 +8,7 @@ const Role = sequelize.define(
     roleId: {
       type: DataTypes.STRING,
       primaryKey: true,
-      allowNull: false,
+      allowNull: true,
     },
     roleName: {
       type: DataTypes.STRING,
@@ -38,6 +39,13 @@ const Role = sequelize.define(
   {
     tableName: 'roles',
     timestamps: true,
+    hooks: {
+      beforeCreate: (role) => {
+        if (!role.roleId) {
+          role.roleId = generateId({ prefix: 'ROLE' });
+        }
+      },
+    },
   }
 );
 

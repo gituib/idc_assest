@@ -5,6 +5,7 @@ const { sequelize } = require('../db');
 const Consumable = require('../models/Consumable');
 const ConsumableLog = require('../models/ConsumableLog');
 const { importJobManager } = require('../utils/importJobManager');
+const { generateId } = require('../utils/idGenerator');
 
 const SUPPORTED_FIELDS = [
   'consumableId',
@@ -54,7 +55,10 @@ const parseSnList = snStr => {
   if (!snStr) return [];
   if (Array.isArray(snStr)) return snStr;
   if (typeof snStr === 'string') {
-    return snStr.split(/[,，;；\n]/).map(s => s.trim()).filter(Boolean);
+    return snStr
+      .split(/[,，;；\n]/)
+      .map(s => s.trim())
+      .filter(Boolean);
   }
   return [];
 };
@@ -108,8 +112,7 @@ router.post('/consumables/background', async (req, res) => {
             }
           }
 
-          const consumableId =
-            mappedItem.consumableId || mappedItem.name + `_${Date.now()}`;
+          const consumableId = mappedItem.consumableId || generateId({ prefix: 'CON' });
           const name = mappedItem.name;
           const category = mappedItem.category;
 
@@ -128,9 +131,7 @@ router.post('/consumables/background', async (req, res) => {
             category,
             unit: mappedItem.unit || '个',
             currentStock:
-              snList.length > 0
-                ? snList.length
-                : parseInt(mappedItem.currentStock) || 0,
+              snList.length > 0 ? snList.length : parseInt(mappedItem.currentStock) || 0,
             minStock: parseInt(mappedItem.minStock) || 10,
             maxStock: parseInt(mappedItem.maxStock) || 0,
             unitPrice: parseFloat(mappedItem.unitPrice) || 0,
@@ -210,7 +211,13 @@ router.post('/consumables/background', async (req, res) => {
             { transaction }
           );
 
-          importJobManager.incrementProgress(jobId, existingConsumable && mode === 'update' ? 0 : 1, 0, 0, existingConsumable ? 1 : 0);
+          importJobManager.incrementProgress(
+            jobId,
+            existingConsumable && mode === 'update' ? 0 : 1,
+            0,
+            0,
+            existingConsumable ? 1 : 0
+          );
         } catch (error) {
           results.failed++;
           results.errors.push(`第 ${rowNumber} 行: ${error.message}`);
@@ -294,13 +301,28 @@ router.get('/consumables/field-mappings', async (req, res) => {
     { source: '单位', target: 'unit', required: false, description: '计量单位，默认"个"' },
     { source: '当前库存', target: 'currentStock', required: false, description: '当前库存数量' },
     { source: '最小库存', target: 'minStock', required: false, description: '安全库存预警值' },
-    { source: '最大库存', target: 'maxStock', required: false, description: '最大库存限制，0表示无限制' },
+    {
+      source: '最大库存',
+      target: 'maxStock',
+      required: false,
+      description: '最大库存限制，0表示无限制',
+    },
     { source: '单价', target: 'unitPrice', required: false, description: '耗材单价' },
     { source: '供应商', target: 'supplier', required: false, description: '供应商名称' },
     { source: '存放位置', target: 'location', required: false, description: '仓库内存放位置' },
     { source: '描述', target: 'description', required: false, description: '耗材详细描述' },
-    { source: 'SN序列号', target: 'snList', required: false, description: '序列号列表，用逗号分隔' },
-    { source: '状态', target: 'status', required: false, description: '状态：active启用，inactive停用' },
+    {
+      source: 'SN序列号',
+      target: 'snList',
+      required: false,
+      description: '序列号列表，用逗号分隔',
+    },
+    {
+      source: '状态',
+      target: 'status',
+      required: false,
+      description: '状态：active启用，inactive停用',
+    },
   ];
 
   const systemFields = [

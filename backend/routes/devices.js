@@ -728,12 +728,12 @@ async function generateDeviceId() {
       },
     },
     attributes: [
-      [sequelize.fn('MAX', sequelize.literal("CAST(SUBSTR(deviceId, 4) AS INTEGER)")), 'maxNum'],
+      [sequelize.fn('MAX', sequelize.literal('CAST(SUBSTR(deviceId, 4) AS INTEGER)')), 'maxNum'],
     ],
     raw: true,
   });
 
-  const maxNumber = (result && result.maxNum) ? parseInt(result.maxNum, 10) : 0;
+  const maxNumber = result && result.maxNum ? parseInt(result.maxNum, 10) : 0;
   const newNumber = maxNumber + 1;
   return `DEV${String(newNumber).padStart(3, '0')}`;
 }

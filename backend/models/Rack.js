@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
+const { generateId } = require('../utils/idGenerator');
 const Room = require('./Room');
 
 const Rack = sequelize.define(
@@ -8,7 +9,7 @@ const Rack = sequelize.define(
     rackId: {
       type: DataTypes.STRING,
       primaryKey: true,
-      allowNull: false,
+      allowNull: true,
       unique: true,
     },
     name: {
@@ -45,6 +46,13 @@ const Rack = sequelize.define(
     tableName: 'racks',
     timestamps: true,
     indexes: [{ fields: ['roomId'] }, { fields: ['status'] }, { fields: ['roomId', 'status'] }],
+    hooks: {
+      beforeCreate: (rack) => {
+        if (!rack.rackId) {
+          rack.rackId = generateId({ prefix: 'RCK' });
+        }
+      },
+    },
   }
 );
 

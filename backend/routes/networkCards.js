@@ -281,7 +281,10 @@ router.post('/batch', async (req, res) => {
 
           let device;
           if (cardData.deviceSn) {
-            device = await Device.findOne({ where: { serialNumber: cardData.deviceSn }, transaction });
+            device = await Device.findOne({
+              where: { serialNumber: cardData.deviceSn },
+              transaction,
+            });
             if (!device) {
               throw new Error(`设备SN ${cardData.deviceSn} 不存在`);
             }

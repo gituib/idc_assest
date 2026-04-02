@@ -33,9 +33,13 @@ async function migrateCableFields() {
     for (const column of newColumns) {
       if (!existingColumns.includes(column.name)) {
         if (dbDialect === 'sqlite') {
-          await sequelize.query(`ALTER TABLE ${tableName} ADD COLUMN ${column.name} ${column.type}`);
+          await sequelize.query(
+            `ALTER TABLE ${tableName} ADD COLUMN ${column.name} ${column.type}`
+          );
         } else {
-          await sequelize.query(`ALTER TABLE ${tableName} ADD COLUMN ${column.name} ${column.type}`);
+          await sequelize.query(
+            `ALTER TABLE ${tableName} ADD COLUMN ${column.name} ${column.type}`
+          );
         }
         console.log(`  ✓ 添加字段: ${column.name}`);
       } else {

@@ -2,6 +2,7 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
 const User = require('./User');
 const Device = require('./Device');
+const { generateId } = require('../utils/idGenerator');
 
 const Ticket = sequelize.define(
   'Ticket',
@@ -9,7 +10,7 @@ const Ticket = sequelize.define(
     ticketId: {
       type: DataTypes.STRING,
       primaryKey: true,
-      allowNull: false,
+      allowNull: true,
       unique: true,
     },
     title: {
@@ -128,6 +129,13 @@ const Ticket = sequelize.define(
       { fields: ['assigneeId'] },
       { fields: ['createdAt'] },
     ],
+    hooks: {
+      beforeCreate: (ticket) => {
+        if (!ticket.ticketId) {
+          ticket.ticketId = generateId({ prefix: 'TKT' });
+        }
+      },
+    },
   }
 );
 

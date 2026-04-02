@@ -171,7 +171,10 @@ router.post('/batch', async (req, res) => {
 
           let device;
           if (portData.deviceSn) {
-            device = await Device.findOne({ where: { serialNumber: portData.deviceSn }, transaction });
+            device = await Device.findOne({
+              where: { serialNumber: portData.deviceSn },
+              transaction,
+            });
             if (!device) {
               throw new Error(`设备SN ${portData.deviceSn} 不存在`);
             }

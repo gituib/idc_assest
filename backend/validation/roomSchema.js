@@ -3,14 +3,13 @@ const Joi = require('joi');
 // 创建机房验证Schema
 const createRoomSchema = Joi.object({
   roomId: Joi.string()
-    .required()
+    .optional()
     .max(50)
     .pattern(/^[a-zA-Z0-9_-]+$/)
     .messages({
       'string.empty': '机房ID不能为空',
       'string.max': '机房ID不能超过50个字符',
       'string.pattern.base': '机房ID只能包含字母、数字、下划线和横线',
-      'any.required': '机房ID是必填字段',
     }),
 
   name: Joi.string().required().max(100).messages({

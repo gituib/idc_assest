@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
+const { generateId } = require('../utils/idGenerator');
 
 const User = sequelize.define(
   'User',
@@ -7,7 +8,7 @@ const User = sequelize.define(
     userId: {
       type: DataTypes.STRING,
       primaryKey: true,
-      allowNull: false,
+      allowNull: true,
     },
     username: {
       type: DataTypes.STRING,
@@ -62,6 +63,13 @@ const User = sequelize.define(
     tableName: 'users',
     timestamps: true,
     indexes: [{ fields: ['status'] }, { fields: ['username'] }, { fields: ['email'] }],
+    hooks: {
+      beforeCreate: (user) => {
+        if (!user.userId) {
+          user.userId = generateId({ prefix: 'USR' });
+        }
+      },
+    },
   }
 );
 

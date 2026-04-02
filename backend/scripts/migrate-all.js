@@ -109,7 +109,8 @@ const migrations = [
   },
   {
     name: '耗材日志设备关联',
-    description: '为 consumable_logs 表添加 deviceId、deviceName、rackId、rackName、roomId、roomName 字段',
+    description:
+      '为 consumable_logs 表添加 deviceId、deviceName、rackId、rackName、roomId、roomName 字段',
     migrate: migrateConsumableLogDeviceAssociation,
   },
 ];
@@ -761,9 +762,7 @@ async function migrateDevicePositionIndexes() {
       const existingIndexes = await sequelize.query(`SHOW INDEX FROM ${tableName}`, {
         type: sequelize.QueryTypes.SELECT,
       });
-      const indexExists = existingIndexes.some(
-        existing => existing.Key_name === idx.name
-      );
+      const indexExists = existingIndexes.some(existing => existing.Key_name === idx.name);
 
       if (indexExists) {
         console.log('     → 索引已存在，跳过');
@@ -780,7 +779,10 @@ async function migrateDevicePositionIndexes() {
         console.log('     ✓ 索引创建成功');
       }
     } catch (error) {
-      if (error.message.includes('already exists') || error.message.includes('Duplicate key name')) {
+      if (
+        error.message.includes('already exists') ||
+        error.message.includes('Duplicate key name')
+      ) {
         console.log('     → 索引已存在，跳过');
       } else {
         throw error;

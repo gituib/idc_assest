@@ -127,9 +127,7 @@ class ImportJobManager extends EventEmitter {
       error: job.error,
       startTime: job.startTime,
       endTime: job.endTime,
-      elapsedTime: job.startTime
-        ? Date.now() - new Date(job.startTime).getTime()
-        : null,
+      elapsedTime: job.startTime ? Date.now() - new Date(job.startTime).getTime() : null,
     };
 
     return progress;
@@ -164,9 +162,12 @@ class ImportJobManager extends EventEmitter {
 
 const importJobManager = new ImportJobManager();
 
-setInterval(() => {
-  importJobManager.cleanupOldJobs();
-}, 60 * 60 * 1000);
+setInterval(
+  () => {
+    importJobManager.cleanupOldJobs();
+  },
+  60 * 60 * 1000
+);
 
 module.exports = {
   importJobManager,

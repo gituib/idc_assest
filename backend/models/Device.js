@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
+const { generateId } = require('../utils/idGenerator');
 const Rack = require('./Rack');
 const Warehouse = require('./Warehouse');
 
@@ -9,7 +10,7 @@ const Device = sequelize.define(
     deviceId: {
       type: DataTypes.STRING,
       primaryKey: true,
-      allowNull: false,
+      allowNull: true,
       unique: true,
     },
     name: {
@@ -107,6 +108,13 @@ const Device = sequelize.define(
       { fields: ['rackId', 'position'] },
       { fields: ['rackId', 'position', 'isIdle'] },
     ],
+    hooks: {
+      beforeCreate: (device) => {
+        if (!device.deviceId) {
+          device.deviceId = generateId({ prefix: 'DEV' });
+        }
+      },
+    },
   }
 );
 

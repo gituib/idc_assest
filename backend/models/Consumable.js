@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
+const { generateId } = require('../utils/idGenerator');
 
 const Consumable = sequelize.define(
   'Consumable',
@@ -7,7 +8,7 @@ const Consumable = sequelize.define(
     consumableId: {
       type: DataTypes.STRING,
       primaryKey: true,
-      allowNull: false,
+      allowNull: true,
     },
     name: {
       type: DataTypes.STRING,
@@ -79,6 +80,13 @@ const Consumable = sequelize.define(
       { fields: ['category', 'status'] },
       { fields: ['updatedAt'] },
     ],
+    hooks: {
+      beforeCreate: (consumable) => {
+        if (!consumable.consumableId) {
+          consumable.consumableId = generateId({ prefix: 'CON' });
+        }
+      },
+    },
   }
 );
 

@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
 const Device = require('./Device');
+const { generateId } = require('../utils/idGenerator');
 
 const Cable = sequelize.define(
   'Cable',
@@ -8,7 +9,7 @@ const Cable = sequelize.define(
     cableId: {
       type: DataTypes.STRING,
       primaryKey: true,
-      allowNull: false,
+      allowNull: true,
       unique: true,
     },
     sourceDeviceId: {
@@ -90,6 +91,13 @@ const Cable = sequelize.define(
       { fields: ['sourceDeviceId', 'targetDeviceId'] },
       { fields: ['cableLabel'] },
     ],
+    hooks: {
+      beforeCreate: (cable) => {
+        if (!cable.cableId) {
+          cable.cableId = generateId({ prefix: 'CBL' });
+        }
+      },
+    },
   }
 );
 

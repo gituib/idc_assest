@@ -338,7 +338,15 @@ const TICKET_EXPORT_FIELDS = [
 
 router.get('/export', async (req, res) => {
   try {
-    const { keyword, status, priority, faultCategory, deviceId, format = 'csv', ticketIds } = req.query;
+    const {
+      keyword,
+      status,
+      priority,
+      faultCategory,
+      deviceId,
+      format = 'csv',
+      ticketIds,
+    } = req.query;
 
     const where = {};
 
@@ -391,9 +399,19 @@ router.get('/export', async (req, res) => {
           const priorityMap = { low: '低', medium: '中', high: '高', urgent: '紧急' };
           value = priorityMap[value] || value;
         } else if (fieldName === 'status') {
-          const statusMap = { pending: '待处理', in_progress: '处理中', completed: '已完成', closed: '已关闭' };
+          const statusMap = {
+            pending: '待处理',
+            in_progress: '处理中',
+            completed: '已完成',
+            closed: '已关闭',
+          };
           value = statusMap[value] || value;
-        } else if (fieldName === 'expectedCompletionDate' || fieldName === 'completionDate' || fieldName === 'createdAt' || fieldName === 'updatedAt') {
+        } else if (
+          fieldName === 'expectedCompletionDate' ||
+          fieldName === 'completionDate' ||
+          fieldName === 'createdAt' ||
+          fieldName === 'updatedAt'
+        ) {
           value = value ? new Date(value).toLocaleString('zh-CN') : '';
         }
 
@@ -411,7 +429,8 @@ router.get('/export', async (req, res) => {
     });
 
     if (format === 'json') {
-      return res.setHeader('Content-Type', 'application/json; charset=utf-8')
+      return res
+        .setHeader('Content-Type', 'application/json; charset=utf-8')
         .setHeader('Content-Disposition', `attachment; filename=tickets_${Date.now()}.json`)
         .json({ success: true, data: exportData, total: exportData.length });
     }
@@ -422,7 +441,10 @@ router.get('/export', async (req, res) => {
       XLSX.utils.book_append_sheet(workbook, worksheet, '工单数据');
       const xlsxBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
 
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
       res.setHeader('Content-Disposition', `attachment; filename=tickets_${Date.now()}.xlsx`);
       return res.send(xlsxBuffer);
     }
@@ -554,7 +576,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: '请选择设备或手动输入设备信息' });
     }
 
-    const ticketId = `TKT${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    const ticketId = generateId({ prefix: 'TKT' });
 
     const ticket = await Ticket.create({
       ticketId,
@@ -607,9 +629,17 @@ router.put('/:ticketId', async (req, res) => {
 
     // 白名单过滤：只允许更新安全字段，防止覆盖 ticketId/createdAt 等关键字段
     const ALLOWED_UPDATE_FIELDS = [
-      'title', 'description', 'category', 'priority', 'location',
-      'contactPerson', 'contactPhone', 'contactEmail',
-      'expectedDate', 'attachments', 'customFields',
+      'title',
+      'description',
+      'category',
+      'priority',
+      'location',
+      'contactPerson',
+      'contactPhone',
+      'contactEmail',
+      'expectedDate',
+      'attachments',
+      'customFields',
     ];
     const updateData = {};
     ALLOWED_UPDATE_FIELDS.forEach(field => {
