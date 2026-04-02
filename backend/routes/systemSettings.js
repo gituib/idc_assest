@@ -350,7 +350,7 @@ router.put('/:key', async (req, res) => {
         return res.status(400).json({ error: '值必须是有效的数字' });
       }
     } else if (setting.settingType === 'boolean') {
-      parsedValue = Boolean(value);
+      parsedValue = value === true || value === 'true' || value === '1' || value === 1;
     }
 
     await setting.update({

@@ -433,6 +433,14 @@ router.put('/:userId/password', authMiddleware, async (req, res) => {
       });
     }
 
+    // 权限检查：只能重置自己的密码，或管理员重置他人密码
+    if (req.user.userId !== user.userId && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: '无权重置其他用户的密码',
+      });
+    }
+
     if (!newPassword || newPassword.length < PASSWORD_MIN_LENGTH) {
       return res.status(400).json({
         success: false,

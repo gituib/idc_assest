@@ -75,7 +75,12 @@ api.interceptors.response.use(
         if (!currentPath.startsWith('/login')) {
           secureStorage.remove(TOKEN_KEY);
           secureStorage.remove('user');
-          window.location.href = '/login';
+          // 使用 React Router 导航而非强制刷新，保留 SPA 状态
+          if (window.__navigate) {
+            window.__navigate('/login');
+          } else {
+            window.location.href = '/login';
+          }
         }
       }
 

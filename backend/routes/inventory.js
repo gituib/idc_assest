@@ -150,9 +150,9 @@ router.put('/plans/:planId', async (req, res) => {
       type: type || plan.type,
       description: description !== undefined ? description : plan.description,
       scheduledDate: scheduledDate ? new Date(scheduledDate) : plan.scheduledDate,
-      targetRooms: targetRooms || plan.targetRooms,
-      targetRacks: targetRacks || plan.targetRacks,
-      status: status || plan.status,
+      targetRooms: Array.isArray(targetRooms) ? targetRooms : plan.targetRooms,
+      targetRacks: Array.isArray(targetRacks) ? targetRacks : plan.targetRacks,
+      status: status !== undefined ? status : plan.status,
     });
 
     res.json(plan);

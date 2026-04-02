@@ -130,7 +130,7 @@ router.get('/', async (req, res) => {
     }
 
     const onlineRate =
-      totalDevices > 0 ? (((totalDevices - faultDevices) / totalDevices) * 100).toFixed(1) : 100;
+      totalDevices > 0 ? ((runningDevices / totalDevices) * 100).toFixed(1) : 100;
 
     const totalRooms = rooms.length;
 

@@ -520,7 +520,9 @@ router.post('/import-preview', async (req, res) => {
 
 router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
   try {
-    const { keyword, status, type, rackId, roomId, page = 1, pageSize = 10, isIdle } = req.query;
+    const { keyword, status, type, rackId, roomId, isIdle } = req.query;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 10));
     const offset = (page - 1) * pageSize;
 
     // 构建查询条件
@@ -1078,8 +1080,12 @@ router.post('/import', async (req, res) => {
       fs.mkdirSync(path.join(__dirname, '../temp'));
     }
 
-    // 保存上传的文件
-    const filePath = path.join(__dirname, '../temp', csvFile.name);
+    // 保存上传的文件（使用 path.basename 防止路径遍历）
+    const safeFileName = path.basename(csvFile.name);
+    if (!safeFileName || safeFileName.startsWith('.') || safeFileName !== csvFile.name) {
+      return res.status(400).json({ error: '文件名不合法' });
+    }
+    const filePath = path.join(__dirname, '../temp', safeFileName);
     await csvFile.mv(filePath);
 
     // 读取并解析CSV文件（GBK编码）

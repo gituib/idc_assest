@@ -390,6 +390,14 @@ router.get('/export', async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
+    // 收集所有工单的自定义字段 key，确保导出列完整
+    const allCustomKeys = new Set();
+    tickets.forEach(ticket => {
+      if (ticket.metadata && typeof ticket.metadata === 'object') {
+        Object.keys(ticket.metadata).forEach(key => allCustomKeys.add(key));
+      }
+    });
+
     const exportData = tickets.map(ticket => {
       const item = {};
       TICKET_EXPORT_FIELDS.forEach(({ fieldName, displayName }) => {
@@ -418,12 +426,11 @@ router.get('/export', async (req, res) => {
         item[displayName] = value !== null && value !== undefined ? String(value) : '';
       });
 
-      if (ticket.metadata && typeof ticket.metadata === 'object') {
-        Object.entries(ticket.metadata).forEach(([key, val]) => {
-          const customDisplayName = key;
-          item[customDisplayName] = val !== null && val !== undefined ? String(val) : '';
-        });
-      }
+      // 填充所有自定义字段（缺失的填空字符串，保证每行列数一致）
+      allCustomKeys.forEach(key => {
+        const val = ticket.metadata && ticket.metadata[key];
+        item[key] = val !== null && val !== undefined ? String(val) : '';
+      });
 
       return item;
     });
@@ -855,6 +862,10 @@ router.post('/:ticketId/evaluate', async (req, res) => {
     const ticket = await Ticket.findByPk(req.params.ticketId);
     if (!ticket) {
       return res.status(404).json({ error: '工单不存在' });
+    }
+
+    if (ticket.status !== 'completed') {
+      return res.status(400).json({ error: '只有已完成的工单才能评价' });
     }
 
     await ticket.update({ evaluation, evaluationRating });

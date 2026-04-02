@@ -3,8 +3,6 @@ import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import Components from 'unplugin-vue-components/vite';
-import { AntDesignVueResolver } from 'unplugin-vue-components/resolvers';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,14 +35,6 @@ const port = getFrontendPort();
 export default defineConfig({
   plugins: [
     react(),
-    Components({
-      resolvers: [
-        AntDesignVueResolver({
-          importStyle: false,
-        }),
-      ],
-      dts: false,
-    }),
   ],
   assetsInclude: ['**/*.hdr', '**/*.woff2'],
   server: {

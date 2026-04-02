@@ -93,10 +93,18 @@ async function syncBusinessModels() {
   const DeviceBusiness = require('./models/DeviceBusiness');
   const Warehouse = require('./models/Warehouse');
 
-  await Business.sync({ alter: true });
-  await DeviceBusiness.sync({ alter: true });
-  await Warehouse.sync({ alter: true });
-  console.log('业务/设备关联/库房模型同步完成');
+  // 仅在开发环境使用 sync({ alter: true })，生产环境应使用 migrations
+  if (process.env.NODE_ENV !== 'production') {
+    await Business.sync({ alter: true });
+    await DeviceBusiness.sync({ alter: true });
+    await Warehouse.sync({ alter: true });
+    console.log('业务/设备关联/库房模型同步完成（alter mode）');
+  } else {
+    await Business.sync();
+    await DeviceBusiness.sync();
+    await Warehouse.sync();
+    console.log('业务/设备关联/库房模型同步完成（safe mode）');
+  }
 }
 
 async function initDefaultSystemSettings() {

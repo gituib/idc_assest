@@ -62,11 +62,16 @@ const Controls = ({ rack, onControlsReady }) => {
     }
   }, [controlsRef.current, camera, initialCameraPosition, fixedTarget, onControlsReady]);
 
+  const prevTargetRef = React.useRef(null);
+
   useFrame(() => {
     if (controlsRef.current) {
-      // 强制保持 target 在机柜中轴线
-      controlsRef.current.target.copy(fixedTarget);
-      controlsRef.current.update();
+      // 仅在 target 变化时更新，避免每帧执行矩阵计算
+      if (prevTargetRef.current !== fixedTarget) {
+        controlsRef.current.target.copy(fixedTarget);
+        controlsRef.current.update();
+        prevTargetRef.current = fixedTarget;
+      }
     }
   });
 

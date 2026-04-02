@@ -304,7 +304,20 @@ router.post('/batch', async (req, res) => {
 
 router.put('/:portId', async (req, res) => {
   try {
-    const [updated] = await DevicePort.update(req.body, {
+    // 白名单过滤：只允许更新安全字段
+    const ALLOWED_FIELDS = ['portName', 'portType', 'portSpeed', 'status', 'vlanId', 'description', 'connectedDevice', 'macAddress'];
+    const updateData = {};
+    ALLOWED_FIELDS.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: '没有可更新的字段' });
+    }
+
+    const [updated] = await DevicePort.update(updateData, {
       where: { portId: req.params.portId },
     });
 

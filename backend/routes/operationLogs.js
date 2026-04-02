@@ -183,11 +183,11 @@ router.get('/statistics', authMiddleware, async (req, res) => {
       OperationLog.findAll({
         where,
         attributes: [
-          [sequelize.fn('DATE', sequelize.col('createdAt')), 'date'],
+          [sequelize.literal("strftime('%Y-%m-%d', \"createdAt\")"), 'date'],
           [sequelize.fn('COUNT', '*'), 'count'],
         ],
-        group: [sequelize.fn('DATE', sequelize.col('createdAt'))],
-        order: [[sequelize.fn('DATE', sequelize.col('createdAt')), 'DESC']],
+        group: [sequelize.literal("strftime('%Y-%m-%d', \"createdAt\")")],
+        order: [[sequelize.literal("strftime('%Y-%m-%d', \"createdAt\")"), 'DESC']],
         limit: 30,
       }),
     ]);
