@@ -69,6 +69,9 @@ if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
 
+// 全局认证保护：所有备份路由需要登录
+router.use(authMiddleware);
+
 router.post('/', async (req, res) => {
   try {
     const { description = '', includeFiles = true } = req.body;
@@ -217,7 +220,7 @@ router.get('/validate/:filename', async (req, res) => {
   }
 });
 
-router.get('/restore-progress/:filename', authMiddleware, async (req, res) => {
+router.get('/restore-progress/:filename', async (req, res) => {
   const { filename } = req.params;
   const options = req.query.options ? JSON.parse(req.query.options) : {};
 

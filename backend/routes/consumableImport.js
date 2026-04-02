@@ -2,10 +2,15 @@ const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
 const { sequelize } = require('../db');
+const { authMiddleware } = require('../middleware/auth');
 const Consumable = require('../models/Consumable');
 const ConsumableLog = require('../models/ConsumableLog');
 const { importJobManager } = require('../utils/importJobManager');
 const { generateId } = require('../utils/idGenerator');
+
+// 注意：此路由挂载在 /api 根路径，不能使用 router.use(authMiddleware)，
+// 否则会拦截所有 /api 下的请求。认证由 server.js 全局中间件处理。
+// 各路由单独添加 authMiddleware。
 
 const SUPPORTED_FIELDS = [
   'consumableId',
@@ -63,7 +68,7 @@ const parseSnList = snStr => {
   return [];
 };
 
-router.post('/consumables/background', async (req, res) => {
+router.post('/consumables/background', authMiddleware, async (req, res) => {
   const { items, operator = '系统', mode = 'create', fieldMapping = {} } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -245,7 +250,7 @@ router.post('/consumables/background', async (req, res) => {
   });
 });
 
-router.get('/consumables/progress/:jobId', async (req, res) => {
+router.get('/consumables/progress/:jobId', authMiddleware, async (req, res) => {
   const { jobId } = req.params;
 
   const progress = importJobManager.getJobProgress(jobId);
@@ -256,7 +261,7 @@ router.get('/consumables/progress/:jobId', async (req, res) => {
   res.json(progress);
 });
 
-router.post('/consumables/cancel/:jobId', async (req, res) => {
+router.post('/consumables/cancel/:jobId', authMiddleware, async (req, res) => {
   const { jobId } = req.params;
 
   const job = importJobManager.getJob(jobId);
@@ -272,7 +277,7 @@ router.post('/consumables/cancel/:jobId', async (req, res) => {
   res.json({ message: '任务已取消' });
 });
 
-router.get('/consumables/result/:jobId', async (req, res) => {
+router.get('/consumables/result/:jobId', authMiddleware, async (req, res) => {
   const { jobId } = req.params;
 
   const job = importJobManager.getJob(jobId);
@@ -293,7 +298,7 @@ router.get('/consumables/result/:jobId', async (req, res) => {
   });
 });
 
-router.get('/consumables/field-mappings', async (req, res) => {
+router.get('/consumables/field-mappings', authMiddleware, async (req, res) => {
   const mappings = [
     { source: '耗材ID', target: 'consumableId', required: false, description: '耗材唯一标识符' },
     { source: '名称', target: 'name', required: true, description: '耗材名称' },

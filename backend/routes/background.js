@@ -2,6 +2,10 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const router = express.Router();
+const { authMiddleware } = require('../middleware/auth');
+
+// 所有背景设置路由需要认证
+router.use(authMiddleware);
 
 const UPLOAD_DIR = path.join(__dirname, '../uploads');
 if (!fs.existsSync(UPLOAD_DIR)) {
