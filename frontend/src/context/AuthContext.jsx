@@ -1,79 +1,66 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { authAPI } from '../api';
 import secureStorage, { TOKEN_KEY, USER_KEY } from '../utils/secureStorage';
 
-const AuthContext = createContext(null);
+const AuthContext = createContext({
+  user: null,
+  token: null,
+  loading: true,
+  initialized: false,
+  login: async () => ({ success: false, message: '认证未初始化' }),
+  register: async () => ({ success: false, message: '认证未初始化' }),
+  logout: () => {},
+  updateUser: () => {},
+  hasPermission: () => false,
+  checkAdmin: () => Promise.resolve({ success: true, data: { hasAdmin: false, userCount: 0 } }),
+});
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth必须在AuthProvider内部使用');
-  }
-  return context;
+  return useContext(AuthContext);
 };
 
 export const AuthProvider = ({ children }) => {
-  console.log('[AuthContext] Initializing...');
-
   const savedToken = secureStorage.get(TOKEN_KEY);
   const savedUser = secureStorage.get(USER_KEY);
 
-  console.log('[AuthContext] Saved token:', savedToken ? 'exists' : 'null');
-  console.log('[AuthContext] Saved user:', savedUser ? 'exists' : 'null');
-
-  const [user, setUser] = useState(() => savedUser || null);
-  const [token, setToken] = useState(() => savedToken);
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(savedUser);
+  const [token, setToken] = useState(savedToken);
+  const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     const currentToken = secureStorage.get(TOKEN_KEY);
-    const currentUser = secureStorage.get(USER_KEY);
 
-    if (currentToken && currentToken === token) {
-      if (currentUser && JSON.stringify(currentUser) !== JSON.stringify(user)) {
-        setUser(currentUser);
-      }
-      // 有 token 时调用 fetchProfile 验证有效性并刷新用户信息
-      fetchProfile();
-    } else if (!currentToken) {
+    if (!currentToken) {
       setToken(null);
       setUser(null);
-      setInitialized(true);
-    } else {
-      setToken(currentToken);
-      setInitialized(true);
-    }
-  }, []);
-
-  const fetchProfile = useCallback(async () => {
-    const currentToken = secureStorage.get(TOKEN_KEY);
-    if (!currentToken) {
       setLoading(false);
       setInitialized(true);
       return;
     }
 
-    try {
-      const response = await authAPI.getProfile();
-      if (response.success) {
-        setUser(response.data.user);
-        secureStorage.set(USER_KEY, response.data.user);
+    const initializeAuth = async () => {
+      try {
+        const response = await authAPI.getProfile();
+        if (response.success) {
+          setUser(response.data.user);
+          secureStorage.set(USER_KEY, response.data.user);
+        }
+      } catch {
+        secureStorage.remove(TOKEN_KEY);
+        secureStorage.remove(USER_KEY);
+        setToken(null);
+        setUser(null);
+      } finally {
+        setLoading(false);
+        setInitialized(true);
       }
-    } catch (error) {
-      console.error('获取用户信息失败:', error);
-      // Token 无效，清除登录状态
-      secureStorage.remove(TOKEN_KEY);
-      secureStorage.remove(USER_KEY);
-      setToken(null);
-      setUser(null);
-    } finally {
-      setLoading(false);
-      setInitialized(true);
-    }
+    };
+
+    initializeAuth();
   }, []);
 
-  const login = async (username, password) => {
+  const login = useCallback(async (username, password) => {
     try {
       const response = await authAPI.login({ username, password });
       if (response.success) {
@@ -89,9 +76,9 @@ export const AuthProvider = ({ children }) => {
       const message = error?.response?.data?.message || error?.message || '登录失败，请稍后重试';
       return { success: false, message };
     }
-  };
+  }, []);
 
-  const register = async userData => {
+  const register = useCallback(async userData => {
     try {
       const response = await authAPI.register(userData);
       if (response.success) {
@@ -109,7 +96,7 @@ export const AuthProvider = ({ children }) => {
       const message = error?.response?.data?.message || error?.message || '注册失败，请稍后重试';
       return { success: false, message };
     }
-  };
+  }, []);
 
   const logout = useCallback(() => {
     secureStorage.remove(TOKEN_KEY);
@@ -118,24 +105,25 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   }, []);
 
-  const updateUser = newUserData => {
-    const updatedUser = { ...user, ...newUserData };
-    setUser(updatedUser);
-    secureStorage.set(USER_KEY, updatedUser);
-  };
+  const updateUser = useCallback(newUserData => {
+    setUser(prev => {
+      const updated = { ...prev, ...newUserData };
+      secureStorage.set(USER_KEY, updated);
+      return updated;
+    });
+  }, []);
 
-  const hasPermission = permission => {
+  const hasPermission = useCallback(permission => {
     if (!user) return false;
     const roles = user.roles || [];
-    // 管理员拥有所有权限
     if (roles.some(r => r.roleCode === 'admin')) return true;
-    // 检查具体权限
     if (permission === 'admin') return roles.some(r => r.roleCode === 'admin');
-    // roleCode 格式的权限直接匹配
     return roles.some(r => r.roleCode === permission);
-  };
+  }, [user]);
 
-  const value = {
+  const checkAdmin = useCallback(() => authAPI.checkAdmin(), []);
+
+  const value = useMemo(() => ({
     user,
     token,
     loading,
@@ -145,8 +133,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateUser,
     hasPermission,
-    checkAdmin: () => authAPI.checkAdmin(),
-  };
+    checkAdmin,
+  }), [user, token, loading, initialized, login, register, logout, updateUser, hasPermission, checkAdmin]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

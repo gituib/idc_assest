@@ -1,5 +1,4 @@
 const STORAGE_PREFIX = 'idc_';
-const ENCRYPTION_ENABLED = import.meta.env.PROD;
 
 /**
  * 生成运行时密钥（基于浏览器指纹）
@@ -11,7 +10,6 @@ const getOrCreateRuntimeKey = () => {
   let key = sessionStorage.getItem(KEY_STORAGE_ID);
   if (key) return key;
 
-  // 基于浏览器特征生成指纹作为密钥种子
   const fingerprint = [
     navigator.userAgent,
     screen.width,
@@ -21,14 +19,12 @@ const getOrCreateRuntimeKey = () => {
     navigator.language,
   ].join('|');
 
-  // 使用简单的哈希混合生成 32 字符密钥
   let hash = 0;
   for (let i = 0; i < fingerprint.length; i++) {
     const char = fingerprint.charCodeAt(i);
     hash = ((hash << 5) - hash + char) | 0;
   }
 
-  // 生成 32 字符的随机密钥
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   key = '';
   let seed = Math.abs(hash) + Date.now();
@@ -38,12 +34,11 @@ const getOrCreateRuntimeKey = () => {
   }
 
   sessionStorage.setItem(KEY_STORAGE_ID, key);
+  console.log('[SecureStorage] New runtime key generated:', key.substring(0, 8) + '...');
   return key;
 };
 
 const simpleEncrypt = (text) => {
-  if (!ENCRYPTION_ENABLED) return text;
-
   const key = getOrCreateRuntimeKey();
   let result = '';
   for (let i = 0; i < text.length; i++) {
@@ -53,8 +48,6 @@ const simpleEncrypt = (text) => {
 };
 
 const simpleDecrypt = (encrypted) => {
-  if (!ENCRYPTION_ENABLED) return encrypted;
-
   try {
     const key = getOrCreateRuntimeKey();
     const decoded = decodeURIComponent(atob(encrypted));
@@ -63,7 +56,8 @@ const simpleDecrypt = (encrypted) => {
       result += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length));
     }
     return result;
-  } catch {
+  } catch (e) {
+    console.error('[SecureStorage] Decrypt error:', e.message);
     return null;
   }
 };
@@ -80,6 +74,8 @@ export const secureStorage = {
       const serialized = JSON.stringify(data);
       const encrypted = simpleEncrypt(serialized);
       localStorage.setItem(storageKey, encrypted);
+      console.log('[SecureStorage] Set:', key, '=', value ? value.substring(0, 30) + '...' : 'null');
+      console.log('[SecureStorage] Stored encrypted value length:', encrypted.length);
       return true;
     } catch (error) {
       console.error('[SecureStorage] Set error:', error);
@@ -92,10 +88,25 @@ export const secureStorage = {
       const storageKey = `${STORAGE_PREFIX}${key}`;
       const encrypted = localStorage.getItem(storageKey);
 
-      if (!encrypted) return null;
+      if (!encrypted) {
+        console.log('[SecureStorage] Get:', key, '- not found in localStorage');
+        return null;
+      }
 
-      const decrypted = simpleDecrypt(encrypted);
+      console.log('[SecureStorage] Get:', key, '- found encrypted data, length:', encrypted.length);
+
+      let decrypted = simpleDecrypt(encrypted);
       if (!decrypted) {
+        console.log('[SecureStorage] Get:', key, '- decryption failed, trying raw JSON parse');
+        try {
+          const parsed = JSON.parse(encrypted);
+          if (parsed && parsed.value !== undefined) {
+            console.log('[SecureStorage] Get:', key, '- recovered from raw JSON');
+            return parsed.value;
+          }
+        } catch {
+          console.log('[SecureStorage] Get:', key, '- raw JSON parse also failed');
+        }
         localStorage.removeItem(storageKey);
         return null;
       }
@@ -103,10 +114,13 @@ export const secureStorage = {
       const data = JSON.parse(decrypted);
 
       if (data.expiry && Date.now() > data.expiry) {
+        console.log('[SecureStorage] Get:', key, '- expired');
         localStorage.removeItem(storageKey);
         return null;
       }
 
+      const valuePreview = typeof data.value === 'string' ? data.value.substring(0, 30) + '...' : typeof data.value;
+      console.log('[SecureStorage] Get:', key, '- success:', valuePreview);
       return data.value;
     } catch (error) {
       console.error('[SecureStorage] Get error:', error);
@@ -118,6 +132,7 @@ export const secureStorage = {
     try {
       const storageKey = `${STORAGE_PREFIX}${key}`;
       localStorage.removeItem(storageKey);
+      console.log('[SecureStorage] Remove:', key);
       return true;
     } catch (error) {
       console.error('[SecureStorage] Remove error:', error);
@@ -135,6 +150,7 @@ export const secureStorage = {
         }
       }
       keys.forEach((key) => localStorage.removeItem(key));
+      console.log('[SecureStorage] Clear: removed', keys.length, 'keys');
       return true;
     } catch (error) {
       console.error('[SecureStorage] Clear error:', error);

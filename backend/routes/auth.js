@@ -244,25 +244,23 @@ router.get('/profile', authMiddleware, async (req, res) => {
       });
     }
 
-    const roles = await Role.findAll({
-      include: [
-        {
-          model: User,
-          where: { userId: req.user.userId },
-          attributes: [],
-        },
-      ],
+    const userRoles = await UserRole.findAll({
+      where: { UserId: user.userId },
+      include: [{ model: Role }],
     });
 
     res.json({
       success: true,
       data: {
         user,
-        roles: roles.map(r => ({
-          roleId: r.roleId,
-          roleName: r.roleName,
-          roleCode: r.roleCode,
-        })),
+        roles: userRoles.map(ur => {
+          const role = ur.Role || ur;
+          return {
+            roleId: role.roleId,
+            roleName: role.roleName,
+            roleCode: role.roleCode,
+          };
+        }),
       },
     });
   } catch (error) {
