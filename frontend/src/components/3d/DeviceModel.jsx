@@ -630,7 +630,7 @@ const DeviceModel = ({
   // 背板渲染控制状态
   const [backPanelLevel, setBackPanelLevel] = useState(0); // 0: 不渲染, 1: 简化, 2: 完整
   const { camera } = useThree();
-  const frameCount = useRef(0);
+  const prevCameraZRef = useRef(null);
 
   // 使用传入的 uHeight (默认为 0.04445m)
   const uHeight = propUHeight || 0.04445;
@@ -653,19 +653,21 @@ const DeviceModel = ({
   });
 
   // 背板渲染控制 - 根据相机位置动态调整
-  // 只在相机绕到背面时才渲染背板
+  // 仅在相机 Z 坐标变化超过阈值时触发，减少不必要的状态更新
   useFrame(() => {
-    // 每10帧检查一次，减少计算频率
-    frameCount.current++;
-    if (frameCount.current % 10 !== 0) return;
-
     if (!groupRef.current) return;
+
+    const cameraZ = camera.position.z;
+
+    // 仅当相机 Z 坐标变化超过阈值（0.1）时才检查
+    if (prevCameraZRef.current !== null && Math.abs(cameraZ - prevCameraZRef.current) < 0.1) {
+      return;
+    }
+    prevCameraZRef.current = cameraZ;
 
     // 获取相机相对设备的位置
     const deviceWorldPos = new THREE.Vector3();
     groupRef.current.getWorldPosition(deviceWorldPos);
-
-    const cameraZ = camera.position.z;
 
     // 简单逻辑：相机在正面（z > threshold）时不渲染背板
     // 相机在背面（z <= threshold）时渲染完整背板

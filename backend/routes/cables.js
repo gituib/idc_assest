@@ -5,6 +5,159 @@ const Cable = require('../models/Cable');
 const Device = require('../models/Device');
 const DevicePort = require('../models/DevicePort');
 
+const PORT_COMPATIBILITY = {
+  RJ45: {
+    compatibleWith: ['RJ45'],
+    cableTypes: ['ethernet', 'copper'],
+    description: '电口',
+  },
+  SFP: {
+    compatibleWith: ['SFP', 'SFP+', 'SFP28', 'QSFP', 'QSFP28'],
+    cableTypes: ['fiber'],
+    description: '光口',
+  },
+  'SFP+': {
+    compatibleWith: ['SFP', 'SFP+', 'SFP28', 'QSFP28'],
+    cableTypes: ['fiber'],
+    description: '万兆光口',
+  },
+  SFP28: {
+    compatibleWith: ['SFP28', 'SFP+', 'QSFP28'],
+    cableTypes: ['fiber'],
+    description: '25G光口',
+  },
+  QSFP: {
+    compatibleWith: ['QSFP', 'QSFP28'],
+    cableTypes: ['fiber'],
+    description: '40G光口',
+  },
+  QSFP28: {
+    compatibleWith: ['QSFP28', 'QSFP'],
+    cableTypes: ['fiber'],
+    description: '100G光口',
+  },
+};
+
+const SPEED_COMPATIBILITY = {
+  '100M': { compatibleSpeeds: ['100M', '1G'], warningThreshold: null },
+  '1G': { compatibleSpeeds: ['100M', '1G', '10G'], warningThreshold: '10G' },
+  '10G': { compatibleSpeeds: ['1G', '10G', '25G'], warningThreshold: '25G' },
+  '25G': { compatibleSpeeds: ['10G', '25G', '40G'], warningThreshold: '40G' },
+  '40G': { compatibleSpeeds: ['25G', '40G', '100G'], warningThreshold: '100G' },
+  '100G': { compatibleSpeeds: ['40G', '100G'], warningThreshold: null },
+};
+
+function checkPortCompatibility(sourcePort, targetPort) {
+  const incompatibilityReasons = [];
+
+  const sourcePortType = sourcePort.portType;
+  const targetPortType = targetPort.portType;
+
+  const sourceCompat = PORT_COMPATIBILITY[sourcePortType];
+  const targetCompat = PORT_COMPATIBILITY[targetPortType];
+
+  if (!sourceCompat || !targetCompat) {
+    incompatibilityReasons.push({
+      type: 'unknown',
+      message: `未知端口类型: 源端口=${sourcePortType}, 目标端口=${targetPortType}`,
+      severity: 'error',
+    });
+    return { compatible: false, reasons: incompatibilityReasons };
+  }
+
+  const sourceCanConnect = sourceCompat.compatibleWith.includes(targetPortType);
+  const targetCanConnect = targetCompat.compatibleWith.includes(sourcePortType);
+
+  if (!sourceCanConnect || !targetCanConnect) {
+    incompatibilityReasons.push({
+      type: 'portType',
+      message: `端口类型不兼容: 源端口(${sourcePortType}-${sourceCompat.description})无法连接到目标端口(${targetPortType}-${targetCompat.description})`,
+      severity: 'error',
+      details: {
+        sourcePortType,
+        targetPortType,
+        sourceDescription: sourceCompat.description,
+        targetDescription: targetCompat.description,
+      },
+    });
+  }
+
+  const sourceSpeedCompat = SPEED_COMPATIBILITY[sourcePort.portSpeed];
+  const targetSpeedCompat = SPEED_COMPATIBILITY[targetPort.portSpeed];
+
+  if (sourceSpeedCompat && targetSpeedCompat) {
+    const sourceCanSupportTarget = sourceSpeedCompat.compatibleSpeeds.includes(targetPort.portSpeed);
+    const targetCanSupportSource = targetSpeedCompat.compatibleSpeeds.includes(sourcePort.portSpeed);
+
+    if (!sourceCanSupportTarget || !targetCanSupportSource) {
+      if (sourcePort.portSpeed !== targetPort.portSpeed) {
+        incompatibilityReasons.push({
+          type: 'speed',
+          message: `端口速率不匹配: 源端口(${sourcePort.portSpeed})与目标端口(${targetPort.portSpeed})速率不一致，可能影响连接质量`,
+          severity: 'warning',
+          details: {
+            sourceSpeed: sourcePort.portSpeed,
+            targetSpeed: targetPort.portSpeed,
+            sourceWarning: sourceSpeedCompat.warningThreshold,
+            targetWarning: targetSpeedCompat.warningThreshold,
+          },
+        });
+      }
+    }
+  }
+
+  return {
+    compatible: incompatibilityReasons.filter(r => r.severity === 'error').length === 0,
+    reasons: incompatibilityReasons,
+  };
+}
+
+async function validatePortCompatibility(sourceDeviceId, sourcePortName, targetDeviceId, targetPortName) {
+  try {
+    const [sourcePorts, targetPorts] = await Promise.all([
+      DevicePort.findAll({ where: { deviceId: sourceDeviceId, portName: sourcePortName } }),
+      DevicePort.findAll({ where: { deviceId: targetDeviceId, portName: targetPortName } }),
+    ]);
+
+    const sourcePort = sourcePorts[0];
+    const targetPort = targetPorts[0];
+
+    if (!sourcePort) {
+      return {
+        compatible: false,
+        reasons: [{
+          type: 'notFound',
+          message: `源设备 ${sourceDeviceId} 的端口 ${sourcePortName} 不存在`,
+          severity: 'error',
+        }],
+      };
+    }
+
+    if (!targetPort) {
+      return {
+        compatible: false,
+        reasons: [{
+          type: 'notFound',
+          message: `目标设备 ${targetDeviceId} 的端口 ${targetPortName} 不存在`,
+          severity: 'error',
+        }],
+      };
+    }
+
+    return checkPortCompatibility(sourcePort, targetPort);
+  } catch (error) {
+    console.error('验证端口兼容性时出错:', error);
+    return {
+      compatible: false,
+      reasons: [{
+        type: 'error',
+        message: `验证端口兼容性时出错: ${error.message}`,
+        severity: 'error',
+      }],
+    };
+  }
+}
+
 // 辅助函数：更新端口状态
 async function updatePortStatus(deviceId, portName, status) {
   try {
@@ -245,6 +398,27 @@ router.post('/check-conflict', async (req, res) => {
   }
 });
 
+// 检查端口兼容性
+router.post('/check-compatibility', async (req, res) => {
+  try {
+    const { sourceDeviceId, sourcePort, targetDeviceId, targetPort } = req.body;
+
+    if (!sourceDeviceId || !sourcePort || !targetDeviceId || !targetPort) {
+      return res.status(400).json({ error: '缺少必填字段' });
+    }
+
+    const compatibilityResult = await validatePortCompatibility(sourceDeviceId, sourcePort, targetDeviceId, targetPort);
+
+    res.json({
+      compatible: compatibilityResult.compatible,
+      ...compatibilityResult,
+    });
+  } catch (error) {
+    console.error('检查端口兼容性失败:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/', async (req, res) => {
   try {
     const {
@@ -273,6 +447,18 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: '源设备和目标设备不能相同' });
     }
 
+    // 端口兼容性验证
+    const compatibilityResult = await validatePortCompatibility(sourceDeviceId, sourcePort, targetDeviceId, targetPort);
+    if (!compatibilityResult.compatible) {
+      const errorReasons = compatibilityResult.reasons.filter(r => r.severity === 'error');
+      return res.status(400).json({
+        error: '端口不兼容',
+        incompatibility: true,
+        compatibilityResult,
+        errors: errorReasons.map(r => r.message),
+      });
+    }
+
     // 如果不是强制模式，检查冲突（包括反向端口分配）
     if (!force) {
       const existingCable = await Cable.findOne({
@@ -280,7 +466,6 @@ router.post('/', async (req, res) => {
           [Op.or]: [
             { sourceDeviceId, sourcePort },
             { targetDeviceId, targetPort },
-            // 反向检查：已有接线的目标端口恰好是当前源端口
             { sourceDeviceId: targetDeviceId, sourcePort: targetPort },
             { targetDeviceId: sourceDeviceId, targetPort: sourcePort },
           ],

@@ -109,28 +109,26 @@ const LODManager = ({
   const mediumDetailRef = useRef();
   const lowDetailRef = useRef();
   const { camera } = useThree();
-  // 使用 ref 存储 LOD 级别，避免 React 状态更新
   const lodLevelRef = useRef(LOD_LEVELS.HIGH);
   const distanceRef = useRef(0);
-  // 帧计数器，用于节流
-  const frameCount = useRef(0);
-  // 用于强制重新渲染的 state（仅在必要时更新）
+  const prevDistanceRef = useRef(null);
   const [, forceUpdate] = React.useReducer(x => x + 1, 0);
 
   useFrame(() => {
     if (!groupRef.current) return;
 
-    // 节流：每5帧检查一次
-    frameCount.current++;
-    if (frameCount.current % 5 !== 0) return;
-
     const distance = camera.position.distanceTo(groupRef.current.position);
+
+    // 仅当距离变化超过阈值（10%）时才检查
+    if (prevDistanceRef.current !== null) {
+      const changeRatio = Math.abs(distance - prevDistanceRef.current) / (prevDistanceRef.current || 1);
+      if (changeRatio < 0.1) return;
+    }
+    prevDistanceRef.current = distance;
     distanceRef.current = distance;
 
-    // 添加缓冲避免频繁切换（10% 缓冲）
-    const buffer = 0.1;
-    const highThreshold = LOD_DISTANCES.HIGH * (1 + buffer);
-    const mediumThreshold = LOD_DISTANCES.MEDIUM * (1 + buffer);
+    const highThreshold = LOD_DISTANCES.HIGH;
+    const mediumThreshold = LOD_DISTANCES.MEDIUM;
 
     let newLevel = LOD_LEVELS.HIGH;
     if (distance > mediumThreshold) {
@@ -139,10 +137,8 @@ const LODManager = ({
       newLevel = LOD_LEVELS.MEDIUM;
     }
 
-    // 只有当级别变化时才更新
     if (newLevel !== lodLevelRef.current) {
       lodLevelRef.current = newLevel;
-      // 直接操作 ref 切换可见性，避免频繁的 React 重渲染
       if (highDetailRef.current) {
         highDetailRef.current.visible = newLevel === LOD_LEVELS.HIGH;
       }
@@ -152,10 +148,7 @@ const LODManager = ({
       if (lowDetailRef.current) {
         lowDetailRef.current.visible = newLevel === LOD_LEVELS.LOW;
       }
-      // 偶尔强制更新以确保同步（每30帧）
-      if (frameCount.current % 30 === 0) {
-        forceUpdate();
-      }
+      forceUpdate();
     }
   });
 

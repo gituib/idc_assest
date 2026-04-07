@@ -30,14 +30,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import CloseButton from './CloseButton';
 import PortPanel from './PortPanel';
+import FilterableDeviceSelect from './FilterableDeviceSelect';
 import { designTokens } from '../config/theme';
 
 const { Title, Text } = Typography;
 
 const CABLE_TYPES = [
-  { value: 'ethernet', label: '以太网线', color: '#52c41a', icon: '🌐' },
-  { value: 'fiber', label: '光纤', color: '#1890ff', icon: '🔦' },
-  { value: 'copper', label: '铜缆', color: '#faad14', icon: '🔌' },
+  { value: 'ethernet', label: '以太网线', desc: 'Cat6 1G/10G', color: '#52c41a', icon: '🌐' },
+  { value: 'fiber', label: '光纤', desc: 'SMF/MMF 长距离', color: '#1890ff', icon: '🔦' },
+  { value: 'copper', label: '铜缆', desc: '电源/特殊连接', color: '#faad14', icon: '🔌' },
 ];
 
 const CABLE_LENGTHS = [1, 2, 3, 5, 7, 10, 15, 20, 30, 50];
@@ -73,6 +74,7 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
   const [targetPorts, setTargetPorts] = useState([]);
   const [conflicts, setConflicts] = useState([]);
   const [cablesData, setCablesData] = useState([]);
+  const [compatibilityWarning, setCompatibilityWarning] = useState(null);
 
   // 初始化编辑模式的数据
   useEffect(() => {
@@ -154,6 +156,21 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
     }
   }, []);
 
+  const checkPortCompatibility = useCallback(async (srcDeviceId, srcPort, tgtDeviceId, tgtPort) => {
+    try {
+      const response = await axios.post('/api/cables/check-compatibility', {
+        sourceDeviceId: srcDeviceId,
+        sourcePort: srcPort,
+        targetDeviceId: tgtDeviceId,
+        targetPort: tgtPort,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('检查端口兼容性失败:', error);
+      return { compatible: false, reasons: [] };
+    }
+  }, []);
+
   const debounce = (fn, delay) => {
     let timer = null;
     return function (...args) {
@@ -163,8 +180,8 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
   };
 
   const handleDeviceSearch = useCallback(
-    debounce((value) => {
-      fetchDevices(value, 'switch');
+    debounce((value, type = '') => {
+      fetchDevices(value, type);
     }, 300),
     [fetchDevices]
   );
@@ -183,6 +200,7 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
       setSourcePorts([]);
       setTargetPorts([]);
       setConflicts([]);
+      setCompatibilityWarning(null);
       setDevices([]);
       setCablesData([]);
 
@@ -215,7 +233,6 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
   const handleSourcePortSelect = useCallback(async port => {
     console.log('handleSourcePortSelect called with port:', port);
 
-    // 如果点击的是已选中的端口，则取消选择
     const isAlreadySelected =
       sourcePort?.portId === port.portId || sourcePort?.portName === port.portName;
 
@@ -223,13 +240,20 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
       console.log('Deselecting source port:', port);
       setSourcePort(null);
       setConflicts([]);
+      setCompatibilityWarning(null);
     } else {
-      // 只有在选择新端口时才进行设备相同性检查
       if (sourceDevice?.deviceId === targetDevice?.deviceId) {
         message.warning('源设备和目标设备不能相同');
         return;
       }
-      
+
+      const conflictResult = await checkPortConflict(sourceDevice.deviceId, port.portName);
+      if (conflictResult.hasConflict) {
+        const conflict = conflictResult.conflicts[0];
+        message.error(`源端口 ${port.portName} 已被占用，无法选择`);
+        return;
+      }
+
       setSourcePort(port);
       console.log('Source port set to:', port);
 
@@ -242,7 +266,6 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
   const handleTargetPortSelect = useCallback(async port => {
     console.log('handleTargetPortSelect called with port:', port);
 
-    // 如果点击的是已选中的端口，则取消选择
     const isAlreadySelected =
       targetPort?.portId === port.portId || targetPort?.portName === port.portName;
 
@@ -250,18 +273,54 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
       console.log('Deselecting target port:', port);
       setTargetPort(null);
       setConflicts([]);
+      setCompatibilityWarning(null);
     } else {
-      // 只有在选择新端口时才进行设备相同性检查
       if (sourceDevice?.deviceId === targetDevice?.deviceId) {
         message.warning('源设备和目标设备不能相同');
         return;
       }
-      
+
+      const conflictResult = await checkPortConflict(sourceDevice.deviceId, port.portName);
+      if (conflictResult.hasConflict) {
+        const conflict = conflictResult.conflicts[0];
+        message.error(`目标端口 ${port.portName} 已被占用，无法选择`);
+        return;
+      }
+
       setTargetPort(port);
       console.log('Target port set to:', port);
-      await checkPortConflict(sourceDevice.deviceId, port.portName);
+
+      if (sourcePort) {
+        const compatResult = await checkPortCompatibility(
+          sourceDevice.deviceId,
+          sourcePort.portName,
+          targetDevice.deviceId,
+          port.portName
+        );
+        if (!compatResult.compatible) {
+          const errorReasons = compatResult.reasons.filter(r => r.severity === 'error');
+          if (errorReasons.length > 0) {
+            setCompatibilityWarning({
+              type: 'error',
+              message: errorReasons[0].message,
+              details: compatResult.reasons,
+            });
+          }
+        } else {
+          const warningReasons = compatResult.reasons.filter(r => r.severity === 'warning');
+          if (warningReasons.length > 0) {
+            setCompatibilityWarning({
+              type: 'warning',
+              message: warningReasons[0].message,
+              details: compatResult.reasons,
+            });
+          } else {
+            setCompatibilityWarning(null);
+          }
+        }
+      }
     }
-  }, [sourceDevice, targetDevice, targetPort, checkPortConflict]);
+  }, [sourceDevice, targetDevice, targetPort, sourcePort, checkPortConflict, checkPortCompatibility]);
 
   const handleNextStep = useCallback(async () => {
     if (currentStep === 0) {
@@ -290,6 +349,10 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
         message.warning('目标设备没有可用端口');
         return;
       }
+      if (compatibilityWarning?.type === 'error') {
+        message.error('端口类型不兼容，无法创建接线');
+        return;
+      }
     } else if (currentStep === 2) {
       if (!sourcePort || !targetPort) {
         message.warning('请先选择源端口和目标端口');
@@ -299,10 +362,14 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
         message.warning('源端口和目标端口不能相同');
         return;
       }
+      if (compatibilityWarning?.type === 'error') {
+        message.error('端口类型不兼容，无法创建接线');
+        return;
+      }
     }
 
     setCurrentStep(prev => prev + 1);
-  }, [currentStep, sourceDevice, targetDevice, sourcePort, targetPort, sourcePorts, targetPorts]);
+  }, [currentStep, sourceDevice, targetDevice, sourcePort, targetPort, sourcePorts, targetPorts, compatibilityWarning]);
 
   const handlePrevStep = useCallback(() => {
     setCurrentStep(prev => Math.max(0, prev - 1));
@@ -413,6 +480,7 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
             sourcePorts={sourcePorts}
             sourcePort={sourcePort}
             onPortSelect={handleSourcePortSelect}
+            onDevicesChange={setDevices}
           />
         );
 
@@ -428,6 +496,8 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
             targetPort={targetPort}
             onPortSelect={handleTargetPortSelect}
             conflicts={conflicts}
+            compatibilityWarning={compatibilityWarning}
+            onDevicesChange={setDevices}
           />
         );
 
@@ -462,6 +532,7 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
             cableLength={selectedCableLength}
             cableLabel={cableLabel}
             cableDescription={cableDescription}
+            compatibilityWarning={compatibilityWarning}
           />
         );
 
@@ -604,15 +675,8 @@ const Step1SourceDevice = ({
   sourcePorts,
   sourcePort,
   onPortSelect,
+  onDevicesChange,
 }) => {
-  const [searchKeyword, setSearchKeyword] = useState('');
-
-  const handleSearch = (e) => {
-    const value = e.target.value;
-    setSearchKeyword(value);
-    onDeviceSearch?.(value);
-  };
-
   return (
     <div style={{ padding: '20px 0' }}>
       <Card
@@ -632,12 +696,9 @@ const Step1SourceDevice = ({
         </div>
 
         <div style={{ marginBottom: '16px' }}>
-          <Input
-            placeholder="搜索设备名称或ID..."
-            prefix={<SearchOutlined />}
-            value={searchKeyword}
-            onChange={handleSearch}
-            style={{ width: '100%' }}
+          <FilterableDeviceSelect
+            filterType="switch"
+            onDeviceListChange={onDevicesChange}
           />
         </div>
 
@@ -855,15 +916,9 @@ const Step2TargetDevice = ({
   targetPort,
   onPortSelect,
   conflicts,
+  compatibilityWarning,
+  onDevicesChange,
 }) => {
-  const [searchKeyword, setSearchKeyword] = useState('');
-
-  const handleSearch = (e) => {
-    const value = e.target.value;
-    setSearchKeyword(value);
-    onDeviceSearch?.(value);
-  };
-
   return (
     <div style={{ padding: '20px 0' }}>
       <Card
@@ -883,12 +938,9 @@ const Step2TargetDevice = ({
         </div>
 
         <div style={{ marginBottom: '16px' }}>
-          <Input
-            placeholder="搜索设备名称或ID..."
-            prefix={<SearchOutlined />}
-            value={searchKeyword}
-            onChange={handleSearch}
-            style={{ width: '100%' }}
+          <FilterableDeviceSelect
+            filterType=""
+            onDeviceListChange={onDevicesChange}
           />
         </div>
 
@@ -1118,6 +1170,45 @@ const Step2TargetDevice = ({
                   </div>
                 </div>
               )}
+
+              {compatibilityWarning && (
+                <div
+                  style={{
+                    marginTop: '16px',
+                    padding: '12px',
+                    background: compatibilityWarning.type === 'error'
+                      ? 'rgba(239,68,68,0.1)'
+                      : 'rgba(250,173,20,0.1)',
+                    borderRadius: '8px',
+                    border: `1px solid ${compatibilityWarning.type === 'error'
+                      ? 'rgba(239,68,68,0.3)'
+                      : 'rgba(250,173,20,0.3)'}`,
+                  }}
+                >
+                  <Typography.Text
+                    type={compatibilityWarning.type === 'error' ? 'danger' : 'warning'}
+                    style={{ fontWeight: 600 }}
+                  >
+                    {compatibilityWarning.type === 'error' ? '❌ 端口类型不兼容' : '⚠️ 端口速率不匹配'}
+                  </Typography.Text>
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#595959' }}>
+                    {compatibilityWarning.message}
+                  </div>
+                  {compatibilityWarning.type === 'error' && (
+                    <div
+                      style={{
+                        marginTop: '8px',
+                        padding: '8px',
+                        background: 'rgba(0,0,0,0.05)',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                      }}
+                    >
+                      请选择相同类型的端口（如 RJ45 电口只能连接 RJ45 电口）
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -1164,116 +1255,198 @@ const Step3CableConfig = ({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '24px',
+            gridTemplateColumns: 'repeat(12, 1fr)',
+            gap: '16px',
           }}
         >
-          <div>
-            <Typography.Text style={{ fontWeight: 600, marginBottom: '12px', display: 'block' }}>
-              连接信息
-            </Typography.Text>
+          <div
+            style={{
+              gridColumn: 'span 12',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '12px',
+            }}
+          >
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: '12px',
+                padding: '16px',
+                color: '#fff',
+              }}
+            >
+              <div style={{ fontSize: '12px', opacity: 0.8, marginBottom: '8px' }}>
+                源设备
+              </div>
+              <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '4px' }}>
+                {sourceDevice?.name}
+              </div>
+              <Tag
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  color: '#fff',
+                }}
+              >
+                {sourcePort?.portName}
+              </Tag>
+            </div>
 
             <div
               style={{
-                background: '#f5f5f5',
-                borderRadius: '12px',
-                padding: '16px',
-                marginBottom: '16px',
-                border: '1px solid #d9d9d9',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>源设备</div>
-                  <div style={{ fontWeight: 600, color: '#262626' }}>{sourceDevice?.name}</div>
-                  <div style={{ fontSize: '11px', color: '#bfbfbf' }}>
-                    端口: {sourcePort?.portName}
-                  </div>
-                </div>
-
-                <ArrowRightOutlined style={{ color: '#1890ff' }} />
-
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>目标设备</div>
-                  <div style={{ fontWeight: 600, color: '#262626' }}>{targetDevice?.name}</div>
-                  <div style={{ fontSize: '11px', color: '#bfbfbf' }}>
-                    端口: {targetPort?.portName}
-                  </div>
-                </div>
+              <div
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(24,144,255,0.3)',
+                }}
+              >
+                <ArrowRightOutlined style={{ color: '#fff', fontSize: '18px' }} />
               </div>
-
-              <Divider style={{ margin: '8px 0' }} />
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>线缆类型</div>
-                  <div style={{ marginTop: '8px' }}>
-                    {cableTypes.map(type => (
-                      <Tag
-                        key={type.value}
-                        color={type.color}
-                        style={{
-                          cursor: 'pointer',
-                          marginRight: '8px',
-                          marginBottom: '8px',
-                          border: selectedCableType === type.value
-                            ? `2px solid ${type.color}`
-                            : '1px solid #d9d9d9',
-                        }}
-                        onClick={() => onCableTypeChange(type.value)}
-                      >
-                        {type.icon} {type.label}
-                      </Tag>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>线缆长度</div>
-                  <div style={{ marginTop: '8px' }}>
-                    {cableLengths.map(length => (
-                      <Tag
-                        key={length}
-                        color={selectedCableLength === length ? 'blue' : 'default'}
-                        style={{
-                          cursor: 'pointer',
-                          marginRight: '8px',
-                          marginBottom: '8px',
-                          border: selectedCableLength === length
-                            ? '2px solid #1890ff'
-                            : '1px solid #d9d9d9',
-                        }}
-                        onClick={() => onCableLengthChange(length)}
-                      >
-                        {length}m
-                      </Tag>
-                    ))}
-                  </div>
-                </div>
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: '#8c8c8c',
+                  textAlign: 'center',
+                }}
+              >
+                建议长度: <Text strong style={{ color: '#1890ff' }}>{estimatedLength}m</Text>
               </div>
             </div>
 
-            <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-              <InfoCircleOutlined style={{ marginRight: '4px' }} />
-              建议长度: <Text code>{estimatedLength}m</Text>
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                borderRadius: '12px',
+                padding: '16px',
+                color: '#fff',
+              }}
+            >
+              <div style={{ fontSize: '12px', opacity: 0.8, marginBottom: '8px' }}>
+                目标设备
+              </div>
+              <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '4px' }}>
+                {targetDevice?.name}
+              </div>
+              <Tag
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  color: '#fff',
+                }}
+              >
+                {targetPort?.portName}
+              </Tag>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(12, 1fr)',
+            gap: '16px',
+            marginTop: '16px',
+          }}
+        >
+          <div style={{ gridColumn: 'span 5' }}>
+            <Typography.Text style={{ fontWeight: 600, marginBottom: '12px', display: 'block' }}>
+              线缆类型
+            </Typography.Text>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '8px',
+              }}
+            >
+              {cableTypes.map(type => (
+                <div
+                  key={type.value}
+                  onClick={() => onCableTypeChange(type.value)}
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    border: `2px solid ${selectedCableType === type.value ? type.color : '#e8e8e8'}`,
+                    background: selectedCableType === type.value
+                      ? `${type.color}10`
+                      : '#fafafa',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }}>{type.icon}</span>
+                  <div>
+                    <div style={{ fontWeight: 500, fontSize: '13px' }}>{type.label}</div>
+                    <div style={{ fontSize: '11px', color: '#8c8c8c' }}>{type.desc}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div>
+          <div style={{ gridColumn: 'span 7' }}>
+            <Typography.Text style={{ fontWeight: 600, marginBottom: '12px', display: 'block' }}>
+              线缆长度
+            </Typography.Text>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '8px',
+                marginBottom: '16px',
+              }}
+            >
+              {cableLengths.map(length => (
+                <div
+                  key={length}
+                  onClick={() => onCableLengthChange(length)}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '20px',
+                    border: `2px solid ${selectedCableLength === length ? '#1890ff' : '#e8e8e8'}`,
+                    background: selectedCableLength === length
+                      ? '#e6f7ff'
+                      : '#fafafa',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    fontWeight: selectedCableLength === length ? 600 : 400,
+                    color: selectedCableLength === length ? '#1890ff' : '#595959',
+                  }}
+                >
+                  {length}m
+                </div>
+              ))}
+            </div>
+
             <Typography.Text style={{ fontWeight: 600, marginBottom: '12px', display: 'block' }}>
               线缆属性
             </Typography.Text>
-
             <div
               style={{
-                background: '#f5f5f5',
+                background: '#fafafa',
                 borderRadius: '12px',
                 padding: '16px',
-                border: '1px solid #d9d9d9',
+                border: '1px solid #e8e8e8',
               }}
             >
-              <div style={{ marginBottom: '16px' }}>
-                <Typography.Text style={{ fontSize: '13px', display: 'block', marginBottom: '8px' }}>
+              <div style={{ marginBottom: '12px' }}>
+                <Typography.Text style={{ fontSize: '12px', color: '#8c8c8c', display: 'block', marginBottom: '6px' }}>
                   线缆标签
                 </Typography.Text>
                 <Input
@@ -1282,44 +1455,42 @@ const Step3CableConfig = ({
                   onChange={e => setCableLabel(e.target.value)}
                   style={{ width: '100%' }}
                 />
-                <div style={{ fontSize: '11px', color: '#bfbfbf', marginTop: '4px' }}>
-                  示例: CABLE-{sourceDevice?.deviceId.slice(-4)}-{targetDevice?.deviceId.slice(-4)}-{Date.now().toString().slice(-4)}
-                </div>
               </div>
-
               <div>
-                <Typography.Text style={{ fontSize: '13px', display: 'block', marginBottom: '8px' }}>
+                <Typography.Text style={{ fontSize: '12px', color: '#8c8c8c', display: 'block', marginBottom: '6px' }}>
                   备注说明
                 </Typography.Text>
                 <Input.TextArea
                   placeholder="添加接线说明..."
                   value={cableDescription}
                   onChange={e => setCableDescription(e.target.value)}
-                  rows={6}
+                  rows={3}
                   style={{ width: '100%' }}
                 />
               </div>
             </div>
+          </div>
+        </div>
 
-            <div
-              style={{
-                marginTop: '16px',
-                padding: '12px',
-                background: 'rgba(24,144,255,0.1)',
-                borderRadius: '8px',
-                border: '1px solid rgba(24,144,255,0.3)',
-              }}
-            >
-              <Typography.Text style={{ fontWeight: 600, color: '#1890ff' }}>
-                💡 提示
-              </Typography.Text>
-              <div style={{ fontSize: '12px', marginTop: '8px', lineHeight: '1.6' }}>
-                • 以太网线（Cat6）: 适用于1G/10G短距离连接
-                <br />
-                • 光纤（SMF/MMF）: 适用于长距离或高带宽需求
-                <br />
-                • 铜缆: 适用于电源或特殊设备连接
-              </div>
+        <div
+          style={{
+            marginTop: '16px',
+            padding: '14px 16px',
+            background: '#f0f5ff',
+            borderRadius: '10px',
+            border: '1px solid #adc6ff',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px',
+          }}
+        >
+          <InfoCircleOutlined style={{ color: '#1890ff', fontSize: '16px', marginTop: '2px' }} />
+          <div>
+            <Typography.Text style={{ fontWeight: 600, color: '#1890ff', fontSize: '13px' }}>
+              选择建议
+            </Typography.Text>
+            <div style={{ fontSize: '12px', marginTop: '4px', lineHeight: '1.6', color: '#595959' }}>
+              以太网线适用于1G/10G短距离连接 · 光纤适用于长距离或高带宽需求 · 铜缆适用于电源或特殊设备
             </div>
           </div>
         </div>
@@ -1337,6 +1508,7 @@ const Step4Preview = ({
   cableLength,
   cableLabel,
   cableDescription,
+  compatibilityWarning,
 }) => {
   return (
     <div style={{ padding: '20px 0' }}>
@@ -1479,15 +1651,41 @@ const Step4Preview = ({
               alignItems: 'center',
               gap: '8px',
               padding: '12px',
-              background: 'rgba(82,196,26,0.1)',
+              background: compatibilityWarning?.type === 'error'
+                ? 'rgba(239,68,68,0.1)'
+                : compatibilityWarning?.type === 'warning'
+                  ? 'rgba(250,173,20,0.1)'
+                  : 'rgba(82,196,26,0.1)',
               borderRadius: '8px',
-              border: '1px solid rgba(82,196,26,0.3)',
+              border: `1px solid ${compatibilityWarning?.type === 'error'
+                ? 'rgba(239,68,68,0.3)'
+                : compatibilityWarning?.type === 'warning'
+                  ? 'rgba(250,173,20,0.3)'
+                  : 'rgba(82,196,26,0.3)'}`,
             }}
           >
-            <CheckCircleOutlined style={{ color: '#52c41a' }} />
-            <Typography.Text style={{ fontWeight: 600, color: '#52c41a' }}>
-              ✅ 所有信息已确认，可以创建接线
-            </Typography.Text>
+            {compatibilityWarning?.type === 'error' ? (
+              <>
+                <CheckCircleOutlined style={{ color: '#ff4d4f' }} />
+                <Typography.Text style={{ fontWeight: 600, color: '#ff4d4f' }}>
+                  ❌ 端口类型不兼容，无法创建接线
+                </Typography.Text>
+              </>
+            ) : compatibilityWarning?.type === 'warning' ? (
+              <>
+                <CheckCircleOutlined style={{ color: '#faad14' }} />
+                <Typography.Text style={{ fontWeight: 600, color: '#faad14' }}>
+                  ⚠️ {compatibilityWarning.message}
+                </Typography.Text>
+              </>
+            ) : (
+              <>
+                <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                <Typography.Text style={{ fontWeight: 600, color: '#52c41a' }}>
+                  ✅ 所有信息已确认，可以创建接线
+                </Typography.Text>
+              </>
+            )}
           </div>
         </div>
       </Card>

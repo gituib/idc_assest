@@ -165,7 +165,6 @@ const Scene = forwardRef(
         subTitle="3D 场景在渲染过程中遇到错误，请检查浏览器是否支持 WebGL"
       >
         <Canvas
-          shadows
           dpr={deviceDpr}
           performance={{ min: 0.5 }}
           gl={{
@@ -178,12 +177,12 @@ const Scene = forwardRef(
           <PerspectiveCamera makeDefault position={cameraPosition} fov={45} />
 
           <ambientLight intensity={0.5} color="#ffffff" />
-          <pointLight position={[5, 8, 5]} intensity={2} color="#ffffff" castShadow />
+          <pointLight position={[5, 8, 5]} intensity={2} color="#ffffff" />
           <directionalLight
             position={[10, 10, 5]}
             intensity={1}
             castShadow
-            shadow-mapSize={[2048, 2048]}
+            shadow-mapSize={[512, 512]}
             shadow-camera-far={20}
             shadow-camera-left={-10}
             shadow-camera-right={10}
