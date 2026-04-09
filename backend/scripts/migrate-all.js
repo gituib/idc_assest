@@ -300,6 +300,7 @@ async function removeConsumableLogFK() {
     });
 
     if (!fks || fks.length === 0) {
+      console.log('SQLite: 没有外键约束需要移除');
       return;
     }
 
@@ -346,6 +347,34 @@ async function removeConsumableLogFK() {
     await sequelize.query(
       `CREATE INDEX idx_logs_is_consumable_deleted ON consumable_logs(isConsumableDeleted)`
     );
+  } else if (dialect === 'mysql') {
+    try {
+      const [fks] = await sequelize.query(`
+        SELECT CONSTRAINT_NAME
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+        WHERE TABLE_NAME = 'consumable_logs'
+        AND TABLE_SCHEMA = DATABASE()
+        AND REFERENCED_TABLE_NAME IS NOT NULL
+      `);
+
+      if (!fks || fks.length === 0) {
+        console.log('MySQL: 没有外键约束需要移除');
+        return;
+      }
+
+      console.log(`MySQL: 发现 ${fks.length} 个外键约束`);
+
+      for (const fk of fks) {
+        try {
+          await sequelize.query(`ALTER TABLE consumable_logs DROP FOREIGN KEY \`${fk.CONSTRAINT_NAME}\``);
+          console.log(`MySQL: 已移除外键约束 ${fk.CONSTRAINT_NAME}`);
+        } catch (err) {
+          console.log(`MySQL: 移除外键 ${fk.CONSTRAINT_NAME} 失败:`, err.message);
+        }
+      }
+    } catch (err) {
+      console.log('MySQL: 检查外键约束失败:', err.message);
+    }
   }
 }
 
