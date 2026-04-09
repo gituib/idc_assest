@@ -22,6 +22,7 @@ import {
   Statistic,
   Divider,
   Popover,
+  Popconfirm,
 } from 'antd';
 import {
   HistoryOutlined,
@@ -35,6 +36,7 @@ import {
   EditOutlined,
   EyeOutlined,
   PlusOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import CloseButton from '../components/CloseButton';
@@ -317,7 +319,7 @@ function ConsumableLogs() {
     {
       title: '操作',
       key: 'action',
-      width: 120,
+      width: 150,
       fixed: 'right',
       render: (_, record) => (
         <Space>
@@ -339,6 +341,23 @@ function ConsumableLogs() {
               onClick={() => handleViewHistory(record)}
             />
           </Tooltip>
+          <Popconfirm
+            title="确认删除"
+            description="确定要删除这条日志记录吗？此操作不可恢复。"
+            onConfirm={() => handleDeleteLog(record.id)}
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+          >
+            <Tooltip title="删除">
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+              />
+            </Tooltip>
+          </Popconfirm>
         </Space>
       ),
     },
@@ -584,6 +603,17 @@ function ConsumableLogs() {
       setLogHistory([]);
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  // 删除日志
+  const handleDeleteLog = async logId => {
+    try {
+      await axios.delete(`/api/consumables/logs/${logId}`);
+      message.success('日志删除成功');
+      fetchLogs(pagination.current, pagination.pageSize);
+    } catch (error) {
+      message.error(error.response?.data?.error || '删除失败');
     }
   };
 

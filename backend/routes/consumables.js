@@ -1461,6 +1461,28 @@ router.put('/logs/:id', async (req, res) => {
   }
 });
 
+// 删除日志记录
+router.delete('/logs/:id', async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+
+    const log = await ConsumableLog.findByPk(id, { transaction });
+    if (!log) {
+      await transaction.rollback();
+      return res.status(404).json({ error: '日志记录不存在' });
+    }
+
+    await log.destroy({ transaction });
+    await transaction.commit();
+
+    res.json({ message: '日志删除成功' });
+  } catch (error) {
+    await transaction.rollback();
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 获取日志修改历史
 router.get('/logs/:id/history', async (req, res) => {
   try {
