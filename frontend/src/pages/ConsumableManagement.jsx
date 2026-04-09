@@ -58,6 +58,7 @@ import {
   QrcodeOutlined,
   DesktopOutlined,
   HistoryOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -142,6 +143,13 @@ function ConsumableManagement() {
   const [snInputValue, setSnInputValue] = useState('');
   const [selectedSnList, setSelectedSnList] = useState([]);
   const [snSearchKeyword, setSnSearchKeyword] = useState('');
+  const [createWithInbound, setCreateWithInbound] = useState(false);
+  const [inboundData, setInboundData] = useState({
+    quantity: 1,
+    operator: '',
+    reason: '',
+  });
+  const [inboundSnList, setInboundSnList] = useState([]);
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [scanMode, setScanMode] = useState('add');
   const [scanValue, setScanValue] = useState('');
@@ -243,10 +251,12 @@ function ConsumableManagement() {
       } else {
         setMaxStockUnlimited(true);
         setSnList([]);
+        setCreateWithInbound(false);
+        setInboundData({ quantity: 1, operator: '', reason: '' });
+        setInboundSnList([]);
         form.resetFields();
         form.setFieldsValue({
           unit: '个',
-          currentStock: 0,
           minStock: 0,
           status: 'active',
           unitPrice: 0,
@@ -263,6 +273,8 @@ function ConsumableManagement() {
     setSnList([]);
     setSnInputVisible(false);
     setSnInputValue('');
+    setCreateWithInbound(false);
+    setInboundData({ quantity: 1, operator: '', reason: '' });
   }, []);
 
   const handleSubmit = useCallback(
@@ -272,7 +284,6 @@ function ConsumableManagement() {
           ...values,
           maxStock: maxStockUnlimited ? 0 : values.maxStock,
           unitPrice: values.unitPrice || 0,
-          snList: snList,
         };
         if (editingConsumable) {
           await axios.put(`/api/consumables/${editingConsumable.consumableId}`, submitData);
@@ -281,25 +292,45 @@ function ConsumableManagement() {
             icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
           });
         } else {
-          await axios.post('/api/consumables', {
-            ...submitData,
-            consumableId: `CON${Date.now()}`,
-          });
-          message.success({
-            content: '耗材创建成功',
-            icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
-          });
+          if (createWithInbound) {
+            // 同时入库模式，调用创建并入库接口
+            await axios.post('/api/consumables/create-with-inbound', {
+              ...submitData,
+              consumableId: `CON${Date.now()}`,
+              inboundQuantity: inboundData.quantity,
+              inboundOperator: inboundData.operator,
+              inboundReason: inboundData.reason,
+              inboundSnList: inboundSnList,
+            });
+            message.success({
+              content: '耗材创建成功并已入库',
+              icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+            });
+          } else {
+            // 普通创建模式
+            await axios.post('/api/consumables', {
+              ...submitData,
+              consumableId: `CON${Date.now()}`,
+            });
+            message.success({
+              content: '耗材创建成功',
+              icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
+            });
+          }
         }
         setModalVisible(false);
         fetchConsumables();
         setEditingConsumable(null);
         setSnList([]);
+        setCreateWithInbound(false);
+        setInboundData({ quantity: 1, operator: '', reason: '' });
+        setInboundSnList([]);
       } catch (error) {
         message.error(editingConsumable ? '耗材更新失败' : '耗材创建失败');
         console.error('提交失败:', error);
       }
     },
-    [editingConsumable, fetchConsumables, maxStockUnlimited, snList]
+    [editingConsumable, fetchConsumables, maxStockUnlimited, createWithInbound, inboundData, inboundSnList]
   );
 
   const handleDelete = useCallback(
@@ -1030,10 +1061,15 @@ function ConsumableManagement() {
                 },
               });
             } else {
-              if (!snList.includes(code)) {
-                setSnList(prev => [...prev, code]);
-                const currentStock = form.getFieldValue('currentStock') || 0;
-                form.setFieldsValue({ currentStock: currentStock + 1 });
+              // 区分添加到哪个列表
+              const targetList = createWithInbound ? inboundSnList : snList;
+              const setTargetList = createWithInbound ? setInboundSnList : setSnList;
+              if (!targetList.includes(code)) {
+                setTargetList(prev => [...prev, code]);
+                // 如果是同时入库模式，自动同步入库数量
+                if (createWithInbound) {
+                  setInboundData(prev => ({ ...prev, quantity: targetList.length + 1 }));
+                }
                 message.success(`已添加SN: ${code}`);
               } else {
                 message.warning(`SN已在列表中: ${code}`);
@@ -1111,6 +1147,12 @@ function ConsumableManagement() {
       scanMode,
       scanValue,
       scannedSnList,
+      snList,
+      setSnList,
+      createWithInbound,
+      inboundSnList,
+      setInboundSnList,
+      setInboundData,
       handleScanCancel,
       showModal,
       form,
@@ -1974,106 +2016,466 @@ function ConsumableManagement() {
               </Row>
             </div>
 
-            {/* 库存管理 */}
-            <div
-              style={{
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                borderRadius: designTokens.borderRadius.lg,
-                padding: '20px',
-                marginBottom: '20px',
-                border: '1px solid #86efac',
-              }}
-            >
+            {/* 库存预警设置 */}
+            {!editingConsumable && (
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                  borderRadius: designTokens.borderRadius.lg,
+                  padding: '20px',
                   marginBottom: '16px',
-                  fontSize: '15px',
-                  fontWeight: '600',
-                  color: designTokens.colors.neutral[700],
+                  border: '1px solid #86efac',
                 }}
               >
                 <div
                   style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    background: designTokens.colors.success.gradient,
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                    fontSize: '12px',
+                    gap: '8px',
+                    marginBottom: '16px',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    color: designTokens.colors.neutral[700],
                   }}
                 >
-                  2
+                  <div
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: designTokens.colors.success.gradient,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: '12px',
+                    }}
+                  >
+                    2
+                  </div>
+                  库存预警
                 </div>
-                库存管理
-                <Text type="secondary" style={{ fontSize: '12px', marginLeft: 'auto' }}>
-                  设置库存预警和上限
-                </Text>
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item
+                      label="最小库存(预警线)"
+                      name="minStock"
+                      rules={[inputValidationRules.required('请输入最小库存')]}
+                    >
+                      <InputNumber
+                        min={0}
+                        style={{ ...inputNumberStyles.base, width: '100%' }}
+                        placeholder={inputPlaceholders.minStock}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item label="最大库存">
+                      <div style={{ marginBottom: '8px' }}>
+                        <Checkbox
+                          checked={maxStockUnlimited}
+                          onChange={e => {
+                            setMaxStockUnlimited(e.target.checked);
+                            if (e.target.checked) {
+                              form.setFieldsValue({ maxStock: undefined });
+                            }
+                          }}
+                        >
+                          无限制
+                        </Checkbox>
+                      </div>
+                      {!maxStockUnlimited && (
+                        <Form.Item
+                          name="maxStock"
+                          noStyle
+                          rules={[inputValidationRules.required('请输入最大库存')]}
+                        >
+                          <InputNumber
+                            min={0}
+                            style={{ ...inputNumberStyles.base, width: '100%' }}
+                            placeholder={inputPlaceholders.maxStock}
+                          />
+                        </Form.Item>
+                      )}
+                    </Form.Item>
+                  </Col>
+                </Row>
               </div>
-              <Row gutter={16}>
-                <Col span={8}>
-                  <Form.Item
-                    name="currentStock"
-                    label="当前库存"
-                    rules={[inputValidationRules.required('请输入当前库存')]}
-                  >
-                    <InputNumber
-                      min={0}
-                      style={{ ...inputNumberStyles.base, width: '100%' }}
-                      placeholder={inputPlaceholders.stock}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item
-                    name="minStock"
-                    label="最小库存(预警线)"
-                    rules={[inputValidationRules.required('请输入最小库存')]}
-                  >
-                    <InputNumber
-                      min={0}
-                      style={{ ...inputNumberStyles.base, width: '100%' }}
-                      placeholder={inputPlaceholders.minStock}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="最大库存">
-                    <div style={{ marginBottom: '8px' }}>
-                      <Checkbox
-                        checked={maxStockUnlimited}
-                        onChange={e => {
-                          setMaxStockUnlimited(e.target.checked);
-                          if (e.target.checked) {
-                            form.setFieldsValue({ maxStock: undefined });
-                          }
-                        }}
-                      >
-                        无限制
-                      </Checkbox>
+            )}
+
+            {/* 初始入库（添加模式专用） */}
+            {!editingConsumable && (
+              <div
+                style={{
+                  background: createWithInbound
+                    ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)'
+                    : '#fafafa',
+                  borderRadius: designTokens.borderRadius.lg,
+                  padding: '16px 20px',
+                  marginBottom: '20px',
+                  border: `1px solid ${createWithInbound ? '#93c5fd' : '#e5e7eb'}`,
+                  transition: 'all 0.3s ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <Checkbox
+                    checked={createWithInbound}
+                    onChange={e => setCreateWithInbound(e.target.checked)}
+                    style={{ marginTop: '4px' }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: createWithInbound ? '12px' : '0',
+                      }}
+                    >
+                      <Text strong style={{ fontSize: '15px', color: designTokens.colors.neutral[700] }}>
+                        同时进行初始入库
+                      </Text>
+                      <Tag color={createWithInbound ? 'blue' : 'default'} style={{ borderRadius: '8px' }}>
+                        推荐
+                      </Tag>
                     </div>
-                    {!maxStockUnlimited && (
-                      <Form.Item
-                        name="maxStock"
-                        noStyle
-                        rules={[inputValidationRules.required('请输入最大库存')]}
+                    <Text type="secondary" style={{ fontSize: '13px', display: 'block', marginBottom: createWithInbound ? '16px' : '0' }}>
+                      创建耗材后立即录入初始库存数量，生成入库记录
+                    </Text>
+
+                    {createWithInbound && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
                       >
-                        <InputNumber
-                          min={0}
-                          style={{ ...inputNumberStyles.base, width: '100%' }}
-                          placeholder={inputPlaceholders.maxStock}
-                        />
-                      </Form.Item>
+                        <div
+                          style={{
+                            padding: '16px',
+                            background: '#fff',
+                            borderRadius: designTokens.borderRadius.md,
+                            border: '1px solid #e5e7eb',
+                          }}
+                        >
+                          <Row gutter={16}>
+                            <Col span={8}>
+                              <Form.Item
+                                label="入库数量"
+                                rules={[inputValidationRules.required('请输入入库数量')]}
+                              >
+                                <InputNumber
+                                  min={1}
+                                  value={inboundData.quantity}
+                                  onChange={value =>
+                                    setInboundData({ ...inboundData, quantity: value || 0 })
+                                  }
+                                  style={{ ...inputNumberStyles.base, width: '100%' }}
+                                  placeholder="输入数量"
+                                />
+                              </Form.Item>
+                            </Col>
+                            <Col span={8}>
+                              <Form.Item label="操作人">
+                                <Input
+                                  value={inboundData.operator}
+                                  onChange={e =>
+                                    setInboundData({ ...inboundData, operator: e.target.value })
+                                  }
+                                  placeholder="输入操作人"
+                                  style={inputStyles.form}
+                                />
+                              </Form.Item>
+                            </Col>
+                            <Col span={8}>
+                              <Form.Item label="原因">
+                                <Input
+                                  value={inboundData.reason}
+                                  onChange={e =>
+                                    setInboundData({ ...inboundData, reason: e.target.value })
+                                  }
+                                  placeholder="输入入库原因"
+                                  style={inputStyles.form}
+                                />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+
+                          {/* SN序列号管理 */}
+                          <div
+                            style={{
+                              marginTop: '16px',
+                              paddingTop: '16px',
+                              borderTop: '1px dashed #e5e7eb',
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: '12px',
+                              }}
+                            >
+                              <Text strong style={{ fontSize: '14px', color: designTokens.colors.neutral[700] }}>
+                                SN序列号（可选）
+                              </Text>
+                              <Space>
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  icon={<ScanOutlined />}
+                                  onClick={() => {
+                                    setScanMode('add');
+                                    setScanValue('');
+                                    setScanModalVisible(true);
+                                    setTimeout(() => scanInputRef.current?.focus(), 100);
+                                  }}
+                                  style={{
+                                    background: designTokens.colors.primary.gradient,
+                                    border: 'none',
+                                    borderRadius: designTokens.borderRadius.sm,
+                                  }}
+                                >
+                                  扫码添加
+                                </Button>
+                                <Button
+                                  size="small"
+                                  icon={<PlusOutlined />}
+                                  onClick={() => {
+                                    const newSn = window.prompt('请输入SN序列号：');
+                                    if (newSn && newSn.trim() && !inboundSnList.includes(newSn.trim())) {
+                                      const newList = [...inboundSnList, newSn.trim()];
+                                      setInboundSnList(newList);
+                                      setInboundData(prev => ({ ...prev, quantity: newList.length }));
+                                    }
+                                  }}
+                                  style={{ borderRadius: designTokens.borderRadius.sm }}
+                                >
+                                  手动添加
+                                </Button>
+                              </Space>
+                            </div>
+                            {inboundSnList.length > 0 ? (
+                              <div
+                                style={{
+                                  maxHeight: '120px',
+                                  overflowY: 'auto',
+                                  border: `1px solid ${designTokens.colors.neutral[200]}`,
+                                  borderRadius: designTokens.borderRadius.sm,
+                                  padding: '8px',
+                                }}
+                              >
+                                {inboundSnList.map((sn, index) => (
+                                  <Tag
+                                    key={index}
+                                    closable
+                                    onClose={() => {
+                                      const newList = inboundSnList.filter((_, i) => i !== index);
+                                      setInboundSnList(newList);
+                                      setInboundData(prev => ({ ...prev, quantity: newList.length }));
+                                    }}
+                                    color="blue"
+                                    style={{ marginBottom: '4px', marginRight: '4px' }}
+                                  >
+                                    {sn}
+                                  </Tag>
+                                ))}
+                              </div>
+                            ) : (
+                              <Text type="secondary" style={{ fontSize: '12px' }}>
+                                暂未添加SN序列号
+                              </Text>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
                     )}
-                  </Form.Item>
-                </Col>
-              </Row>
-            </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 编辑模式下的库存预警设置 */}
+            {editingConsumable && (
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                  borderRadius: designTokens.borderRadius.lg,
+                  padding: '20px',
+                  marginBottom: '16px',
+                  border: '1px solid #86efac',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '16px',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    color: designTokens.colors.neutral[700],
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: designTokens.colors.success.gradient,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: '12px',
+                    }}
+                  >
+                    2
+                  </div>
+                  库存预警
+                </div>
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item
+                      label="最小库存(预警线)"
+                      name="minStock"
+                      rules={[inputValidationRules.required('请输入最小库存')]}
+                    >
+                      <InputNumber
+                        min={0}
+                        style={{ ...inputNumberStyles.base, width: '100%' }}
+                        placeholder={inputPlaceholders.minStock}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item label="最大库存">
+                      <div style={{ marginBottom: '8px' }}>
+                        <Checkbox
+                          checked={maxStockUnlimited}
+                          onChange={e => {
+                            setMaxStockUnlimited(e.target.checked);
+                            if (e.target.checked) {
+                              form.setFieldsValue({ maxStock: undefined });
+                            }
+                          }}
+                        >
+                          无限制
+                        </Checkbox>
+                      </div>
+                      {!maxStockUnlimited && (
+                        <Form.Item
+                          name="maxStock"
+                          noStyle
+                          rules={[inputValidationRules.required('请输入最大库存')]}
+                        >
+                          <InputNumber
+                            min={0}
+                            style={{ ...inputNumberStyles.base, width: '100%' }}
+                            placeholder={inputPlaceholders.maxStock}
+                          />
+                        </Form.Item>
+                      )}
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </div>
+            )}
+
+            {/* 编辑模式下的当前库存信息展示 */}
+            {editingConsumable && (
+              <div
+                style={{
+                  background: '#fafafa',
+                  borderRadius: designTokens.borderRadius.lg,
+                  padding: '16px 20px',
+                  marginBottom: '20px',
+                  border: '1px solid #e5e7eb',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <div
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: '12px',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <EyeOutlined style={{ fontSize: '12px' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '12px',
+                      }}
+                    >
+                      <Text strong style={{ fontSize: '15px', color: designTokens.colors.neutral[700] }}>
+                        当前库存信息
+                      </Text>
+                      <Tag color="default" style={{ borderRadius: '8px' }}>
+                        只读
+                      </Tag>
+                    </div>
+                    <Text type="secondary" style={{ fontSize: '13px', display: 'block', marginBottom: '12px' }}>
+                      如需调整库存，请使用「调整库存」功能
+                    </Text>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(3, 1fr)',
+                        gap: '16px',
+                        padding: '16px',
+                        background: '#fff',
+                        borderRadius: designTokens.borderRadius.md,
+                        border: '1px solid #e5e7eb',
+                      }}
+                    >
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: designTokens.colors.primary.main }}>
+                          {editingConsumable.currentStock || 0}
+                        </div>
+                        <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], marginTop: '4px' }}>
+                          当前库存 ({editingConsumable.unit})
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: designTokens.colors.success.main }}>
+                          {editingConsumable.snList?.length || 0}
+                        </div>
+                        <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], marginTop: '4px' }}>
+                          已录入SN
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{
+                          fontSize: '24px',
+                          fontWeight: 'bold',
+                          color: (editingConsumable.currentStock || 0) <= (editingConsumable.minStock || 0)
+                            ? designTokens.colors.error.main
+                            : designTokens.colors.neutral[700]
+                        }}>
+                          {editingConsumable.currentStock <= editingConsumable.minStock ? '⚠️ 低' : '✓ 正常'}
+                        </div>
+                        <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], marginTop: '4px' }}>
+                          库存状态
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 价格与状态 */}
             <div
@@ -2205,222 +2607,6 @@ function ConsumableManagement() {
                   </Form.Item>
                 </Col>
               </Row>
-            </div>
-
-            {/* SN序列号管理 */}
-            <div
-              style={{
-                background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
-                borderRadius: designTokens.borderRadius.lg,
-                padding: '20px',
-                marginBottom: '20px',
-                border: '1px solid #fda4af',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '16px',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '15px',
-                    fontWeight: '600',
-                    color: designTokens.colors.neutral[700],
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      background: designTokens.colors.error.gradient,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#fff',
-                      fontSize: '12px',
-                    }}
-                  >
-                    5
-                  </div>
-                  SN序列号管理
-                  <Tag color="red" style={{ marginLeft: '8px', borderRadius: '12px' }}>
-                    已录入 {snList.length} 个
-                  </Tag>
-                </div>
-                <Space>
-                  <Button
-                    type="primary"
-                    size="small"
-                    icon={<ScanOutlined />}
-                    onClick={() => {
-                      setScanMode('add');
-                      setScanValue('');
-                      setScanModalVisible(true);
-                      setTimeout(() => scanInputRef.current?.focus(), 100);
-                    }}
-                    style={{
-                      background: designTokens.colors.primary.gradient,
-                      border: 'none',
-                      borderRadius: designTokens.borderRadius.sm,
-                    }}
-                  >
-                    扫码添加
-                  </Button>
-                  <Button
-                    size="small"
-                    icon={<PlusOutlined />}
-                    onClick={() => setSnInputVisible(!snInputVisible)}
-                    style={{ borderRadius: designTokens.borderRadius.sm }}
-                  >
-                    批量添加
-                  </Button>
-                  <Button
-                    size="small"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => {
-                      setSnList([]);
-                      form.setFieldsValue({ currentStock: 0 });
-                    }}
-                    disabled={snList.length === 0}
-                    style={{ borderRadius: designTokens.borderRadius.sm }}
-                  >
-                    清空全部
-                  </Button>
-                </Space>
-              </div>
-
-              {/* 批量添加输入区 */}
-              {snInputVisible && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  style={{ marginBottom: '12px' }}
-                >
-                  <Alert
-                    message="批量添加提示"
-                    description="每行输入一个SN序列号，系统会自动过滤重复项"
-                    type="info"
-                    showIcon
-                    style={{ marginBottom: '12px', borderRadius: designTokens.borderRadius.md }}
-                  />
-                  <TextArea
-                    rows={4}
-                    placeholder="输入SN序列号，每行一个&#10;例如：&#10;SN001&#10;SN002&#10;SN003"
-                    value={snInputValue}
-                    onChange={e => setSnInputValue(e.target.value)}
-                    style={{ ...textAreaStyles.base, marginBottom: '8px' }}
-                  />
-                  <Space>
-                    <Button
-                      type="primary"
-                      size="small"
-                      onClick={() => {
-                        const newSns = snInputValue
-                          .split('\n')
-                          .map(s => s.trim())
-                          .filter(s => s && !snList.includes(s));
-                        if (newSns.length > 0) {
-                          const updatedSnList = [...snList, ...newSns];
-                          setSnList(updatedSnList);
-                          form.setFieldsValue({ currentStock: updatedSnList.length });
-                          setSnInputValue('');
-                          message.success(`成功添加 ${newSns.length} 个SN`);
-                        } else {
-                          message.warning('没有新的SN可添加（可能已存在或为空）');
-                        }
-                      }}
-                      style={{
-                        background: designTokens.colors.success.gradient,
-                        border: 'none',
-                        borderRadius: designTokens.borderRadius.sm,
-                      }}
-                    >
-                      确认添加
-                    </Button>
-                    <Button
-                      size="small"
-                      onClick={() => {
-                        setSnInputValue('');
-                        setSnInputVisible(false);
-                      }}
-                      style={{ borderRadius: designTokens.borderRadius.sm }}
-                    >
-                      取消
-                    </Button>
-                  </Space>
-                </motion.div>
-              )}
-
-              {/* SN列表展示 */}
-              {snList.length > 0 ? (
-                <div
-                  style={{
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    border: `1px solid ${designTokens.colors.neutral[200]}`,
-                    borderRadius: designTokens.borderRadius.md,
-                    padding: '12px',
-                    background: '#fff',
-                  }}
-                >
-                  <AnimatePresence>
-                    {snList.map((sn, index) => (
-                      <motion.div
-                        key={sn}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        transition={{ duration: 0.2 }}
-                        style={{ display: 'inline-block', marginBottom: '8px', marginRight: '8px' }}
-                      >
-                        <Tag
-                          closable
-                          onClose={() => {
-                            const newSnList = snList.filter((_, i) => i !== index);
-                            setSnList(newSnList);
-                            form.setFieldsValue({ currentStock: newSnList.length });
-                          }}
-                          color="blue"
-                          style={{
-                            padding: '4px 8px',
-                            borderRadius: designTokens.borderRadius.sm,
-                            fontSize: '13px',
-                          }}
-                        >
-                          {sn}
-                        </Tag>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '24px',
-                    color: designTokens.colors.neutral[400],
-                    background: '#fff',
-                    borderRadius: designTokens.borderRadius.md,
-                    border: `1px dashed ${designTokens.colors.neutral[300]}`,
-                  }}
-                >
-                  <BarcodeOutlined
-                    style={{ fontSize: '32px', marginBottom: '8px', display: 'block' }}
-                  />
-                  <div>暂无SN序列号</div>
-                  <div style={{ fontSize: '12px', marginTop: '4px' }}>点击上方按钮添加</div>
-                </div>
-              )}
             </div>
 
             {/* 操作按钮 */}
@@ -3817,7 +4003,6 @@ function ConsumableManagement() {
                     onClose={() => {
                       const newSnList = snList.filter((_, i) => i !== index);
                       setSnList(newSnList);
-                      form.setFieldsValue({ currentStock: newSnList.length });
                     }}
                     color="blue"
                     style={{ marginBottom: '4px' }}

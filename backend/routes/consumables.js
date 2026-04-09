@@ -122,14 +122,9 @@ router.post('/', async (req, res) => {
     const consumableData = {
       ...req.body,
       consumableId: req.body.consumableId || `CON${Date.now()}`,
+      currentStock: 0,  // 强制设为0
+      snList: [],       // 强制设为空数组
     };
-    // SN 列表非空时，取手动填写的库存和 SN 数量中的较大值
-    if (Array.isArray(consumableData.snList) && consumableData.snList.length > 0) {
-      consumableData.currentStock = Math.max(
-        Number(consumableData.currentStock) || 0,
-        consumableData.snList.length
-      );
-    }
     const consumable = await Consumable.create(consumableData, { transaction });
 
     await ConsumableLog.create(
@@ -161,6 +156,132 @@ router.post('/', async (req, res) => {
   } catch (error) {
     await transaction.rollback();
     console.error('创建耗材错误:', error);
+    if (error.name === 'SequelizeValidationError') {
+      const messages = error.errors.map(e => `${e.path}: ${e.message}`).join(', ');
+      res.status(400).json({ error: `Validation error: ${messages}` });
+    } else {
+      res.status(400).json({ error: error.message });
+    }
+  }
+});
+
+// 创建耗材并同时入库
+router.post('/create-with-inbound', async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const {
+      consumableId,
+      name,
+      category,
+      unit,
+      currentStock,
+      minStock,
+      maxStock,
+      unitPrice,
+      supplier,
+      location,
+      description,
+      status,
+      // 入库相关字段
+      inboundQuantity,
+      inboundOperator,
+      inboundReason,
+      inboundNotes,
+      inboundSnList,
+    } = req.body;
+
+    // 创建耗材
+    const consumable = await Consumable.create({
+      consumableId: consumableId || `CON${Date.now()}`,
+      name,
+      category,
+      unit: unit || '个',
+      currentStock: 0,
+      minStock: minStock || 10,
+      maxStock: maxStock || 0,
+      unitPrice: unitPrice || 0,
+      supplier: supplier || '',
+      location: location || '',
+      description: description || '',
+      status: status || 'active',
+      snList: [],
+    }, { transaction });
+
+    // 记录创建日志
+    await ConsumableLog.create({
+      consumableId: consumable.consumableId,
+      consumableName: consumable.name,
+      operationType: 'create',
+      quantity: 0,
+      previousStock: 0,
+      currentStock: 0,
+      operator: inboundOperator || '系统',
+      reason: '新建耗材',
+      notes: description || '',
+      consumableSnapshot: {
+        category: consumable.category,
+        unit: consumable.unit,
+        unitPrice: consumable.unitPrice,
+        supplier: consumable.supplier,
+        location: consumable.location,
+        minStock: consumable.minStock,
+        maxStock: consumable.maxStock,
+      },
+    }, { transaction });
+
+    // 执行入库操作
+    if (inboundQuantity && inboundQuantity > 0) {
+      const previousStock = 0;
+      const newStock = inboundQuantity;
+      let updatedSnList = [...(inboundSnList || [])];
+
+      await Consumable.update({
+        currentStock: newStock,
+        snList: updatedSnList,
+        version: sequelize.literal('version + 1'),
+      }, {
+        where: { consumableId: consumable.consumableId },
+        transaction,
+      });
+
+      await ConsumableRecord.create({
+        consumableId: consumable.consumableId,
+        type: 'in',
+        quantity: inboundQuantity,
+        previousStock,
+        currentStock: newStock,
+        operator: inboundOperator || '系统',
+        reason: inboundReason || '初始入库',
+        notes: inboundNotes || '',
+        snList: updatedSnList,
+      }, { transaction });
+
+      await ConsumableLog.create({
+        consumableId: consumable.consumableId,
+        consumableName: consumable.name,
+        operationType: 'in',
+        quantity: inboundQuantity,
+        previousStock,
+        currentStock: newStock,
+        operator: inboundOperator || '系统',
+        reason: inboundReason || '初始入库',
+        notes: inboundNotes || '',
+        snList: updatedSnList,
+        consumableSnapshot: {
+          category: consumable.category,
+          unit: consumable.unit,
+          unitPrice: consumable.unitPrice,
+          supplier: consumable.supplier,
+          location: consumable.location,
+        },
+      }, { transaction });
+    }
+
+    await transaction.commit();
+    res.status(201).json(consumable);
+  } catch (error) {
+    await transaction.rollback();
+    console.error('创建耗材并入库错误:', error);
     if (error.name === 'SequelizeValidationError') {
       const messages = error.errors.map(e => `${e.path}: ${e.message}`).join(', ');
       res.status(400).json({ error: `Validation error: ${messages}` });
@@ -1272,9 +1393,9 @@ router.put('/:id', async (req, res) => {
 
     const oldData = consumable.toJSON();
     const updateData = { ...req.body };
-    if (Array.isArray(updateData.snList)) {
-      updateData.currentStock = updateData.snList.length;
-    }
+    // 禁止通过编辑接口修改库存和SN列表
+    delete updateData.currentStock;
+    delete updateData.snList;
     await consumable.update(updateData, { transaction });
 
     await ConsumableLog.create(
