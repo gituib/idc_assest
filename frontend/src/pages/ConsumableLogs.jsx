@@ -34,6 +34,7 @@ import {
   DownOutlined,
   EditOutlined,
   EyeOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import CloseButton from '../components/CloseButton';
@@ -78,6 +79,11 @@ function ConsumableLogs() {
   const [archiveModalVisible, setArchiveModalVisible] = useState(false);
   const [currentArchive, setCurrentArchive] = useState(null);
   const [archiveLoading, setArchiveLoading] = useState(false);
+
+  // 手动添加日志弹窗状态
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
+  const [addForm] = Form.useForm();
 
   const fetchLogs = async (page = 1, pageSize = 10, currentFilters = filters) => {
     try {
@@ -581,6 +587,43 @@ function ConsumableLogs() {
     }
   };
 
+  // 手动添加日志
+  const handleAddLog = () => {
+    addForm.resetFields();
+    setAddModalVisible(true);
+  };
+
+  const handleAddSubmit = async values => {
+    setAddLoading(true);
+    try {
+      const submitData = {
+        consumableId: values.consumableId,
+        consumableName: values.consumableName,
+        operationType: values.operationType,
+        quantity: values.quantity || 0,
+        previousStock: values.previousStock || 0,
+        currentStock: values.currentStock || 0,
+        operator: values.operator || '',
+        reason: values.reason || '',
+        notes: values.notes || '',
+      };
+
+      if (values.createdAt) {
+        submitData.createdAt = values.createdAt.format('YYYY-MM-DD HH:mm:ss');
+      }
+
+      await axios.post('/api/consumables/logs', submitData);
+
+      message.success('日志添加成功');
+      setAddModalVisible(false);
+      fetchLogs(1, pagination.pageSize);
+    } catch (error) {
+      message.error(error.response?.data?.error || '添加失败');
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
   return (
     <div>
       <Card
@@ -656,6 +699,14 @@ function ConsumableLogs() {
                 导出 <DownOutlined />
               </Button>
             </Dropdown>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleAddLog}
+              style={{ height: '40px', borderRadius: '10px' }}
+            >
+              手动添加
+            </Button>
             <Button
               icon={<UploadOutlined />}
               onClick={() => setImportModalVisible(true)}
@@ -960,6 +1011,186 @@ function ConsumableLogs() {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* 手动添加日志弹窗 */}
+      <Modal
+        title={
+          <Space>
+            <FileTextOutlined style={{ color: '#6366f1' }} />
+            <span>手动添加日志</span>
+          </Space>
+        }
+        open={addModalVisible}
+        closeIcon={<CloseButton />}
+        onCancel={() => {
+          setAddModalVisible(false);
+          addForm.resetFields();
+        }}
+        footer={
+          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <Button
+              onClick={() => {
+                setAddModalVisible(false);
+                addForm.resetFields();
+              }}
+            >
+              取消
+            </Button>
+            <Button type="primary" loading={addLoading} onClick={() => addForm.submit()}>
+              确认添加
+            </Button>
+          </Space>
+        }
+        width={900}
+        destroyOnClose
+      >
+        <Form
+          form={addForm}
+          layout="vertical"
+          onFinish={handleAddSubmit}
+          initialValues={{
+            operationType: 'in',
+            quantity: 0,
+            previousStock: 0,
+            currentStock: 0,
+          }}
+        >
+          <Card
+            size="small"
+            title={
+              <Space>
+                <span style={{ fontSize: '14px', fontWeight: 500 }}>基本信息</span>
+              </Space>
+            }
+            style={{ marginBottom: 16 }}
+          >
+            <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item
+                  label={<Space><span style={{ color: '#ef4444' }}>*</span> 耗材名称</Space>}
+                  name="consumableName"
+                  rules={[inputValidationRules.required('请输入耗材名称')]}
+                >
+                  <Input placeholder="请输入耗材名称" style={inputStyles.form} />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label={<Space><span style={{ color: '#ef4444' }}>*</span> 操作类型</Space>}
+                  name="operationType"
+                  rules={[inputValidationRules.required('请选择操作类型')]}
+                >
+                  <Select placeholder="请选择操作类型" style={{ width: '100%', height: '40px' }}>
+                    <Option value="in">
+                      <Space>
+                        <Tag color="green">入库</Tag>
+                      </Space>
+                    </Option>
+                    <Option value="out">
+                      <Space>
+                        <Tag color="red">出库</Tag>
+                      </Space>
+                    </Option>
+                    <Option value="create">
+                      <Space>
+                        <Tag color="blue">创建</Tag>
+                      </Space>
+                    </Option>
+                    <Option value="update">
+                      <Space>
+                        <Tag color="orange">更新</Tag>
+                      </Space>
+                    </Option>
+                    <Option value="adjust">
+                      <Space>
+                        <Tag color="purple">调整</Tag>
+                      </Space>
+                    </Option>
+                    <Option value="import">
+                      <Space>
+                        <Tag color="cyan">导入</Tag>
+                      </Space>
+                    </Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="操作时间" name="createdAt">
+                  <DatePicker
+                    showTime
+                    format="YYYY-MM-DD HH:mm:ss"
+                    style={{ width: '100%', height: '40px' }}
+                    placeholder="选择时间（默认当前时间）"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+
+          <Card
+            size="small"
+            title={
+              <Space>
+                <span style={{ fontSize: '14px', fontWeight: 500 }}>库存信息</span>
+              </Space>
+            }
+            style={{ marginBottom: 16 }}
+          >
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item label="变动数量" name="quantity">
+                  <Input type="number" placeholder="变动数量" style={inputStyles.form} />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item label="操作前库存" name="previousStock">
+                  <Input type="number" placeholder="操作前" style={inputStyles.form} />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item label="操作后库存" name="currentStock">
+                  <Input type="number" placeholder="操作后" style={inputStyles.form} />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+
+          <Card
+            size="small"
+            title={
+              <Space>
+                <span style={{ fontSize: '14px', fontWeight: 500 }}>其他信息</span>
+              </Space>
+            }
+          >
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="操作人" name="operator">
+                  <Input placeholder="请输入操作人" style={inputStyles.form} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="原因" name="reason">
+                  <Input placeholder="请输入原因" style={inputStyles.form} />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item label="备注" name="notes">
+                  <Input.TextArea
+                    rows={3}
+                    placeholder="请输入备注信息（可选）"
+                    style={textAreaStyles.base}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+        </Form>
       </Modal>
     </div>
   );

@@ -8,6 +8,7 @@ const ConsumableRecord = require('../models/ConsumableRecord');
 const ConsumableLog = require('../models/ConsumableLog');
 const ConsumableLogArchive = require('../models/ConsumableLogArchive');
 const { PAGINATION, RETRY } = require('../config');
+const { generateId } = require('../utils/idGenerator');
 
 router.get('/', async (req, res) => {
   try {
@@ -1041,6 +1042,78 @@ router.get('/logs/export', async (req, res) => {
     );
     res.send(csv);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/logs', async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const {
+      consumableId,
+      consumableName,
+      operationType,
+      quantity,
+      previousStock,
+      currentStock,
+      operator,
+      reason,
+      notes,
+      snList,
+      deviceId,
+      deviceName,
+      rackId,
+      rackName,
+      roomId,
+      roomName,
+      createdAt,
+    } = req.body;
+
+    if (!consumableName || !operationType) {
+      await transaction.rollback();
+      return res.status(400).json({ error: '缺少必填字段：耗材名称、操作类型' });
+    }
+
+    const validOperationTypes = ['in', 'out', 'create', 'update', 'delete', 'adjust', 'import'];
+    if (!validOperationTypes.includes(operationType)) {
+      await transaction.rollback();
+      return res.status(400).json({ error: '无效的操作类型' });
+    }
+
+    const logData = {
+      consumableId: consumableId || generateId({ prefix: 'LOG' }),
+      consumableName,
+      operationType,
+      quantity: parseInt(quantity) || 0,
+      previousStock: parseInt(previousStock) || 0,
+      currentStock: parseInt(currentStock) || 0,
+      operator: operator || '',
+      reason: reason || '',
+      notes: notes || '',
+      snList: Array.isArray(snList) ? snList : [],
+      deviceId: deviceId || null,
+      deviceName: deviceName || null,
+      rackId: rackId || null,
+      rackName: rackName || null,
+      roomId: roomId || null,
+      roomName: roomName || null,
+      isEditable: true,
+    };
+
+    if (createdAt) {
+      const parsedDate = new Date(createdAt);
+      if (!isNaN(parsedDate.getTime())) {
+        logData.createdAt = parsedDate;
+        logData.updatedAt = parsedDate;
+      }
+    }
+
+    const log = await ConsumableLog.create(logData, { transaction });
+
+    await transaction.commit();
+    res.status(201).json({ message: '日志创建成功', log });
+  } catch (error) {
+    await transaction.rollback();
     res.status(500).json({ error: error.message });
   }
 });
