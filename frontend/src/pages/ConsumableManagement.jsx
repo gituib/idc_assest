@@ -30,6 +30,7 @@ import {
   AutoComplete,
   Avatar,
   Statistic,
+  Timeline,
 } from 'antd';
 import {
   PlusOutlined,
@@ -56,12 +57,14 @@ import {
   InfoCircleOutlined,
   QrcodeOutlined,
   DesktopOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { designTokens } from '../config/theme';
 import CloseButton from '../components/CloseButton';
+import ConsumableTimelineModal from '../components/ConsumableTimelineModal';
 import {
   inputStyles,
   selectStyles,
@@ -172,6 +175,8 @@ function ConsumableManagement() {
   const [showFieldMapping, setShowFieldMapping] = useState(false);
   const [pollingInterval, setPollingInterval] = useState(null);
   const importProgressRef = React.useRef(null);
+  const [timelineModalVisible, setTimelineModalVisible] = useState(false);
+  const [selectedConsumable, setSelectedConsumable] = useState(null);
 
   // 获取全部耗材（用于扫码入库下拉框，不受分页限制）
   const fetchAllConsumablesForScan = useCallback(async () => {
@@ -1482,10 +1487,21 @@ function ConsumableManagement() {
       {
         title: '操作',
         key: 'action',
-        width: 200,
+        width: 240,
         fixed: 'right',
         render: (_, record) => (
           <Space size="small">
+            <Tooltip title="查看记录">
+              <Button
+                type="text"
+                icon={<HistoryOutlined />}
+                onClick={() => {
+                  setSelectedConsumable(record);
+                  setTimelineModalVisible(true);
+                }}
+                style={{ color: designTokens.colors.info.main }}
+              />
+            </Tooltip>
             <Tooltip title="编辑">
               <Button
                 type="text"
@@ -4382,6 +4398,15 @@ function ConsumableManagement() {
           </Space>
         </div>
       </Modal>
+
+      <ConsumableTimelineModal
+        visible={timelineModalVisible}
+        consumable={selectedConsumable}
+        onClose={() => {
+          setTimelineModalVisible(false);
+          setSelectedConsumable(null);
+        }}
+      />
     </motion.div>
   );
 }
