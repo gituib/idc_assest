@@ -81,7 +81,7 @@ const IdleDeviceManagement = () => {
 
   const fetchRacks = async () => {
     try {
-      const response = await axios.get('/api/racks', { params: { pageSize: 100 } });
+      const response = await axios.get('/api/racks/all');
       setRacks(response.data.racks || []);
     } catch (error) {
       console.error('获取机柜列表失败', error);
