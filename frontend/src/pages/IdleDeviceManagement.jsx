@@ -167,7 +167,7 @@ const IdleDeviceManagement = () => {
       powerConsumption: record.powerConsumption,
       roomId: roomId,
       rackId: record.rackId,
-      position: record.position,
+      position: null,
       description: record.description,
     });
     if (record.rackId) {
