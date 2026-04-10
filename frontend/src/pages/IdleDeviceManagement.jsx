@@ -183,7 +183,9 @@ const IdleDeviceManagement = () => {
     }
 
     try {
+      console.log('检查U位冲突:', { rackId, position, height, deviceId: shelvingDevice?.deviceId });
       const result = await deviceAPI.checkPosition(rackId, { position, height: height || 1 });
+      console.log('U位检查结果:', result);
       if (!result.available) {
         setShelvePositionConflict(result.reason);
       } else {
@@ -1018,6 +1020,7 @@ const IdleDeviceManagement = () => {
                     placeholder="请输入高度"
                     min={1}
                     style={{ borderRadius: '8px' }}
+                    onChange={handleShelveHeightChange}
                   />
                 </Form.Item>
               </Col>

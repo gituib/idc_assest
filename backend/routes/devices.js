@@ -45,13 +45,14 @@ async function checkPositionAvailable(
   excludeDeviceId = null,
   transaction = null
 ) {
-  if (!position || position <= 0) {
+  const pos = parseInt(position, 10);
+  if (!pos || pos <= 0) {
     return { available: true, reason: null };
   }
 
-  const deviceHeight = height || 1;
-  const startU = position;
-  const endU = position + deviceHeight - 1;
+  const deviceHeight = parseInt(height, 10) || 1;
+  const startU = pos;
+  const endU = pos + deviceHeight - 1;
 
   const queryOptions = {
     where: {
