@@ -731,7 +731,17 @@ async function generateDeviceId() {
       },
     },
     attributes: [
-      [sequelize.fn('MAX', sequelize.literal('CAST(SUBSTR(deviceId, 4) AS INTEGER)')), 'maxNum'],
+      [
+        sequelize.fn(
+          'MAX',
+          sequelize.literal(
+            dbDialect === 'mysql'
+              ? 'CAST(SUBSTR(deviceId, 4) AS SIGNED)'
+              : 'CAST(SUBSTR(deviceId, 4) AS INTEGER)'
+          )
+        ),
+        'maxNum',
+      ],
     ],
     raw: true,
   });
@@ -1112,12 +1122,14 @@ router.post('/import', async (req, res) => {
       Device.findOne({
         attributes: [
           [
-            sequelize.fn(
-              'MAX',
-              sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('deviceId'), 4), 'INTEGER')
-            ),
-            'maxNum',
-          ],
+        sequelize.fn(
+          'MAX',
+          dbDialect === 'mysql'
+            ? sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('deviceId'), 4), 'SIGNED')
+            : sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('deviceId'), 4), 'INTEGER')
+        ),
+        'maxNum',
+      ],
         ],
         where: { deviceId: { [Op.like]: 'DEV%' } },
         transaction: t,
@@ -1268,7 +1280,9 @@ router.post('/import', async (req, res) => {
               [
                 sequelize.fn(
                   'MAX',
-                  sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('rackId'), 5), 'INTEGER')
+                  dbDialect === 'mysql'
+                    ? sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('rackId'), 5), 'SIGNED')
+                    : sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('rackId'), 5), 'INTEGER')
                 ),
                 'maxNum',
               ],
