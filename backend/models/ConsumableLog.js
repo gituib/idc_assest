@@ -126,6 +126,11 @@ const ConsumableLog = sequelize.define(
       allowNull: true,
       comment: '机房名称',
     },
+    lastNameSyncAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: '名称最后同步时间（名称变更时更新）',
+    },
   },
   {
     tableName: 'consumable_logs',

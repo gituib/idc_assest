@@ -163,31 +163,46 @@ function ConsumableLogs() {
       title: '耗材名称',
       dataIndex: 'consumableName',
       key: 'consumableName',
-      width: 180,
-      render: (value, record) => (
-        <Tooltip
-          title={
-            record.consumableSnapshot ? (
+      width: 200,
+      render: (value, record) => {
+        const currentName = record.currentConsumableName || value;
+        const nameChanged = currentName !== value && value;
+        return (
+          <Tooltip
+            title={
               <div>
-                <div>分类: {record.consumableSnapshot.category || '-'}</div>
-                <div>单位: {record.consumableSnapshot.unit || '-'}</div>
-                <div>单价: {record.consumableSnapshot.unitPrice || '-'}</div>
-                <div>供应商: {record.consumableSnapshot.supplier || '-'}</div>
-                <div>位置: {record.consumableSnapshot.location || '-'}</div>
+                {record.consumableSnapshot && (
+                  <div>
+                    <div>分类: {record.consumableSnapshot.category || '-'}</div>
+                    <div>单位: {record.consumableSnapshot.unit || '-'}</div>
+                    <div>单价: {record.consumableSnapshot.unitPrice || '-'}</div>
+                    <div>供应商: {record.consumableSnapshot.supplier || '-'}</div>
+                    <div>位置: {record.consumableSnapshot.location || '-'}</div>
+                  </div>
+                )}
+                {nameChanged && (
+                  <div style={{ marginTop: '8px', color: '#faad14' }}>
+                    曾用名: {value}
+                  </div>
+                )}
               </div>
-            ) : null
-          }
-        >
-          <Space direction="vertical" size={0}>
-            <span>{value}</span>
-            {record.isConsumableDeleted && (
-              <Tag color="red" size="small">
-                已删除
-              </Tag>
-            )}
-          </Space>
-        </Tooltip>
-      ),
+            }
+          >
+            <Space direction="vertical" size={0}>
+              <span>{currentName}</span>
+              {record.isConsumableDeleted ? (
+                <Tag color="red" size="small">
+                  已删除
+                </Tag>
+              ) : nameChanged ? (
+                <Tag color="orange" size="small">
+                  已更名
+                </Tag>
+              ) : null}
+            </Space>
+          </Tooltip>
+        );
+      },
     },
     {
       title: '操作类型',
@@ -417,6 +432,7 @@ function ConsumableLogs() {
         时间: dayjs(log.createdAt).format('YYYY-MM-DD HH:mm:ss'),
         耗材ID: log.consumableId,
         耗材名称: log.consumableName,
+        当前名称: log.currentConsumableName || log.consumableName,
         操作类型: getOperationTypeText(log.operationType),
         变动数量: log.quantity,
         操作前库存: log.previousStock,

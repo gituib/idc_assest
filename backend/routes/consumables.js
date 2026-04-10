@@ -71,15 +71,22 @@ const MAX_EXPORT_SIZE = 50000;
 
 router.get('/export', async (req, res) => {
   try {
-    const { keyword, category, status } = req.query;
+    const {
+      keyword,
+      category,
+      status,
+      stockStatus, // 新增：warning/normal/all
+      ids,         // 新增：耗材ID列表，逗号分隔
+      fields,     // 新增：要导出的字段列表，逗号分隔
+    } = req.query;
 
+    // 构建查询条件
     const where = {};
 
     if (keyword) {
       where[Op.or] = [
-        { consumableId: { [Op.like]: `%${keyword}%` } },
         { name: { [Op.like]: `%${keyword}%` } },
-        { category: { [Op.like]: `%${keyword}%` } },
+        { consumableId: { [Op.like]: `%${keyword}%` } },
         { supplier: { [Op.like]: `%${keyword}%` } },
         { location: { [Op.like]: `%${keyword}%` } },
       ];
@@ -93,14 +100,70 @@ router.get('/export', async (req, res) => {
       where.status = status;
     }
 
+    // 支持导出选中项
+    if (ids) {
+      const idList = ids.split(',').map(id => id.trim()).filter(Boolean);
+      if (idList.length > 0) {
+        where.consumableId = { [Op.in]: idList };
+      }
+    }
+
+    // 支持导出预警库存
+    if (stockStatus === 'warning') {
+      where[Op.and] = [
+        {
+          [Op.or]: [
+            { currentStock: { [Op.lte]: sequelize.col('minStock') } },
+            {
+              [Op.and]: [
+                { maxStock: { [Op.gt]: 0 } },
+                { currentStock: { [Op.gte]: sequelize.col('maxStock') } },
+              ],
+            },
+          ],
+        },
+      ];
+    } else if (stockStatus === 'normal') {
+      where[Op.and] = [
+        { currentStock: { [Op.gt]: sequelize.col('minStock') } },
+        {
+          [Op.or]: [
+            { maxStock: { [Op.eq]: 0 } },
+            { currentStock: { [Op.lt]: sequelize.col('maxStock') } },
+          ],
+        },
+      ];
+    }
+
     const consumables = await Consumable.findAll({
       where,
       limit: MAX_EXPORT_SIZE,
       order: [['createdAt', 'DESC']],
     });
 
-    const result = consumables.map(item => {
-      const data = item.toJSON();
+    // 处理导出字段
+    let exportData = consumables;
+    if (fields) {
+      const fieldList = fields.split(',').map(f => f.trim()).filter(Boolean);
+      if (fieldList.length > 0) {
+        exportData = consumables.map(c => {
+          const obj = {};
+          fieldList.forEach(field => {
+            if (c[field] !== undefined) {
+              obj[field] = c[field];
+            }
+          });
+          // 始终保留名称
+          if (!obj.name && c.name) {
+            obj.name = c.name;
+          }
+          return obj;
+        });
+      }
+    }
+
+    const result = exportData.map(item => {
+      const data = item.toJSON ? item.toJSON() : item;
       if (!Array.isArray(data.snList)) {
         data.snList = [];
       }
@@ -112,6 +175,7 @@ router.get('/export', async (req, res) => {
       total: result.length,
     });
   } catch (error) {
+    console.error('导出失败:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -294,7 +358,7 @@ router.post('/create-with-inbound', async (req, res) => {
 router.post('/import', async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
-    const { items, operator = '系统', mode = 'create' } = req.body;
+    const { items, operator = '系统', mode = 'create', stockMode = 'basic' } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       await transaction.rollback();
@@ -327,7 +391,7 @@ router.post('/import', async (req, res) => {
         }
 
         let snList = [];
-        if (item.SN序列号 || item.snList) {
+        if (stockMode !== 'basic' && (item.SN序列号 || item.snList)) {
           const snStr = item.SN序列号 || item.snList;
           if (typeof snStr === 'string') {
             snList = snStr
@@ -344,8 +408,10 @@ router.post('/import', async (req, res) => {
           name,
           category,
           unit: item.单位 || item.unit || '个',
-          currentStock:
-            snList.length > 0 ? snList.length : parseInt(item.当前库存 || item.currentStock) || 0,
+          // 根据 stockMode 决定库存处理方式
+          currentStock: stockMode === 'basic'
+            ? 0  // basic模式：强制为0
+            : (snList.length > 0 ? snList.length : parseInt(item.当前库存 || item.currentStock) || 0),
           minStock: parseInt(item.最小库存 || item.minStock) || 10,
           maxStock: parseInt(item.最大库存 || item.maxStock) || 0,
           unitPrice: parseFloat(item.单价 || item.unitPrice) || 0,
@@ -353,7 +419,7 @@ router.post('/import', async (req, res) => {
           location: item.存放位置 || item.location || '',
           description: item.描述 || item.description || '',
           status: item.状态 || item.status || 'active',
-          snList,
+          snList: stockMode === 'basic' ? [] : snList,  // basic模式：强制为空数组
         };
 
         let existingConsumable = null;
@@ -400,17 +466,113 @@ router.post('/import', async (req, res) => {
           });
         }
 
+        // 如果是 inbound 模式且是新创建的耗材，执行入库操作
+        if (stockMode === 'inbound' && !existingConsumable) {
+          // 新建模式下的入库
+          const inboundQuantity = parseInt(item.入库数量 || item.inboundQuantity) || consumable.currentStock;
+          const inboundSnList = consumable.snList; // 使用处理后的SN列表
+
+          // 更新耗材库存
+          await consumable.update({
+            currentStock: inboundQuantity,
+            snList: inboundSnList,
+            version: sequelize.literal('version + 1'),
+          }, { transaction });
+
+          // 创建入库记录
+          await ConsumableRecord.create({
+            consumableId: consumable.consumableId,
+            type: 'in',
+            quantity: inboundQuantity,
+            previousStock: 0,
+            currentStock: inboundQuantity,
+            operator: item.操作人 || operator,
+            reason: item.原因 || '批量导入入库',
+            notes: '',
+            snList: inboundSnList,
+          }, { transaction });
+
+          // 创建入库日志
+          await ConsumableLog.create({
+            consumableId: consumable.consumableId,
+            consumableName: consumable.name,
+            operationType: 'in',
+            quantity: inboundQuantity,
+            previousStock: 0,
+            currentStock: inboundQuantity,
+            operator: item.操作人 || operator,
+            reason: item.原因 || '批量导入入库',
+            notes: '',
+            snList: inboundSnList,
+            consumableSnapshot: {
+              category: consumable.category,
+              unit: consumable.unit,
+              unitPrice: consumable.unitPrice,
+              supplier: consumable.supplier,
+              location: consumable.location,
+            },
+          }, { transaction });
+        }
+
+        // 对于 update 模式下的 inbound，计算库存差异
+        if (stockMode === 'inbound' && existingConsumable && mode === 'update') {
+          const inboundQuantity = parseInt(item.入库数量 || item.inboundQuantity) || 0;
+          if (inboundQuantity > 0) {
+            const prevStock = existingConsumable.currentStock;
+            const newStock = prevStock + inboundQuantity;
+            const inboundSnList = consumable.snList || [];
+
+            await consumable.update({
+              currentStock: newStock,
+              snList: inboundSnList,
+              version: sequelize.literal('version + 1'),
+            }, { transaction });
+
+            await ConsumableRecord.create({
+              consumableId: consumable.consumableId,
+              type: 'in',
+              quantity: inboundQuantity,
+              previousStock: prevStock,
+              currentStock: newStock,
+              operator: item.操作人 || operator,
+              reason: item.原因 || '批量导入入库',
+              notes: '',
+              snList: inboundSnList,
+            }, { transaction });
+
+            await ConsumableLog.create({
+              consumableId: consumable.consumableId,
+              consumableName: consumable.name,
+              operationType: 'in',
+              quantity: inboundQuantity,
+              previousStock: prevStock,
+              currentStock: newStock,
+              operator: item.操作人 || operator,
+              reason: item.原因 || '批量导入入库',
+              notes: '',
+              snList: inboundSnList,
+              consumableSnapshot: {
+                category: consumable.category,
+                unit: consumable.unit,
+                unitPrice: consumable.unitPrice,
+                supplier: consumable.supplier,
+                location: consumable.location,
+              },
+            }, { transaction });
+          }
+        }
+
         await ConsumableLog.create(
           {
             consumableId: consumable.consumableId,
             consumableName: consumable.name,
-            operationType,
-            quantity: consumable.currentStock,
-            previousStock,
-            currentStock: consumable.currentStock,
+            operationType: stockMode === 'inbound' && !existingConsumable ? 'import' : 'import_update',
+            quantity: stockMode === 'basic' ? 0 : consumable.currentStock,
+            previousStock: stockMode === 'basic' ? 0 : previousStock,
+            currentStock: stockMode === 'basic' ? 0 : consumable.currentStock,
             operator,
             reason: '批量导入',
-            notes: existingConsumable ? '更新现有耗材' : '',
+            notes: existingConsumable ? '更新现有耗材' : (stockMode === 'inbound' ? '导入并入库' : ''),
             consumableSnapshot: {
               category: consumable.category,
               unit: consumable.unit,
@@ -444,19 +606,18 @@ router.post('/import', async (req, res) => {
 router.get('/by-sn/:sn', async (req, res) => {
   try {
     const sn = req.params.sn;
-    // 使用数据库 LIKE 查询替代全表扫描
+    
+    // 获取所有有 snList 的耗材
     const consumables = await Consumable.findAll({
-      where: {
-        snList: {
-          [Op.like]: `%${sn}%`,
-        },
-      },
+      attributes: ['consumableId', 'name', 'category', 'currentStock', 'unit', 'snList', 'location', 'status'],
     });
+    
     // 精确匹配 SN（JSON 数组中的元素）
     const consumable = consumables.find(c => {
       const snList = Array.isArray(c.snList) ? c.snList : [];
       return snList.includes(sn);
     });
+    
     const result = consumable ? consumable.toJSON() : null;
     if (result && !Array.isArray(result.snList)) {
       result.snList = [];
@@ -1077,9 +1238,30 @@ router.get('/logs', async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
+    const consumableIds = [...new Set(rows.map(log => log.consumableId).filter(Boolean))];
+    const consumables = await Consumable.findAll({
+      where: { consumableId: { [Op.in]: consumableIds } },
+      attributes: ['consumableId', 'name', 'status'],
+    });
+    const consumableMap = Object.fromEntries(consumables.map(c => [c.consumableId, c]));
+
+    const logsWithCurrentName = rows.map(log => {
+      const logData = log.toJSON();
+      const relatedConsumable = consumableMap[log.consumableId];
+      logData.currentConsumableName = relatedConsumable ? relatedConsumable.name : logData.consumableName;
+      if (relatedConsumable) {
+        logData.consumable = {
+          consumableId: relatedConsumable.consumableId,
+          name: relatedConsumable.name,
+          status: relatedConsumable.status,
+        };
+      }
+      return logData;
+    });
+
     res.json({
       total: count,
-      logs: rows,
+      logs: logsWithCurrentName,
       page: parseInt(page),
       pageSize: parseInt(pageSize),
     });
@@ -1117,8 +1299,15 @@ router.get('/logs/export', async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
+    const consumableIds = [...new Set(logs.map(log => log.consumableId).filter(Boolean))];
+    const consumables = await Consumable.findAll({
+      where: { consumableId: { [Op.in]: consumableIds } },
+      attributes: ['consumableId', 'name', 'status'],
+    });
+    const consumableMap = Object.fromEntries(consumables.map(c => [c.consumableId, c]));
+
     const csvHeader =
-      'ID,耗材ID,耗材名称,操作类型,变动数量,操作前库存,操作后库存,操作人,原因,备注,耗材状态,分类,单位,单价,创建时间,更新时间\n';
+      'ID,耗材ID,耗材名称(历史),耗材名称(当前),操作类型,变动数量,操作前库存,操作后库存,操作人,原因,备注,耗材状态,分类,单位,单价,创建时间,更新时间\n';
     const csvRows = logs
       .map(log => {
         const operationTypeMap = {
@@ -1131,10 +1320,13 @@ router.get('/logs/export', async (req, res) => {
           import: '导入',
         };
         const snapshot = log.consumableSnapshot || {};
+        const relatedConsumable = consumableMap[log.consumableId];
+        const currentConsumableName = relatedConsumable ? relatedConsumable.name : log.consumableName;
         return [
           log.id,
           log.consumableId,
           log.consumableName,
+          currentConsumableName,
           operationTypeMap[log.operationType] || log.operationType,
           log.quantity,
           log.previousStock,
@@ -1392,11 +1584,25 @@ router.put('/:id', async (req, res) => {
     }
 
     const oldData = consumable.toJSON();
+    const oldName = oldData.name;
     const updateData = { ...req.body };
-    // 禁止通过编辑接口修改库存和SN列表
     delete updateData.currentStock;
     delete updateData.snList;
     await consumable.update(updateData, { transaction });
+
+    const newName = consumable.name;
+    if (oldName !== newName) {
+      await ConsumableLog.update(
+        {
+          consumableName: newName,
+          lastNameSyncAt: new Date(),
+        },
+        {
+          where: { consumableId: consumable.consumableId },
+          transaction,
+        }
+      );
+    }
 
     await ConsumableLog.create(
       {

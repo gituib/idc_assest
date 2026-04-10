@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
+const { generateId } = require('../utils/idGenerator');
 const { Ticket, TicketOperationRecord } = require('../models/ticketIndex');
 const Device = require('../models/Device');
 const User = require('../models/User');

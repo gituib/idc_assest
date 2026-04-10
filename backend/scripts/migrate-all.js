@@ -113,6 +113,11 @@ const migrations = [
       '为 consumable_logs 表添加 deviceId、deviceName、rackId、rackName、roomId、roomName 字段',
     migrate: migrateConsumableLogDeviceAssociation,
   },
+  {
+    name: '耗材日志名称同步',
+    description: '为 consumable_logs 表添加 lastNameSyncAt 字段，支持名称同步',
+    migrate: migrateConsumableLogNameSync,
+  },
 ];
 
 async function runMigrations() {
@@ -843,6 +848,18 @@ async function migrateConsumableLogDeviceAssociation() {
   }
 
   console.log('    耗材日志设备关联迁移完成');
+}
+
+async function migrateConsumableLogNameSync() {
+  const tableName = 'consumable_logs';
+
+  if (!(await tableExists(tableName))) {
+    console.log(`    ${tableName} 表不存在，跳过`);
+    return;
+  }
+
+  await addColumnIfNotExists(tableName, 'lastNameSyncAt', 'DATETIME');
+  console.log('    耗材日志名称同步迁移完成');
 }
 
 // 执行迁移
