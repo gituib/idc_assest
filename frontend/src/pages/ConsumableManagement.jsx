@@ -1903,14 +1903,8 @@ function ConsumableManagement() {
                     <Menu.Item key="all">
                       <FileExcelOutlined /> 导出全部
                     </Menu.Item>
-                    <Menu.Item key="filtered">
-                      <FilterOutlined /> 导出筛选结果
-                    </Menu.Item>
                     <Menu.Item key="selected" disabled={selectedRowKeys.length === 0}>
                       <CheckSquareOutlined /> 导出选中项 ({selectedRowKeys.length})
-                    </Menu.Item>
-                    <Menu.Item key="warning">
-                      <WarningOutlined /> 导出预警库存
                     </Menu.Item>
                     <Menu.Divider />
                     <Menu.Item key="fields">
