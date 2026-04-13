@@ -105,6 +105,10 @@ const routesConfig = [
     file: 'dangerousOperations.js',
     path: '/api/dangerous-operations',
   },
+  {
+    file: 'topology.js',
+    path: '/api/topology',
+  },
 ];
 
 module.exports = routesConfig;

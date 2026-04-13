@@ -62,7 +62,8 @@ function parsePortRange(portName) {
     return null;
   }
 
-  const prefix = startPart.replace(startNumMatch[0], '');
+  const startIdx = startPart.length - startNumMatch[0].length;
+  const prefix = startPart.substring(0, startIdx);
   const portCount = endNum - startNum + 1;
 
   const ports = [];

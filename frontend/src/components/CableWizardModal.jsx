@@ -189,7 +189,6 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
   useEffect(() => {
     if (visible) {
       setCurrentStep(0);
-      setSourceDevice(null);
       setTargetDevice(null);
       setSourcePort(null);
       setTargetPort(null);
@@ -197,22 +196,30 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
       setSelectedCableLength(3);
       setCableLabel('');
       setCableDescription('');
-      setSourcePorts([]);
       setTargetPorts([]);
       setConflicts([]);
       setCompatibilityWarning(null);
-      setDevices([]);
       setCablesData([]);
 
-      fetchDevices('', 'switch').then(deviceList => {
-        if (initialSourceDevice?.deviceId) {
-          const device = deviceList.find(d => d.deviceId === initialSourceDevice.deviceId);
-          if (device) {
-            setSourceDevice(device);
-            fetchDevicePorts(device.deviceId, 'source');
-          }
-        }
-      });
+      if (initialSourceDevice?.deviceId) {
+        const deviceWithId = {
+          deviceId: initialSourceDevice.deviceId,
+          name: initialSourceDevice.name || initialSourceDevice.deviceId,
+          type: initialSourceDevice.type || 'switch',
+          model: initialSourceDevice.model,
+          status: initialSourceDevice.status,
+          Rack: initialSourceDevice.Rack,
+          ipAddress: initialSourceDevice.ipAddress,
+          position: initialSourceDevice.position,
+        };
+        setSourceDevice(deviceWithId);
+        fetchDevicePorts(deviceWithId.deviceId, 'source');
+        fetchDevices('', 'switch');
+      } else {
+        setSourceDevice(null);
+        setSourcePorts([]);
+        fetchDevices('', 'switch');
+      }
       fetchCables();
     }
   }, [visible, initialSourceDevice, fetchDevices, fetchDevicePorts, fetchCables]);
@@ -677,152 +684,165 @@ const Step1SourceDevice = ({
   onPortSelect,
   onDevicesChange,
 }) => {
+  const isSourcePreSelected = !!sourceDevice;
+
   return (
     <div style={{ padding: '20px 0' }}>
       <Card
         title={
           <Space>
             <CloudServerOutlined style={{ color: '#1890ff' }} />
-            <span>步骤 1: 选择源设备</span>
+            <span>步骤 1: 选择源设备端口</span>
           </Space>
         }
         size="small"
         style={{ marginBottom: '20px' }}
       >
-        <div style={{ marginBottom: '16px' }}>
-          <Typography.Text type="secondary" style={{ fontSize: '13px' }}>
-            选择接线的起点设备
-          </Typography.Text>
-        </div>
-
-        <div style={{ marginBottom: '16px' }}>
-          <FilterableDeviceSelect
-            filterType="switch"
-            onDeviceListChange={onDevicesChange}
-          />
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: '12px',
-            maxHeight: 300,
-            overflowY: 'auto',
-            padding: '8px',
-            background: designTokens.colors.background,
-            borderRadius: '8px',
-          }}
-        >
-          {fetchingDevices ? (
-            <div style={{ textAlign: 'center', padding: '40px', gridColumn: '1 / -1' }}>
-              <Spin size="large" />
+        {!isSourcePreSelected && (
+          <>
+            <div style={{ marginBottom: '16px' }}>
+              <Typography.Text type="secondary" style={{ fontSize: '13px' }}>
+                选择接线的起点设备
+              </Typography.Text>
             </div>
-          ) : (
-            devices.map(device => (
-              <motion.div
-                key={device.deviceId}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Card
-                  onClick={() => onDeviceSelect(device)}
-                  hoverable
-                  style={{
-                    border: sourceDevice?.deviceId === device.deviceId
-                      ? `2px solid ${designTokens.colors.primary}`
-                      : '1px solid #d9d9d9',
-                    background: sourceDevice?.deviceId === device.deviceId
-                      ? 'rgba(24,144,255,0.08)'
-                      : '#fff',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <div
+
+            <div style={{ marginBottom: '16px' }}>
+              <FilterableDeviceSelect
+                filterType="switch"
+                onDeviceListChange={onDevicesChange}
+              />
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: '12px',
+                maxHeight: 300,
+                overflowY: 'auto',
+                padding: '8px',
+                background: designTokens.colors.background,
+                borderRadius: '8px',
+              }}
+            >
+              {fetchingDevices ? (
+                <div style={{ textAlign: 'center', padding: '40px', gridColumn: '1 / -1' }}>
+                  <Spin size="large" />
+                </div>
+              ) : (
+                devices.map(device => (
+                  <motion.div
+                    key={device.deviceId}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Card
+                      onClick={() => onDeviceSelect(device)}
+                      hoverable
                       style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '10px',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '24px',
-                        flexShrink: 0,
+                        border: sourceDevice?.deviceId === device.deviceId
+                          ? `2px solid ${designTokens.colors.primary}`
+                          : '1px solid #d9d9d9',
+                        background: sourceDevice?.deviceId === device.deviceId
+                          ? 'rgba(24,144,255,0.08)'
+                          : '#fff',
                       }}
                     >
-                      {device.type === 'server' ? '🖥️' : device.type === 'switch' ? '📡' : device.type === 'router' ? '🔀' : device.type === 'storage' ? '💾' : '📦'}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                        <div style={{ fontWeight: 600, color: '#262626', fontSize: '15px' }}>
-                          {device.name || device.deviceId}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                        <div
+                          style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '10px',
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '24px',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {device.type === 'server' ? '🖥️' : device.type === 'switch' ? '📡' : device.type === 'router' ? '🔀' : device.type === 'storage' ? '💾' : '📦'}
                         </div>
-                        {device.status && getStatusTag(device.status)}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#8c8c8c', marginBottom: '4px' }}>
-                        <span style={{ marginRight: '12px' }}>
-                          <span style={{ color: '#bfbfbf', marginRight: '4px' }}>ID:</span>
-                          {device.deviceId}
-                        </span>
-                        <span>
-                          <span style={{ color: '#bfbfbf', marginRight: '4px' }}>类型:</span>
-                          {device.type === 'server' ? '服务器' : device.type === 'switch' ? '交换机' : device.type === 'router' ? '路由器' : device.type === 'storage' ? '存储设备' : device.type}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#8c8c8c', lineHeight: '1.5' }}>
-                        {device.Rack?.Room?.name && (
-                          <span style={{ marginRight: '12px' }}>
-                            <span style={{ color: '#bfbfbf', marginRight: '4px' }}>机房:</span>
-                            {device.Rack.Room.name}
-                          </span>
-                        )}
-                        {device.Rack?.name && (
-                          <span style={{ marginRight: '12px' }}>
-                            <span style={{ color: '#bfbfbf', marginRight: '4px' }}>机柜:</span>
-                            {device.Rack.name}
-                          </span>
-                        )}
-                        {device.position && (
-                          <span style={{ marginRight: '12px' }}>
-                            <span style={{ color: '#bfbfbf', marginRight: '4px' }}>U位:</span>
-                            U{device.position}
-                          </span>
-                        )}
-                        {device.ipAddress && (
-                          <span>
-                            <span style={{ color: '#bfbfbf', marginRight: '4px' }}>IP:</span>
-                            {device.ipAddress}
-                          </span>
-                        )}
-                      </div>
-                      {device.model && (
-                        <div style={{ fontSize: '11px', color: '#bfbfbf', marginTop: '4px' }}>
-                          <span style={{ color: '#8c8c8c', marginRight: '4px' }}>型号:</span>
-                          {device.model}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                            <div style={{ fontWeight: 600, color: '#262626', fontSize: '15px' }}>
+                              {device.name || device.deviceId}
+                            </div>
+                            {device.status && getStatusTag(device.status)}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#8c8c8c', marginBottom: '4px' }}>
+                            <span style={{ marginRight: '12px' }}>
+                              <span style={{ color: '#bfbfbf', marginRight: '4px' }}>ID:</span>
+                              {device.deviceId}
+                            </span>
+                            <span>
+                              <span style={{ color: '#bfbfbf', marginRight: '4px' }}>类型:</span>
+                              {device.type === 'server' ? '服务器' : device.type === 'switch' ? '交换机' : device.type === 'router' ? '路由器' : device.type === 'storage' ? '存储设备' : device.type}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#8c8c8c', lineHeight: '1.5' }}>
+                            {device.Rack?.Room?.name && (
+                              <span style={{ marginRight: '12px' }}>
+                                <span style={{ color: '#bfbfbf', marginRight: '4px' }}>机房:</span>
+                                {device.Rack.Room.name}
+                              </span>
+                            )}
+                            {device.Rack?.name && (
+                              <span style={{ marginRight: '12px' }}>
+                                <span style={{ color: '#bfbfbf', marginRight: '4px' }}>机柜:</span>
+                                {device.Rack.name}
+                              </span>
+                            )}
+                            {device.position && (
+                              <span style={{ marginRight: '12px' }}>
+                                <span style={{ color: '#bfbfbf', marginRight: '4px' }}>U位:</span>
+                                U{device.position}
+                              </span>
+                            )}
+                            {device.ipAddress && (
+                              <span>
+                                <span style={{ color: '#bfbfbf', marginRight: '4px' }}>IP:</span>
+                                {device.ipAddress}
+                              </span>
+                            )}
+                          </div>
+                          {device.model && (
+                            <div style={{ fontSize: '11px', color: '#bfbfbf', marginTop: '4px' }}>
+                              <span style={{ color: '#8c8c8c', marginRight: '4px' }}>型号:</span>
+                              {device.model}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    {sourceDevice?.deviceId === device.deviceId && (
-                      <CheckCircleOutlined style={{ color: designTokens.colors.primary, fontSize: '22px', flexShrink: 0 }} />
-                    )}
-                  </div>
-                </Card>
-              </motion.div>
-            ))
-          )}
-        </div>
+                        {sourceDevice?.deviceId === device.deviceId && (
+                          <CheckCircleOutlined style={{ color: designTokens.colors.primary, fontSize: '22px', flexShrink: 0 }} />
+                        )}
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))
+              )}
+            </div>
+          </>
+        )}
 
         {sourceDevice && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            style={{ marginTop: '20px' }}
+            style={{ marginTop: isSourcePreSelected ? 0 : '20px' }}
           >
-            <div style={{ marginBottom: '12px' }}>
+            <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <DatabaseOutlined style={{ color: '#1890ff' }} />
               <Typography.Text style={{ fontWeight: 600, color: '#262626' }}>
-                源设备已选择: {sourceDevice.name}
+                源设备: {sourceDevice.name}
               </Typography.Text>
+              {isSourcePreSelected && (
+                <Tag color="blue" style={{ marginLeft: '8px' }}>已选择</Tag>
+              )}
+              <Tag color="blue" style={{ marginLeft: 'auto' }}>
+                {sourcePorts.filter(p => p.status === 'free').length} 个空闲端口
+              </Tag>
             </div>
 
             <div
@@ -833,23 +853,12 @@ const Step1SourceDevice = ({
                 border: '1px solid #d9d9d9',
               }}
             >
-              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <DatabaseOutlined style={{ color: '#1890ff' }} />
-                <Typography.Text style={{ fontWeight: 600 }}>端口选择</Typography.Text>
-                <Tag color="blue" style={{ marginLeft: 'auto' }}>
-                  {sourcePorts.filter(p => p.status === 'free').length} 个空闲端口
-                </Tag>
-              </div>
-
               {sourcePorts.length === 0 ? (
                 <Empty description="该设备暂无端口数据" />
               ) : (
                 <>
                   <div style={{ marginBottom: '8px', fontSize: '12px', color: '#8c8c8c' }}>
                     端口总数: {sourcePorts.length} | 空闲端口: {sourcePorts.filter(p => p.status === 'free').length}
-                  </div>
-                  <div style={{ marginBottom: '8px', fontSize: '11px', color: '#bfbfbf' }}>
-                    端口状态分布: {sourcePorts.map(p => p.status).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
                   </div>
                   {sourcePort && (
                     <div

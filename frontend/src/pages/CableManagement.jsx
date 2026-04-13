@@ -46,6 +46,7 @@ import {
   FilterOutlined,
   ClearOutlined,
   MoreOutlined,
+  ShareAltOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -55,6 +56,7 @@ import { designTokens } from '../config/theme';
 import { debounce } from '../utils/common';
 import CloseButton from '../components/CloseButton';
 import CableWizardModal from '../components/CableWizardModal';
+import { TopologyModal } from '../components/topology';
 
 const { Option } = Select;
 const { Panel } = Collapse;
@@ -144,6 +146,8 @@ function CableManagement() {
   const [pendingSubmitValues, setPendingSubmitValues] = useState(null);
 
   const [expandedKeys, setExpandedKeys] = useState([]);
+
+  const [topologyModalVisible, setTopologyModalVisible] = useState(false);
 
   const fetchCables = useCallback(async () => {
     try {
@@ -1069,6 +1073,14 @@ function CableManagement() {
               >
                 导出
               </Button>
+              <Button
+                icon={<ShareAltOutlined />}
+                onClick={() => setTopologyModalVisible(true)}
+                size="large"
+                style={{ borderRadius: designTokens.borderRadius.sm }}
+              >
+                生成拓扑图
+              </Button>
             </Space>
             <Space>
               <Tooltip title="刷新数据">
@@ -1866,6 +1878,11 @@ function CableManagement() {
           </div>
         )}
       </Modal>
+
+      <TopologyModal
+        visible={topologyModalVisible}
+        onClose={() => setTopologyModalVisible(false)}
+      />
     </motion.div>
   );
 }
