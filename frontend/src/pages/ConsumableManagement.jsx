@@ -65,6 +65,8 @@ import {
   DownOutlined,
   CheckSquareOutlined,
   SettingOutlined,
+  InboxOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -163,6 +165,9 @@ function ConsumableManagement() {
   const [scanChecking, setScanChecking] = useState(false);
   const [scannedSnList, setScannedSnList] = useState([]);
   const [selectedScanInConsumable, setSelectedScanInConsumable] = useState(null);
+  const [scanInOperator, setScanInOperator] = useState('');
+  const [scanInReason, setScanInReason] = useState('');
+  const [scanInNotes, setScanInNotes] = useState('');
   const scanInputRef = React.useRef(null);
   const [quickOutModalVisible, setQuickOutModalVisible] = useState(false);
   const [quickOutConsumable, setQuickOutConsumable] = useState(null);
@@ -1066,6 +1071,9 @@ function ConsumableManagement() {
     setScannedSnList([]);
     setSelectedScanInConsumable(null);
     setScanChecking(false);
+    setScanInOperator('');
+    setScanInReason('');
+    setScanInNotes('');
   }, []);
 
   const addToPendingOut = (consumable, snList = []) => {
@@ -1253,8 +1261,9 @@ function ConsumableManagement() {
           consumableId,
           type: 'in',
           quantity: scannedSnList.length,
-          operator: '系统管理员',
-          reason: '扫码入库',
+          operator: scanInOperator || '系统管理员',
+          reason: scanInReason || '扫码入库',
+          notes: scanInNotes || '',
           snList: scannedSnList,
         });
         message.success({
@@ -1268,7 +1277,7 @@ function ConsumableManagement() {
         console.error('入库失败:', error);
       }
     },
-    [scannedSnList, handleScanCancel, fetchConsumables]
+    [scannedSnList, scanInOperator, scanInReason, scanInNotes, handleScanCancel, fetchConsumables]
   );
 
   const searchDevices = useCallback(async keyword => {
@@ -3920,68 +3929,135 @@ function ConsumableManagement() {
 
       {/* 入库/出库弹窗 */}
       <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: designTokens.borderRadius.md,
-                background:
-                  stockType === 'in'
-                    ? designTokens.colors.success.gradient
-                    : designTokens.colors.error.gradient,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-              }}
-            >
-              {stockType === 'in' ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
-            </div>
-            <span style={{ fontSize: '18px', fontWeight: 600 }}>
-              {stockType === 'in' ? '耗材入库' : '耗材出库'}
-            </span>
-          </div>
-        }
+        title={null}
         open={stockModalVisible}
         closeIcon={<CloseButton />}
         onCancel={handleStockCancel}
         footer={null}
-        width={500}
+        width={560}
+        style={{ top: 80 }}
+        bodyStyle={{ padding: 0 }}
       >
-        <Form
-          form={stockForm}
-          layout="vertical"
-          onFinish={handleStockSubmit}
-          style={{ marginTop: '16px' }}
+        {/* 标题栏 */}
+        <div
+          style={{
+            padding: '20px 24px 16px',
+            background: stockType === 'in'
+              ? 'linear-gradient(135deg, #52c41a15 0%, #52c41a08 100%)'
+              : 'linear-gradient(135deg, #ff4d4f15 0%, #ff4d4f08 100%)',
+            borderBottom: `1px solid ${designTokens.colors.neutral[200]}`,
+          }}
         >
-          <Form.Item name="consumableId" label="耗材ID">
-            <Input disabled style={{ ...inputStyles.form, ...inputStyles.disabled }} />
-          </Form.Item>
-          <Form.Item name="consumableName" label="耗材名称">
-            <Input disabled style={{ ...inputStyles.form, ...inputStyles.disabled }} />
-          </Form.Item>
-
-          {stockType === 'out' && stockRecord?.snList && stockRecord.snList.length > 0 && (
-            <Form.Item
-              label={
-                <span>
-                  选择SN序列号
-                  <Text type="secondary" style={{ fontSize: '12px', marginLeft: '8px' }}>
-                    (已选 {selectedSnList.length} 个)
-                  </Text>
-                </span>
-              }
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: designTokens.borderRadius.lg,
+                background: stockType === 'in'
+                  ? designTokens.colors.success.gradient
+                  : designTokens.colors.error.gradient,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                boxShadow: stockType === 'in'
+                  ? `0 4px 16px ${designTokens.colors.success.main}50`
+                  : `0 4px 16px ${designTokens.colors.error.main}50`,
+              }}
             >
-              <Space direction="vertical" style={{ width: '100%' }} size="small">
+              {stockType === 'in' ? <ArrowDownOutlined style={{ fontSize: '22px' }} /> : <ArrowUpOutlined style={{ fontSize: '22px' }} />}
+            </div>
+            <div>
+              <div style={{ fontSize: '20px', fontWeight: 600, color: designTokens.colors.text.primary }}>
+                {stockType === 'in' ? '耗材入库' : '耗材出库'}
+              </div>
+              <div style={{ fontSize: '13px', color: designTokens.colors.neutral[500], marginTop: '2px' }}>
+                {stockType === 'in' ? '填写入库信息，增加库存数量' : '填写出库信息，减少库存数量'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: '20px 24px 24px' }}>
+          <Form
+            form={stockForm}
+            layout="vertical"
+            onFinish={handleStockSubmit}
+          >
+            {/* 耗材信息卡片 */}
+            <div
+              style={{
+                background: `linear-gradient(135deg, ${designTokens.colors.primary.main}08 0%, ${designTokens.colors.primary.main}03 100%)`,
+                border: `1px solid ${designTokens.colors.primary.main}20`,
+                borderRadius: designTokens.borderRadius.md,
+                padding: '16px',
+                marginBottom: '20px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <InboxOutlined style={{ color: designTokens.colors.primary.main, fontSize: '16px' }} />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: designTokens.colors.text.secondary }}>
+                  耗材信息
+                </span>
+              </div>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <div style={{ marginBottom: '8px' }}>
+                    <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], marginBottom: '2px' }}>耗材ID</div>
+                    <div style={{ fontSize: '14px', fontWeight: 500, color: designTokens.colors.text.primary, fontFamily: 'monospace' }}>
+                      <Form.Item name="consumableId" style={{ margin: 0 }}>
+                        <Input disabled style={{ ...inputStyles.form, ...inputStyles.disabled, background: 'transparent', border: 'none', padding: 0 }} />
+                      </Form.Item>
+                    </div>
+                  </div>
+                </Col>
+                <Col span={12}>
+                  <div style={{ marginBottom: '8px' }}>
+                    <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], marginBottom: '2px' }}>耗材名称</div>
+                    <div style={{ fontSize: '14px', fontWeight: 500, color: designTokens.colors.text.primary }}>
+                      <Form.Item name="consumableName" style={{ margin: 0 }}>
+                        <Input disabled style={{ ...inputStyles.form, ...inputStyles.disabled, background: 'transparent', border: 'none', padding: 0 }} />
+                      </Form.Item>
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+            </div>
+
+            {/* SN序列号选择区（出库） */}
+            {stockType === 'out' && stockRecord?.snList && stockRecord.snList.length > 0 && (
+              <div
+                style={{
+                  background: designTokens.colors.neutral[50],
+                  border: `1px solid ${designTokens.colors.neutral[200]}`,
+                  borderRadius: designTokens.borderRadius.md,
+                  padding: '16px',
+                  marginBottom: '20px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <BarcodeOutlined style={{ color: designTokens.colors.neutral[600], fontSize: '14px' }} />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: designTokens.colors.text.secondary }}>
+                      SN序列号选择
+                    </span>
+                  </div>
+                  <Badge
+                    count={`已选 ${selectedSnList.length}`}
+                    style={{
+                      backgroundColor: selectedSnList.length > 0 ? designTokens.colors.success.main : designTokens.colors.neutral[400],
+                      fontSize: '11px',
+                    }}
+                  />
+                </div>
                 <Input
                   placeholder="搜索SN序列号..."
                   prefix={<SearchOutlined />}
                   allowClear
                   value={snSearchKeyword}
                   onChange={e => setSnSearchKeyword(e.target.value)}
-                  style={{ ...inputStyles.search, marginBottom: '8px' }}
+                  style={{ ...inputStyles.search, marginBottom: '12px' }}
                 />
                 <Space size="small" style={{ marginBottom: '8px' }}>
                   <Button
@@ -4012,8 +4088,9 @@ function ConsumableManagement() {
                 </Space>
                 <div
                   style={{
-                    maxHeight: '150px',
+                    maxHeight: '140px',
                     overflowY: 'auto',
+                    background: '#fff',
                     border: `1px solid ${designTokens.colors.neutral[200]}`,
                     borderRadius: designTokens.borderRadius.sm,
                     padding: '8px',
@@ -4026,10 +4103,7 @@ function ConsumableManagement() {
                     );
                     if (filteredSnList.length === 0) {
                       return (
-                        <Text
-                          type="secondary"
-                          style={{ display: 'block', textAlign: 'center', padding: '16px 0' }}
-                        >
+                        <Text type="secondary" style={{ display: 'block', textAlign: 'center', padding: '16px 0' }}>
                           无匹配的 SN
                         </Text>
                       );
@@ -4055,198 +4129,269 @@ function ConsumableManagement() {
                     ));
                   })()}
                 </div>
-                <Text type="secondary" style={{ fontSize: '12px' }}>
+                <Text type="secondary" style={{ fontSize: '11px', marginTop: '8px', display: 'block' }}>
                   {snSearchKeyword
                     ? `过滤结果: ${stockRecord.snList.filter(sn => sn.toLowerCase().includes(snSearchKeyword.toLowerCase())).length} 个SN`
                     : `共 ${stockRecord.snList.length} 个SN`}
-                  ，点击SN进行选择
                 </Text>
-              </Space>
-            </Form.Item>
-          )}
+              </div>
+            )}
 
-          {stockType === 'in' && (
-            <Form.Item name="snList" label="入库SN序列号（可选）">
-              <Select
-                mode="tags"
-                style={selectStyles.base}
-                placeholder={inputPlaceholders.snList}
-                tokenSeparators={[',', '\n']}
-              />
-            </Form.Item>
-          )}
+            {/* 入库SN输入区 */}
+            {stockType === 'in' && (
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <BarcodeOutlined style={{ color: designTokens.colors.neutral[600], fontSize: '14px' }} />
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: designTokens.colors.text.secondary }}>
+                    入库SN序列号
+                  </span>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>（可选）</Text>
+                </div>
+                <Form.Item name="snList" style={{ margin: 0 }}>
+                  <Select
+                    mode="tags"
+                    style={{ ...selectStyles.base, maxHeight: '120px', overflowY: 'auto' }}
+                    placeholder="输入SN后按回车添加，支持批量粘贴"
+                    tokenSeparators={[',', '\n']}
+                    maxTagCount="responsive"
+                  />
+                </Form.Item>
+              </div>
+            )}
 
-          <Form.Item
-            name="quantity"
-            label="数量"
-            rules={[inputValidationRules.required('请输入数量')]}
-          >
-            <InputNumber
-              min={1}
-              max={
-                stockType === 'out' && stockRecord?.snList?.length > 0
-                  ? stockRecord.snList.length
-                  : undefined
-              }
-              style={inputNumberStyles.base}
-              placeholder="请输入数量"
-            />
-          </Form.Item>
-          <Form.Item name="operator" label="操作人">
-            <Input placeholder={inputPlaceholders.operator} style={inputStyles.form} />
-          </Form.Item>
-          <Form.Item name="reason" label={stockType === 'in' ? '入库原因' : '出库原因'}>
-            <Input
-              placeholder={stockType === 'in' ? '如: 采购入库' : '如: 部门领用、报损出库'}
-              style={inputStyles.form}
-            />
-          </Form.Item>
-          <Form.Item name="notes" label="备注">
-            <TextArea rows={2} placeholder={inputPlaceholders.notes} style={textAreaStyles.base} />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button
-                type="primary"
-                htmlType="submit"
-                style={{
-                  background:
-                    stockType === 'in'
+            {/* 操作信息区 */}
+            <div
+              style={{
+                background: designTokens.colors.neutral[50],
+                borderRadius: designTokens.borderRadius.md,
+                padding: '16px',
+                marginBottom: '20px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <InfoCircleOutlined style={{ color: designTokens.colors.neutral[600], fontSize: '14px' }} />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: designTokens.colors.text.secondary }}>
+                  操作信息
+                </span>
+              </div>
+
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item
+                    name="quantity"
+                    label="数量"
+                    rules={[inputValidationRules.required('请输入数量')]}
+                    style={{ marginBottom: '16px' }}
+                  >
+                    <InputNumber
+                      min={1}
+                      max={
+                        stockType === 'out' && stockRecord?.snList?.length > 0
+                          ? stockRecord.snList.length
+                          : undefined
+                      }
+                      style={{ ...inputNumberStyles.base, width: '100%' }}
+                      placeholder="请输入数量"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="operator" label="操作人" style={{ marginBottom: '16px' }}>
+                    <Input prefix={<UserOutlined style={{ color: designTokens.colors.neutral[400] }} />} placeholder={inputPlaceholders.operator} style={inputStyles.form} />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Form.Item name="reason" label={stockType === 'in' ? '入库原因' : '出库原因'} style={{ marginBottom: '16px' }}>
+                <Input
+                  prefix={<FileTextOutlined style={{ color: designTokens.colors.neutral[400] }} />}
+                  placeholder={stockType === 'in' ? '如: 采购入库、退还入库' : '如: 部门领用、报损出库'}
+                  style={inputStyles.form}
+                />
+              </Form.Item>
+
+              <Form.Item name="notes" label="备注">
+                <TextArea rows={2} placeholder="请输入备注信息（可选）" style={textAreaStyles.base} />
+              </Form.Item>
+            </div>
+
+            {/* 操作按钮 */}
+            <Form.Item style={{ marginBottom: 0 }}>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <Button
+                  onClick={handleStockCancel}
+                  style={{
+                    height: '44px',
+                    borderRadius: designTokens.borderRadius.md,
+                    paddingLeft: '24px',
+                    paddingRight: '24px',
+                  }}
+                >
+                  取消
+                </Button>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  style={{
+                    background: stockType === 'in'
                       ? designTokens.colors.success.gradient
                       : designTokens.colors.error.gradient,
-                  border: 'none',
-                  borderRadius: designTokens.borderRadius.sm,
-                }}
-              >
-                {stockType === 'in' ? '确认入库' : '确认出库'}
-              </Button>
-              <Button onClick={handleStockCancel}>取消</Button>
-            </Space>
-          </Form.Item>
-        </Form>
+                    border: 'none',
+                    borderRadius: designTokens.borderRadius.md,
+                    height: '44px',
+                    paddingLeft: '32px',
+                    paddingRight: '32px',
+                    fontSize: '15px',
+                    fontWeight: 500,
+                    boxShadow: stockType === 'in'
+                      ? `0 4px 12px ${designTokens.colors.success.main}40`
+                      : `0 4px 12px ${designTokens.colors.error.main}40`,
+                  }}
+                >
+                  <Space>
+                    {stockType === 'in' ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
+                    {stockType === 'in' ? '确认入库' : '确认出库'}
+                  </Space>
+                </Button>
+              </div>
+            </Form.Item>
+          </Form>
+        </div>
       </Modal>
 
       {/* 扫码弹窗 - 支持入库/出库/添加SN三种模式 */}
       <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: designTokens.borderRadius.md,
-                background: scanMode === 'in' 
-                  ? designTokens.colors.success.gradient 
-                  : scanMode === 'out' 
-                  ? designTokens.colors.error.gradient 
-                  : designTokens.colors.primary.gradient,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                boxShadow: scanMode === 'in' 
-                  ? `0 4px 12px ${designTokens.colors.success.main}40`
-                  : scanMode === 'out'
-                  ? `0 4px 12px ${designTokens.colors.error.main}40`
-                  : `0 4px 12px ${designTokens.colors.primary.main}40`,
-              }}
-            >
-              {scanMode === 'in' ? <ArrowDownOutlined style={{ fontSize: '20px' }} /> :
-               scanMode === 'out' ? <ArrowUpOutlined style={{ fontSize: '20px' }} /> :
-               <BarcodeOutlined style={{ fontSize: '20px' }} />}
-            </div>
-            <div>
-              <span style={{ fontSize: '18px', fontWeight: 600, color: designTokens.colors.text.primary }}>
-                {scanMode === 'in' ? '扫码入库' : scanMode === 'out' ? '扫码出库' : '扫码添加SN'}
-              </span>
-              <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], marginTop: '2px' }}>
-                {scanMode === 'in' ? '扫描 SN 序列号快速入库' : 
-                 scanMode === 'out' ? '扫描 SN 序列号快速出库' : 
-                 '扫描 SN 序列号添加到表单'}
-              </div>
-            </div>
-          </div>
-        }
+        title={null}
         open={scanModalVisible}
         closeIcon={<CloseButton />}
         onCancel={handleScanCancel}
         footer={null}
         width={560}
-        bodyStyle={{ padding: '0 24px 24px' }}
-        style={{ top: 60 }}
+        style={{ top: 80 }}
+        bodyStyle={{ padding: 0 }}
       >
-        {/* 统计卡片区 - 根据模式显示不同内容 */}
-        <div style={{ marginBottom: '24px', marginTop: '-8px' }}>
-          {scanMode === 'out' ? (
-            /* 出库模式：显示待出库列表 */
+        {/* 标题栏 */}
+        <div
+          style={{
+            padding: '20px 24px 16px',
+            background: scanMode === 'in'
+              ? 'linear-gradient(135deg, #52c41a15 0%, #52c41a08 100%)'
+              : scanMode === 'out'
+              ? 'linear-gradient(135deg, #ff4d4f15 0%, #ff4d4f08 100%)'
+              : 'linear-gradient(135deg, #1890ff15 0%, #1890ff08 100%)',
+            borderBottom: `1px solid ${designTokens.colors.neutral[200]}`,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div
               style={{
-                background: `linear-gradient(135deg, ${designTokens.colors.error.main}10 0%, ${designTokens.colors.error.main}05 100%)`,
-                border: `1px solid ${designTokens.colors.error.main}30`,
-                borderRadius: designTokens.borderRadius.md,
-                padding: '20px',
-                textAlign: 'center',
+                width: '48px',
+                height: '48px',
+                borderRadius: designTokens.borderRadius.lg,
+                background: scanMode === 'in'
+                  ? designTokens.colors.success.gradient
+                  : scanMode === 'out'
+                  ? designTokens.colors.error.gradient
+                  : designTokens.colors.primary.gradient,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                boxShadow: scanMode === 'in'
+                  ? `0 4px 16px ${designTokens.colors.success.main}50`
+                  : scanMode === 'out'
+                  ? `0 4px 16px ${designTokens.colors.error.main}50`
+                  : `0 4px 16px ${designTokens.colors.primary.main}50`,
               }}
             >
-              <div style={{ fontSize: '32px', fontWeight: 700, color: designTokens.colors.error.main, lineHeight: 1 }}>
-                {pendingOutItems.length}
-              </div>
-              <div style={{ fontSize: '13px', color: designTokens.colors.neutral[600], marginTop: '6px' }}>
-                待出库耗材项
-              </div>
-              {pendingOutItems.length > 0 && (
-                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px dashed ${designTokens.colors.error.main}30` }}>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>
-                    共 {pendingOutItems.reduce((sum, item) => sum + item.quantity, 0)} 件耗材
-                  </Text>
-                </div>
-              )}
+              {scanMode === 'in' ? <ArrowDownOutlined style={{ fontSize: '22px' }} /> :
+               scanMode === 'out' ? <ArrowUpOutlined style={{ fontSize: '22px' }} /> :
+               <BarcodeOutlined style={{ fontSize: '22px' }} />}
             </div>
-          ) : (
-            /* 入库/添加SN模式：显示已扫描数量 */
-            <Row gutter={12}>
-              <Col span={12}>
-                <div
-                  style={{
-                    background: `linear-gradient(135deg, ${designTokens.colors.success.main}15 0%, ${designTokens.colors.success.main}05 100%)`,
-                    border: `1px solid ${designTokens.colors.success.main}30`,
-                    borderRadius: designTokens.borderRadius.md,
-                    padding: '16px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <div style={{ fontSize: '28px', fontWeight: 700, color: designTokens.colors.success.main, lineHeight: 1 }}>
-                    {(scanMode === 'in' ? scannedSnList : snList).length}
-                  </div>
-                  <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], marginTop: '4px' }}>
-                    已扫描SN
-                  </div>
-                </div>
-              </Col>
-              <Col span={12}>
-                <div
-                  style={{
-                    background: `linear-gradient(135deg, ${designTokens.colors.primary.main}15 0%, ${designTokens.colors.primary.main}05 100%)`,
-                    border: `1px solid ${designTokens.colors.primary.main}30`,
-                    borderRadius: designTokens.borderRadius.md,
-                    padding: '16px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <div style={{ fontSize: '28px', fontWeight: 700, color: designTokens.colors.primary.main, lineHeight: 1 }}>
-                    {allConsumablesForScan.length}
-                  </div>
-                  <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], marginTop: '4px' }}>
-                    {scanMode === 'in' ? '可入库耗材' : '可选耗材'}
-                  </div>
-                </div>
-              </Col>
-            </Row>
-          )}
+            <div>
+              <div style={{ fontSize: '20px', fontWeight: 600, color: designTokens.colors.text.primary }}>
+                {scanMode === 'in' ? '扫码入库' : scanMode === 'out' ? '扫码出库' : '扫码添加SN'}
+              </div>
+              <div style={{ fontSize: '13px', color: designTokens.colors.neutral[500], marginTop: '2px' }}>
+                {scanMode === 'in' ? '扫描 SN 序列号快速入库' :
+                 scanMode === 'out' ? '扫描 SN 序列号快速出库' :
+                 '扫描 SN 序列号添加到表单'}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* 扫码动画输入区 */}
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ padding: '20px 24px 24px' }}>
+          {/* 统计卡片区 - 根据模式显示不同内容 */}
+          <div style={{ marginBottom: '20px' }}>
+            {scanMode === 'out' ? (
+              <div
+                style={{
+                  background: `linear-gradient(135deg, ${designTokens.colors.error.main}10 0%, ${designTokens.colors.error.main}05 100%)`,
+                  border: `1px solid ${designTokens.colors.error.main}30`,
+                  borderRadius: designTokens.borderRadius.md,
+                  padding: '16px',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: '28px', fontWeight: 700, color: designTokens.colors.error.main, lineHeight: 1 }}>
+                  {pendingOutItems.length}
+                </div>
+                <div style={{ fontSize: '12px', color: designTokens.colors.neutral[600], marginTop: '4px' }}>
+                  待出库耗材项
+                </div>
+                {pendingOutItems.length > 0 && (
+                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px dashed ${designTokens.colors.error.main}30` }}>
+                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                      共 {pendingOutItems.reduce((sum, item) => sum + item.quantity, 0)} 件耗材
+                    </Text>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Row gutter={12}>
+                <Col span={12}>
+                  <div
+                    style={{
+                      background: `linear-gradient(135deg, ${designTokens.colors.success.main}15 0%, ${designTokens.colors.success.main}05 100%)`,
+                      border: `1px solid ${designTokens.colors.success.main}30`,
+                      borderRadius: designTokens.borderRadius.md,
+                      padding: '14px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: '26px', fontWeight: 700, color: designTokens.colors.success.main, lineHeight: 1 }}>
+                      {(scanMode === 'in' ? scannedSnList : snList).length}
+                    </div>
+                    <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], marginTop: '4px' }}>
+                      已扫描SN
+                    </div>
+                  </div>
+                </Col>
+                <Col span={12}>
+                  <div
+                    style={{
+                      background: `linear-gradient(135deg, ${designTokens.colors.primary.main}15 0%, ${designTokens.colors.primary.main}05 100%)`,
+                      border: `1px solid ${designTokens.colors.primary.main}30`,
+                      borderRadius: designTokens.borderRadius.md,
+                      padding: '14px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: '26px', fontWeight: 700, color: designTokens.colors.primary.main, lineHeight: 1 }}>
+                      {allConsumablesForScan.length}
+                    </div>
+                    <div style={{ fontSize: '12px', color: designTokens.colors.neutral[500], marginTop: '4px' }}>
+                      {scanMode === 'in' ? '可入库耗材' : '可选耗材'}
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+            )}
+          </div>
+
+          {/* 扫码动画输入区 */}
+          <div style={{ marginBottom: '20px' }}>
           <div
             style={{
               position: 'relative',
@@ -4431,6 +4576,52 @@ function ConsumableManagement() {
                 </Option>
               ))}
             </Select>
+          </div>
+        )}
+
+        {/* 入库模式：入库原因、操作人、备注 */}
+        {scanMode === 'in' && (
+          <div style={{ marginBottom: '16px' }}>
+            <Row gutter={12}>
+              <Col span={12}>
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 500, color: designTokens.colors.neutral[600], marginBottom: '4px' }}>
+                    入库原因
+                  </div>
+                  <Input
+                    placeholder="如: 采购入库、退还入库"
+                    value={scanInReason}
+                    onChange={e => setScanInReason(e.target.value)}
+                    style={{ borderRadius: designTokens.borderRadius.sm }}
+                  />
+                </div>
+              </Col>
+              <Col span={12}>
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 500, color: designTokens.colors.neutral[600], marginBottom: '4px' }}>
+                    操作人
+                  </div>
+                  <Input
+                    placeholder="请输入操作人"
+                    value={scanInOperator}
+                    onChange={e => setScanInOperator(e.target.value)}
+                    style={{ borderRadius: designTokens.borderRadius.sm }}
+                  />
+                </div>
+              </Col>
+            </Row>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 500, color: designTokens.colors.neutral[600], marginBottom: '4px' }}>
+                备注
+              </div>
+              <Input.TextArea
+                placeholder="请输入备注信息（可选）"
+                value={scanInNotes}
+                onChange={e => setScanInNotes(e.target.value)}
+                rows={2}
+                style={{ borderRadius: designTokens.borderRadius.sm }}
+              />
+            </div>
           </div>
         )}
 
@@ -4682,6 +4873,7 @@ function ConsumableManagement() {
              scanMode === 'out' ? '扫描耗材 SN 进行出库操作' :
              '扫描 SN 序列号自动添加到表单中'}
           </Text>
+        </div>
         </div>
       </Modal>
 
