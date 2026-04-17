@@ -171,6 +171,38 @@ const ImportModal = ({ visible, deviceFields, onImport, onCancel }) => {
     return '';
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/devices/import-template', {
+        responseType: 'blob',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const blob = new Blob([response.data], { type: 'text/csv; charset=gbk' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = '设备导入模板.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('下载模板失败:', error);
+      if (error.response?.data) {
+        const text = await error.response.data.text();
+        try {
+          const json = JSON.parse(text);
+          message.error(json.message || '下载模板失败');
+        } catch {
+          message.error('下载模板失败');
+        }
+      } else {
+        message.error('下载模板失败');
+      }
+    }
+  };
+
   const renderUploadStep = () => (
     <div>
       <p style={{ color: '#666', marginBottom: '8px' }}>请上传CSV格式的设备数据文件</p>
@@ -222,18 +254,17 @@ const ImportModal = ({ visible, deviceFields, onImport, onCancel }) => {
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <a href="/api/devices/import-template" download="设备导入模板.csv">
-          <Button
-            icon={<DownloadOutlined />}
-            style={{
-              height: '36px',
-              borderRadius: designTokens.borderRadius.small,
-              border: `1px solid ${designTokens.colors.border.light}`,
-            }}
-          >
-            下载导入模板
-          </Button>
-        </a>
+        <Button
+          onClick={handleDownloadTemplate}
+          icon={<DownloadOutlined />}
+          style={{
+            height: '36px',
+            borderRadius: designTokens.borderRadius.small,
+            border: `1px solid ${designTokens.colors.border.light}`,
+          }}
+        >
+          下载导入模板
+        </Button>
         <span style={{ color: '#999', fontSize: '12px', marginLeft: '10px' }}>
           包含示例数据的CSV模板文件（根据当前字段配置生成）
         </span>
