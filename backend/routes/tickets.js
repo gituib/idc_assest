@@ -32,6 +32,11 @@ router.get('/stats', async (req, res) => {
 
     const Sequelize = require('sequelize');
 
+    const avgTimeExpr =
+      dbDialect === 'mysql'
+        ? Sequelize.literal('AVG(TIMESTAMPDIFF(HOUR, Ticket.createdAt, Ticket.updatedAt))')
+        : Sequelize.literal('AVG((julianday(Ticket.updatedAt) - julianday(Ticket.createdAt)) * 24)');
+
     const [
       total,
       statusStats,
@@ -41,30 +46,35 @@ router.get('/stats', async (req, res) => {
       deviceStats,
       dailyCreatedStats,
       dailyCompletedStats,
+      dailyClosedStats,
+      dailyInProgressStats,
+      dailyPendingStats,
+      priorityCompletedStats,
+      categoryCompletedStats,
     ] = await Promise.all([
       Ticket.count({ where }),
       Ticket.findAll({
         where,
         attributes: ['status', [Sequelize.fn('COUNT', '*'), 'count']],
-        group: ['status'],
+        group: [Sequelize.col('Ticket.status')],
       }),
       Ticket.findAll({
         where,
         attributes: ['priority', [Sequelize.fn('COUNT', '*'), 'count']],
-        group: ['priority'],
+        group: [Sequelize.col('Ticket.priority')],
       }),
       Ticket.findAll({
         where,
         attributes: ['faultCategory', [Sequelize.fn('COUNT', '*'), 'count']],
-        group: ['faultCategory'],
+        group: [Sequelize.col('Ticket.faultCategory')],
       }),
       Ticket.findAll({
         where,
         attributes: [
           [
             dbDialect === 'mysql'
-              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('createdAt'), '%Y-%m')
-              : Sequelize.fn('strftime', '%Y-%m', Sequelize.col('createdAt')),
+              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('Ticket.createdAt'), '%Y-%m')
+              : Sequelize.fn('strftime', '%Y-%m', Sequelize.col('Ticket.createdAt')),
             'month',
           ],
           [Sequelize.fn('COUNT', '*'), 'count'],
@@ -79,19 +89,20 @@ router.get('/stats', async (req, res) => {
           'deviceId',
           'deviceName',
           [Sequelize.fn('COUNT', '*'), 'count'],
-          [Sequelize.fn('MAX', Sequelize.col('createdAt')), 'lastFaultTime'],
+          [Sequelize.fn('MAX', Sequelize.col('Ticket.createdAt')), 'lastFaultTime'],
         ],
-        group: ['deviceId', 'deviceName'],
+        group: [Sequelize.col('Ticket.deviceId'), 'deviceName'],
         order: [[Sequelize.fn('COUNT', '*'), 'DESC']],
         limit: 10,
+        include: [{ model: Device, attributes: ['type'] }],
       }),
       Ticket.findAll({
         where,
         attributes: [
           [
             dbDialect === 'mysql'
-              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('createdAt'), '%Y-%m-%d')
-              : Sequelize.fn('date', Sequelize.col('createdAt')),
+              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('Ticket.createdAt'), '%Y-%m-%d')
+              : Sequelize.fn('date', Sequelize.col('Ticket.createdAt')),
             'date',
           ],
           [Sequelize.fn('COUNT', '*'), 'created'],
@@ -107,14 +118,89 @@ router.get('/stats', async (req, res) => {
         attributes: [
           [
             dbDialect === 'mysql'
-              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('updatedAt'), '%Y-%m-%d')
-              : Sequelize.fn('date', Sequelize.col('updatedAt')),
+              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('Ticket.updatedAt'), '%Y-%m-%d')
+              : Sequelize.fn('date', Sequelize.col('Ticket.updatedAt')),
             'date',
           ],
           [Sequelize.fn('COUNT', '*'), 'completed'],
         ],
         group: ['date'],
         order: [['date', 'ASC']],
+      }),
+      Ticket.findAll({
+        where: {
+          ...where,
+          status: 'closed',
+        },
+        attributes: [
+          [
+            dbDialect === 'mysql'
+              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('Ticket.updatedAt'), '%Y-%m-%d')
+              : Sequelize.fn('date', Sequelize.col('Ticket.updatedAt')),
+            'date',
+          ],
+          [Sequelize.fn('COUNT', '*'), 'closed'],
+        ],
+        group: ['date'],
+        order: [['date', 'ASC']],
+      }),
+      Ticket.findAll({
+        where: {
+          ...where,
+          status: 'in_progress',
+        },
+        attributes: [
+          [
+            dbDialect === 'mysql'
+              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('Ticket.updatedAt'), '%Y-%m-%d')
+              : Sequelize.fn('date', Sequelize.col('Ticket.updatedAt')),
+            'date',
+          ],
+          [Sequelize.fn('COUNT', '*'), 'inProgress'],
+        ],
+        group: ['date'],
+        order: [['date', 'ASC']],
+      }),
+      Ticket.findAll({
+        where: {
+          ...where,
+          status: 'pending',
+        },
+        attributes: [
+          [
+            dbDialect === 'mysql'
+              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('Ticket.createdAt'), '%Y-%m-%d')
+              : Sequelize.fn('date', Sequelize.col('Ticket.createdAt')),
+            'date',
+          ],
+          [Sequelize.fn('COUNT', '*'), 'pending'],
+        ],
+        group: ['date'],
+        order: [['date', 'ASC']],
+      }),
+      Ticket.findAll({
+        where: {
+          ...where,
+          status: 'completed',
+        },
+        attributes: [
+          'priority',
+          [Sequelize.fn('COUNT', '*'), 'completed'],
+          [avgTimeExpr, 'avgTime'],
+        ],
+        group: [Sequelize.col('Ticket.priority')],
+      }),
+      Ticket.findAll({
+        where: {
+          ...where,
+          status: 'completed',
+        },
+        attributes: [
+          'faultCategory',
+          [Sequelize.fn('COUNT', '*'), 'completed'],
+          [avgTimeExpr, 'avgTime'],
+        ],
+        group: [Sequelize.col('Ticket.faultCategory')],
       }),
     ]);
 
@@ -130,26 +216,42 @@ router.get('/stats', async (req, res) => {
       percentage: total > 0 ? (item.count / total) * 100 : 0,
     }));
 
-    const byPriority = priorityStats.map(p => ({
-      priority: p.dataValues.priority,
-      count: p.dataValues.count,
-      completed: 0,
-      avgTime: 0,
-    }));
+    const byPriority = priorityStats.map(p => {
+      const priority = p.dataValues.priority;
+      const completedData = priorityCompletedStats.find(
+        pc => pc.dataValues.priority === priority
+      );
+      return {
+        priority,
+        count: p.dataValues.count,
+        completed: completedData?.dataValues?.completed || 0,
+        avgTime: completedData?.dataValues?.avgTime
+          ? parseFloat(completedData.dataValues.avgTime)
+          : 0,
+      };
+    });
 
-    const byCategory = categoryStats.map(c => ({
-      category: c.dataValues.faultCategory,
-      count: c.dataValues.count,
-      completed: 0,
-      avgTime: 0,
-    }));
+    const byCategory = categoryStats.map(c => {
+      const category = c.dataValues.faultCategory;
+      const completedData = categoryCompletedStats.find(
+        cc => cc.dataValues.faultCategory === category
+      );
+      return {
+        category,
+        count: c.dataValues.count,
+        completed: completedData?.dataValues?.completed || 0,
+        avgTime: completedData?.dataValues?.avgTime
+          ? parseFloat(completedData.dataValues.avgTime)
+          : 0,
+      };
+    });
 
     const byDevice = deviceStats.map(d => ({
       deviceId: d.deviceId,
       deviceName: d.deviceName,
       count: d.dataValues.count,
       lastFaultTime: d.dataValues.lastFaultTime,
-      deviceType: '',
+      deviceType: d.Device?.type || '',
     }));
 
     const createdMap = {};
@@ -160,17 +262,35 @@ router.get('/stats', async (req, res) => {
     dailyCompletedStats.forEach(d => {
       completedMap[d.dataValues.date] = d.dataValues.completed;
     });
+    const closedMap = {};
+    dailyClosedStats.forEach(d => {
+      closedMap[d.dataValues.date] = d.dataValues.closed;
+    });
+    const inProgressMap = {};
+    dailyInProgressStats.forEach(d => {
+      inProgressMap[d.dataValues.date] = d.dataValues.inProgress;
+    });
+    const pendingMap = {};
+    dailyPendingStats.forEach(d => {
+      pendingMap[d.dataValues.date] = d.dataValues.pending;
+    });
 
     const allDates = [
-      ...new Set([...Object.keys(createdMap), ...Object.keys(completedMap)]),
+      ...new Set([
+        ...Object.keys(createdMap),
+        ...Object.keys(completedMap),
+        ...Object.keys(closedMap),
+        ...Object.keys(inProgressMap),
+        ...Object.keys(pendingMap),
+      ]),
     ].sort();
     const trend = allDates.map(date => ({
       date,
       created: createdMap[date] || 0,
       completed: completedMap[date] || 0,
-      closed: 0,
-      inProgress: 0,
-      pending: 0,
+      closed: closedMap[date] || 0,
+      inProgress: inProgressMap[date] || 0,
+      pending: pendingMap[date] || 0,
     }));
 
     const completedTickets = await Ticket.findAll({
@@ -696,8 +816,8 @@ router.put('/:ticketId/status', async (req, res) => {
 
     // 状态机校验：定义合法的状态流转
     const STATUS_TRANSITIONS = {
-      pending: ['processing', 'closed'],
-      processing: ['completed', 'closed'],
+      pending: ['in_progress', 'closed'],
+      in_progress: ['completed', 'closed'],
       completed: ['closed'],
       closed: [],
     };
