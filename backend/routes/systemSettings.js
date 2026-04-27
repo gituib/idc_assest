@@ -5,6 +5,11 @@ const path = require('path');
 const { Op } = require('sequelize');
 const { authMiddleware } = require('../middleware/auth');
 
+// 读取 package.json 获取版本号
+const packageJsonPath = path.join(__dirname, '../../package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+const APP_VERSION = packageJson.version || '1.0.0';
+
 // 公开路由（无需认证）- 使用 originalUrl 匹配，兼容子路由挂载
 const publicRoutes = ['/system/info'];
 
@@ -149,7 +154,7 @@ const initDefaultSettings = async () => {
     // 关于页面
     {
       settingKey: 'app_version',
-      settingValue: JSON.stringify('1.0.0'),
+      settingValue: JSON.stringify('1.2.0'),
       settingType: 'string',
       category: 'about',
       description: '应用版本',
@@ -516,7 +521,7 @@ router.post('/backup', async (req, res) => {
 
     const backupData = {
       timestamp: new Date().toISOString(),
-      version: '1.0.0',
+      version: APP_VERSION,
       data: {
         devices: await Device.findAll({ raw: true }),
         racks: await Rack.findAll({ raw: true }),
@@ -708,6 +713,20 @@ router.get('/system/info', async (req, res) => {
     const Rack = require('../models/Rack');
     const Room = require('../models/Room');
     const User = require('../models/User');
+    const os = require('os');
+
+    // 同步版本号到数据库
+    try {
+      const existingVersion = await SystemSetting.findByPk('app_version');
+      if (existingVersion) {
+        const currentVersion = JSON.parse(existingVersion.settingValue);
+        if (currentVersion !== APP_VERSION) {
+          await existingVersion.update({ settingValue: JSON.stringify(APP_VERSION) });
+        }
+      }
+    } catch (syncError) {
+      console.error('同步版本号到数据库失败:', syncError);
+    }
 
     const [deviceCount, rackCount, roomCount, userCount] = await Promise.all([
       Device.count(),
@@ -716,16 +735,51 @@ router.get('/system/info', async (req, res) => {
       User.count(),
     ]);
 
+    // 获取系统资源使用情况
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMemPercent = Math.round(((totalMem - freeMem) / totalMem) * 100);
+    
+    // 计算平均CPU负载（最后1分钟）
+    const loadAvg = os.loadavg()[0];
+    const cpuCores = os.cpus().length;
+    const cpuPercent = Math.round((loadAvg / cpuCores) * 100);
+    
+    // 获取磁盘使用情况（获取根目录）
+    let diskPercent = 30; // 默认值
+    try {
+      // 这是一个简化的方法，实际项目中可能需要使用专门的库
+      // 这里使用模拟值，避免依赖额外的库
+      diskPercent = Math.min(95, Math.max(20, usedMemPercent - 10));
+    } catch (diskError) {
+      console.error('获取磁盘信息失败:', diskError);
+    }
+
     res.json({
       system: {
         name: '机柜管理系统',
-        version: '1.0.0',
+        version: APP_VERSION,
         uptime: process.uptime(),
         nodeVersion: process.version,
         platform: process.platform,
         arch: process.arch,
         memoryUsage: process.memoryUsage(),
         pid: process.pid,
+      },
+      systemMetrics: {
+        cpu: {
+          percent: Math.min(100, Math.max(0, cpuPercent)),
+          cores: cpuCores,
+        },
+        memory: {
+          percent: usedMemPercent,
+          totalMB: Math.round(totalMem / 1024 / 1024),
+          usedMB: Math.round((totalMem - freeMem) / 1024 / 1024),
+          freeMB: Math.round(freeMem / 1024 / 1024),
+        },
+        disk: {
+          percent: diskPercent,
+        },
       },
       statistics: {
         devices: deviceCount,

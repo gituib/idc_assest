@@ -1,6 +1,6 @@
 {
   "name": "idc-device-management",
-  "version": "1.0",
+  "version": "1.3.0",
   "description": "IDC设备管理系统",
   "scripts": {
     "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",

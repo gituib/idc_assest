@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Card, Row, Col, Typography, message } from 'antd';
+import { Card, Row, Col, Typography } from 'antd';
 import {
   DatabaseOutlined,
   CloudServerOutlined,
@@ -8,8 +8,8 @@ import {
   TeamOutlined,
   BarChartOutlined,
   DashboardOutlined,
+  SafetyOutlined,
 } from '@ant-design/icons';
-import api from '../api';
 import { designTokens } from '../config/theme';
 import { useFetch } from '../hooks/useSWR';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -376,10 +376,56 @@ function Dashboard() {
     }
   `;
 
+  // 区域标题组件
+  const SectionTitle = ({ icon: Icon, title, subtitle, color = designTokens.colors.primary.main }) => (
+    <div style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      gap: '12px',
+      marginBottom: '20px',
+    }}>
+      <div style={{
+        width: '40px',
+        height: '40px',
+        borderRadius: '12px',
+        background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontSize: '18px',
+        boxShadow: `0 4px 12px ${color}30`,
+        flexShrink: 0,
+      }}>
+        <Icon />
+      </div>
+      <div>
+        <h3 style={{
+          fontSize: '1.15rem',
+          fontWeight: '700',
+          color: designTokens.colors.text.primary,
+          margin: '0 0 4px 0',
+        }}>
+          {title}
+        </h3>
+        {subtitle && (
+          <p style={{
+            fontSize: '0.85rem',
+            color: designTokens.colors.text.secondary,
+            margin: '0',
+          }}>
+            {subtitle}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <>
       <style>{styles}</style>
       <div style={containerStyle} className="dashboard-container">
+        {/* 1. 欢迎横幅 */}
         <div style={headerStyle} className="dashboard-header">
           <h1 style={titleStyle} className="dashboard-title">
             <DashboardOutlined />
@@ -390,234 +436,306 @@ function Dashboard() {
           </p>
         </div>
 
-        <Row gutter={[24, 24]} style={{ marginBottom: '32px' }}>
-          {statCards.map(config => (
-            <StatCard
-              key={config.statKey}
-              config={config}
-              stats={stats}
-              loading={loading}
-              animatedKey={animatedKey}
-              hoveredCard={hoveredCard}
-              onHover={handleHover}
-            />
-          ))}
-        </Row>
+        {/* 2. 功能导航模块 - 移到原快捷操作位置 */}
+        <div style={{ animation: 'fadeInUp 0.6s ease-out 0.1s backwards', marginBottom: '32px' }}>
+          <Row gutter={[24, 24]}>
+            <Col xs={24} lg={18}>
+              <Card style={{
+                borderRadius: designTokens.borderRadius.large,
+                border: 'none',
+                boxShadow: designTokens.shadows.large,
+                background: '#fff',
+                height: '100%',
+                padding: '16px',
+              }}>
+                {/* 功能导航网格 */}
+                <NavigationGrid hoveredCard={hoveredCard} onHover={handleHover} />
+              </Card>
+            </Col>
 
-        <Row gutter={[24, 24]} style={{ marginBottom: '24px' }}>
-          <Col xs={24} md={8}>
-            <Card style={progressCardStyle}>
-              <div style={{ padding: '20px' }}>
-                <Title
-                  level={5}
-                  style={{ margin: '0 0 20px 0', color: designTokens.colors.text.primary }}
-                >
-                  设备状态分布
-                </Title>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <div style={pieChartStyle}>
-                    <div style={pieChartInner}>
-                      <span
-                        style={{
-                          fontSize: '1.5rem',
-                          fontWeight: '700',
-                          color: designTokens.colors.text.primary,
-                        }}
-                      >
-                        {stats.totalDevices}
-                      </span>
-                      <span
-                        style={{ fontSize: '0.75rem', color: designTokens.colors.text.secondary }}
-                      >
-                        设备总数
-                      </span>
+            <Col xs={24} lg={6}>
+              <Card style={{
+                borderRadius: designTokens.borderRadius.large,
+                border: 'none',
+                boxShadow: designTokens.shadows.large,
+                background: '#fff',
+                height: '100%',
+              }}>
+                <SystemInfo onRefresh={handleRefresh} isRefreshing={isRefreshing} />
+              </Card>
+            </Col>
+          </Row>
+        </div>
+
+        {/* 3. 核心指标统计卡片 */}
+        <div style={{ animation: 'fadeInUp 0.6s ease-out 0.2s backwards', marginBottom: '32px' }}>
+          <SectionTitle 
+            icon={BarChartOutlined} 
+            title="核心指标"
+            subtitle="实时监控数据中心关键指标"
+          />
+          <Row gutter={[24, 24]}>
+            {statCards.map(config => (
+              <StatCard
+                key={config.statKey}
+                config={config}
+                stats={stats}
+                loading={loading}
+                animatedKey={animatedKey}
+                hoveredCard={hoveredCard}
+                onHover={handleHover}
+              />
+            ))}
+          </Row>
+        </div>
+
+        {/* 4. 数据图表区域 */}
+        <div style={{ animation: 'fadeInUp 0.6s ease-out 0.3s backwards', marginBottom: '32px' }}>
+          <SectionTitle 
+            icon={DatabaseOutlined} 
+            title="数据可视化"
+            subtitle="详细的数据分析和趋势展示"
+          />
+          <Row gutter={[24, 24]}>
+            <Col xs={24} md={8}>
+              <Card style={progressCardStyle}>
+                <div style={{ padding: '20px' }}>
+                  <Title
+                    level={5}
+                    style={{ margin: '0 0 20px 0', color: designTokens.colors.text.primary }}
+                  >
+                    设备状态分布
+                  </Title>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={pieChartStyle}>
+                      <div style={pieChartInner}>
+                        <span
+                          style={{
+                            fontSize: '1.5rem',
+                            fontWeight: '700',
+                            color: designTokens.colors.text.primary,
+                          }}
+                        >
+                          {stats.totalDevices}
+                        </span>
+                        <span
+                          style={{ fontSize: '0.75rem', color: designTokens.colors.text.secondary }}
+                        >
+                          设备总数
+                        </span>
+                      </div>
                     </div>
+                    <StatusLegend deviceStatusPercentages={deviceStatusPercentages} />
                   </div>
-                  <StatusLegend deviceStatusPercentages={deviceStatusPercentages} />
                 </div>
-              </div>
-            </Card>
-          </Col>
+              </Card>
+            </Col>
 
-          <Col xs={24} md={8}>
-            <Card style={progressCardStyle}>
-              <div style={{ padding: '20px' }}>
-                <Title
-                  level={5}
-                  style={{ margin: '0 0 20px 0', color: designTokens.colors.text.primary }}
-                >
-                  系统健康指标
-                </Title>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '24px',
-                  }}
-                >
-                  <ErrorBoundary
-                    fallback={
-                      <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
-                        在线率图表加载失败
-                      </div>
-                    }
+            <Col xs={24} md={8}>
+              <Card style={progressCardStyle}>
+                <div style={{ padding: '20px' }}>
+                  <Title
+                    level={5}
+                    style={{ margin: '0 0 20px 0', color: designTokens.colors.text.primary }}
                   >
-                    <CircularProgress
-                      percentage={parseFloat(stats.onlineRate)}
-                      size={140}
-                      strokeWidth={12}
-                      color={designTokens.colors.success.main}
-                      label="在线率"
-                    />
-                  </ErrorBoundary>
-                  <ErrorBoundary
-                    fallback={
-                      <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
-                        功率仪表加载失败
-                      </div>
-                    }
-                  >
-                    <PowerGauge value={stats.powerUsage} maxValue={stats.totalMaxPower} />
-                  </ErrorBoundary>
-                </div>
-              </div>
-            </Card>
-          </Col>
-
-          <Col xs={24} md={8}>
-            <Card style={progressCardStyle}>
-              <div style={{ padding: '20px' }}>
-                <Title
-                  level={5}
-                  style={{ margin: '0 0 20px 0', color: designTokens.colors.text.primary }}
-                >
-                  周设备趋势
-                </Title>
-                <div style={chartContainerStyle}>
-                  <ErrorBoundary
-                    fallback={
-                      <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
-                        趋势图表加载失败
-                      </div>
-                    }
-                  >
-                    <DeviceTrendChart data={deviceTrendData} />
-                  </ErrorBoundary>
-                </div>
-                <div
-                  style={{
-                    marginTop: '16px',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    gap: '16px',
-                  }}
-                >
-                  <span style={{ fontSize: '0.75rem', color: designTokens.colors.text.tertiary }}>
-                    周一 至 周日 设备变化趋势
-                  </span>
-                </div>
-              </div>
-            </Card>
-          </Col>
-        </Row>
-
-        <div>
-          <Card style={overviewCardStyle}>
-            <div style={{ padding: '24px' }}>
-              <Row gutter={[24, 24]}>
-                <Col xs={24} md={16}>
+                    系统健康指标
+                  </Title>
                   <div
-                    className="welcome-banner"
                     style={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      borderRadius: designTokens.borderRadius.medium,
-                      padding: '28px',
-                      color: '#fff',
-                      marginBottom: '24px',
-                      animation: 'fadeInUp 0.6s ease-out 0.4s backwards',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '24px',
                     }}
                   >
-                    <h2
-                      style={{
-                        fontSize: '1.4rem',
-                        fontWeight: '600',
-                        margin: '0 0 8px 0',
-                        color: '#fff',
-                      }}
+                    <ErrorBoundary
+                      fallback={
+                        <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                          在线率图表加载失败
+                        </div>
+                      }
                     >
-                      欢迎使用IDC设备管理系统
-                    </h2>
-                    <p
-                      style={{
-                        fontSize: '1rem',
-                        margin: '0',
-                        opacity: '0.9',
-                        color: '#fff',
-                      }}
+                      <CircularProgress
+                        percentage={parseFloat(stats.onlineRate)}
+                        size={140}
+                        strokeWidth={12}
+                        color={designTokens.colors.success.main}
+                        label="在线率"
+                      />
+                    </ErrorBoundary>
+                    <ErrorBoundary
+                      fallback={
+                        <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                          功率仪表加载失败
+                        </div>
+                      }
                     >
-                      专业的机房设备管理解决方案，提供全方位的设备监控和管理能力
-                    </p>
+                      <PowerGauge value={stats.powerUsage} maxValue={stats.totalMaxPower} />
+                    </ErrorBoundary>
                   </div>
+                </div>
+              </Card>
+            </Col>
 
-                  <QuickStats
-                    onlineRate={stats.onlineRate}
-                    powerUsage={stats.powerUsage}
-                    totalMaxPower={stats.totalMaxPower}
-                  />
-                </Col>
+            <Col xs={24} md={8}>
+              <Card style={progressCardStyle}>
+                <div style={{ padding: '20px' }}>
+                  <Title
+                    level={5}
+                    style={{ margin: '0 0 20px 0', color: designTokens.colors.text.primary }}
+                  >
+                    周设备趋势
+                  </Title>
+                  <div style={chartContainerStyle}>
+                    <ErrorBoundary
+                      fallback={
+                        <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                          趋势图表加载失败
+                        </div>
+                      }
+                    >
+                      <DeviceTrendChart data={deviceTrendData} />
+                    </ErrorBoundary>
+                  </div>
+                  <div
+                    style={{
+                      marginTop: '16px',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      gap: '16px',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.75rem', color: designTokens.colors.text.tertiary }}>
+                      周一 至 周日 设备变化趋势
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+          </Row>
+        </div>
 
-                <Col xs={24} md={8}>
-                  <SystemInfo onRefresh={handleRefresh} isRefreshing={isRefreshing} />
-                </Col>
-              </Row>
-
-              <NavigationGrid hoveredCard={hoveredCard} onHover={handleHover} />
-            </div>
-          </Card>
+        {/* 5. 系统状态 */}
+        <div style={{ animation: 'fadeInUp 0.6s ease-out 0.4s backwards' }}>
+          <SectionTitle 
+            icon={SafetyOutlined} 
+            title="系统状态"
+            subtitle="关键运行指标概览"
+          />
+          <Row gutter={[24, 24]}>
+            <Col xs={24} lg={24}>
+              <Card style={{
+                borderRadius: designTokens.borderRadius.large,
+                border: 'none',
+                boxShadow: designTokens.shadows.large,
+                background: '#fff',
+              }}>
+                <QuickStats
+                  onlineRate={stats.onlineRate}
+                  powerUsage={stats.powerUsage}
+                  totalMaxPower={stats.totalMaxPower}
+                />
+              </Card>
+            </Col>
+          </Row>
         </div>
 
         <style>{`
-          @media (max-width: 576px) {
-            .dashboard-container {
-              padding: 12px !important;
-            }
-            .dashboard-header {
-              padding: 20px 16px !important;
-              border-radius: 12px !important;
-            }
-            .dashboard-title {
-              font-size: 1.4rem !important;
-              gap: 8px !important;
-            }
-            .dashboard-subtitle {
-              font-size: 0.85rem !important;
-            }
-            .stat-value {
-              font-size: 1.6rem !important;
-            }
-            .nav-grid {
-              grid-template-columns: repeat(3, 1fr) !important;
-              gap: 8px !important;
-            }
-            .nav-button {
-              padding: 12px 8px !important;
-            }
-            .nav-icon {
-              width: 40px !important;
-              height: 40px !important;
-              font-size: 20px !important;
-            }
-            .nav-text {
-              font-size: 0.7rem !important;
-            }
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+          .nav-grid {
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
           }
-          @media (max-width: 375px) {
-            .nav-grid {
-              grid-template-columns: repeat(2, 1fr) !important;
-            }
+        }
+        
+        @media (max-width: 992px) {
+          .nav-grid {
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+            gap: 12px !important;
           }
-        `}</style>
+        }
+        
+        @media (max-width: 768px) {
+          .dashboard-container {
+            padding: 16px !important;
+          }
+          .dashboard-header {
+            padding: 24px 20px !important;
+            border-radius: 16px !important;
+          }
+          .dashboard-title {
+            font-size: 1.5rem !important;
+            gap: 10px !important;
+          }
+          .dashboard-subtitle {
+            font-size: 0.9rem !important;
+          }
+          .nav-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 12px !important;
+          }
+        }
+        
+        @media (max-width: 576px) {
+          .dashboard-container {
+            padding: 12px !important;
+          }
+          .dashboard-header {
+            padding: 20px 16px !important;
+            border-radius: 12px !important;
+          }
+          .dashboard-title {
+            font-size: 1.3rem !important;
+            gap: 8px !important;
+          }
+          .dashboard-subtitle {
+            font-size: 0.85rem !important;
+          }
+          .nav-grid {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
+          .nav-button {
+            padding: 16px !important;
+          }
+          .nav-icon {
+            width: 48px !important;
+            height: 48px !important;
+            font-size: 22px !important;
+          }
+        }
+        
+        @media (max-width: 375px) {
+          .dashboard-container {
+            padding: 10px !important;
+          }
+          .dashboard-header {
+            padding: 18px 14px !important;
+          }
+        }
+        
+        /* 动画关键帧 */
+        @keyframes fadeInDown {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
       </div>
     </>
   );
