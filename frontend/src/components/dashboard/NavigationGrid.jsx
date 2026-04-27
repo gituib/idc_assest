@@ -4,12 +4,12 @@ import {
   CloudServerOutlined,
   DatabaseOutlined,
   WarningOutlined,
-  BarChartOutlined,
   AppstoreOutlined,
   SettingOutlined,
   ApartmentOutlined,
   LinkOutlined,
   ArrowRightOutlined,
+  AuditOutlined,
 } from '@ant-design/icons';
 import { designTokens } from '../../config/theme';
 
@@ -39,12 +39,12 @@ const NAV_BUTTONS_DATA = [
     description: '工单和故障处理',
   },
   {
-    key: 'analytics',
-    icon: BarChartOutlined,
-    text: '数据分析',
-    path: '/',
+    key: 'inventory',
+    icon: AuditOutlined,
+    text: '资产盘点',
+    path: '/inventory',
     color: '#13c2c2',
-    description: '数据统计和分析',
+    description: '资产库存和盘点管理',
   },
   {
     key: 'consumables',

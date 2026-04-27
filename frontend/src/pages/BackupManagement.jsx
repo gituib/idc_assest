@@ -190,8 +190,22 @@ const BackupManagement = () => {
     }
   };
 
-  const handleDownload = filename => {
-    window.open(`/api/backup/download/${filename}`, '_blank');
+  const handleDownload = async filename => {
+    try {
+      const blob = await backupAPI.download(filename);
+      // 创建临时链接并触发下载
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      message.success('备份文件下载已开始');
+    } catch (error) {
+      message.error('下载失败: ' + (error.message || '未知错误'));
+    }
   };
 
   const handleValidate = async filename => {
