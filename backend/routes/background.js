@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('BackgroundRoute');
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -36,7 +37,7 @@ router.get('/', (req, res) => {
       data: settings,
     });
   } catch (error) {
-    console.error('读取背景设置失败:', error);
+    logger.error('读取背景设置失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '读取背景设置失败' });
   }
 });
@@ -50,7 +51,7 @@ router.put('/', (req, res) => {
       data: settings,
     });
   } catch (error) {
-    console.error('保存背景设置失败:', error);
+    logger.error('保存背景设置失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '保存背景设置失败' });
   }
 });
@@ -88,7 +89,7 @@ router.post('/upload', (req, res) => {
 
     file.mv(filePath, err => {
       if (err) {
-        console.error('文件保存失败:', err);
+        logger.error('文件保存失败', { err: err.message, stack: err.stack });
         return res.status(500).json({ error: '文件保存失败' });
       }
 
@@ -96,7 +97,7 @@ router.post('/upload', (req, res) => {
       res.json({ path: fileUrl });
     });
   } catch (error) {
-    console.error('上传错误:', error);
+    logger.error('上传错误', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '上传失败' });
   }
 });
@@ -106,7 +107,7 @@ router.get('/settings', (req, res) => {
     const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
     res.json(settings);
   } catch (error) {
-    console.error('读取背景设置失败:', error);
+    logger.error('读取背景设置失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '读取背景设置失败' });
   }
 });
@@ -117,7 +118,7 @@ router.post('/settings', (req, res) => {
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
     res.json({ success: true });
   } catch (error) {
-    console.error('保存背景设置失败:', error);
+    logger.error('保存背景设置失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '保存背景设置失败' });
   }
 });

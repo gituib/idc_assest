@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('DangerousOperationsRoute');
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
@@ -55,7 +56,7 @@ router.post('/log', async (req, res) => {
 
     res.json({ success: true, riskLevel });
   } catch (error) {
-    console.error('Failed to log dangerous operation:', error);
+    logger.error('Failed to log dangerous operation', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '日志记录失败' });
   }
 });
@@ -98,7 +99,7 @@ router.get('/logs', async (req, res) => {
       totalPages: Math.ceil(total / parseInt(pageSize)),
     });
   } catch (error) {
-    console.error('Failed to get dangerous operations logs:', error);
+    logger.error('Failed to get dangerous operations logs', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '获取日志失败' });
   }
 });
@@ -144,7 +145,7 @@ router.delete('/logs/clean', async (req, res) => {
       remainingCount: result.remainingCount,
     });
   } catch (error) {
-    console.error('Failed to clean logs:', error);
+    logger.error('Failed to clean logs', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '清理日志失败' });
   }
 });
@@ -177,7 +178,7 @@ router.get('/risk-assessment', async (req, res) => {
             : 'STANDARD',
     });
   } catch (error) {
-    console.error('Failed to assess risk:', error);
+    logger.error('Failed to assess risk', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '风险评估失败' });
   }
 });

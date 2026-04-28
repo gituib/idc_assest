@@ -1,3 +1,5 @@
+const logger = require('../utils/logger').module('ValidationMiddleware');
+
 const validate = (schema, source = 'body') => {
   return async (req, res, next) => {
     const data = source === 'query' ? req.query : req.body;
@@ -73,7 +75,7 @@ const validate = (schema, source = 'body') => {
         });
       }
 
-      console.error('验证中间件错误:', error);
+      logger.error('验证中间件错误', { error: error.message, stack: error.stack });
       return res.status(500).json({
         error: '验证过程发生错误',
         message: error.message,

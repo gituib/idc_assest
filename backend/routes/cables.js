@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('CablesRoute');
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
@@ -146,7 +147,7 @@ async function validatePortCompatibility(sourceDeviceId, sourcePortName, targetD
 
     return checkPortCompatibility(sourcePort, targetPort);
   } catch (error) {
-    console.error('验证端口兼容性时出错:', error);
+    logger.error('验证端口兼容性时出错', { error: error.message, stack: error.stack });
     return {
       compatible: false,
       reasons: [{
@@ -163,7 +164,7 @@ async function updatePortStatus(deviceId, portName, status) {
   try {
     await DevicePort.update({ status }, { where: { deviceId, portName } });
   } catch (error) {
-    console.error(`更新端口状态失败: ${deviceId}:${portName} -> ${status}`, error);
+    logger.error('更新端口状态失败: ${deviceId}:${portName} -> ${status}', { error: error.message, stack: error.stack });
   }
 }
 
@@ -233,7 +234,7 @@ router.get('/', async (req, res) => {
       pageSize: parseInt(pageSize),
     });
   } catch (error) {
-    console.error('获取接线列表失败:', error);
+    logger.error('获取接线列表失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -262,7 +263,7 @@ router.get('/device/:deviceId', async (req, res) => {
 
     res.json(cables);
   } catch (error) {
-    console.error('获取设备接线失败:', error);
+    logger.error('获取设备接线失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -308,7 +309,7 @@ router.get('/rack/:rackId', async (req, res) => {
 
     res.json(cables);
   } catch (error) {
-    console.error('获取机柜接线失败:', error);
+    logger.error('获取机柜接线失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -393,7 +394,7 @@ router.post('/check-conflict', async (req, res) => {
       conflicts,
     });
   } catch (error) {
-    console.error('检查接线冲突失败:', error);
+    logger.error('检查接线冲突失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -414,7 +415,7 @@ router.post('/check-compatibility', async (req, res) => {
       ...compatibilityResult,
     });
   } catch (error) {
-    console.error('检查端口兼容性失败:', error);
+    logger.error('检查端口兼容性失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -542,7 +543,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(createdCable);
   } catch (error) {
-    console.error('创建接线失败:', error);
+    logger.error('创建接线失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -622,7 +623,7 @@ router.post('/batch', async (req, res) => {
 
     res.json(results);
   } catch (error) {
-    console.error('批量创建接线失败:', error);
+    logger.error('批量创建接线失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -683,7 +684,7 @@ router.put('/:cableId', async (req, res) => {
       res.status(404).json({ error: '接线不存在' });
     }
   } catch (error) {
-    console.error('更新接线失败:', error);
+    logger.error('更新接线失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -717,7 +718,7 @@ router.delete('/batch', async (req, res) => {
       deletedCount,
     });
   } catch (error) {
-    console.error('批量删除接线失败:', error);
+    logger.error('批量删除接线失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -748,7 +749,7 @@ router.delete('/:cableId', async (req, res) => {
       res.status(404).json({ error: '接线不存在' });
     }
   } catch (error) {
-    console.error('删除接线失败:', error);
+    logger.error('删除接线失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -776,7 +777,7 @@ router.get('/:cableId', async (req, res) => {
 
     res.json(cable);
   } catch (error) {
-    console.error('获取接线详情失败:', error);
+    logger.error('获取接线详情失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });

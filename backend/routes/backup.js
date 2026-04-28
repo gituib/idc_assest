@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('BackupRoute');
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
@@ -76,7 +77,7 @@ router.post('/', async (req, res) => {
   try {
     const { description = '', includeFiles = true } = req.body;
 
-    console.log('开始创建备份...');
+    logger.info('开始创建备份...');
     const result = await createBackup({
       description,
       includeFiles: includeFiles !== false,
@@ -88,7 +89,7 @@ router.post('/', async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error('创建备份失败:', error);
+    logger.error('创建备份失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '创建备份失败',
@@ -178,7 +179,7 @@ router.get('/list', async (req, res) => {
       data: { backups: resolvedFiles, total: resolvedFiles.length },
     });
   } catch (error) {
-    console.error('获取备份列表失败:', error);
+    logger.error('获取备份列表失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取备份列表失败',
@@ -211,7 +212,7 @@ router.get('/validate/:filename', async (req, res) => {
       data: validation,
     });
   } catch (error) {
-    console.error('验证备份文件失败:', error);
+    logger.error('验证备份文件失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '验证备份文件失败',
@@ -248,7 +249,8 @@ router.get('/restore-progress/:filename', async (req, res) => {
   };
 
   try {
-    console.log(`开始恢复备份: ${filename}`);
+    logger.info('开始恢复备份: ${filename}');
+    logger.info('恢复选项', { data: options });
     sendProgress({ stage: 'start', message: '正在验证备份文件...', progress: 5 });
 
     const validation = await validateBackupFile(filePath);
@@ -285,12 +287,56 @@ router.get('/restore-progress/:filename', async (req, res) => {
 
     const totalTables = require('../utils/backup').RESTORE_ORDER.length;
     let processedTables = 0;
+    let isStopped = false;
+    let clientDisconnected = false;
+
+    // 监听客户端断开连接 - 使用多种事件确保可靠检测
+    req.on('close', () => {
+      if (!clientDisconnected) {
+        clientDisconnected = true;
+        logger.info('客户端断开连接(req.close)，准备停止恢复...');
+        isStopped = true;
+      }
+    });
+
+    req.on('aborted', () => {
+      if (!clientDisconnected) {
+        clientDisconnected = true;
+        logger.info('客户端中断请求(req.aborted)，准备停止恢复...');
+        isStopped = true;
+      }
+    });
+
+    res.on('close', () => {
+      if (!clientDisconnected) {
+        clientDisconnected = true;
+        logger.info('响应流关闭(res.close)，准备停止恢复...');
+        isStopped = true;
+      }
+    });
+
+    // 定期检查客户端是否仍然连接
+    const keepAliveInterval = setInterval(() => {
+      if (res.writableEnded || res.destroyed) {
+        if (!clientDisconnected) {
+          clientDisconnected = true;
+          logger.info('检测到响应流已结束，准备停止恢复...');
+          isStopped = true;
+        }
+        clearInterval(keepAliveInterval);
+      }
+    }, 1000);
 
     const result = await restoreBackup(filePath, {
       overwriteExisting: options.overwriteExisting !== false,
       skipTables: options.skipTables || [],
       skipFiles: options.skipFiles === true,
+      skipUserData: options.skipUserData === true,
+      shouldStop: () => isStopped,
       onProgress: (tableName, status, count) => {
+        // 如果已停止，不再发送进度
+        if (isStopped) return;
+
         processedTables++;
         const progress = 20 + Math.floor((processedTables / totalTables) * 70);
         const statusMap = {
@@ -312,23 +358,43 @@ router.get('/restore-progress/:filename', async (req, res) => {
       },
     });
 
-    sendProgress({
-      stage: 'complete',
-      message: '恢复完成!',
-      progress: 100,
-      result: {
-        tablesRestored: result.tablesRestored,
-        recordsRestored: result.recordsRestored,
-        filesRestored: result.filesRestored,
-        restoredAt: result.restoredAt,
-        tableDetails: result.tableDetails,
-        fileDetails: result.fileDetails,
-      },
-    });
+    clearInterval(keepAliveInterval);
+
+    if (result.stopped) {
+      sendProgress({
+        stage: 'stopped',
+        message: result.rolledBack ? '恢复已停止，数据已回滚到恢复前的状态' : '恢复已停止，数据可能处于不一致状态',
+        progress: 0,
+        result: {
+          tablesRestored: result.tablesRestored,
+          recordsRestored: result.recordsRestored,
+          filesRestored: result.filesRestored,
+          restoredAt: result.restoredAt,
+          tableDetails: result.tableDetails,
+          fileDetails: result.fileDetails,
+          stopped: true,
+          rolledBack: result.rolledBack,
+        },
+      });
+    } else {
+      sendProgress({
+        stage: 'complete',
+        message: '恢复完成!',
+        progress: 100,
+        result: {
+          tablesRestored: result.tablesRestored,
+          recordsRestored: result.recordsRestored,
+          filesRestored: result.filesRestored,
+          restoredAt: result.restoredAt,
+          tableDetails: result.tableDetails,
+          fileDetails: result.fileDetails,
+        },
+      });
+    }
 
     res.end();
   } catch (error) {
-    console.error('恢复备份失败:', error);
+    logger.error('恢复备份失败', { error: error.message, stack: error.stack });
     sendProgress({ stage: 'error', message: `恢复失败: ${error.message}`, progress: 0 });
     res.end();
   }
@@ -352,14 +418,16 @@ router.post('/restore', async (req, res) => {
       });
     }
 
-    console.log(`开始恢复备份: ${filename}`);
+    logger.info('开始恢复备份: ${filename}');
+    logger.info('恢复选项', { data: options });
 
     const result = await restoreBackup(filePath, {
       overwriteExisting: options.overwriteExisting !== false,
       skipTables: options.skipTables || [],
       skipFiles: options.skipFiles === true,
+      skipUserData: options.skipUserData === true,
       onProgress: (tableName, status, count) => {
-        console.log(`  ${tableName}: ${status}${count ? ` (${count})` : ''}`);
+        logger.info(`  ${tableName}: ${status}${count ? ` (${count})` : ''}`);
       },
     });
 
@@ -369,7 +437,7 @@ router.post('/restore', async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error('恢复备份失败:', error);
+    logger.error('恢复备份失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '恢复备份失败',
@@ -401,7 +469,7 @@ router.post('/upload', async (req, res) => {
 
     const isCompressed = nameLower.endsWith('.gz');
 
-    console.log(`上传备份文件: ${originalName}, 压缩: ${isCompressed}, 大小: ${backupFile.size}`);
+    logger.info('上传备份文件: ${originalName}, 压缩: ${isCompressed}, 大小: ${backupFile.size}');
 
     // 保存到临时文件
     const tempFilename = `upload_${Date.now()}`;
@@ -437,7 +505,7 @@ router.post('/upload', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('上传备份文件失败:', error);
+    logger.error('上传备份文件失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '上传备份文件失败',
@@ -465,11 +533,11 @@ router.get('/download/:filename', (req, res) => {
 
     res.download(filePath, filename, err => {
       if (err) {
-        console.error('下载备份文件失败:', err);
+        logger.error('下载备份文件失败', { err: err.message, stack: err.stack });
       }
     });
   } catch (error) {
-    console.error('下载备份文件失败:', error);
+    logger.error('下载备份文件失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '下载备份文件失败',
@@ -503,7 +571,7 @@ router.delete('/:filename', (req, res) => {
       data: { filename },
     });
   } catch (error) {
-    console.error('删除备份文件失败:', error);
+    logger.error('删除备份文件失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '删除备份文件失败',
@@ -539,7 +607,7 @@ router.get('/info', (req, res) => {
       },
     });
   } catch (error) {
-    console.error('获取备份信息失败:', error);
+    logger.error('获取备份信息失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取备份信息失败',
@@ -570,7 +638,7 @@ router.post('/clean', (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error('清理备份失败:', error);
+    logger.error('清理备份失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '清理备份失败',
@@ -580,7 +648,7 @@ router.post('/clean', (req, res) => {
 });
 
 router.use((error, req, res, next) => {
-  console.error('路由错误:', error);
+  logger.error('路由错误', { error: error.message, stack: error.stack });
   res.status(500).json({
     success: false,
     message: '服务器内部错误',
@@ -599,7 +667,7 @@ router.get('/auto/status', (req, res) => {
       data: status,
     });
   } catch (error) {
-    console.error('获取自动备份状态失败:', error);
+    logger.error('获取自动备份状态失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取自动备份状态失败',
@@ -675,7 +743,7 @@ router.post('/auto/settings', (req, res) => {
       });
     }
   } catch (error) {
-    console.error('更新自动备份设置失败:', error);
+    logger.error('更新自动备份设置失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '更新自动备份设置失败',
@@ -709,7 +777,7 @@ router.post('/auto/execute', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('立即执行备份失败:', error);
+    logger.error('立即执行备份失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '立即执行备份失败',
@@ -741,7 +809,7 @@ router.post('/auto/test-cron', (req, res) => {
       },
     });
   } catch (error) {
-    console.error('测试 Cron 表达式失败:', error);
+    logger.error('测试 Cron 表达式失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '测试 Cron 表达式失败',
@@ -761,7 +829,7 @@ router.get('/remote/targets', (req, res) => {
       data: { targets },
     });
   } catch (error) {
-    console.error('获取远端备份目标失败:', error);
+    logger.error('获取远端备份目标失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取远端备份目标失败',
@@ -787,7 +855,7 @@ router.get('/remote/targets/:id', (req, res) => {
       data: { target },
     });
   } catch (error) {
-    console.error('获取远端备份目标失败:', error);
+    logger.error('获取远端备份目标失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取远端备份目标失败',
@@ -816,7 +884,7 @@ router.post('/remote/targets', (req, res) => {
       data: { target },
     });
   } catch (error) {
-    console.error('添加远端备份目标失败:', error);
+    logger.error('添加远端备份目标失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '添加远端备份目标失败',
@@ -837,7 +905,7 @@ router.put('/remote/targets/:id', (req, res) => {
       data: { target },
     });
   } catch (error) {
-    console.error('更新远端备份目标失败:', error);
+    logger.error('更新远端备份目标失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '更新远端备份目标失败',
@@ -863,7 +931,7 @@ router.delete('/remote/targets/:id', (req, res) => {
       message: '远端备份目标已删除',
     });
   } catch (error) {
-    console.error('删除远端备份目标失败:', error);
+    logger.error('删除远端备份目标失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '删除远端备份目标失败',
@@ -907,7 +975,7 @@ router.post('/remote/test', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('[RemoteBackup] 测试远端连接失败:', error);
+    logger.error('[RemoteBackup] 测试远端连接失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '测试远端连接失败',
@@ -944,7 +1012,7 @@ router.post('/remote/targets/:id/test', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('测试远端连接失败:', error);
+    logger.error('测试远端连接失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '测试远端连接失败',
@@ -962,7 +1030,7 @@ router.get('/remote/settings', (req, res) => {
       data: { settings },
     });
   } catch (error) {
-    console.error('获取远端备份设置失败:', error);
+    logger.error('获取远端备份设置失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取远端备份设置失败',
@@ -981,7 +1049,7 @@ router.put('/remote/settings', (req, res) => {
       data: { settings },
     });
   } catch (error) {
-    console.error('更新远端备份设置失败:', error);
+    logger.error('更新远端备份设置失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '更新远端备份设置失败',
@@ -1004,7 +1072,7 @@ router.get('/remote/protocols', (req, res) => {
       data: { protocols },
     });
   } catch (error) {
-    console.error('获取协议列表失败:', error);
+    logger.error('获取协议列表失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取协议列表失败',
@@ -1078,7 +1146,7 @@ router.post('/remote/upload', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('手动上传备份失败:', error);
+    logger.error('手动上传备份失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '手动上传备份失败',
@@ -1106,7 +1174,7 @@ router.get('/logs', async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error('获取备份日志失败:', error);
+    logger.error('获取备份日志失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取备份日志失败',
@@ -1133,7 +1201,7 @@ router.get('/logs/:id', async (req, res) => {
       data: log,
     });
   } catch (error) {
-    console.error('获取备份日志详情失败:', error);
+    logger.error('获取备份日志详情失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取备份日志详情失败',
@@ -1154,7 +1222,7 @@ router.delete('/logs/clean', async (req, res) => {
       data: { deletedCount },
     });
   } catch (error) {
-    console.error('清理旧日志失败:', error);
+    logger.error('清理旧日志失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '清理旧日志失败',

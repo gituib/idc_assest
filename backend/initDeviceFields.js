@@ -174,16 +174,26 @@ async function initDeviceFields() {
         console.log(`创建字段: ${field.displayName}`);
       } else {
         // 如果字段已存在但缺少 options，则补充 options
-        if (field.options && !existingField.options) {
+        // 确保 options 是数组（数据库 JSON 类型可能返回字符串）
+        let existingOptions = existingField.options;
+        if (existingOptions && typeof existingOptions === 'string') {
+          try {
+            existingOptions = JSON.parse(existingOptions);
+          } catch {
+            existingOptions = null;
+          }
+        }
+
+        if (field.options && !existingOptions) {
           await existingField.update({ options: field.options });
           console.log(`更新字段 options: ${field.displayName}`);
-        } else if (field.options && existingField.options) {
+        } else if (field.options && Array.isArray(existingOptions)) {
           // 如果系统字段已有 options，检查是否缺少默认选项，补充缺失的选项
-          const existingValues = existingField.options.map(o => o.value);
+          const existingValues = existingOptions.map(o => o.value);
           const defaultValues = field.options.map(o => o.value);
           const missingOptions = field.options.filter(o => !existingValues.includes(o.value));
           if (missingOptions.length > 0) {
-            const updatedOptions = [...existingField.options, ...missingOptions];
+            const updatedOptions = [...existingOptions, ...missingOptions];
             await existingField.update({ options: updatedOptions });
             console.log(
               `补充缺失的 options: ${field.displayName}，新增: ${missingOptions.map(o => o.label).join(', ')}`

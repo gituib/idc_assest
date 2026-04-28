@@ -118,7 +118,7 @@ const Device = sequelize.define(
   }
 );
 
-Device.belongsTo(Rack, { foreignKey: 'rackId' });
-Device.belongsTo(Warehouse, { foreignKey: 'warehouseId' });
+Device.belongsTo(Rack, { foreignKey: 'rackId', onDelete: 'SET NULL' });
+Device.belongsTo(Warehouse, { foreignKey: 'warehouseId', onDelete: 'SET NULL' });
 
 module.exports = Device;

@@ -2,6 +2,12 @@ import axios from 'axios';
 import { API_CONFIG } from '../config/api';
 import secureStorage, { TOKEN_KEY } from '../utils/secureStorage';
 
+let maintenanceCallback = null;
+
+export function setMaintenanceCallback(callback) {
+  maintenanceCallback = callback;
+}
+
 // 给全局 axios 默认实例添加 Token 拦截器
 // 确保所有页面中直接使用 axios.get/post 的请求也能自动携带 Token
 axios.interceptors.request.use(config => {
@@ -69,13 +75,19 @@ api.interceptors.response.use(
     if (error.response) {
       const { status, data } = error.response;
 
+      if (status === 503 && data?.maintenance) {
+        if (maintenanceCallback) {
+          maintenanceCallback(data.maintenance);
+        }
+        return Promise.reject(new Error('系统维护中'));
+      }
+
       if (status === 401) {
         const currentPath = window.location.pathname;
 
         if (!currentPath.startsWith('/login')) {
           secureStorage.remove(TOKEN_KEY);
           secureStorage.remove('user');
-          // 使用 React Router 导航而非强制刷新，保留 SPA 状态
           if (window.__navigate) {
             window.__navigate('/login');
           } else {

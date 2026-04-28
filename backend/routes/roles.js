@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('RolesRoute');
 const express = require('express');
 const Role = require('../models/Role');
 const Permission = require('../models/Permission');
@@ -45,7 +46,7 @@ router.get('/', authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('获取角色列表错误:', error);
+    logger.error('获取角色列表错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取角色列表失败',
@@ -65,7 +66,7 @@ router.get('/all', authMiddleware, async (req, res) => {
       data: roles,
     });
   } catch (error) {
-    console.error('获取所有角色错误:', error);
+    logger.error('获取所有角色错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取角色列表失败',
@@ -98,7 +99,7 @@ router.get('/:roleId', authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('获取角色详情错误:', error);
+    logger.error('获取角色详情错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取角色详情失败',
@@ -155,7 +156,7 @@ router.post('/', authMiddleware, async (req, res) => {
       data: role,
     });
   } catch (error) {
-    console.error('创建角色错误:', error);
+    logger.error('创建角色错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '创建角色失败',
@@ -264,7 +265,7 @@ router.put('/:roleId', authMiddleware, async (req, res) => {
       data: role,
     });
   } catch (error) {
-    console.error('更新角色错误:', error);
+    logger.error('更新角色错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '更新角色失败',
@@ -321,7 +322,7 @@ router.delete('/:roleId', authMiddleware, async (req, res) => {
       message: '删除成功',
     });
   } catch (error) {
-    console.error('删除角色错误:', error);
+    logger.error('删除角色错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '删除角色失败',
@@ -377,7 +378,7 @@ router.post('/init-roles', authMiddleware, async (req, res) => {
       message: '初始化角色成功',
     });
   } catch (error) {
-    console.error('初始化角色错误:', error);
+    logger.error('初始化角色错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '初始化角色失败',

@@ -19,6 +19,7 @@ import {
   Row,
   Col,
   Dropdown,
+  Checkbox,
 } from 'antd';
 import {
   CloudDownloadOutlined,
@@ -41,6 +42,7 @@ import {
   ClearOutlined,
   EyeOutlined,
   TableOutlined,
+  CloseCircleOutlined,
 } from '@ant-design/icons';
 import api, { backupAPI } from '../api';
 import CloseButton from '../components/CloseButton';
@@ -48,6 +50,34 @@ import { useNavigate } from 'react-router-dom';
 import secureStorage, { TOKEN_KEY } from '../utils/secureStorage';
 
 const { Title, Text } = Typography;
+
+const TABLE_NAME_MAPPING = {
+  User: '用户',
+  Role: '角色',
+  UserRole: '用户角色关联',
+  Permission: '权限',
+  Room: '机房',
+  Rack: '机柜',
+  Device: '设备',
+  DeviceField: '设备自定义字段',
+  DevicePort: '设备端口',
+  NetworkCard: '网卡',
+  Cable: '线缆',
+  PendingDevice: '待入库设备',
+  FaultCategory: '故障分类',
+  Ticket: '工单',
+  TicketField: '工单自定义字段',
+  TicketOperationRecord: '工单操作记录',
+  ConsumableCategory: '耗材分类',
+  Consumable: '耗材',
+  ConsumableRecord: '耗材记录',
+  ConsumableLog: '耗材操作日志',
+  ConsumableLogArchive: '耗材操作日志归档',
+  InventoryPlan: '盘点计划',
+  InventoryTask: '盘点任务',
+  InventoryRecord: '盘点记录',
+  SystemSetting: '系统设置',
+};
 
 const formatBytes = bytes => {
   if (bytes === 0) return '0 B';
@@ -136,6 +166,8 @@ const BackupManagement = () => {
   const [backupInfo, setBackupInfo] = useState(null);
   const [restoreProgress, setRestoreProgress] = useState(0);
   const [restoreStatus, setRestoreStatus] = useState('');
+  const [skipUserData, setSkipUserData] = useState(false);
+  const [eventSourceRef, setEventSourceRef] = useState(null);
 
   const fetchBackups = useCallback(async () => {
     setLoading(true);
@@ -624,12 +656,14 @@ const BackupManagement = () => {
     const options = {
       overwriteExisting: true,
       skipFiles: false,
+      skipUserData: skipUserData,
     };
 
     const eventSource = new EventSource(
       `/api/backup/restore-progress/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}&options=${encodeURIComponent(JSON.stringify(options))}`
     );
 
+    setEventSourceRef(eventSource);
     let resultData = null;
 
     eventSource.onmessage = event => {
@@ -642,6 +676,7 @@ const BackupManagement = () => {
         if (data.stage === 'complete') {
           resultData = data.result;
           eventSource.close();
+          setEventSourceRef(null);
 
           setTimeout(() => {
             setRestoreVisible(false);
@@ -851,6 +886,129 @@ const BackupManagement = () => {
                     </div>
                   </div>
 
+                  {resultData?.skipped && resultData.skipped.length > 0 && (
+                    <div
+                      style={{
+                        padding: '16px',
+                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                        borderRadius: '16px',
+                        border: '1px solid #f59e0b30',
+                        marginBottom: 16,
+                        animation: 'slideUp 0.5s ease 0.15s forwards',
+                        opacity: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: 12,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: '8px',
+                              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <SafetyOutlined style={{ color: '#fff', fontSize: 16 }} />
+                          </div>
+                          <span style={{ fontWeight: 600, color: '#92400e', fontSize: 15 }}>
+                            已跳过的数据表
+                          </span>
+                        </div>
+                        <Tag
+                          style={{
+                            background: '#fff7ed',
+                            border: '1px solid #fed7aa',
+                            color: '#c2410c',
+                            borderRadius: '6px',
+                            padding: '2px 8px',
+                          }}
+                        >
+                          共 {resultData.skipped.length} 个表
+                        </Tag>
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(2, 1fr)',
+                          gap: 8,
+                          padding: '4px',
+                        }}
+                      >
+                        {resultData.skipped.map((tableName, index) => (
+                          <div
+                            key={tableName}
+                            className="table-card"
+                            style={{
+                              padding: '12px 16px',
+                              background: '#ffffff',
+                              borderRadius: '12px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              border: '1px solid #fcd34d',
+                              transition: 'all 0.25s ease',
+                              cursor: 'default',
+                              animationDelay: `${index * 0.03}s`,
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: '50%',
+                                  background: '#f59e0b',
+                                  boxShadow: '0 0 8px rgba(245, 158, 11, 0.5)',
+                                }}
+                              />
+                              <span
+                                style={{
+                                  fontWeight: 600,
+                                  color: '#78350f',
+                                  fontSize: 13,
+                                }}
+                              >
+                                {TABLE_NAME_MAPPING[tableName] || tableName}
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                background: '#fef3c7',
+                                border: '1px solid #fcd34d',
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  color: '#b45309',
+                                }}
+                              >
+                                已跳过
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {resultData?.tableDetails && Object.keys(resultData.tableDetails).length > 0 && (
                     <div
                       style={{
@@ -1038,8 +1196,43 @@ const BackupManagement = () => {
           }, 500);
         }
 
+        if (data.stage === 'stopped') {
+          resultData = data.result;
+          eventSource.close();
+          setEventSourceRef(null);
+          setRestoreLoading(false);
+          setRestoreVisible(false);
+
+          const isRolledBack = data.result?.rolledBack;
+          Modal.info({
+            title: isRolledBack ? '恢复已停止并回滚' : '恢复已停止',
+            content: (
+              <div style={{ marginTop: 16 }}>
+                <p>数据恢复已被用户停止。</p>
+                {isRolledBack ? (
+                  <p style={{ color: '#52c41a', marginTop: 8 }}>
+                    数据已成功回滚到恢复前的状态，无需担心数据完整性。
+                  </p>
+                ) : (
+                  <>
+                    <p style={{ marginTop: 8, color: '#666' }}>
+                      已恢复 {data.result?.tablesRestored || 0} 个表，
+                      {data.result?.recordsRestored || 0} 条记录。
+                    </p>
+                    <p style={{ color: '#f59e0b', marginTop: 8 }}>
+                      警告：数据回滚失败，数据可能处于不一致状态，建议检查数据完整性。
+                    </p>
+                  </>
+                )}
+              </div>
+            ),
+            okText: '知道了',
+          });
+        }
+
         if (data.stage === 'error') {
           eventSource.close();
+          setEventSourceRef(null);
           setRestoreLoading(false);
           Modal.error({
             title: '数据恢复失败',
@@ -1054,12 +1247,39 @@ const BackupManagement = () => {
     eventSource.onerror = error => {
       console.error('SSE 连接错误:', error);
       eventSource.close();
+      setEventSourceRef(null);
       setRestoreLoading(false);
       Modal.error({
         title: '数据恢复失败',
         content: '连接中断，请重试',
       });
     };
+  };
+
+  const handleStopRestore = () => {
+    if (eventSourceRef) {
+      console.log('用户请求停止恢复');
+      setRestoreStatus('正在停止恢复...');
+      eventSourceRef.close();
+      setEventSourceRef(null);
+
+      // 设置超时：如果5秒内没有收到 stopped 事件，强制重置状态
+      setTimeout(() => {
+        setRestoreLoading(prev => {
+          if (prev) {
+            console.log('停止恢复超时，强制重置状态');
+            setRestoreVisible(false);
+            Modal.warning({
+              title: '停止恢复',
+              content: '恢复操作已停止，请刷新页面查看最新数据状态。',
+              okText: '知道了',
+            });
+            return false;
+          }
+          return prev;
+        });
+      }, 5000);
+    }
   };
 
   const handleDelete = async filename => {
@@ -1155,6 +1375,7 @@ const BackupManagement = () => {
 
   const showRestoreConfirm = record => {
     setSelectedBackup(record);
+    setSkipUserData(false);
     setRestoreVisible(true);
   };
 
@@ -1992,6 +2213,18 @@ const BackupManagement = () => {
               >
                 {restoreStatus}
               </Text>
+              <Button
+                danger
+                icon={<CloseCircleOutlined />}
+                onClick={handleStopRestore}
+                style={{
+                  marginTop: 24,
+                  ...buttonStyles.danger.base,
+                  padding: '8px 24px',
+                }}
+              >
+                停止恢复
+              </Button>
             </div>
           ) : (
             <>
@@ -2058,6 +2291,34 @@ const BackupManagement = () => {
                   </Descriptions>
                 </div>
               )}
+
+              <div
+                style={{
+                  background: `${designTokens.colors.primary.main}05`,
+                  border: `1px solid ${designTokens.colors.primary.main}20`,
+                  borderRadius: designTokens.borderRadius.md,
+                  padding: '16px',
+                  marginBottom: 20,
+                }}
+              >
+                <Checkbox
+                  checked={skipUserData}
+                  onChange={e => setSkipUserData(e.target.checked)}
+                  style={{ fontWeight: 600, color: designTokens.colors.text.primary }}
+                >
+                  跳过用户数据（保留当前系统用户账户）
+                </Checkbox>
+                <div
+                  style={{
+                    fontSize: '13px',
+                    color: designTokens.colors.text.secondary,
+                    marginTop: 8,
+                    paddingLeft: 24,
+                  }}
+                >
+                  选择此项后，将不会恢复备份中的用户和用户角色数据，保留当前系统已有的用户账户
+                </div>
+              </div>
 
               <Divider style={{ margin: '20px 0' }} />
 

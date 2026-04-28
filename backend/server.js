@@ -9,6 +9,8 @@ const fileUpload = require('express-fileupload');
 const { sequelize } = require('./db');
 const { FILE_UPLOAD } = require('./config');
 const { generateId } = require('./utils/idGenerator');
+const logger = require('./utils/logger').module('Server');
+const requestLogger = require('./middleware/requestLogger');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -17,37 +19,38 @@ app.use(cors());
 app.use(express.json());
 app.use(fileUpload({ limits: { fileSize: FILE_UPLOAD.MAX_FILE_SIZE } }));
 app.use('/temp', express.static('temp'));
+app.use(requestLogger);
 
 async function syncDatabase() {
   await sequelize.authenticate();
-  console.log('数据库连接成功');
+  logger.info('数据库连接成功');
 
   await sequelize.sync({
     force: false,
     alter: false,
   });
-  console.log('数据库表结构同步完成');
+  logger.info('数据库表结构同步完成');
 }
 
 async function initDeviceFields() {
   await require('./initDeviceFields')();
-  console.log('设备字段初始化完成');
+  logger.info('设备字段初始化完成');
 }
 
 async function initTicketFields() {
   await require('./initTicketFields')();
-  console.log('工单字段初始化完成');
+  logger.info('工单字段初始化完成');
 }
 
 async function initTicketModels() {
   await require('./models/ticketIndex').initializeModels();
-  console.log('工单模型关联初始化完成');
+  logger.info('工单模型关联初始化完成');
 }
 
 async function syncSystemSettings() {
   const SystemSetting = require('./models/SystemSetting');
   await SystemSetting.sync();
-  console.log('系统设置模型同步完成');
+  logger.info('系统设置模型同步完成');
 }
 
 async function syncConsumableModels() {
@@ -64,7 +67,7 @@ async function syncConsumableModels() {
     ConsumableRecord.sync(),
     ConsumableLogArchive.sync(),
   ]);
-  console.log('耗材模型同步完成');
+  logger.info('耗材模型同步完成');
 }
 
 async function syncInventoryModels() {
@@ -73,19 +76,19 @@ async function syncInventoryModels() {
   const InventoryRecord = require('./models/InventoryRecord');
 
   await Promise.all([InventoryPlan.sync(), InventoryTask.sync(), InventoryRecord.sync()]);
-  console.log('盘点模型同步完成');
+  logger.info('盘点模型同步完成');
 }
 
 async function syncBackupLogModel() {
   const BackupLog = require('./models/BackupLog');
   await BackupLog.sync();
-  console.log('备份日志模型同步完成');
+  logger.info('备份日志模型同步完成');
 }
 
 async function syncOperationLogModel() {
   const OperationLog = require('./models/OperationLog');
   await OperationLog.sync();
-  console.log('操作日志模型同步完成');
+  logger.info('操作日志模型同步完成');
 }
 
 async function syncBusinessModels() {
@@ -98,24 +101,24 @@ async function syncBusinessModels() {
     await Business.sync({ alter: true });
     await DeviceBusiness.sync({ alter: true });
     await Warehouse.sync({ alter: true });
-    console.log('业务/设备关联/库房模型同步完成（alter mode）');
+    logger.info('业务/设备关联/库房模型同步完成（alter mode）');
   } else {
     await Business.sync();
     await DeviceBusiness.sync();
     await Warehouse.sync();
-    console.log('业务/设备关联/库房模型同步完成（safe mode）');
+    logger.info('业务/设备关联/库房模型同步完成（safe mode）');
   }
 }
 
 async function initDefaultSystemSettings() {
-  console.log('开始初始化系统设置默认值...');
+  logger.info('开始初始化系统设置默认值...');
   const { initDefaultSettings } = require('./routes/systemSettings');
   await initDefaultSettings();
-  console.log('系统设置初始化完成');
+  logger.info('系统设置初始化完成');
 }
 
 async function initFaultCategories() {
-  console.log('开始初始化故障分类...');
+  logger.info('开始初始化故障分类...');
   const FaultCategory = require('./models/FaultCategory');
 
   const defaultCategories = [
@@ -193,17 +196,17 @@ async function initFaultCategories() {
         isSystem: true,
         isActive: true,
       });
-      console.log(`创建故障分类: ${cat.name}`);
+      logger.info(`创建故障分类: ${cat.name}`);
     }
   }
-  console.log('故障分类初始化完成');
+  logger.info('故障分类初始化完成');
 }
 
 async function initAutoBackupScheduler() {
   const { initAutoBackup } = require('./utils/autoBackupScheduler');
   const status = initAutoBackup();
   if (status.enabled) {
-    console.log(`自动备份已启用，下次执行时间：${status.nextRun || '未知'}`);
+    logger.info(`自动备份已启用，下次执行时间：${status.nextRun || '未知'}`);
   }
 }
 
@@ -223,9 +226,9 @@ async function initializeApp() {
     await initFaultCategories();
     await initAutoBackupScheduler();
 
-    console.log('所有初始化完成，服务器准备就绪');
+    logger.info('所有初始化完成，服务器准备就绪');
   } catch (error) {
-    console.error('初始化失败:', error);
+    logger.error('初始化失败', { error: error.message, stack: error.stack });
     process.exit(1);
   }
 }
@@ -233,16 +236,17 @@ async function initializeApp() {
 const swaggerUi = require('swagger-ui-express');
 const { specs, customCSS } = require('./swagger');
 const { authMiddleware } = require('./middleware/auth');
+const { maintenanceMiddleware } = require('./middleware/maintenance');
 const loadRoutes = require('./utils/routeLoader');
 
 initializeApp()
   .then(() => {
     app.listen(PORT, () => {
-      console.log(`服务器运行在 http://localhost:${PORT}`);
+      logger.info(`服务器运行在 http://localhost:${PORT}`);
     });
   })
   .catch(err => {
-    console.error('应用初始化失败:', err);
+    logger.error('应用初始化失败', { error: err.message, stack: err.stack });
     process.exit(1);
   });
 
@@ -253,6 +257,7 @@ const PUBLIC_PATHS = [
   '/api-docs',
   '/api-docs.json',
   '/system-settings/system/info',
+  '/maintenance',
 ];
 
 const isPublicPath = path => {
@@ -269,7 +274,34 @@ app.use('/api', (req, res, next) => {
   return authMiddleware(req, res, next);
 });
 
+app.use('/api', maintenanceMiddleware);
+
 loadRoutes(app);
+
+const { getMaintenanceStatus, disableMaintenanceMode } = require('./utils/maintenanceMode');
+
+app.get('/api/maintenance/status', (req, res) => {
+  res.json({
+    success: true,
+    data: getMaintenanceStatus(),
+  });
+});
+
+app.post('/api/maintenance/disable', async (req, res) => {
+  try {
+    disableMaintenanceMode();
+    res.json({
+      success: true,
+      message: '维护模式已手动解除',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: '解除维护模式失败',
+      error: error.message,
+    });
+  }
+});
 
 app.use('/uploads', express.static('uploads'));
 

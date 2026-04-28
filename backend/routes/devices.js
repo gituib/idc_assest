@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('DevicesRoute');
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
@@ -512,7 +513,7 @@ router.post('/import-preview', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('预览设备数据失败:', error);
+    logger.error('预览设备数据失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       error: error.message || '预览过程中发生未知错误',
     });
@@ -531,8 +532,8 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
 
     // 关键词搜索（所有文本字段 + 自定义字段）
     if (keyword) {
-      console.log('搜索关键词:', keyword);
-      console.log('数据库类型:', dbDialect);
+      logger.info('搜索关键词', { data: keyword });
+      logger.info('数据库类型', { data: dbDialect });
 
       // 转义关键词中的特殊字符，防止SQL注入
       // 转义单引号（SQL注入）和 LIKE 通配符（%、_）
@@ -561,10 +562,7 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
         },
       });
 
-      console.log(
-        '找到的自定义字段:',
-        customFields.map(f => f.fieldName)
-      );
+      logger.info('找到的自定义字段', { data: customFields.map(f => f.fieldName) });
 
       // 构建自定义字段搜索条件（使用原始SQL，兼容SQLite和MySQL）
       if (customFields.length > 0) {
@@ -592,7 +590,7 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
 
       // 合并所有搜索条件
       where[Op.or] = searchConditions;
-      console.log('搜索条件数量:', searchConditions.length);
+      logger.info('搜索条件数量', { data: searchConditions.length });
     }
 
     // 状态筛选
@@ -615,13 +613,10 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
 
     // 调试日志
     if (process.env.NODE_ENV === 'development') {
-      console.log('=== 设备查询调试 ===');
-      console.log('接收参数 - roomId:', roomId, 'rackId:', rackId);
-      console.log('查询条件 - where:', JSON.stringify(where));
-      console.log(
-        '机房筛选条件 - Rack.where:',
-        roomId && roomId !== 'all' ? { roomId: roomId } : undefined
-      );
+      logger.info('=== 设备查询调试 ===');
+      logger.info('接收参数', { roomId, rackId });
+      logger.info('查询条件 - where', { data: JSON.stringify(where) });
+      logger.info('机房筛选条件 - Rack.where', { data: roomId && roomId !== 'all' ? { roomId: roomId } : undefined });
     }
 
     // 空闲设备筛选
@@ -653,10 +648,10 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
       pageSize: parseInt(pageSize),
     });
   } catch (error) {
-    console.error('搜索设备失败:', error);
-    console.error('错误详情:', error.message);
+    logger.error('搜索设备失败', { error: error.message, stack: error.stack });
+    logger.error('错误详情', { error: error.message });
     if (error.sql) {
-      console.error('SQL:', error.sql);
+      logger.error('SQL', { error: error.sql });
     }
     res.status(500).json({ error: error.message, sql: error.sql });
   }
@@ -717,7 +712,7 @@ router.get('/all', async (req, res) => {
       total: devices.length,
     });
   } catch (error) {
-    console.error('获取设备列表失败:', error);
+    logger.error('获取设备列表失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -941,7 +936,7 @@ router.get('/import-template', async (req, res) => {
     // 删除临时文件
     fs.unlinkSync(path.join(tempDir, 'import_template.csv'));
   } catch (error) {
-    console.error('生成导入模板失败:', error);
+    logger.error('生成导入模板失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '生成导入模板失败' });
   }
 });
@@ -1068,7 +1063,7 @@ router.get('/export', async (req, res) => {
     // 删除临时文件
     fs.unlinkSync(path.join(__dirname, '../temp/devices.csv'));
   } catch (error) {
-    console.error('导出设备数据失败:', error);
+    logger.error('导出设备数据失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '导出设备数据失败' });
   }
 });
@@ -1525,7 +1520,7 @@ router.post('/import', async (req, res) => {
     res.json({ statistics: stats });
   } catch (error) {
     await t.rollback();
-    console.error('导入设备数据失败:', error);
+    logger.error('导入设备数据失败', { error: error.message, stack: error.stack });
 
     // 清理临时文件
     try {
@@ -1533,7 +1528,7 @@ router.post('/import', async (req, res) => {
         fs.unlinkSync(filePath);
       }
     } catch (fileErr) {
-      console.error('删除临时文件失败:', fileErr);
+      logger.error('删除临时文件失败', { error: fileErr });
     }
 
     res.status(500).json({
@@ -2070,7 +2065,7 @@ router.get('/enhanced-export', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('增强导出失败:', error);
+    logger.error('增强导出失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '增强导出失败' });
   }
 });
@@ -2179,7 +2174,7 @@ router.put('/:deviceId/to-idle', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
-    console.error('设备转入空闲设备失败:', error);
+    logger.error('设备转入空闲设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -2456,7 +2451,7 @@ router.post('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, res
     });
   } catch (error) {
     await t.rollback();
-    console.error('批量删除设备错误:', error);
+    logger.error('批量删除设备错误', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message, stack: error.stack });
   }
 });
@@ -2539,7 +2534,7 @@ router.delete('/delete-all', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
-    console.error('删除所有设备错误:', error);
+    logger.error('删除所有设备错误', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message, stack: error.stack });
   }
 });
@@ -2603,7 +2598,7 @@ router.delete('/:deviceId', async (req, res) => {
           );
         }
       } catch (err) {
-        console.error('更新机柜功率失败:', err);
+        logger.error('更新机柜功率失败', { err: err.message, stack: err.stack });
         throw err; // 重新抛出错误，触发事务回滚
       }
     }
@@ -2618,7 +2613,7 @@ router.delete('/:deviceId', async (req, res) => {
     await t.commit();
 
     if (deletedCables > 0) {
-      console.log(`已删除 ${deletedCables} 条相关接线`);
+      logger.info('已删除 ${deletedCables} 条相关接线');
     }
 
     await logDeviceOperation(
@@ -2645,7 +2640,7 @@ router.delete('/:deviceId', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
-    console.error('删除设备失败:', error);
+    logger.error('删除设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });

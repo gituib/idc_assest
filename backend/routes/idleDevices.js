@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('IdleDevicesRoute');
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
@@ -83,7 +84,7 @@ router.get('/', async (req, res) => {
       pageSize: parseInt(pageSize),
     });
   } catch (error) {
-    console.error('获取空闲设备列表失败:', error);
+    logger.error('获取空闲设备列表失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -245,7 +246,7 @@ router.post('/from-device/:deviceId', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
-    console.error('设备转入空闲设备失败:', error);
+    logger.error('设备转入空闲设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -312,7 +313,7 @@ router.post('/batch-from-devices', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
-    console.error('批量转入空闲设备失败:', error);
+    logger.error('批量转入空闲设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -322,52 +323,46 @@ router.put('/batch-restore', async (req, res) => {
   try {
     const { devices } = req.body;
 
-    console.log('========== batch-restore 开始 ==========');
-    console.log('原始请求 body:', JSON.stringify(req.body));
-    console.log('devices 参数:', devices);
+    logger.info('========== batch-restore 开始 ==========');
+    logger.info('原始请求 body', { data: JSON.stringify(req.body) });
+    logger.info('devices 参数', { data: devices });
 
     if (!devices || !Array.isArray(devices) || devices.length === 0) {
       await t.rollback();
-      console.log('错误: devices 参数无效');
+      logger.info('错误: devices 参数无效');
       return res.status(400).json({ error: '请提供有效的设备列表' });
     }
 
     const deviceIds = devices.map(d => d.deviceId).filter(Boolean);
-    console.log('提取的 deviceIds:', deviceIds);
+    logger.info('提取的 deviceIds', { data: deviceIds });
 
     if (deviceIds.length === 0) {
       await t.rollback();
-      console.log('错误: deviceIds 为空');
+      logger.info('错误: deviceIds 为空');
       return res.status(400).json({ error: '设备ID不能为空' });
     }
 
-    console.log('开始查询设备，条件:', { deviceId: { [Op.in]: deviceIds }, isIdle: true });
+    logger.info('开始查询设备，条件', { data: { deviceId: { [Op.in]: deviceIds }, isIdle: true } });
 
     const idleDevices = await Device.findAll({
       where: { deviceId: { [Op.in]: deviceIds }, isIdle: true },
       transaction: t,
     });
 
-    console.log('查询到的空闲设备数量:', idleDevices.length);
+    logger.info('查询到的空闲设备数量', { data: idleDevices.length });
     if (idleDevices.length > 0) {
-      console.log(
-        '查询到的设备ID:',
-        idleDevices.map(d => d.deviceId)
-      );
+      logger.info('查询到的设备ID', { data: idleDevices.map(d => d.deviceId) });
     }
 
     if (idleDevices.length === 0) {
-      console.log('没有找到空闲设备，检查设备是否存在:');
+      logger.info('没有找到空闲设备，检查设备是否存在:');
       const allDevices = await Device.findAll({
         where: { deviceId: { [Op.in]: deviceIds } },
         transaction: t,
       });
-      console.log('设备表中存在的设备数量:', allDevices.length);
+      logger.info('设备表中存在的设备数量', { data: allDevices.length });
       if (allDevices.length > 0) {
-        console.log(
-          '存在的设备及其 isIdle 状态:',
-          allDevices.map(d => ({ deviceId: d.deviceId, isIdle: d.isIdle }))
-        );
+        logger.info('存在的设备及其 isIdle 状态', { data: allDevices.map(d => ({ deviceId: d.deviceId, isIdle: d.isIdle })) });
       }
 
       await t.rollback();
@@ -493,7 +488,7 @@ router.put('/batch-restore', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
-    console.error('批量上架设备失败:', error);
+    logger.error('批量上架设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -536,9 +531,9 @@ router.put('/:deviceId/shelve', async (req, res) => {
     }
 
     const deviceHeight = height || device.height || 1;
-    console.log('上架设备 - 位置检查参数:', { rackId, position, deviceHeight, deviceId, existingDeviceId: device.deviceId });
+    logger.info('上架设备 - 位置检查参数', { data: { rackId, position, deviceHeight, deviceId, existingDeviceId: device.deviceId } });
     const positionCheck = await checkPositionAvailable(rackId, position, deviceHeight, deviceId, t);
-    console.log('上架设备 - 位置检查结果:', positionCheck);
+    logger.info('上架设备 - 位置检查结果', { data: positionCheck });
     if (!positionCheck.available) {
       await t.rollback();
       return res.status(400).json({ error: positionCheck.reason });
@@ -606,7 +601,7 @@ router.put('/:deviceId/shelve', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
-    console.error('设备上架失败:', error);
+    logger.error('设备上架失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -776,7 +771,7 @@ router.put('/:deviceId/restore', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
-    console.error('恢复设备失败:', error);
+    logger.error('恢复设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -822,7 +817,7 @@ router.delete('/:deviceId', async (req, res) => {
     res.json({ message: '空闲设备删除成功' });
   } catch (error) {
     await t.rollback();
-    console.error('删除空闲设备失败:', error);
+    logger.error('删除空闲设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });

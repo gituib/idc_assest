@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('StatisticsRoute');
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
@@ -162,7 +163,7 @@ router.get('/', authMiddleware, async (req, res) => {
       deviceTrendData,
     });
   } catch (error) {
-    console.error('获取统计数据失败:', error);
+    logger.error('获取统计数据失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });

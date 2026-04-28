@@ -1,5 +1,6 @@
 const path = require('path');
 const routesConfig = require('../config/routes');
+const logger = require('./logger').module('RouteLoader');
 
 function loadRoutes(app) {
   const routesDir = path.join(__dirname, '../routes');
@@ -11,12 +12,12 @@ function loadRoutes(app) {
 
       if (typeof router === 'function') {
         app.use(routeConfig.path, router);
-        console.log(`路由已加载: ${routeConfig.path} -> ${routeConfig.file}`);
+        logger.info(`路由已加载: ${routeConfig.path} -> ${routeConfig.file}`);
       } else {
-        console.warn(`警告: ${routeConfig.file} 没有导出有效的 Express 路由器`);
+        logger.warn(`${routeConfig.file} 没有导出有效的 Express 路由器`);
       }
     } catch (error) {
-      console.error(`加载路由失败: ${routeConfig.file}`, error.message);
+      logger.error(`加载路由失败: ${routeConfig.file}`, { error: error.message, stack: error.stack });
       throw error;
     }
   });

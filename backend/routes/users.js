@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('UsersRoute');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const path = require('path');
@@ -111,7 +112,7 @@ router.get('/', authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('获取用户列表错误:', error);
+    logger.error('获取用户列表错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取用户列表失败',
@@ -132,7 +133,7 @@ router.get('/all', authMiddleware, async (req, res) => {
       data: users,
     });
   } catch (error) {
-    console.error('获取所有用户错误:', error);
+    logger.error('获取所有用户错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取用户列表失败',
@@ -174,7 +175,7 @@ router.get('/:userId', authMiddleware, async (req, res) => {
       data: user,
     });
   } catch (error) {
-    console.error('获取用户详情错误:', error);
+    logger.error('获取用户详情错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取用户详情失败',
@@ -259,7 +260,7 @@ router.post('/', authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('创建用户错误:', error);
+    logger.error('创建用户错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '创建用户失败',
@@ -413,7 +414,7 @@ router.put('/:userId', authMiddleware, async (req, res) => {
       data: updatedUser,
     });
   } catch (error) {
-    console.error('更新用户错误:', error);
+    logger.error('更新用户错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '更新用户失败',
@@ -456,7 +457,7 @@ router.put('/:userId/password', authMiddleware, async (req, res) => {
       message: '密码重置成功',
     });
   } catch (error) {
-    console.error('重置密码错误:', error);
+    logger.error('重置密码错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '重置密码失败',
@@ -512,7 +513,7 @@ router.delete('/:userId', authMiddleware, async (req, res) => {
       message: '删除成功',
     });
   } catch (error) {
-    console.error('删除用户错误:', error);
+    logger.error('删除用户错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '删除用户失败',
@@ -583,7 +584,7 @@ router.post('/:userId/avatar', authMiddleware, async (req, res) => {
       data: { avatar: avatarUrl },
     });
   } catch (error) {
-    console.error('上传头像错误:', error);
+    logger.error('上传头像错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '上传头像失败',
@@ -617,7 +618,7 @@ router.delete('/:userId/avatar', authMiddleware, async (req, res) => {
       message: '头像删除成功',
     });
   } catch (error) {
-    console.error('删除头像错误:', error);
+    logger.error('删除头像错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '删除头像失败',
@@ -656,7 +657,7 @@ router.put('/:userId/approve', authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('审核用户错误:', error);
+    logger.error('审核用户错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '审核用户失败',
@@ -695,7 +696,7 @@ router.put('/:userId/reject', authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('拒绝用户错误:', error);
+    logger.error('拒绝用户错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '操作失败',

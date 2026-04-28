@@ -65,7 +65,7 @@ const Ticket = sequelize.define(
     },
     reporterId: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
       comment: '报修人ID',
     },
     reporterName: {
@@ -139,8 +139,8 @@ const Ticket = sequelize.define(
   }
 );
 
-Ticket.belongsTo(User, { foreignKey: 'reporterId', as: 'reporter', constraints: false });
-Ticket.belongsTo(User, { foreignKey: 'assigneeId', as: 'assignee', constraints: false });
-Ticket.belongsTo(Device, { foreignKey: 'deviceId', constraints: false });
+Ticket.belongsTo(User, { foreignKey: 'reporterId', as: 'reporter', onDelete: 'SET NULL' });
+Ticket.belongsTo(User, { foreignKey: 'assigneeId', as: 'assignee', onDelete: 'SET NULL' });
+Ticket.belongsTo(Device, { foreignKey: 'deviceId', onDelete: 'SET NULL' });
 
 module.exports = Ticket;

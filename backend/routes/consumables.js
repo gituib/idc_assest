@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('ConsumablesRoute');
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
@@ -175,7 +176,7 @@ router.get('/export', async (req, res) => {
       total: result.length,
     });
   } catch (error) {
-    console.error('导出失败:', error);
+    logger.error('导出失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -219,7 +220,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(consumable);
   } catch (error) {
     await transaction.rollback();
-    console.error('创建耗材错误:', error);
+    logger.error('创建耗材错误', { error: error.message, stack: error.stack });
     if (error.name === 'SequelizeValidationError') {
       const messages = error.errors.map(e => `${e.path}: ${e.message}`).join(', ');
       res.status(400).json({ error: `Validation error: ${messages}` });
@@ -345,7 +346,7 @@ router.post('/create-with-inbound', async (req, res) => {
     res.status(201).json(consumable);
   } catch (error) {
     await transaction.rollback();
-    console.error('创建耗材并入库错误:', error);
+    logger.error('创建耗材并入库错误', { error: error.message, stack: error.stack });
     if (error.name === 'SequelizeValidationError') {
       const messages = error.errors.map(e => `${e.path}: ${e.message}`).join(', ');
       res.status(400).json({ error: `Validation error: ${messages}` });
@@ -1891,7 +1892,7 @@ router.get('/devices/search', async (req, res) => {
 
     res.json({ devices: result });
   } catch (error) {
-    console.error('搜索设备失败:', error);
+    logger.error('搜索设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -1927,7 +1928,7 @@ router.get('/devices/by-sn/:sn', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('查询设备失败:', error);
+    logger.error('查询设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });

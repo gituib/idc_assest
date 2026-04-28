@@ -5,6 +5,7 @@ const { createBackup, createIncrementalBackup, getBackupPath } = require('./back
 const { uploadToRemote } = require('./remoteBackup');
 const { getEnabledTargets, getGlobalSettings } = require('./remoteBackupConfig');
 const { createLogEntry, updateLogStatus } = require('./backupLog');
+const logger = require('./logger').module('AutoBackup');
 
 const schedulers = new Map();
 
@@ -28,7 +29,7 @@ function loadSettings() {
       return { ...DEFAULT_SETTINGS, ...JSON.parse(content) };
     }
   } catch (error) {
-    console.error('加载自动备份设置失败:', error);
+    logger.error('加载自动备份设置失败', { error: error.message, stack: error.stack });
   }
   return { ...DEFAULT_SETTINGS };
 }
@@ -42,7 +43,7 @@ function saveSettings(settings) {
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
     return true;
   } catch (error) {
-    console.error('保存自动备份设置失败:', error);
+    logger.error('保存自动备份设置失败', { error: error.message, stack: error.stack });
     return false;
   }
 }
@@ -82,7 +83,7 @@ function getFileSize(filePath) {
       return stats.size;
     }
   } catch (error) {
-    console.error('获取文件大小失败:', error);
+    logger.error('获取文件大小失败', { error: error.message, stack: error.stack });
   }
   return null;
 }
@@ -95,32 +96,25 @@ function createAutoBackupTask(settings) {
     throw new Error('无效的 Cron 表达式');
   }
 
-  console.log('=== 创建自动备份任务 ===');
-  console.log('Cron表达式:', cronExpression);
-  console.log('备份类型:', backupType);
-  console.log('下次执行:', calculateNextRun(cronExpression));
+  logger.info('创建自动备份任务', { cronExpression, backupType, nextRun: calculateNextRun(cronExpression) });
 
   if (schedulers.has('auto-backup')) {
-    console.log('停止已存在的调度器...');
+    logger.info('停止已存在的调度器...');
     stopAutoBackup();
   }
 
-  console.log('创建新调度器...');
+  logger.info('创建新调度器...');
   const task = cron.schedule(
     cronExpression,
     async function () {
-      console.log('');
-      console.log('============================================');
-      console.log('=== 自动备份任务触发 ===');
-      console.log('触发时间:', new Date().toLocaleString('zh-CN'));
-      console.log('============================================');
+      logger.info('自动备份任务触发', { triggerTime: new Date().toLocaleString('zh-CN') });
 
       let logId = null;
 
       try {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
 
-        console.log('创建备份日志...');
+        logger.info('创建备份日志...');
         const log = await createLogEntry({
           logType: 'auto',
           description: `${description} - ${timestamp}`,
@@ -134,7 +128,7 @@ function createAutoBackupTask(settings) {
           await updateLogStatus(logId, 'running');
         }
 
-        console.log('准备执行备份...');
+        logger.info('准备执行备份...');
         const backupFunction =
           backupType === 'incremental' ? createIncrementalBackup : createBackup;
 
@@ -148,8 +142,7 @@ function createAutoBackupTask(settings) {
         });
 
         if (result) {
-          console.log('自动备份完成:', result.filename);
-          console.log('备份类型:', result.isIncremental ? '增量备份' : '全量备份');
+          logger.info('自动备份完成', { filename: result.filename, type: result.isIncremental ? '增量备份' : '全量备份' });
 
           const fileSize = getFileSize(result.path);
 
@@ -163,28 +156,22 @@ function createAutoBackupTask(settings) {
               remoteUploads: uploadResults,
             });
           }
-
-          console.log('============================================\n');
         } else {
-          console.log('无数据变化，跳过备份');
+          logger.info('无数据变化，跳过备份');
           if (logId) {
             await updateLogStatus(logId, 'success', {
               errorMessage: '无数据变化，跳过备份',
             });
           }
-          console.log('============================================\n');
         }
       } catch (error) {
-        console.error('自动备份失败:', error);
-        console.error('错误堆栈:', error.stack);
+        logger.error('自动备份失败', { error: error.message, stack: error.stack });
 
         if (logId) {
           await updateLogStatus(logId, 'failed', {
             errorMessage: error.message || '未知错误',
           });
         }
-
-        console.error('============================================\n');
       }
     },
     {
@@ -193,7 +180,7 @@ function createAutoBackupTask(settings) {
   );
 
   schedulers.set('auto-backup', task);
-  console.log('自动备份任务已成功创建并启动');
+  logger.info('自动备份任务已成功创建并启动');
 
   return task;
 }
@@ -204,7 +191,7 @@ function startAutoBackup(settings = null) {
   }
 
   if (!settings.enabled) {
-    console.log('自动备份已禁用');
+    logger.info('自动备份已禁用');
     return false;
   }
 
@@ -212,7 +199,7 @@ function startAutoBackup(settings = null) {
     createAutoBackupTask(settings);
     return true;
   } catch (error) {
-    console.error('启动自动备份失败:', error.message);
+    logger.error('启动自动备份失败', { error: error.message, stack: error.stack });
     return false;
   }
 }
@@ -222,7 +209,7 @@ function stopAutoBackup() {
     const task = schedulers.get('auto-backup');
     task.stop();
     schedulers.delete('auto-backup');
-    console.log('自动备份任务已停止');
+    logger.info('自动备份任务已停止');
     return true;
   }
   return false;
@@ -291,14 +278,14 @@ async function uploadToRemoteTargets(localFilePath, filename) {
   const globalSettings = getGlobalSettings();
 
   if (!globalSettings.enabled || !globalSettings.uploadAfterBackup) {
-    console.log('远端备份已禁用');
+    logger.info('远端备份已禁用');
     return [];
   }
 
   const enabledTargets = getEnabledTargets();
 
   if (enabledTargets.length === 0) {
-    console.log('没有启用的远端备份目标');
+    logger.info('没有启用的远端备份目标');
     return [];
   }
 
@@ -306,7 +293,7 @@ async function uploadToRemoteTargets(localFilePath, filename) {
 
   for (const target of enabledTargets) {
     try {
-      console.log('开始上传到目标：' + target.name + ' (' + target.protocol + ')');
+      logger.info(`开始上传到目标：${target.name} (${target.protocol})`);
 
       const remotePath = (target.prefix || 'backups/') + filename;
 
@@ -320,9 +307,9 @@ async function uploadToRemoteTargets(localFilePath, filename) {
         ...result,
       });
 
-      console.log('上传到 ' + target.name + ' 成功');
+      logger.info(`上传到 ${target.name} 成功`);
     } catch (error) {
-      console.error('上传到 ' + target.name + ' 失败:', error.message);
+      logger.error(`上传到 ${target.name} 失败`, { error: error.message, stack: error.stack });
       uploadResults.push({
         targetId: target.id,
         targetName: target.name,
@@ -337,9 +324,9 @@ async function uploadToRemoteTargets(localFilePath, filename) {
   if (settings.deleteLocalAfterUpload && uploadResults.every(r => r.success)) {
     try {
       fs.unlinkSync(localFilePath);
-      console.log('本地备份文件已删除');
+      logger.info('本地备份文件已删除');
     } catch (error) {
-      console.error('删除本地备份文件失败:', error.message);
+      logger.error('删除本地备份文件失败', { error: error.message, stack: error.stack });
     }
   }
 
@@ -347,10 +334,7 @@ async function uploadToRemoteTargets(localFilePath, filename) {
 }
 
 async function executeBackupNow(options = {}) {
-  console.log('');
-  console.log('============================================');
-  console.log('=== 手动触发备份 ===');
-  console.log('============================================');
+  logger.info('手动触发备份');
 
   let logId = null;
 
@@ -358,7 +342,7 @@ async function executeBackupNow(options = {}) {
     const settings = loadSettings();
     const backupType = options.backupType || settings.backupType || 'full';
 
-    console.log('创建备份日志...');
+    logger.info('创建备份日志...');
     const log = await createLogEntry({
       logType: 'manual',
       description: options.description || '手动备份',
@@ -384,7 +368,7 @@ async function executeBackupNow(options = {}) {
       maxAgeDays: settings.maxAgeDays,
     });
 
-    console.log('手动备份完成:', result.filename);
+    logger.info('手动备份完成', { filename: result.filename });
 
     const fileSize = getFileSize(result.path);
 
@@ -399,15 +383,13 @@ async function executeBackupNow(options = {}) {
       });
     }
 
-    console.log('============================================\n');
     return {
       success: true,
       result,
       remoteUploads: uploadResults,
     };
   } catch (error) {
-    console.error('手动备份失败:', error);
-    console.error('============================================\n');
+    logger.error('手动备份失败', { error: error.message, stack: error.stack });
 
     if (logId) {
       await updateLogStatus(logId, 'failed', {
@@ -420,25 +402,22 @@ async function executeBackupNow(options = {}) {
 }
 
 function initAutoBackup() {
-  console.log('');
-  console.log('============================================');
-  console.log('=== 初始化自动备份调度器 ===');
-  console.log('============================================');
+  logger.info('初始化自动备份调度器');
 
   const settings = loadSettings();
 
-  console.log('当前设置:');
-  console.log('  启用:', settings.enabled ? '是' : '否');
-  console.log('  Cron表达式:', settings.cronExpression);
-  console.log('  备份类型:', settings.backupType);
+  logger.info('当前设置', {
+    enabled: settings.enabled,
+    cronExpression: settings.cronExpression,
+    backupType: settings.backupType,
+  });
 
   if (settings.enabled) {
     startAutoBackup(settings);
   } else {
-    console.log('自动备份当前为禁用状态');
+    logger.info('自动备份当前为禁用状态');
   }
 
-  console.log('============================================\n');
   return getAutoBackupStatus();
 }
 

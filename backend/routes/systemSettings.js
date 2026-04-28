@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('SystemSettingsRoute');
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
@@ -234,14 +235,12 @@ const initDefaultSettings = async () => {
         updatedCount++;
       }
     } catch (error) {
-      console.error(`初始化设置 ${setting.settingKey} 失败:`, error.message);
+      logger.error('初始化设置 ${setting.settingKey} 失败', { error: error.message });
       errorCount++;
     }
   }
 
-  console.log(
-    `系统设置初始化结果: 创建 ${createdCount} 个, 更新 ${updatedCount} 个, 失败 ${errorCount} 个`
-  );
+  logger.info(`系统设置初始化结果: 创建 ${createdCount} 个, 更新 ${updatedCount} 个, 失败 ${errorCount} 个`);
   return { createdCount, updatedCount, errorCount };
 };
 
@@ -562,7 +561,7 @@ router.post('/backup', async (req, res) => {
       backupCount: backupFiles.length,
     });
   } catch (error) {
-    console.error('备份失败:', error);
+    logger.error('备份失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '备份失败' });
   }
 });
@@ -665,7 +664,7 @@ router.post('/backup/restore', async (req, res) => {
       restoredAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('恢复备份失败:', error);
+    logger.error('恢复备份失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '恢复备份失败' });
   }
 });
@@ -725,7 +724,7 @@ router.get('/system/info', async (req, res) => {
         }
       }
     } catch (syncError) {
-      console.error('同步版本号到数据库失败:', syncError);
+      logger.error('同步版本号到数据库失败', { error: syncError });
     }
 
     const [deviceCount, rackCount, roomCount, userCount] = await Promise.all([
@@ -752,7 +751,7 @@ router.get('/system/info', async (req, res) => {
       // 这里使用模拟值，避免依赖额外的库
       diskPercent = Math.min(95, Math.max(20, usedMemPercent - 10));
     } catch (diskError) {
-      console.error('获取磁盘信息失败:', diskError);
+      logger.error('获取磁盘信息失败', { error: diskError });
     }
 
     res.json({

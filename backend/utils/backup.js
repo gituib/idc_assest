@@ -9,8 +9,224 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const { pipeline } = require('stream/promises');
 const { sequelize, dbDialect } = require('../db');
+const logger = require('./logger').module('Backup');
+const { enableMaintenanceMode, disableMaintenanceMode } = require('./maintenanceMode');
 
 const BACKUP_VERSION = '2.0.0';
+
+const BATCH_SIZE = 500;
+
+/**
+ * 还原点管理
+ * 恢复前自动创建当前数据的临时备份，用于中断或失败时回滚
+ */
+const SNAPSHOT_DIR = path.join(__dirname, '..', 'backups', '.snapshots');
+
+/**
+ * 确保还原点目录存在
+ */
+function ensureSnapshotDir() {
+  if (!fs.existsSync(SNAPSHOT_DIR)) {
+    fs.mkdirSync(SNAPSHOT_DIR, { recursive: true });
+  }
+  return SNAPSHOT_DIR;
+}
+
+/**
+ * 生成还原点文件名
+ */
+function getSnapshotFileName(snapshotId) {
+  return path.join(SNAPSHOT_DIR, `snapshot_${snapshotId}.json.gz`);
+}
+
+/**
+ * 创建还原点（恢复前自动调用）
+ * 备份当前数据库所有表的数据
+ * @returns {Promise<string|null>} 还原点ID，失败返回null
+ */
+async function createSnapshot() {
+  try {
+    ensureSnapshotDir();
+    const snapshotId = `pre_restore_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const snapshotPath = getSnapshotFileName(snapshotId);
+
+    logger.info('创建还原点...', { snapshotId });
+
+    // 收集当前所有表的数据
+    const snapshotData = {
+      version: BACKUP_VERSION,
+      timestamp: new Date().toISOString(),
+      type: 'snapshot',
+      data: {},
+      files: null,
+    };
+
+    for (const config of BACKUP_MODELS_CONFIG) {
+      try {
+        const Model = require(config.modelPath);
+        const records = await Model.findAll({ raw: true });
+        if (records.length > 0) {
+          snapshotData.data[config.name] = records;
+        }
+      } catch (error) {
+        logger.warn(`创建还原点时跳过表 ${config.name}`, { error: error.message });
+      }
+    }
+
+    // 压缩并保存
+    const jsonStr = JSON.stringify(snapshotData);
+    const compressed = zlib.gzipSync(Buffer.from(jsonStr, 'utf8'));
+    fs.writeFileSync(snapshotPath, compressed);
+
+    logger.info('还原点创建成功', { snapshotId, path: snapshotPath, tables: Object.keys(snapshotData.data).length });
+    return snapshotId;
+  } catch (error) {
+    logger.error('创建还原点失败', { error: error.message, stack: error.stack });
+    return null;
+  }
+}
+
+/**
+ * 从还原点恢复数据
+ * 当恢复过程被中断或失败时调用，回滚到恢复前的状态
+ * @param {string} snapshotId - 还原点ID
+ * @returns {Promise<boolean>} 是否成功回滚
+ */
+async function restoreFromSnapshot(snapshotId) {
+  const snapshotPath = getSnapshotFileName(snapshotId);
+
+  if (!fs.existsSync(snapshotPath)) {
+    logger.error('还原点不存在，无法回滚', { snapshotId });
+    return false;
+  }
+
+  try {
+    logger.info('开始从还原点回滚数据...', { snapshotId });
+
+    // 读取还原点数据
+    const compressed = fs.readFileSync(snapshotPath);
+    const decompressed = zlib.gunzipSync(compressed);
+    const snapshotData = JSON.parse(decompressed.toString('utf8'));
+
+    if (!snapshotData.data) {
+      logger.error('还原点数据无效');
+      return false;
+    }
+
+    await disableForeignKeyChecks();
+
+    try {
+      // 清空所有表（按恢复顺序的逆序，避免外键冲突）
+      const clearOrder = [...RESTORE_ORDER].reverse();
+      for (const tableName of clearOrder) {
+        const config = BACKUP_MODELS_CONFIG.find(c => c.name === tableName);
+        if (!config) continue;
+
+        try {
+          const Model = require(config.modelPath);
+          await Model.destroy({ where: {}, truncate: true });
+        } catch (error) {
+          logger.warn(`回滚时清空表 ${tableName} 失败`, { error: error.message });
+        }
+      }
+
+      // 从还原点恢复数据
+      let restoredCount = 0;
+      for (const tableName of RESTORE_ORDER) {
+        const tableData = snapshotData.data[tableName];
+        if (!tableData || tableData.length === 0) continue;
+
+        const config = BACKUP_MODELS_CONFIG.find(c => c.name === tableName);
+        if (!config) continue;
+
+        try {
+          const Model = require(config.modelPath);
+
+          for (let i = 0; i < tableData.length; i += BATCH_SIZE) {
+            const batch = tableData.slice(i, i + BATCH_SIZE);
+            try {
+              await Model.bulkCreate(batch, {
+                validate: false,
+                individualHooks: false,
+                logging: false,
+              });
+              restoredCount += batch.length;
+            } catch (bulkError) {
+              for (const record of batch) {
+                try {
+                  await Model.create(record, { validate: false, silent: true });
+                  restoredCount++;
+                } catch (insertError) {
+                  logger.warn(`回滚时插入 ${tableName} 记录失败`, { error: insertError.message });
+                }
+              }
+            }
+          }
+        } catch (error) {
+          logger.error(`回滚表 ${tableName} 失败`, { error: error.message });
+        }
+      }
+
+      logger.info('还原点回滚完成', { restoredCount });
+      return true;
+    } finally {
+      await enableForeignKeyChecks();
+    }
+  } catch (error) {
+    logger.error('从还原点回滚失败', { error: error.message, stack: error.stack });
+    return false;
+  }
+}
+
+/**
+ * 删除还原点
+ * @param {string} snapshotId - 还原点ID
+ */
+function deleteSnapshot(snapshotId) {
+  const snapshotPath = getSnapshotFileName(snapshotId);
+  if (fs.existsSync(snapshotPath)) {
+    try {
+      fs.unlinkSync(snapshotPath);
+      logger.info('还原点已删除', { snapshotId });
+    } catch (error) {
+      logger.warn('删除还原点失败', { snapshotId, error: error.message });
+    }
+  }
+}
+
+/**
+ * 清理过期的还原点（保留最近7天）
+ */
+function cleanupOldSnapshots() {
+  try {
+    if (!fs.existsSync(SNAPSHOT_DIR)) return;
+
+    const now = Date.now();
+    const maxAgeMs = 7 * 24 * 60 * 60 * 1000; // 7天
+
+    const files = fs.readdirSync(SNAPSHOT_DIR);
+    let deletedCount = 0;
+
+    for (const file of files) {
+      if (!file.startsWith('snapshot_pre_restore_')) continue;
+
+      const filePath = path.join(SNAPSHOT_DIR, file);
+      const stat = fs.statSync(filePath);
+      const age = now - stat.mtimeMs;
+
+      if (age > maxAgeMs) {
+        fs.unlinkSync(filePath);
+        deletedCount++;
+      }
+    }
+
+    if (deletedCount > 0) {
+      logger.info('清理过期还原点', { deletedCount });
+    }
+  } catch (error) {
+    logger.warn('清理过期还原点失败', { error: error.message });
+  }
+}
 
 async function disableForeignKeyChecks() {
   if (dbDialect === 'sqlite') {
@@ -692,8 +908,17 @@ async function validateBackupFile(filePath, options = {}) {
   };
 }
 
+// 用户相关表定义
+const USER_RELATED_TABLES = ['User', 'UserRole'];
+
 async function restoreData(backupData, options = {}) {
-  const { overwriteExisting = true, skipTables = [], onProgress = () => {} } = options;
+  const { 
+    overwriteExisting = true, 
+    skipTables = [], 
+    skipUserData = false,
+    shouldStop = () => false,
+    onProgress = () => {} 
+  } = options;
 
   const results = {
     tablesRestored: 0,
@@ -701,6 +926,7 @@ async function restoreData(backupData, options = {}) {
     errors: [],
     skipped: [],
     tableDetails: {},
+    stopped: false,
   };
 
   const isIncremental = backupData.backupType === 'incremental';
@@ -711,11 +937,29 @@ async function restoreData(backupData, options = {}) {
     return results;
   }
 
+  // 如果选择跳过用户数据，将用户相关表添加到跳过列表
+  const effectiveSkipTables = [...skipTables];
+  if (skipUserData) {
+    USER_RELATED_TABLES.forEach(table => {
+      if (!effectiveSkipTables.includes(table)) {
+        effectiveSkipTables.push(table);
+      }
+    });
+    console.log('已配置跳过用户相关表:', USER_RELATED_TABLES);
+  }
+
   await disableForeignKeyChecks();
 
   try {
     for (const tableName of RESTORE_ORDER) {
-      if (skipTables.includes(tableName)) {
+      // 检查是否请求停止
+      if (shouldStop()) {
+        results.stopped = true;
+        console.log('恢复操作被用户中断');
+        break;
+      }
+
+      if (effectiveSkipTables.includes(tableName)) {
         results.skipped.push(tableName);
         onProgress(tableName, 'skipped');
         continue;
@@ -736,7 +980,8 @@ async function restoreData(backupData, options = {}) {
       try {
         const Model = require(config.modelPath);
 
-        if (overwriteExisting) {
+        // 对于用户相关表，即使设置了 overwriteExisting 也不截断
+        if (overwriteExisting && !USER_RELATED_TABLES.includes(tableName)) {
           await Model.destroy({ where: {}, truncate: true });
         }
 
@@ -764,30 +1009,55 @@ async function restoreData(backupData, options = {}) {
         });
 
         let insertedCount = 0;
-        for (const record of processedRecords) {
+
+        for (let i = 0; i < processedRecords.length; i += BATCH_SIZE) {
+          if (shouldStop()) {
+            results.stopped = true;
+            logger.info('恢复操作在插入数据时被用户中断');
+            break;
+          }
+
+          const batch = processedRecords.slice(i, i + BATCH_SIZE);
+
           try {
-            await Model.create(record, { validate: false, silent: true });
-            insertedCount++;
-          } catch (insertError) {
-            if (insertError.name === 'SequelizeUniqueConstraintError') {
+            await Model.bulkCreate(batch, {
+              validate: false,
+              individualHooks: false,
+              logging: false,
+            });
+            insertedCount += batch.length;
+          } catch (bulkError) {
+            for (const record of batch) {
               try {
-                await Model.upsert(record, { validate: false, silent: true });
+                await Model.create(record, { validate: false, silent: true });
                 insertedCount++;
-              } catch (upsertError) {
-                results.errors.push({
-                  table: tableName,
-                  record: record[Object.keys(record)[0]],
-                  error: upsertError.message,
-                });
+              } catch (insertError) {
+                if (insertError.name === 'SequelizeUniqueConstraintError') {
+                  try {
+                    await Model.upsert(record, { validate: false, silent: true });
+                    insertedCount++;
+                  } catch (upsertError) {
+                    results.errors.push({
+                      table: tableName,
+                      record: record[Object.keys(record)[0]],
+                      error: upsertError.message,
+                    });
+                  }
+                } else {
+                  results.errors.push({
+                    table: tableName,
+                    record: record[Object.keys(record)[0]],
+                    error: insertError.message,
+                  });
+                }
               }
-            } else {
-              results.errors.push({
-                table: tableName,
-                record: record[Object.keys(record)[0]],
-                error: insertError.message,
-              });
             }
           }
+        }
+
+        // 如果已停止，跳出外层循环
+        if (results.stopped) {
+          break;
         }
 
         results.tablesRestored++;
@@ -843,36 +1113,51 @@ async function restoreIncrementalData(incrementalData, options = {}) {
       let updatedCount = 0;
 
       if (tableIncrement.new && tableIncrement.new.length > 0) {
-        for (const record of tableIncrement.new) {
+        for (let i = 0; i < tableIncrement.new.length; i += BATCH_SIZE) {
+          const batch = tableIncrement.new.slice(i, i + BATCH_SIZE);
           try {
-            await Model.create(record, { validate: false, silent: true });
-            updatedCount++;
-          } catch (insertError) {
-            if (insertError.name === 'SequelizeUniqueConstraintError') {
-              await Model.upsert(record, { validate: false, silent: true });
-              updatedCount++;
-            } else {
-              results.errors.push({
-                table: tableName,
-                record: record[Object.keys(record)[0]],
-                error: `新增失败: ${insertError.message}`,
-              });
+            await Model.bulkCreate(batch, {
+              validate: false,
+              individualHooks: false,
+              logging: false,
+            });
+            updatedCount += batch.length;
+          } catch (bulkError) {
+            for (const record of batch) {
+              try {
+                await Model.create(record, { validate: false, silent: true });
+                updatedCount++;
+              } catch (insertError) {
+                if (insertError.name === 'SequelizeUniqueConstraintError') {
+                  await Model.upsert(record, { validate: false, silent: true });
+                  updatedCount++;
+                } else {
+                  results.errors.push({
+                    table: tableName,
+                    record: record[Object.keys(record)[0]],
+                    error: `新增失败: ${insertError.message}`,
+                  });
+                }
+              }
             }
           }
         }
       }
 
       if (tableIncrement.updated && tableIncrement.updated.length > 0) {
-        for (const record of tableIncrement.updated) {
-          try {
-            await Model.upsert(record, { validate: false, silent: true });
-            updatedCount++;
-          } catch (updateError) {
-            results.errors.push({
-              table: tableName,
-              record: record[Object.keys(record)[0]],
-              error: `更新失败: ${updateError.message}`,
-            });
+        for (let i = 0; i < tableIncrement.updated.length; i += BATCH_SIZE) {
+          const batch = tableIncrement.updated.slice(i, i + BATCH_SIZE);
+          for (const record of batch) {
+            try {
+              await Model.upsert(record, { validate: false, silent: true });
+              updatedCount++;
+            } catch (updateError) {
+              results.errors.push({
+                table: tableName,
+                record: record[Object.keys(record)[0]],
+                error: `更新失败: ${updateError.message}`,
+              });
+            }
           }
         }
       }
@@ -944,77 +1229,189 @@ async function restoreBackup(filePath, options = {}) {
     overwriteExisting = true,
     skipTables = [],
     skipFiles = false,
+    skipUserData = false,
+    shouldStop = () => false,
     onProgress = () => {},
+    enableRollback = true,
   } = options;
 
-  console.log('验证备份文件...');
-  const validation = await validateBackupFile(filePath);
-  if (!validation.valid) {
-    throw new Error(`备份文件验证失败: ${validation.error}`);
-  }
+  let snapshotId = null;
 
-  console.log('备份文件信息:');
-  console.log(`  版本: ${validation.version}`);
-  console.log(`  压缩: ${validation.compressed ? '是' : '否'}`);
-  console.log(`  表数: ${validation.metadata.tableCount}`);
-  console.log(`  记录数: ${validation.metadata.totalRecords}`);
-  console.log(`  文件数: ${validation.metadata.fileCount}`);
+  try {
+    logger.info('验证备份文件...');
+    const validation = await validateBackupFile(filePath);
+    if (!validation.valid) {
+      throw new Error(`备份文件验证失败: ${validation.error}`);
+    }
 
-  console.log('\n读取备份数据...');
-  const buffer = fs.readFileSync(filePath);
-  const isCompressed = filePath.endsWith('.gz');
-
-  let backupData;
-  if (isCompressed) {
-    console.log('解压备份文件...');
-    const decompressed = zlib.gunzipSync(buffer);
-    backupData = JSON.parse(decompressed.toString('utf8'));
-  } else {
-    backupData = JSON.parse(buffer.toString('utf8'));
-  }
-
-  console.log('\n开始恢复数据...');
-  const dataResults = await restoreData(backupData, {
-    overwriteExisting,
-    skipTables,
-    onProgress,
-  });
-
-  let fileResults = { filesRestored: 0, errors: [] };
-  if (!skipFiles && backupData.files) {
-    console.log('\n恢复上传文件...');
-    const uploadsDir = path.join(__dirname, '..', 'uploads');
-    fileResults = await restoreFiles(backupData.files, uploadsDir);
-  }
-
-  const stat = fs.statSync(filePath);
-  console.log('\n恢复完成!');
-  console.log(`备份文件: ${(stat.size / 1024 / 1024).toFixed(2)} MB`);
-  console.log(`数据记录: ${dataResults.recordsRestored} 条`);
-  console.log(`恢复表数: ${dataResults.tablesRestored} 个`);
-  console.log(`文件恢复: ${fileResults.filesRestored} 个`);
-
-  if (dataResults.errors.length > 0) {
-    console.log('\n恢复错误:');
-    dataResults.errors.forEach(err => {
-      console.log(`  - ${err.table}: ${err.error}`);
+    logger.info('备份文件信息', {
+      version: validation.version,
+      compressed: validation.compressed,
+      tableCount: validation.metadata.tableCount,
+      totalRecords: validation.metadata.totalRecords,
+      fileCount: validation.metadata.fileCount,
     });
-  }
 
-  return {
-    restoredAt: new Date().toISOString(),
-    tablesRestored: dataResults.tablesRestored,
-    recordsRestored: dataResults.recordsRestored,
-    filesRestored: fileResults.filesRestored,
-    errors: dataResults.errors,
-    tableDetails: dataResults.tableDetails, // 每个表的详细恢复信息
-    fileDetails: backupData.files
-      ? {
-          avatars: backupData.files.avatars?.length || 0,
-          others: backupData.files.others?.length || 0,
+    // 步骤1: 启用维护模式，防止并发操作导致数据不一致
+    logger.info('启用维护模式...');
+    enableMaintenanceMode('正在恢复备份数据');
+    onProgress('maintenance', 'enabled', 0);
+
+    try {
+      // 步骤2: 创建还原点（如果启用回滚保护）
+      if (enableRollback) {
+        logger.info('创建还原点...');
+        onProgress('snapshot', 'creating', 0);
+        snapshotId = await createSnapshot();
+
+        if (snapshotId) {
+          logger.info('还原点创建成功，开始恢复数据...');
+          onProgress('snapshot', 'created', 5);
+        } else {
+          logger.warn('还原点创建失败，继续恢复但无法回滚');
+          onProgress('snapshot', 'warning', 5);
         }
-      : null,
-  };
+      }
+
+      // 步骤3: 读取备份数据
+      logger.info('读取备份数据...');
+      const buffer = fs.readFileSync(filePath);
+      const isCompressed = filePath.endsWith('.gz');
+
+      let backupData;
+      if (isCompressed) {
+        logger.info('解压备份文件...');
+        const decompressed = zlib.gunzipSync(buffer);
+        backupData = JSON.parse(decompressed.toString('utf8'));
+      } else {
+        backupData = JSON.parse(buffer.toString('utf8'));
+      }
+
+      // 步骤4: 恢复数据
+      logger.info('开始恢复数据...');
+      const dataResults = await restoreData(backupData, {
+        overwriteExisting,
+        skipTables,
+        skipUserData,
+        shouldStop,
+        onProgress,
+      });
+
+      // 步骤5: 恢复上传文件（仅在数据恢复未停止时）
+      let fileResults = { filesRestored: 0, errors: [] };
+      if (!skipFiles && backupData.files && !dataResults.stopped) {
+        logger.info('恢复上传文件...');
+        const uploadsDir = path.join(__dirname, '..', 'uploads');
+        fileResults = await restoreFiles(backupData.files, uploadsDir);
+      }
+
+      // 步骤6: 处理恢复结果
+      const stat = fs.statSync(filePath);
+
+      if (dataResults.stopped) {
+        // 用户中断恢复 - 自动回滚到还原点
+        logger.info('恢复被用户中断，准备回滚数据...');
+
+        if (snapshotId && enableRollback) {
+          onProgress('rollback', 'starting', 0);
+          const rollbackSuccess = await restoreFromSnapshot(snapshotId);
+
+          if (rollbackSuccess) {
+            logger.info('数据已成功回滚到恢复前的状态');
+            onProgress('rollback', 'completed', 100);
+          } else {
+            logger.error('数据回滚失败！数据可能处于不一致状态');
+            onProgress('rollback', 'failed', 0);
+          }
+        } else {
+          logger.warn('无法回滚：没有可用的还原点');
+        }
+
+        // 清理还原点
+        if (snapshotId) {
+          deleteSnapshot(snapshotId);
+        }
+
+        return {
+          restoredAt: new Date().toISOString(),
+          tablesRestored: dataResults.tablesRestored,
+          recordsRestored: dataResults.recordsRestored,
+          filesRestored: fileResults.filesRestored,
+          errors: dataResults.errors,
+          skipped: dataResults.skipped || [],
+          stopped: true,
+          rolledBack: snapshotId ? true : false,
+          tableDetails: dataResults.tableDetails,
+          fileDetails: backupData.files
+            ? {
+                avatars: backupData.files.avatars?.length || 0,
+                others: backupData.files.others?.length || 0,
+              }
+            : null,
+        };
+      }
+
+      // 恢复成功
+      logger.info('恢复完成!', {
+        fileSize: `${(stat.size / 1024 / 1024).toFixed(2)} MB`,
+        recordsRestored: dataResults.recordsRestored,
+        tablesRestored: dataResults.tablesRestored,
+        filesRestored: fileResults.filesRestored,
+      });
+
+      // 清理还原点（恢复成功，不再需要）
+      if (snapshotId) {
+        deleteSnapshot(snapshotId);
+      }
+
+      // 清理过期还原点
+      cleanupOldSnapshots();
+
+      if (dataResults.errors.length > 0) {
+        logger.warn('恢复过程中有错误', { errors: dataResults.errors });
+      }
+
+      return {
+        restoredAt: new Date().toISOString(),
+        tablesRestored: dataResults.tablesRestored,
+        recordsRestored: dataResults.recordsRestored,
+        filesRestored: fileResults.filesRestored,
+        errors: dataResults.errors,
+        skipped: dataResults.skipped || [],
+        stopped: false,
+        rolledBack: false,
+        tableDetails: dataResults.tableDetails,
+        fileDetails: backupData.files
+          ? {
+              avatars: backupData.files.avatars?.length || 0,
+              others: backupData.files.others?.length || 0,
+            }
+          : null,
+      };
+    } finally {
+      // 无论成功或中断，都解除维护模式
+      disableMaintenanceMode();
+      onProgress('maintenance', 'disabled', 100);
+    }
+  } catch (error) {
+    // 恢复过程发生异常 - 尝试回滚
+    logger.error('恢复过程发生错误', { error: error.message, stack: error.stack });
+
+    if (snapshotId && enableRollback) {
+      logger.info('尝试回滚数据到恢复前的状态...');
+      const rollbackSuccess = await restoreFromSnapshot(snapshotId);
+
+      if (rollbackSuccess) {
+        logger.info('数据已成功回滚');
+      } else {
+        logger.error('数据回滚失败！数据可能处于不一致状态');
+      }
+
+      deleteSnapshot(snapshotId);
+    }
+
+    throw error;
+  }
 }
 
 function cleanOldBackups(options = {}) {
@@ -1115,4 +1512,8 @@ module.exports = {
   restoreBackup,
   calculateChecksum,
   cleanOldBackups,
+  createSnapshot,
+  restoreFromSnapshot,
+  deleteSnapshot,
+  cleanupOldSnapshots,
 };

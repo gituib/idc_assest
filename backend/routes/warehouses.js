@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('WarehousesRoute');
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
@@ -72,7 +73,7 @@ router.get('/', async (req, res) => {
       pageSize: parseInt(pageSize),
     });
   } catch (error) {
-    console.error('获取库房列表失败:', error);
+    logger.error('获取库房列表失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -121,7 +122,7 @@ router.get('/:warehouseId/devices', async (req, res) => {
       pageSize: parseInt(pageSize),
     });
   } catch (error) {
-    console.error('获取库房设备失败:', error);
+    logger.error('获取库房设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -231,7 +232,7 @@ router.delete('/:warehouseId', async (req, res) => {
 
     res.json({ message: '库房删除成功' });
   } catch (error) {
-    console.error('删除库房失败:', error);
+    logger.error('删除库房失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });

@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('DevicePortsRoute');
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
@@ -59,8 +60,8 @@ router.get('/', async (req, res) => {
       pageSize: parseInt(pageSize),
     });
   } catch (error) {
-    console.error('获取端口列表失败:', error);
-    console.error('Error name:', error.name);
+    logger.error('获取端口列表失败', { error: error.message, stack: error.stack });
+    logger.error('Error name', { error: error.name });
     res.status(500).json({ error: error.message, errorType: error.name });
   }
 });
@@ -88,7 +89,7 @@ router.get('/device/:deviceId', async (req, res) => {
 
     res.json(ports);
   } catch (error) {
-    console.error('获取设备端口失败:', error);
+    logger.error('获取设备端口失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -136,7 +137,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(createdPort);
   } catch (error) {
-    console.error('创建端口失败:', error);
+    logger.error('创建端口失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -297,7 +298,7 @@ router.post('/batch', async (req, res) => {
       throw error;
     }
   } catch (error) {
-    console.error('批量创建端口失败:', error);
+    logger.error('批量创建端口失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -336,7 +337,7 @@ router.put('/:portId', async (req, res) => {
       res.status(404).json({ error: '端口不存在' });
     }
   } catch (error) {
-    console.error('更新端口失败:', error);
+    logger.error('更新端口失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -359,7 +360,7 @@ router.delete('/batch', async (req, res) => {
       deletedCount,
     });
   } catch (error) {
-    console.error('批量删除端口失败:', error);
+    logger.error('批量删除端口失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -400,7 +401,7 @@ router.delete('/:portId', async (req, res) => {
 
     res.status(204).json();
   } catch (error) {
-    console.error('删除端口失败:', error);
+    logger.error('删除端口失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -422,7 +423,7 @@ router.post('/batch-delete', async (req, res) => {
       deletedCount,
     });
   } catch (error) {
-    console.error('批量删除端口失败:', error);
+    logger.error('批量删除端口失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -482,7 +483,7 @@ router.get('/export/all', async (req, res) => {
       pageSize: parsedPageSize,
     });
   } catch (error) {
-    console.error('获取端口列表失败:', error);
+    logger.error('获取端口列表失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -506,7 +507,7 @@ router.get('/:portId', async (req, res) => {
 
     res.json(port);
   } catch (error) {
-    console.error('获取端口详情失败:', error);
+    logger.error('获取端口详情失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });

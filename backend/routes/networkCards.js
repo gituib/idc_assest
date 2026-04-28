@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('NetworkCardsRoute');
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
@@ -35,7 +36,7 @@ router.get('/', async (req, res) => {
 
     res.json(networkCards);
   } catch (error) {
-    console.error('获取网卡列表失败:', error);
+    logger.error('获取网卡列表失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -61,7 +62,7 @@ router.get('/device/:deviceId', async (req, res) => {
 
     res.json(networkCards);
   } catch (error) {
-    console.error('获取设备网卡失败:', error);
+    logger.error('获取设备网卡失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -126,7 +127,7 @@ router.get('/device/:deviceId/with-ports', async (req, res) => {
 
     res.json(cardsWithPorts);
   } catch (error) {
-    console.error('获取网卡及端口失败:', error);
+    logger.error('获取网卡及端口失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -158,7 +159,7 @@ router.get('/find', async (req, res) => {
 
     res.json(networkCard);
   } catch (error) {
-    console.error('查找网卡失败:', error);
+    logger.error('查找网卡失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -182,7 +183,7 @@ router.get('/:nicId', async (req, res) => {
 
     res.json(networkCard);
   } catch (error) {
-    console.error('获取网卡详情失败:', error);
+    logger.error('获取网卡详情失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -198,7 +199,7 @@ router.get('/:nicId/ports', async (req, res) => {
 
     res.json(ports);
   } catch (error) {
-    console.error('获取网卡端口失败:', error);
+    logger.error('获取网卡端口失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -246,7 +247,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(createdCard);
   } catch (error) {
-    console.error('创建网卡失败:', error);
+    logger.error('创建网卡失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -379,7 +380,7 @@ router.post('/batch', async (req, res) => {
       throw error;
     }
   } catch (error) {
-    console.error('批量创建网卡失败:', error);
+    logger.error('批量创建网卡失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -405,7 +406,7 @@ router.put('/:nicId', async (req, res) => {
       res.status(404).json({ error: '网卡不存在' });
     }
   } catch (error) {
-    console.error('更新网卡失败:', error);
+    logger.error('更新网卡失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -431,7 +432,7 @@ router.delete('/:nicId', async (req, res) => {
       res.status(404).json({ error: '网卡不存在' });
     }
   } catch (error) {
-    console.error('删除网卡失败:', error);
+    logger.error('删除网卡失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });

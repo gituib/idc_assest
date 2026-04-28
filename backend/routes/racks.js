@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('RacksRoute');
 const express = require('express');
 const router = express.Router();
 const Rack = require('../models/Rack');
@@ -181,7 +182,7 @@ router.get('/import-template', async (req, res) => {
     // 发送文件
     res.send(excelBuffer);
   } catch (error) {
-    console.error('生成导入模板失败:', error);
+    logger.error('生成导入模板失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: '生成导入模板失败' });
   }
 });
@@ -275,13 +276,13 @@ router.get('/export', async (req, res) => {
     });
 
     fileStream.on('error', err => {
-      console.error('文件流错误:', err);
+      logger.error('文件流错误', { err: err.message, stack: err.stack });
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
     });
   } catch (error) {
-    console.error('导出租机柜数据失败:', error);
+    logger.error('导出租机柜数据失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '导出失败',

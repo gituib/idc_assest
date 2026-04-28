@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('TopologyRoute');
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
@@ -193,7 +194,7 @@ router.get('/switch/:switchId', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('获取拓扑数据失败:', error);
+    logger.error('获取拓扑数据失败', { error: error.message, stack: error.stack });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -315,7 +316,7 @@ router.get('/rack/:rackId', async (req, res) => {
 
     res.json({ success: true, data: { nodes, edges, statistics } });
   } catch (error) {
-    console.error('获取机柜拓扑数据失败:', error);
+    logger.error('获取机柜拓扑数据失败', { error: error.message, stack: error.stack });
     res.status(500).json({ success: false, error: error.message });
   }
 });

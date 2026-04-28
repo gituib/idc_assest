@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('InventoryRoute');
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
@@ -266,7 +267,7 @@ router.post('/plans/:planId/start', async (req, res) => {
       deviceCount: allDevices.length,
     });
   } catch (error) {
-    console.error('启动盘点错误:', error);
+    logger.error('启动盘点错误', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -330,7 +331,7 @@ router.get('/tasks/:taskId', async (req, res) => {
 
     res.json({ task, records: enrichedRecords });
   } catch (error) {
-    console.error('获取盘点任务记录错误:', error);
+    logger.error('获取盘点任务记录错误', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -649,7 +650,7 @@ router.post('/quick-add-device', async (req, res) => {
       pendingDevice,
     });
   } catch (error) {
-    console.error('快速添加设备错误:', error);
+    logger.error('快速添加设备错误', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -704,7 +705,7 @@ router.get('/pending-devices', async (req, res) => {
       pageSize: parseInt(pageSize),
     });
   } catch (error) {
-    console.error('获取暂存设备列表错误:', error);
+    logger.error('获取暂存设备列表错误', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -889,7 +890,7 @@ router.post('/pending-devices/:pendingId/sync', async (req, res) => {
       pendingDevice,
     });
   } catch (error) {
-    console.error('同步设备错误:', error);
+    logger.error('同步设备错误', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -983,7 +984,7 @@ router.post('/pending-devices/batch-sync', async (req, res) => {
       errors,
     });
   } catch (error) {
-    console.error('批量同步设备错误:', error);
+    logger.error('批量同步设备错误', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });

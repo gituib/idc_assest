@@ -1,3 +1,5 @@
+const logger = require('./logger').module('ErrorHandler');
+
 class AppError extends Error {
   constructor(code, message, statusCode = 500, details = null) {
     super(message);
@@ -43,9 +45,7 @@ const FRIENDLY_MESSAGES = {
 };
 
 function logError(error, req = null) {
-  const timestamp = new Date().toISOString();
   const logData = {
-    timestamp,
     message: error.message,
     code: error.code,
     statusCode: error.statusCode,
@@ -57,8 +57,7 @@ function logError(error, req = null) {
     method: req?.method,
   };
 
-  console.error('=== ERROR LOG ===');
-  console.error(JSON.stringify(logData, null, 2));
+  logger.error('应用错误', logData);
 }
 
 function buildErrorResponse(error) {

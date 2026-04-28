@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('OperationLogsRoute');
 const express = require('express');
 const { Op } = require('sequelize');
 const { sequelize } = require('../db');
@@ -83,7 +84,7 @@ router.get('/', authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('获取操作日志失败:', error);
+    logger.error('获取操作日志失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取操作日志失败',
@@ -108,7 +109,7 @@ router.get('/modules', authMiddleware, async (req, res) => {
       data: moduleList,
     });
   } catch (error) {
-    console.error('获取模块列表失败:', error);
+    logger.error('获取模块列表失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取模块列表失败',
@@ -141,7 +142,7 @@ router.get('/types', authMiddleware, async (req, res) => {
       data: typeList,
     });
   } catch (error) {
-    console.error('获取操作类型列表失败:', error);
+    logger.error('获取操作类型列表失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取操作类型列表失败',
@@ -201,7 +202,7 @@ router.get('/statistics', authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('获取操作日志统计失败:', error);
+    logger.error('获取操作日志统计失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取操作日志统计失败',
@@ -225,7 +226,7 @@ router.get('/:recordId', authMiddleware, async (req, res) => {
       data: log,
     });
   } catch (error) {
-    console.error('获取操作日志详情失败:', error);
+    logger.error('获取操作日志详情失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取操作日志详情失败',

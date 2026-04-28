@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('AuthRoute');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
@@ -124,7 +125,7 @@ router.post('/register', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('注册错误:', error);
+    logger.error('注册错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '注册失败',
@@ -222,7 +223,7 @@ router.post('/login', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('登录错误:', error);
+    logger.error('登录错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '登录失败',
@@ -264,7 +265,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('获取profile错误:', error);
+    logger.error('获取profile错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '获取用户信息失败',
@@ -312,7 +313,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('更新profile错误:', error);
+    logger.error('更新profile错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '更新失败',
@@ -356,7 +357,7 @@ router.put('/password', authMiddleware, async (req, res) => {
       message: '密码修改成功',
     });
   } catch (error) {
-    console.error('修改密码错误:', error);
+    logger.error('修改密码错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '密码修改失败',
@@ -376,7 +377,7 @@ router.post('/check-admin', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('检查管理员错误:', error);
+    logger.error('检查管理员错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '检查失败',
@@ -428,7 +429,7 @@ router.post('/unlock', async (req, res) => {
       message: '账户解锁成功',
     });
   } catch (error) {
-    console.error('解锁账户错误:', error);
+    logger.error('解锁账户错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '解锁失败',

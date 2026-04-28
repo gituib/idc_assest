@@ -1,3 +1,4 @@
+const logger = require('../utils/logger').module('TicketsRoute');
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
@@ -611,7 +612,7 @@ router.get('/export', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=tickets_${Date.now()}.csv`);
     return res.send(csvWithBom);
   } catch (error) {
-    console.error('导出工单失败:', error);
+    logger.error('导出工单失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });

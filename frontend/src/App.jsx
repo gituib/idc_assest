@@ -54,6 +54,7 @@ import { SWRConfig, swrConfig } from './hooks/useSWR';
 import axios from 'axios';
 import { Spin } from 'antd';
 import ErrorBoundary from './components/ErrorBoundary';
+import MaintenanceBanner from './components/MaintenanceBanner';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const DeviceManagement = lazy(() => import('./pages/DeviceManagement'));
@@ -644,6 +645,7 @@ const ThemeConfig = () => {
     <AntdConfigProvider theme={{ token: designTokens }}>
       <SWRConfig value={swrConfig}>
         <Router>
+          <MaintenanceBanner />
           <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route

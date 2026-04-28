@@ -57,7 +57,7 @@ const Rack = sequelize.define(
 );
 
 // 关联关系
-Rack.belongsTo(Room, { foreignKey: 'roomId' });
-Room.hasMany(Rack, { foreignKey: 'roomId' });
+Rack.belongsTo(Room, { foreignKey: 'roomId', onDelete: 'CASCADE' });
+Room.hasMany(Rack, { foreignKey: 'roomId', onDelete: 'CASCADE' });
 
 module.exports = Rack;
