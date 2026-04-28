@@ -10,7 +10,11 @@
  * node backend/scripts/fix-foreign-keys.js
  */
 
-const { sequelize } = require('../db');
+require('dotenv').config();
+const { sequelize, dbDialect } = require('../db');
+
+// 打印当前数据库配置以便调试
+console.log(`当前数据库配置: DB_TYPE=${process.env.DB_TYPE || 'sqlite'}, dialect=${dbDialect || sequelize.options.dialect}`);
 
 /**
  * 主迁移函数
