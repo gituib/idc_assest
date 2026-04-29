@@ -1205,7 +1205,7 @@ function RackManagement() {
                       color: designTokens.colors.success.main,
                     }}
                   >
-                    {viewingRack.height - (viewingRack.Devices?.length || 0)}U
+                    {viewingRack.height - (viewingRack.Devices?.reduce((sum, d) => sum + (d.height || 1), 0) || 0)}U
                   </div>
                 </div>
               </Col>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   Form,
@@ -12,6 +12,7 @@ import {
   Button,
   Space,
   Alert,
+  message,
 } from 'antd';
 import {
   PlusOutlined,
@@ -53,6 +54,13 @@ const DeviceFormModal = ({
   const [selectedRackId, setSelectedRackId] = useState(null);
   const [positionConflict, setPositionConflict] = useState(null);
   const [checkingPosition, setCheckingPosition] = useState(false);
+  const [heightExceedWarning, setHeightExceedWarning] = useState(null);
+
+  const selectedRackHeight = useMemo(() => {
+    if (!selectedRackId || !racks || racks.length === 0) return 42;
+    const rack = racks.find(r => r.rackId === selectedRackId);
+    return rack?.height || 42;
+  }, [selectedRackId, racks]);
 
   useEffect(() => {
     if (visible) {
@@ -122,7 +130,21 @@ const DeviceFormModal = ({
     setSelectedRackId(value);
     const position = form.getFieldValue('position');
     const height = form.getFieldValue('height');
-    if (position) {
+
+    // 获取新机柜的高度
+    const newRack = racks.find(r => r.rackId === value);
+    const newRackHeight = newRack?.height || 42;
+
+    // 检查设备占用的总U位是否超过机柜高度
+    // 设备占用范围: position 到 position + height - 1
+    let warning = null;
+    if (position && height && position + height - 1 > newRackHeight) {
+      warning = `设备从 ${position}U 到 ${position + height - 1}U，超出机柜高度 ${newRackHeight}U`;
+    }
+    setHeightExceedWarning(warning);
+
+    // 重新检查位置冲突（如果值在有效范围内）
+    if (position && height && position + height - 1 <= newRackHeight) {
       checkPositionConflict(value, position, height, editingDevice?.deviceId);
     } else {
       setPositionConflict(null);
@@ -131,6 +153,16 @@ const DeviceFormModal = ({
 
   const handlePositionChange = value => {
     const height = form.getFieldValue('height');
+    const rack = racks.find(r => r.rackId === selectedRackId);
+    const rackHeight = rack?.height || 42;
+
+    // 检查设备占用的总U位是否超过机柜高度
+    let warning = null;
+    if (value && height && value + height - 1 > rackHeight) {
+      warning = `设备从 ${value}U 到 ${value + height - 1}U，超出机柜高度 ${rackHeight}U`;
+    }
+    setHeightExceedWarning(warning);
+
     if (selectedRackId && value) {
       checkPositionConflict(selectedRackId, value, height, editingDevice?.deviceId);
     } else {
@@ -140,6 +172,16 @@ const DeviceFormModal = ({
 
   const handleHeightChange = value => {
     const position = form.getFieldValue('position');
+    const rack = racks.find(r => r.rackId === selectedRackId);
+    const rackHeight = rack?.height || 42;
+
+    // 检查设备占用的总U位是否超过机柜高度
+    let warning = null;
+    if (position && value && position + value - 1 > rackHeight) {
+      warning = `设备从 ${position}U 到 ${position + value - 1}U，超出机柜高度 ${rackHeight}U`;
+    }
+    setHeightExceedWarning(warning);
+
     if (selectedRackId && position) {
       checkPositionConflict(selectedRackId, position, value, editingDevice?.deviceId);
     } else {
@@ -151,6 +193,14 @@ const DeviceFormModal = ({
     if (positionConflict) {
       return;
     }
+    // 检查设备占用的总U位是否超过机柜高度
+    // 设备占用范围: position 到 position + height - 1
+    const rack = racks.find(r => r.rackId === values.rackId);
+    const rackHeight = rack?.height || 42;
+    if (values.position + values.height - 1 > rackHeight) {
+      message.error(`设备从 ${values.position}U 到 ${values.position + values.height - 1}U，超出机柜高度 ${rackHeight}U`);
+      return;
+    }
     const deviceData = prepareDeviceFormData(values, !!editingDevice);
     onSubmit(deviceData);
   };
@@ -159,6 +209,7 @@ const DeviceFormModal = ({
     setSelectedRoomId(value);
     setSelectedRackId(null);
     setPositionConflict(null);
+    setHeightExceedWarning(null);
     form.setFieldValue('rackId', undefined);
   };
 
@@ -347,7 +398,7 @@ const DeviceFormModal = ({
                     <InputNumber
                       placeholder="如: 1"
                       min={1}
-                      max={42}
+                      max={selectedRackHeight}
                       style={{ width: '100%', borderRadius: '8px' }}
                       onChange={handlePositionChange}
                     />
@@ -369,7 +420,7 @@ const DeviceFormModal = ({
                     <InputNumber
                       placeholder="如: 2"
                       min={1}
-                      max={10}
+                      max={selectedRackHeight}
                       style={{ width: '100%', borderRadius: '8px' }}
                       onChange={handleHeightChange}
                     />
@@ -381,6 +432,16 @@ const DeviceFormModal = ({
                   <Alert
                     message={positionConflict}
                     type="error"
+                    showIcon
+                    icon={<ExclamationCircleOutlined />}
+                  />
+                </div>
+              )}
+              {heightExceedWarning && (
+                <div style={{ marginTop: '12px' }}>
+                  <Alert
+                    message={heightExceedWarning}
+                    type="warning"
                     showIcon
                     icon={<ExclamationCircleOutlined />}
                   />
