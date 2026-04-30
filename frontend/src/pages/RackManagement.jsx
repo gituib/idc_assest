@@ -466,9 +466,34 @@ function RackManagement() {
     setDrawerVisible(true);
   };
 
-  const handleDownloadTemplate = useCallback(() => {
-    window.open('/api/racks/import-template', '_blank');
-    message.success('模板下载成功');
+  const handleDownloadTemplate = useCallback(async () => {
+    try {
+      message.loading('正在下载模板...', 0);
+
+      const response = await api.get('/racks/import-template', {
+        responseType: 'blob',
+      });
+
+      // 创建下载链接
+      const blob = new Blob([response], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', '机柜导入模板.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      message.destroy();
+      message.success('模板下载成功');
+    } catch (error) {
+      message.destroy();
+      message.error('模板下载失败');
+      console.error('模板下载失败:', error);
+    }
   }, []);
 
   // 导出租机柜数据
