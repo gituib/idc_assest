@@ -151,12 +151,13 @@ class CanvasRenderer {
     const bodyX = rackBounds.x + RACK_PADDING + leftLabelW;
     const bodyW = U_BODY_WIDTH;
     
-    // 从底部开始计算坐标（和渲染逻辑一致）
+    // 从底部开始计算坐标（和渲染逻辑一致，设备向上扩展）
     const bodyStartY = bodyY + 4 + (totalU * uHeight); // 底部Y坐标
-    const deviceY = bodyStartY - device.position * uHeight;
-    const deviceH = uHeight * (device.height || 1);
+    const deviceHeight = device.height || 1;
+    const deviceStartY = bodyStartY - (device.position + deviceHeight - 1) * uHeight;
+    const deviceH = uHeight * deviceHeight;
     
-    return { x: bodyX, y: deviceY, width: bodyW, height: deviceH };
+    return { x: bodyX, y: deviceStartY, width: bodyW, height: deviceH };
   }
 
   hitTest(canvasX, canvasY) {
@@ -349,30 +350,34 @@ class CanvasRenderer {
     // U位高度
     const uHeight = Math.min(U_HEIGHT, (h - 8) / totalU);
     
-    // 设备数据 - 按position分组
+    // 设备数据 - 按position分组（注意：设备从position向上扩展）
     const devices = (rack.Devices || []).filter(d => d.position != null);
     const deviceByU = new Map();
     devices.forEach(d => {
+      const deviceHeight = d.height || 1;
       const startU = d.position;
-      const endU = startU + (d.height || 1) - 1;
+      const endU = startU + deviceHeight - 1; // 向上扩展
       for (let u = startU; u <= endU; u++) {
         deviceByU.set(u, d);
       }
     });
 
-    // 渲染左侧U位标签（从下到上：1U在底部）
+    // 渲染左侧U位标签（从下到上：1U在底部，totalU在顶部）
     this.drawULabels(ctx, leftLabelX, y + 4, leftLabelW, totalU, uHeight, 'left');
     
-    // 渲染设备区域和空闲U位（从下到上：1U在底部）
+    // 渲染设备区域和空闲U位（从下到上：1U在底部，totalU在顶部）
     // 从底部开始渲染
     const bodyStartY = y + 4 + (totalU * uHeight); // 底部Y坐标
     for (let u = 1; u <= totalU; u++) {
-      // 计算当前U位的Y坐标（从底部向上）
+      // 计算当前U位的Y坐标（从底部向上，u越大Y越小）
       const currentY = bodyStartY - u * uHeight;
       const d = deviceByU.get(u);
       if (d && d.position === u) {
+        // 设备从position向上显示，所以起始Y坐标要计算正确
+        const deviceHeight = d.height || 1;
+        const deviceStartY = bodyStartY - (u + deviceHeight - 1) * uHeight;
         const isHovered = this.hoveredDevice?.deviceId === d.deviceId;
-        this.drawDevice(ctx, d, bodyX, currentY, bodyW, uHeight * (d.height || 1), isHovered);
+        this.drawDevice(ctx, d, bodyX, deviceStartY, bodyW, uHeight * deviceHeight, isHovered);
       } else if (!d) {
         this.drawEmptyU(ctx, bodyX, currentY, bodyW, uHeight);
       }
