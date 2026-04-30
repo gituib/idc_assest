@@ -7,7 +7,7 @@ import {
   WarningOutlined,
   FileTextOutlined,
 } from '@ant-design/icons';
-import axios from 'axios';
+import { deviceAPI } from '../../api';
 import { designTokens } from '../../config/theme';
 
 const modalHeaderStyle = {
@@ -28,18 +28,6 @@ const ImportModal = ({ visible, deviceFields, onImport, onCancel }) => {
   const [importProgress, setImportProgress] = useState(0);
   const [importPhase, setImportPhase] = useState('');
   const [importResult, setImportResult] = useState(null);
-
-  const api = axios.create({
-    baseURL: '/api',
-  });
-
-  api.interceptors.request.use(config => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  });
 
   const resetState = () => {
     setStep('upload');
@@ -65,25 +53,18 @@ const ImportModal = ({ visible, deviceFields, onImport, onCancel }) => {
     setIsPreviewing(true);
 
     try {
-      const formData = new FormData();
-      formData.append('csvFile', actualFile);
+      const response = await deviceAPI.importPreview(actualFile);
 
-      const response = await api.post('/devices/import-preview', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      if (response.data.success) {
-        setPreviewData(response.data.data);
+      if (response.success) {
+        setPreviewData(response.data);
         setStep('preview');
       } else {
-        message.error(response.data.error || '预览失败');
+        message.error(response.error || '预览失败');
         resetState();
       }
     } catch (error) {
       console.error('预览失败:', error);
-      message.error(error.response?.data?.error || '预览失败，请检查文件格式');
+      message.error(error || '预览失败，请检查文件格式');
       resetState();
     } finally {
       setPreviewLoading(false);
@@ -173,12 +154,8 @@ const ImportModal = ({ visible, deviceFields, onImport, onCancel }) => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/devices/import-template', {
-        responseType: 'blob',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      const blob = new Blob([response.data], { type: 'text/csv; charset=gbk' });
+      const response = await deviceAPI.getImportTemplate();
+      const blob = new Blob([response], { type: 'text/csv; charset=gbk' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -189,17 +166,7 @@ const ImportModal = ({ visible, deviceFields, onImport, onCancel }) => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('下载模板失败:', error);
-      if (error.response?.data) {
-        const text = await error.response.data.text();
-        try {
-          const json = JSON.parse(text);
-          message.error(json.message || '下载模板失败');
-        } catch {
-          message.error('下载模板失败');
-        }
-      } else {
-        message.error('下载模板失败');
-      }
+      message.error(error || '下载模板失败');
     }
   };
 

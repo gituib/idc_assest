@@ -35,6 +35,7 @@ import {
   PartitionOutlined,
   CodepenOutlined,
   CloudUploadOutlined,
+  LayoutOutlined,
 } from '@ant-design/icons';
 import {
   BrowserRouter as Router,
@@ -83,6 +84,7 @@ const RemoteBackupSettings = lazy(() => import('./pages/RemoteBackupSettings'));
 const OperationLogs = lazy(() => import('./pages/OperationLogs'));
 const ErrorBoundaryTest = lazy(() => import('./pages/ErrorBoundaryTest'));
 const IdleDeviceManagement = lazy(() => import('./pages/IdleDeviceManagement'));
+const RoomFloorPlan = lazy(() => import('./pages/RoomFloorPlan'));
 
 const { Header, Content, Sider } = Layout;
 
@@ -241,6 +243,11 @@ const AppLayout = ({ children }) => {
           key: 'visualization-3d',
           icon: <CodepenOutlined style={{ fontSize: '16px' }} />,
           label: <Link to="/visualization-3d">3D机柜可视化</Link>,
+        },
+        {
+          key: 'floor-plan',
+          icon: <LayoutOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/floor-plan">机房平面图</Link>,
         },
       ],
     },
@@ -608,6 +615,7 @@ const routeConfig = [
   { path: '/operation-logs', component: OperationLogs },
   { path: '/error-boundary-test', component: ErrorBoundaryTest },
   { path: '/idle-devices', component: IdleDeviceManagement },
+  { path: '/floor-plan', component: RoomFloorPlan },
 ];
 
 const ThemeConfig = () => {

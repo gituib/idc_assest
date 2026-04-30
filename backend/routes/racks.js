@@ -691,4 +691,40 @@ router.post('/import', async (req, res) => {
   }
 });
 
+// 更新机柜位置
+router.put('/:rackId/position', async (req, res) => {
+  try {
+    const { rowPos, colPos, facing } = req.body;
+    const rack = await Rack.findByPk(req.params.rackId);
+    if (!rack) {
+      return res.status(404).json({ error: '机柜不存在' });
+    }
+
+    if (rowPos !== undefined && colPos !== undefined) {
+      const conflict = await Rack.findOne({
+        where: {
+          roomId: rack.roomId,
+          rackId: { [require('sequelize').Op.ne]: req.params.rackId },
+          rowPos,
+          colPos,
+        },
+      });
+      if (conflict) {
+        return res.status(409).json({ error: `位置(${rowPos},${colPos})已被机柜${conflict.name}占用` });
+      }
+    }
+
+    const updateData = {};
+    if (rowPos !== undefined) updateData.rowPos = rowPos;
+    if (colPos !== undefined) updateData.colPos = colPos;
+    if (facing !== undefined) updateData.facing = facing;
+
+    await Rack.update(updateData, { where: { rackId: req.params.rackId } });
+    const updatedRack = await Rack.findByPk(req.params.rackId);
+    res.json(updatedRack);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 module.exports = router;

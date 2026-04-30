@@ -19,7 +19,7 @@ const Rack = sequelize.define(
     height: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      defaultValue: 45, // 标准机柜高度（U数）
+      defaultValue: 45,
     },
     maxPower: {
       type: DataTypes.FLOAT,
@@ -40,6 +40,18 @@ const Rack = sequelize.define(
         model: Room,
         key: 'roomId',
       },
+    },
+    rowPos: {
+      type: DataTypes.INTEGER,
+      defaultValue: null,
+    },
+    colPos: {
+      type: DataTypes.INTEGER,
+      defaultValue: null,
+    },
+    facing: {
+      type: DataTypes.STRING,
+      defaultValue: 'front',
     },
   },
   {

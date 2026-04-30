@@ -170,6 +170,22 @@ export const deviceAPI = {
   delete: deviceId => api.delete(`/devices/${deviceId}`),
   getTickets: (deviceId, params) => api.get(`/devices/${deviceId}/tickets`, { params }),
   checkPosition: (rackId, params) => api.get(`/devices/check-position/${rackId}`, { params }),
+  importPreview: file => {
+    const formData = new FormData();
+    formData.append('csvFile', file);
+    return api.post('/devices/import-preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  import: file => {
+    const formData = new FormData();
+    formData.append('csvFile', file);
+    return api.post('/devices/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  getImportTemplate: () => api.get('/devices/import-template', { responseType: 'blob' }),
+  exportDevices: params => api.get('/devices/export', { params, responseType: 'blob' }),
 };
 
 export const ticketAPI = {

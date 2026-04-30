@@ -118,6 +118,16 @@ const migrations = [
     description: '为 consumable_logs 表添加 lastNameSyncAt 字段，支持名称同步',
     migrate: migrateConsumableLogNameSync,
   },
+  {
+    name: '机房布局字段',
+    description: '为 rooms 表添加 gridRows、gridCols、layoutConfig 字段，支持平面图布局',
+    migrate: migrateRoomLayoutFields,
+  },
+  {
+    name: '机柜位置字段',
+    description: '为 racks 表添加 rowPos、colPos、facing 字段，支持机柜位置定位',
+    migrate: migrateRackPositionFields,
+  },
 ];
 
 async function runMigrations() {
@@ -860,6 +870,34 @@ async function migrateConsumableLogNameSync() {
 
   await addColumnIfNotExists(tableName, 'lastNameSyncAt', 'DATETIME');
   console.log('    耗材日志名称同步迁移完成');
+}
+
+async function migrateRoomLayoutFields() {
+  const tableName = 'rooms';
+  const columns = [
+    { name: 'gridRows', def: 'INTEGER DEFAULT 10' },
+    { name: 'gridCols', def: 'INTEGER DEFAULT 10' },
+    { name: 'layoutConfig', def: dbDialect === 'sqlite' ? 'TEXT' : 'JSON' },
+  ];
+
+  for (const col of columns) {
+    await addColumnIfNotExists(tableName, col.name, col.def);
+  }
+  console.log('    机房布局字段迁移完成');
+}
+
+async function migrateRackPositionFields() {
+  const tableName = 'racks';
+  const columns = [
+    { name: 'rowPos', def: 'INTEGER' },
+    { name: 'colPos', def: 'INTEGER' },
+    { name: 'facing', def: "VARCHAR(20) DEFAULT 'front'" },
+  ];
+
+  for (const col of columns) {
+    await addColumnIfNotExists(tableName, col.name, col.def);
+  }
+  console.log('    机柜位置字段迁移完成');
 }
 
 // 执行迁移

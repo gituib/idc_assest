@@ -65,6 +65,18 @@ const Room = sequelize.define(
     description: {
       type: DataTypes.TEXT,
     },
+    gridRows: {
+      type: DataTypes.INTEGER,
+      defaultValue: 10,
+    },
+    gridCols: {
+      type: DataTypes.INTEGER,
+      defaultValue: 10,
+    },
+    layoutConfig: {
+      type: DataTypes.JSON,
+      defaultValue: null,
+    },
   },
   {
     tableName: 'rooms',

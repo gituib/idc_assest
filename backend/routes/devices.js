@@ -8,15 +8,7 @@ const path = require('path');
 const csv = require('csv-parser');
 const { createObjectCsvWriter } = require('csv-writer');
 const iconv = require('iconv-lite');
-const Device = require('../models/Device');
-const Rack = require('../models/Rack');
-const Room = require('../models/Room');
-const DeviceField = require('../models/DeviceField');
-const Ticket = require('../models/Ticket');
-const DevicePort = require('../models/DevicePort');
-const Cable = require('../models/Cable');
-const NetworkCard = require('../models/NetworkCard');
-const InventoryRecord = require('../models/InventoryRecord');
+const { Room, Rack, Device, DeviceField, Ticket, DevicePort, Cable, NetworkCard, InventoryRecord } = require('../models');
 const {
   logDeviceOperation,
   generateDeviceDescription,
@@ -31,11 +23,6 @@ const {
   batchMoveSchema,
   queryDeviceSchema,
 } = require('../validation/deviceSchema');
-
-Device.belongsTo(Rack, { foreignKey: 'rackId' });
-Rack.hasMany(Device, { foreignKey: 'rackId' });
-Rack.belongsTo(Room, { foreignKey: 'roomId' });
-Room.hasMany(Rack, { foreignKey: 'roomId' });
 
 const PREVIEW_COUNT = 20;
 
@@ -577,11 +564,13 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
           // 使用 sequelize.literal 构建原始SQL条件
           if (dbDialect === 'mysql') {
             return sequelize.literal(
-              `JSON_EXTRACT(customFields, '$."${safeFieldName}"') LIKE '%${escapedKeyword}%' ESCAPE '\\\\'`
+              `JSON_UNQUOTE(JSON_EXTRACT(customFields, '$."${safeFieldName}"')) LIKE '%${escapedKeyword}%' ESCAPE '\\\\'`
             );
           } else {
+            // SQLite: json_extract 返回 JSON 格式值，需要转换为文本进行比较
+            // 使用 ->> 操作符或 CAST 获取纯文本值
             return sequelize.literal(
-              `json_extract(customFields, '$.${safeFieldName}') LIKE '%${escapedKeyword}%' ESCAPE '\\'`
+              `CAST(json_extract(customFields, '$.${safeFieldName}') AS TEXT) LIKE '%${escapedKeyword}%' ESCAPE '\\'`
             );
           }
         });
