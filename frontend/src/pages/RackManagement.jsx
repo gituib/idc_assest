@@ -49,9 +49,9 @@ import {
   FilterOutlined,
   DeleteFilled,
 } from '@ant-design/icons';
-import axios from 'axios';
 import { designTokens } from '../config/theme';
 import CloseButton from '../components/CloseButton';
+import api from '../api';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -321,7 +321,7 @@ function RackManagement() {
     async (page = 1, pageSize = 10) => {
       try {
         setLoading(true);
-        const response = await axios.get('/api/racks', {
+        const response = await api.get('/racks', {
           params: {
             page,
             pageSize,
@@ -330,7 +330,7 @@ function RackManagement() {
             keyword: debouncedSearchKeyword || undefined,
           },
         });
-        const { racks: data, total } = response.data;
+        const { racks: data, total } = response;
         setRacks(data);
         setPagination(prev => ({ ...prev, current: page, pageSize, total }));
       } catch (error) {
@@ -345,8 +345,8 @@ function RackManagement() {
 
   const fetchRooms = useCallback(async () => {
     try {
-      const response = await axios.get('/api/rooms');
-      setRooms(response.data.rooms || []);
+      const response = await api.get('/rooms');
+      setRooms(response.rooms || []);
     } catch (error) {
       message.error('获取机房列表失败');
       console.error('获取机房列表失败:', error);
@@ -389,10 +389,10 @@ function RackManagement() {
   const handleSubmit = async values => {
     try {
       if (editingRack) {
-        await axios.put(`/api/racks/${editingRack.rackId}`, values);
+        await api.put(`/racks/${editingRack.rackId}`, values);
         message.success('机柜更新成功');
       } else {
-        await axios.post('/api/racks', values);
+        await api.post('/racks', values);
         message.success('机柜创建成功');
       }
       setModalVisible(false);
@@ -413,7 +413,7 @@ function RackManagement() {
       cancelText: '取消',
       onOk: async () => {
         try {
-          await axios.delete(`/api/racks/${rackId}`);
+          await api.delete(`/racks/${rackId}`);
           message.success('机柜删除成功');
           fetchRacks();
         } catch (error) {
@@ -440,7 +440,7 @@ function RackManagement() {
       onOk: async () => {
         try {
           const results = await Promise.allSettled(
-            selectedRackIds.map(id => axios.delete(`/api/racks/${id}`))
+            selectedRackIds.map(id => api.delete(`/racks/${id}`))
           );
           const succeeded = results.filter(r => r.status === 'fulfilled').length;
           const failed = results.filter(r => r.status === 'rejected');
@@ -448,7 +448,7 @@ function RackManagement() {
             message.success(`成功删除 ${succeeded} 个机柜`);
           }
           if (failed.length > 0) {
-            const firstError = failed[0].reason.response?.data?.error || '部分机柜删除失败';
+            const firstError = failed[0].reason.error || '部分机柜删除失败';
             message.error(`${firstError}（${failed.length} 个失败）`);
           }
           setSelectedRackIds([]);
@@ -476,12 +476,12 @@ function RackManagement() {
     try {
       message.loading('正在导出租机柜数据...', 0);
 
-      const response = await axios.get('/api/racks/export', {
+      const response = await api.get('/racks/export', {
         responseType: 'blob',
       });
 
       // 创建下载链接
-      const blob = new Blob([response.data], {
+      const blob = new Blob([response], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
       const url = window.URL.createObjectURL(blob);
@@ -524,14 +524,14 @@ function RackManagement() {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await axios.post('/api/racks/import', formData, {
+        const response = await api.post('/racks/import', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
 
         setImportProgress(100);
         setImportPhase('导入完成');
 
-        const resData = response.data;
+        const resData = response;
         const importResult = {
           total: resData.total || 0,
           successCount: resData.imported || 0,
