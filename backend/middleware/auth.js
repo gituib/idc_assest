@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const UserRole = require('../models/UserRole');
+const Role = require('../models/Role');
 const logger = require('../utils/logger').module('AuthMiddleware');
 
 function getJwtSecret() {
@@ -75,7 +77,6 @@ const generateToken = user => {
     {
       userId: user.userId,
       username: user.username,
-      roleId: user.roleId,
     },
     JWT_SECRET,
     { expiresIn: TOKEN_EXPIRY }
@@ -169,7 +170,14 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
-    req.user = decoded;
+    // Fetch user roles
+    const userRoles = await UserRole.findAll({
+      where: { UserId: user.userId },
+      include: [{ model: Role }],
+    });
+    const roles = userRoles.map(ur => ur.Role);
+
+    req.user = { ...decoded, roles: roles.map(r => ({ roleId: r.roleId, roleCode: r.roleCode, roleName: r.roleName })) };
     req.userModel = user;
     next();
   } catch (error) {

@@ -289,7 +289,7 @@ router.put('/:userId', authMiddleware, async (req, res) => {
       remark: user.remark,
     };
 
-    const oldRoleIds = roleIds !== undefined ? null : await getUserRoleIds(user.userId);
+    const oldRoleIds = roleIds !== undefined ? await getUserRoleIds(user.userId) : null;
 
     if (username !== undefined && username !== user.username) {
       const existingUser = await User.findOne({
@@ -435,7 +435,8 @@ router.put('/:userId/password', authMiddleware, async (req, res) => {
     }
 
     // 权限检查：只能重置自己的密码，或管理员重置他人密码
-    if (req.user.userId !== user.userId && req.user.role !== 'admin') {
+    const isAdmin = req.user.roles?.some(r => r.roleCode === 'admin');
+    if (req.user.userId !== user.userId && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: '无权重置其他用户的密码',
