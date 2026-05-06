@@ -724,7 +724,7 @@ async function migrateIdleDeviceAndBusiness() {
         },
         name: { type: sequelize.Sequelize.STRING, allowNull: false },
         description: { type: sequelize.Sequelize.TEXT },
-        status: { type: sequelize.Sequelize.ENUM('active', 'offline'), defaultValue: 'active' },
+        status: { type: sequelize.Sequelize.STRING, defaultValue: 'active' },
         offlineDate: { type: sequelize.Sequelize.DATE },
         offlineReason: { type: sequelize.Sequelize.STRING },
         createdAt: { type: sequelize.Sequelize.DATE, allowNull: false },
@@ -746,7 +746,7 @@ async function migrateIdleDeviceAndBusiness() {
         name: { type: sequelize.Sequelize.STRING, allowNull: false },
         location: { type: sequelize.Sequelize.STRING },
         capacity: { type: sequelize.Sequelize.INTEGER, defaultValue: 100 },
-        status: { type: sequelize.Sequelize.ENUM('active', 'inactive'), defaultValue: 'active' },
+        status: { type: sequelize.Sequelize.STRING, defaultValue: 'active' },
         description: { type: sequelize.Sequelize.TEXT },
         createdAt: { type: sequelize.Sequelize.DATE, allowNull: false },
         updatedAt: { type: sequelize.Sequelize.DATE, allowNull: false },
@@ -803,10 +803,20 @@ async function migrateDevicePositionIndexes() {
   for (const idx of indexesToCreate) {
     console.log(`   → 为 ${tableName} 表添加复合索引 ${idx.name}...`);
     try {
-      const existingIndexes = await sequelize.query(`SHOW INDEX FROM ${tableName}`, {
-        type: sequelize.QueryTypes.SELECT,
-      });
-      const indexExists = existingIndexes.some(existing => existing.Key_name === idx.name);
+      let indexExists = false;
+
+      if (dialect === 'sqlite') {
+        const indexList = await sequelize.query(
+          `SELECT name FROM sqlite_master WHERE type='index' AND name=?`,
+          { replacements: [idx.name], type: sequelize.QueryTypes.SELECT }
+        );
+        indexExists = indexList.length > 0;
+      } else {
+        const existingIndexes = await sequelize.query(`SHOW INDEX FROM ${tableName}`, {
+          type: sequelize.QueryTypes.SELECT,
+        });
+        indexExists = existingIndexes.some(existing => existing.Key_name === idx.name);
+      }
 
       if (indexExists) {
         console.log('     → 索引已存在，跳过');
