@@ -19,8 +19,11 @@ const Business = sequelize.define(
       allowNull: true,
     },
     status: {
-      type: DataTypes.ENUM('active', 'offline'),
+      type: DataTypes.STRING,
       defaultValue: 'active',
+      validate: {
+        isIn: [['active', 'offline']],
+      },
     },
     offlineDate: {
       type: DataTypes.DATE,

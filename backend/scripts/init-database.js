@@ -227,27 +227,29 @@ async function initDatabase() {
     // 同步所有模型（按依赖顺序）
     console.log('开始同步模型...');
 
+    const alterOptions = process.env.DB_TYPE === 'mysql' ? { alter: true } : {};
+
     // 基础模型
-    await User.sync({ alter: true });
-    await Room.sync({ alter: true });
-    await Rack.sync({ alter: true });
-    await Device.sync({ alter: true });
-    await FaultCategory.sync({ alter: true });
+    await User.sync(alterOptions);
+    await Room.sync(alterOptions);
+    await Rack.sync(alterOptions);
+    await Device.sync(alterOptions);
+    await FaultCategory.sync(alterOptions);
 
     // 耗材相关模型
-    await ConsumableCategory.sync({ alter: true });
-    await Consumable.sync({ alter: true });
-    await ConsumableLog.sync({ alter: true });
-    await ConsumableRecord.sync({ alter: true });
-    await ConsumableLogArchive.sync({ alter: true });
+    await ConsumableCategory.sync(alterOptions);
+    await Consumable.sync(alterOptions);
+    await ConsumableLog.sync(alterOptions);
+    await ConsumableRecord.sync(alterOptions);
+    await ConsumableLogArchive.sync(alterOptions);
 
     // 盘点相关模型
-    await InventoryPlan.sync({ alter: true });
-    await InventoryTask.sync({ alter: true });
-    await InventoryRecord.sync({ alter: true });
+    await InventoryPlan.sync(alterOptions);
+    await InventoryTask.sync(alterOptions);
+    await InventoryRecord.sync(alterOptions);
 
     // 系统设置
-    await SystemSetting.sync({ alter: true });
+    await SystemSetting.sync(alterOptions);
 
     console.log('数据库表结构同步完成');
 

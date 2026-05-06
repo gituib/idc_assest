@@ -6,7 +6,7 @@ ensureJwtSecret();
 const express = require('express');
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
-const { sequelize } = require('./db');
+const { sequelize, dbDialect } = require('./db');
 const { FILE_UPLOAD } = require('./config');
 const { generateId } = require('./utils/idGenerator');
 const logger = require('./utils/logger').module('Server');
@@ -96,10 +96,12 @@ async function syncBusinessModels() {
   const DeviceBusiness = require('./models/DeviceBusiness');
   const Warehouse = require('./models/Warehouse');
 
-  await Business.sync();
-  await DeviceBusiness.sync();
-  await Warehouse.sync();
-  logger.info('业务/设备关联/库房模型同步完成');
+  const alterOptions = dbDialect === 'mysql' ? { alter: true } : {};
+
+  await Business.sync(alterOptions);
+  await DeviceBusiness.sync(alterOptions);
+  await Warehouse.sync(alterOptions);
+  logger.info(`业务/设备关联/库房模型同步完成（${dbDialect}${dbDialect === 'mysql' ? ' alter mode' : ''}）`);
 }
 
 async function initDefaultSystemSettings() {
