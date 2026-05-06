@@ -1,14 +1,41 @@
 const STORAGE_PREFIX = 'idc_';
+const KEY_STORAGE_ID = '__idc_sk';
+const SALT = new TextEncoder().encode('idc-secure-storage-salt-v1');
+const PBKDF2_ITERATIONS = 100000;
+const AES_KEY_LENGTH = 256;
 
-/**
- * 生成运行时密钥（基于浏览器指纹）
- * 密钥在每次会话中动态生成，不会出现在源码或构建产物中
- * 同一浏览器同一域名下密钥保持一致，确保刷新页面后仍可解密
- */
-const getOrCreateRuntimeKey = () => {
-  const KEY_STORAGE_ID = '__idc_sk';
-  let key = sessionStorage.getItem(KEY_STORAGE_ID);
-  if (key) return key;
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+const memoryCache = new Map();
+
+let _cachedCryptoKey = null;
+
+async function deriveKey(material) {
+  if (_cachedCryptoKey) return _cachedCryptoKey;
+
+  const keyMaterial = await crypto.subtle.importKey('raw', material, 'PBKDF2', false, [
+    'deriveKey',
+  ]);
+
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: SALT, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: AES_KEY_LENGTH },
+    false,
+    ['encrypt', 'decrypt']
+  );
+
+  _cachedCryptoKey = key;
+  return key;
+}
+
+async function getOrCreateKeyMaterial() {
+  let stored = sessionStorage.getItem(KEY_STORAGE_ID);
+  if (stored) {
+    const raw = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
+    return raw;
+  }
 
   const fingerprint = [
     navigator.userAgent,
@@ -19,128 +46,115 @@ const getOrCreateRuntimeKey = () => {
     navigator.language,
   ].join('|');
 
-  let hash = 0;
-  for (let i = 0; i < fingerprint.length; i++) {
-    const char = fingerprint.charCodeAt(i);
-    hash = ((hash << 5) - hash + char) | 0;
-  }
+  const fingerprintBytes = encoder.encode(fingerprint);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', fingerprintBytes);
+  const material = new Uint8Array(hashBuffer);
 
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  key = '';
-  let seed = Math.abs(hash) + Date.now();
-  for (let i = 0; i < 32; i++) {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    key += chars[seed % chars.length];
-  }
+  sessionStorage.setItem(KEY_STORAGE_ID, btoa(String.fromCharCode(...material)));
+  return material;
+}
 
-  sessionStorage.setItem(KEY_STORAGE_ID, key);
-  console.log('[SecureStorage] New runtime key generated:', key.substring(0, 8) + '...');
-  return key;
-};
+async function encrypt(plaintext) {
+  const material = await getOrCreateKeyMaterial();
+  const key = await deriveKey(material);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoded = encoder.encode(plaintext);
 
-const simpleEncrypt = (text) => {
-  const key = getOrCreateRuntimeKey();
-  let result = '';
-  for (let i = 0; i < text.length; i++) {
-    result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
-  }
-  return btoa(encodeURIComponent(result));
-};
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
 
-const simpleDecrypt = (encrypted) => {
+  const payload = new Uint8Array(iv.length + ciphertext.byteLength);
+  payload.set(iv, 0);
+  payload.set(new Uint8Array(ciphertext), iv.length);
+
+  return btoa(String.fromCharCode(...payload));
+}
+
+async function decrypt(encrypted) {
   try {
-    const key = getOrCreateRuntimeKey();
-    const decoded = decodeURIComponent(atob(encrypted));
-    let result = '';
-    for (let i = 0; i < decoded.length; i++) {
-      result += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length));
-    }
-    return result;
-  } catch (e) {
-    console.error('[SecureStorage] Decrypt error:', e.message);
+    const material = await getOrCreateKeyMaterial();
+    const key = await deriveKey(material);
+
+    const raw = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+    const iv = raw.slice(0, 12);
+    const ciphertext = raw.slice(12);
+
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+    return decoder.decode(decrypted);
+  } catch {
     return null;
   }
-};
+}
+
+async function decryptAndParse(encrypted) {
+  const decrypted = await decrypt(encrypted);
+  if (!decrypted) return null;
+
+  try {
+    const data = JSON.parse(decrypted);
+    if (data.expiry && Date.now() > data.expiry) return null;
+    return data.value;
+  } catch {
+    return null;
+  }
+}
 
 export const secureStorage = {
   set: (key, value, options = {}) => {
-    try {
-      const storageKey = `${STORAGE_PREFIX}${key}`;
-      const data = {
-        value,
-        timestamp: Date.now(),
-        expiry: options.expiry || null,
-      };
-      const serialized = JSON.stringify(data);
-      const encrypted = simpleEncrypt(serialized);
-      localStorage.setItem(storageKey, encrypted);
-      console.log('[SecureStorage] Set:', key, '=', value ? value.substring(0, 30) + '...' : 'null');
-      console.log('[SecureStorage] Stored encrypted value length:', encrypted.length);
-      return true;
-    } catch (error) {
-      console.error('[SecureStorage] Set error:', error);
-      return false;
-    }
+    memoryCache.set(key, value);
+
+    const storageKey = `${STORAGE_PREFIX}${key}`;
+    const data = {
+      value,
+      timestamp: Date.now(),
+      expiry: options.expiry || null,
+    };
+    const serialized = JSON.stringify(data);
+
+    encrypt(serialized)
+      .then(encrypted => {
+        localStorage.setItem(storageKey, encrypted);
+      })
+      .catch(() => {});
+
+    return true;
   },
 
   get: (key) => {
+    if (memoryCache.has(key)) {
+      return memoryCache.get(key);
+    }
+    return null;
+  },
+
+  loadFromStorage: async (key) => {
     try {
       const storageKey = `${STORAGE_PREFIX}${key}`;
       const encrypted = localStorage.getItem(storageKey);
+      if (!encrypted) return null;
 
-      if (!encrypted) {
-        console.log('[SecureStorage] Get:', key, '- not found in localStorage');
-        return null;
-      }
-
-      console.log('[SecureStorage] Get:', key, '- found encrypted data, length:', encrypted.length);
-
-      let decrypted = simpleDecrypt(encrypted);
-      if (!decrypted) {
-        console.log('[SecureStorage] Get:', key, '- decryption failed, trying raw JSON parse');
-        try {
-          const parsed = JSON.parse(encrypted);
-          if (parsed && parsed.value !== undefined) {
-            console.log('[SecureStorage] Get:', key, '- recovered from raw JSON');
-            return parsed.value;
-          }
-        } catch {
-          console.log('[SecureStorage] Get:', key, '- raw JSON parse also failed');
-        }
+      const value = await decryptAndParse(encrypted);
+      if (value !== null) {
+        memoryCache.set(key, value);
+      } else {
         localStorage.removeItem(storageKey);
-        return null;
       }
-
-      const data = JSON.parse(decrypted);
-
-      if (data.expiry && Date.now() > data.expiry) {
-        console.log('[SecureStorage] Get:', key, '- expired');
-        localStorage.removeItem(storageKey);
-        return null;
-      }
-
-      const valuePreview = typeof data.value === 'string' ? data.value.substring(0, 30) + '...' : typeof data.value;
-      console.log('[SecureStorage] Get:', key, '- success:', valuePreview);
-      return data.value;
-    } catch (error) {
-      console.error('[SecureStorage] Get error:', error);
+      return value;
+    } catch {
       return null;
     }
   },
 
   remove: (key) => {
+    memoryCache.delete(key);
     try {
       const storageKey = `${STORAGE_PREFIX}${key}`;
       localStorage.removeItem(storageKey);
-      console.log('[SecureStorage] Remove:', key);
-      return true;
-    } catch (error) {
-      console.error('[SecureStorage] Remove error:', error);
-      return false;
-    }
+    } catch {}
+    return true;
   },
 
   clear: () => {
+    memoryCache.clear();
     try {
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -149,13 +163,9 @@ export const secureStorage = {
           keys.push(key);
         }
       }
-      keys.forEach((key) => localStorage.removeItem(key));
-      console.log('[SecureStorage] Clear: removed', keys.length, 'keys');
-      return true;
-    } catch (error) {
-      console.error('[SecureStorage] Clear error:', error);
-      return false;
-    }
+      keys.forEach(key => localStorage.removeItem(key));
+    } catch {}
+    return true;
   },
 };
 

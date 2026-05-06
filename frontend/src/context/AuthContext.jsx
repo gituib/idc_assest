@@ -20,35 +20,41 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const savedToken = secureStorage.get(TOKEN_KEY);
-  const savedUser = secureStorage.get(USER_KEY);
-
-  const [user, setUser] = useState(savedUser);
-  const [token, setToken] = useState(savedToken);
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    const currentToken = secureStorage.get(TOKEN_KEY);
-
-    if (!currentToken) {
-      setToken(null);
-      setUser(null);
-      setLoading(false);
-      setInitialized(true);
-      return;
-    }
-
     const initializeAuth = async () => {
       try {
-        const response = await authAPI.getProfile();
-        if (response.success) {
-          setUser(response.data.user);
-          secureStorage.set(USER_KEY, response.data.user);
+        const storedToken = await secureStorage.loadFromStorage(TOKEN_KEY);
+        const storedUser = await secureStorage.loadFromStorage(USER_KEY);
+
+        if (!storedToken) {
+          setToken(null);
+          setUser(null);
+          setLoading(false);
+          setInitialized(true);
+          return;
+        }
+
+        setToken(storedToken);
+        setUser(storedUser);
+
+        try {
+          const response = await authAPI.getProfile();
+          if (response.success) {
+            setUser(response.data.user);
+            secureStorage.set(USER_KEY, response.data.user);
+          }
+        } catch {
+          secureStorage.remove(TOKEN_KEY);
+          secureStorage.remove(USER_KEY);
+          setToken(null);
+          setUser(null);
         }
       } catch {
-        secureStorage.remove(TOKEN_KEY);
-        secureStorage.remove(USER_KEY);
         setToken(null);
         setUser(null);
       } finally {
