@@ -25,11 +25,8 @@ const Warehouse = sequelize.define(
       defaultValue: 100,
     },
     status: {
-      type: DataTypes.STRING,
+      type: DataTypes.ENUM('active', 'inactive'),
       defaultValue: 'active',
-      validate: {
-        isIn: [['active', 'inactive']],
-      },
     },
     description: {
       type: DataTypes.TEXT,
