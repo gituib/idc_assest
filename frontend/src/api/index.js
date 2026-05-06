@@ -69,6 +69,9 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   response => {
+    if (response.config.responseType === 'blob') {
+      return response;
+    }
     return response.data;
   },
   error => {
@@ -96,7 +99,9 @@ api.interceptors.response.use(
         }
       }
 
-      return Promise.reject(data.message || '请求失败');
+      error.friendlyMessage = data.message || '请求失败';
+      error.message = data.message || '请求失败';
+      return Promise.reject(error);
     }
 
     if (error.code === 'ECONNABORTED') {

@@ -190,11 +190,22 @@ router.get('/import-template', async (req, res) => {
 // 导出租机柜数据 - 必须放在 /:rackId 路由之前，避免被当作 rackId 参数
 router.get('/export', async (req, res) => {
   try {
-    // 获取所有机柜数据（包含机房信息）
+    const { rackIds } = req.query;
+    const hasSelection = rackIds && rackIds.length > 0;
+
+    // 构建查询条件
+    const where = {};
+    if (hasSelection) {
+      const idList = rackIds.split(',').map(id => id.trim()).filter(Boolean);
+      where.rackId = { [require('sequelize').Op.in]: idList };
+    }
+
+    // 获取机柜数据（包含机房信息）
     const racks = await Rack.findAll({
+      where,
       include: [
         { model: Room, attributes: ['name'] },
-        { model: Device, attributes: ['deviceId', 'name', 'powerConsumption'] },
+        { model: Device, as: 'Devices', attributes: ['deviceId', 'name', 'powerConsumption'] },
       ],
       order: [['rackId', 'ASC']],
     });
@@ -242,7 +253,9 @@ router.get('/export', async (req, res) => {
 
     // 生成文件名
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const fileName = `机柜导出_${timestamp}.xlsx`;
+    const fileName = hasSelection
+      ? `机柜导出_选中${racks.length}条_${timestamp}.xlsx`
+      : `机柜导出_全部_${timestamp}.xlsx`;
 
     // 确保temp目录存在
     const tempDir = path.join(__dirname, '../temp');
@@ -297,7 +310,7 @@ router.get('/:rackId', async (req, res) => {
     const rack = await Rack.findByPk(req.params.rackId, {
       include: [
         { model: Room, separate: false },
-        { model: Device, separate: false },
+        { model: Device, as: 'Devices', separate: false },
       ],
       subQuery: false, // 避免子查询导致的性能问题
     });
@@ -364,7 +377,7 @@ router.put('/:rackId', validateBody(updateRackSchema), async (req, res) => {
       const updatedRack = await Rack.findByPk(req.params.rackId, {
         include: [
           { model: Room, separate: false },
-          { model: Device, separate: false },
+          { model: Device, as: 'Devices', separate: false },
         ],
         subQuery: false, // 避免子查询导致的性能问题
       });
@@ -396,6 +409,248 @@ router.delete('/:rackId', async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * 解析 Excel 文件并转换为 JSON 数据
+ * @param {string} tempFilePath - 临时文件路径
+ * @returns {Object} { jsonData, columnIndexMap, error }
+ */
+function parseExcelFile(tempFilePath) {
+  let workbook;
+  try {
+    workbook = XLSX.readFile(tempFilePath);
+  } catch (readError) {
+    return { error: `无法解析Excel文件: ${readError.message}` };
+  }
+
+  if (!workbook.SheetNames.length) {
+    return { error: 'Excel文件中没有找到工作表' };
+  }
+
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+  // 读取第一行作为列头
+  const headerRow =
+    XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 0, limit: 1 })[0] || [];
+
+  // 定义列名映射（支持导入模板格式和导出文件格式）
+  const columnMapping = {
+    rackId: ['机柜ID(留空自动生成)', '机柜ID'],
+    name: ['机柜名称'],
+    roomName: ['所属机房名称', '所属机房'],
+    height: ['高度(U)', '机柜高度(U)'],
+    maxPower: ['最大功率(W)', '最大功耗(W)'],
+    status: ['状态'],
+  };
+
+  // 根据列头自动检测列索引映射
+  const columnIndexMap = {};
+  Object.keys(columnMapping).forEach(field => {
+    const possibleNames = columnMapping[field];
+    const index = headerRow.findIndex(h => possibleNames.includes(String(h).trim()));
+    if (index !== -1) {
+      columnIndexMap[field] = index;
+    }
+  });
+
+  // 检查必需的列是否存在
+  const requiredColumns = ['name', 'roomName', 'height', 'maxPower', 'status'];
+  const missingColumns = requiredColumns.filter(col => columnIndexMap[col] === undefined);
+  if (missingColumns.length > 0) {
+    return { error: `缺少必需的列: ${missingColumns.join(', ')}，请使用系统导出的文件或下载导入模板` };
+  }
+
+  // 转换为JSON格式
+  const rawData = XLSX.utils.sheet_to_json(worksheet, {
+    header: headerRow.map((h, i) => `col_${i}`),
+    range: 1,
+    blankrows: false,
+  });
+
+  const jsonData = rawData.map(row => {
+    const item = {};
+    Object.keys(columnIndexMap).forEach(field => {
+      const colIndex = columnIndexMap[field];
+      item[field] = row[`col_${colIndex}`];
+    });
+    return item;
+  });
+
+  if (jsonData.length === 0) {
+    return { error: 'Excel文件中没有找到可导入的数据行' };
+  }
+
+  return { jsonData, columnIndexMap };
+}
+
+/**
+ * 验证机柜数据
+ * @param {Array} jsonData - Excel 解析后的原始数据
+ * @param {Map} roomNameToIdMap - 机房名称到 ID 的映射
+ * @param {Set} validRoomNames - 有效机房名称集合
+ * @returns {Object} { processedData, validationResults }
+ */
+function validateRackData(jsonData, roomNameToIdMap, validRoomNames) {
+  const statusMapping = {
+    启用: 'active',
+    在用: 'active',
+    停用: 'inactive',
+    禁用: 'inactive',
+    维护中: 'maintenance',
+    active: 'active',
+    inactive: 'inactive',
+    maintenance: 'maintenance',
+  };
+
+  const validStatuses = ['active', 'maintenance', 'inactive'];
+  const validationResults = [];
+
+  // 处理数据
+  const processedData = jsonData.map((item, index) => {
+    const rowNumber = index + 2;
+    const rawStatus = String(item.status || '').trim();
+    const normalizedStatus = statusMapping[rawStatus] || rawStatus.toLowerCase();
+    const rawRackId = item.rackId ? String(item.rackId).trim() : '';
+
+    const height = Number(item.height);
+    const maxPower = Number(item.maxPower);
+
+    return {
+      ...item,
+      rackId: rawRackId,
+      height,
+      maxPower,
+      status: normalizedStatus,
+      rowNumber,
+    };
+  });
+
+  // 验证数据
+  processedData.forEach(item => {
+    const errors = [];
+
+    if (!item.rackId || item.rackId === '') {
+      errors.push('机柜ID不能为空（如需自动生成请使用导入功能）');
+    } else if (!/^[a-zA-Z0-9_-]+$/.test(item.rackId)) {
+      errors.push('机柜ID只能包含字母、数字、下划线和横线');
+    }
+    if (!item.name || String(item.name).trim() === '') {
+      errors.push('机柜名称不能为空');
+    }
+    if (!item.roomName || String(item.roomName).trim() === '') {
+      errors.push('所属机房名称不能为空');
+    } else if (!validRoomNames.has(String(item.roomName).trim())) {
+      const availableRooms = Array.from(validRoomNames).join('、');
+      errors.push(`所属机房"${item.roomName}"不存在，可用机房: ${availableRooms}`);
+    }
+    if (isNaN(item.height) || item.height <= 0) {
+      errors.push('高度必须是大于0的有效数字');
+    }
+    if (isNaN(item.maxPower) || item.maxPower < 0) {
+      errors.push('最大功率必须是大于等于0的有效数字');
+    }
+    if (!item.status || !validStatuses.includes(item.status)) {
+      errors.push(`状态必须是以下值之一: ${validStatuses.join(', ')}`);
+    }
+
+    if (errors.length > 0) {
+      validationResults.push({ row: item.rowNumber, data: item, errors });
+    }
+  });
+
+  return { processedData, validationResults };
+}
+
+// 导入机柜数据预览（不写入数据库）
+router.post('/import-preview', async (req, res) => {
+  try {
+    // 检查是否有上传文件
+    if (!req.files || !req.files.file) {
+      return res.status(400).json({
+        success: false,
+        error: '没有找到有效的上传文件，请选择一个Excel文件后重试',
+      });
+    }
+
+    const file = req.files.file;
+
+    // 确保temp目录存在
+    const tempDir = path.join(__dirname, '../temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    // 保存临时文件
+    const tempFilePath = path.join(tempDir, `${Date.now()}_${file.name}`);
+    try {
+      await file.mv(tempFilePath);
+    } catch (saveError) {
+      return res.status(500).json({
+        success: false,
+        error: `无法保存上传的文件: ${saveError.message}`,
+      });
+    }
+
+    try {
+      // 解析Excel文件
+      const { jsonData, error } = parseExcelFile(tempFilePath);
+      if (error) {
+        return res.status(400).json({
+          success: false,
+          error: error,
+        });
+      }
+
+      // 查询机房信息
+      const allRooms = await Room.findAll();
+      const roomNameToIdMap = new Map(allRooms.map(room => [room.name, room.roomId]));
+      const validRoomNames = new Set(roomNameToIdMap.keys());
+
+      // 验证数据
+      const { processedData, validationResults } = validateRackData(jsonData, roomNameToIdMap, validRoomNames);
+
+      // 构建预览数据
+      const preview = processedData.map(item => ({
+        _rowNum: item.rowNumber,
+        rackId: item.rackId,
+        name: item.name,
+        roomName: item.roomName,
+        height: item.height,
+        maxPower: item.maxPower,
+        status: item.status,
+        _hasError: validationResults.some(v => v.row === item.rowNumber),
+      }));
+
+      // 构建错误信息
+      const errors = validationResults.map(v => ({
+        row: v.row,
+        errors: v.errors,
+      }));
+
+      res.status(200).json({
+        success: true,
+        data: {
+          total: jsonData.length,
+          valid: jsonData.length - validationResults.length,
+          invalid: validationResults.length,
+          preview: preview.slice(0, 50), // 最多预览50条
+          errors,
+        },
+      });
+    } finally {
+      // 删除临时文件
+      if (fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+      }
+    }
+  } catch (error) {
+    logger.error('机柜导入预览失败:', error);
+    res.status(500).json({
+      success: false,
+      error: `预览过程中发生未知错误: ${error.message}`,
+    });
   }
 });
 
@@ -436,113 +691,36 @@ router.post('/import', async (req, res) => {
     }
 
     try {
-      // 读取Excel文件
-      let workbook;
-      try {
-        workbook = XLSX.readFile(tempFilePath);
-      } catch (readError) {
+      // 解析Excel文件
+      const { jsonData, error } = parseExcelFile(tempFilePath);
+      if (error) {
         await t.rollback();
         return res.status(400).json({
           success: false,
           message: '文件解析失败',
-          error: `无法解析Excel文件: ${readError.message}`,
+          error: error,
         });
       }
 
-      // 获取第一个工作表
-      if (!workbook.SheetNames.length) {
-        await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: '文件格式错误',
-          error: 'Excel文件中没有找到工作表',
-        });
-      }
-
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-      // 读取第一行作为列头
-      const headerRow =
-        XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 0, limit: 1 })[0] || [];
-
-      // 定义列名映射（支持导入模板格式和导出文件格式）
-      const columnMapping = {
-        rackId: ['机柜ID(留空自动生成)', '机柜ID'],
-        name: ['机柜名称'],
-        roomName: ['所属机房名称', '所属机房'],
-        height: ['高度(U)', '机柜高度(U)'],
-        maxPower: ['最大功率(W)', '最大功耗(W)'],
-        status: ['状态'],
-      };
-
-      // 根据列头自动检测列索引映射
-      const columnIndexMap = {};
-      Object.keys(columnMapping).forEach(field => {
-        const possibleNames = columnMapping[field];
-        const index = headerRow.findIndex(h => possibleNames.includes(String(h).trim()));
-        if (index !== -1) {
-          columnIndexMap[field] = index;
-        }
-      });
-
-      // 检查必需的列是否存在
-      const requiredColumns = ['name', 'roomName', 'height', 'maxPower', 'status'];
-      const missingColumns = requiredColumns.filter(col => columnIndexMap[col] === undefined);
-      if (missingColumns.length > 0) {
-        await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: 'Excel列名格式不正确',
-          error: `缺少必需的列: ${missingColumns.join(', ')}，请使用系统导出的文件或下载导入模板`,
-        });
-      }
-
-      // 转换为JSON格式
-      const rawData = XLSX.utils.sheet_to_json(worksheet, {
-        header: headerRow.map((h, i) => `col_${i}`),
-        range: 1,
-        blankrows: false,
-      });
-
-      const jsonData = rawData.map(row => {
-        const item = {};
-        Object.keys(columnIndexMap).forEach(field => {
-          const colIndex = columnIndexMap[field];
-          item[field] = row[`col_${colIndex}`];
-        });
-        return item;
-      });
-
-      if (jsonData.length === 0) {
-        await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: '没有找到有效数据',
-          error: 'Excel文件中没有找到可导入的数据行',
-        });
-      }
-
-      // 状态值转换映射
-      const statusMapping = {
-        启用: 'active',
-        在用: 'active',
-        停用: 'inactive',
-        禁用: 'inactive',
-        维护中: 'maintenance',
-        active: 'active',
-        inactive: 'inactive',
-        maintenance: 'maintenance',
-      };
-
-      const validStatuses = ['active', 'maintenance', 'inactive'];
-      const validationResults = [];
-
-      // 【优化1】批量查询机房信息（单次查询）
+      // 查询机房信息
       const allRooms = await Room.findAll({ transaction: t });
       const roomNameToIdMap = new Map(allRooms.map(room => [room.name, room.roomId]));
       const validRoomNames = new Set(roomNameToIdMap.keys());
 
-      // 【优化2】批量查询现有最大机柜ID（单次查询）
+      // 验证数据
+      const { processedData, validationResults } = validateRackData(jsonData, roomNameToIdMap, validRoomNames);
+
+      if (validationResults.length > 0) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: '数据验证失败',
+          error: `${validationResults.length} 行数据格式错误`,
+          details: validationResults,
+        });
+      }
+
+      // 【优化1】批量查询现有最大机柜ID（单次查询）
       const maxRackResult = await Rack.findOne({
         attributes: [
           [
@@ -562,85 +740,31 @@ router.post('/import', async (req, res) => {
       });
       let maxNumber = maxRackResult?.get('maxNum') || 0;
 
-      // 处理数据
-      const processedData = jsonData.map((item, index) => {
-        const rowNumber = index + 2;
-        const rawStatus = String(item.status || '').trim();
-        const normalizedStatus = statusMapping[rawStatus] || rawStatus.toLowerCase();
-        const rawRackId = item.rackId ? String(item.rackId).trim() : '';
-
-        if (!rawRackId || rawRackId === '') {
+      // 处理空 rackId（自动生成）
+      const finalData = processedData.map(item => {
+        if (!item.rackId || item.rackId === '') {
           maxNumber++;
           return {
             ...item,
             rackId: `RACK${String(maxNumber).padStart(3, '0')}`,
-            status: normalizedStatus,
-            rowNumber,
           };
         }
-
-        return {
-          ...item,
-          rackId: rawRackId,
-          status: normalizedStatus,
-          rowNumber,
-        };
+        return item;
       });
 
-      // 验证数据
-      processedData.forEach(item => {
-        const errors = [];
-
-        if (!/^[a-zA-Z0-9_-]+$/.test(item.rackId)) {
-          errors.push('机柜ID只能包含字母、数字、下划线和横线');
-        }
-        if (!item.name || String(item.name).trim() === '') {
-          errors.push('机柜名称不能为空');
-        }
-        if (!item.roomName || String(item.roomName).trim() === '') {
-          errors.push('所属机房名称不能为空');
-        } else if (!validRoomNames.has(String(item.roomName).trim())) {
-          const availableRooms = Array.from(validRoomNames).join('、');
-          errors.push(`所属机房"${item.roomName}"不存在，可用机房: ${availableRooms}`);
-        }
-        if (typeof item.height !== 'number' || item.height <= 0) {
-          errors.push('高度必须是大于0的数字');
-        }
-        if (typeof item.maxPower !== 'number' || item.maxPower < 0) {
-          errors.push('最大功率必须是大于等于0的数字');
-        }
-        if (!item.status || !validStatuses.includes(item.status)) {
-          errors.push(`状态必须是以下值之一: ${validStatuses.join(', ')}`);
-        }
-
-        if (errors.length > 0) {
-          validationResults.push({ row: item.rowNumber, data: item, errors });
-        }
-      });
-
-      if (validationResults.length > 0) {
-        await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: '数据验证失败',
-          error: `${validationResults.length} 行数据格式错误`,
-          details: validationResults,
-        });
-      }
-
-      // 【优化3】批量查询已存在的机柜ID（单次查询）
+      // 【优化2】批量查询已存在的机柜ID（单次查询）
       const existingRacks = await Rack.findAll({
         where: {
-          rackId: processedData.map(item => item.rackId),
+          rackId: finalData.map(item => item.rackId),
         },
         transaction: t,
       });
 
       const existingIds = new Set(existingRacks.map(rack => rack.rackId));
-      const newData = processedData.filter(item => !existingIds.has(item.rackId));
-      const duplicateCount = processedData.length - newData.length;
+      const newData = finalData.filter(item => !existingIds.has(item.rackId));
+      const duplicateCount = finalData.length - newData.length;
 
-      // 【优化4】批量插入数据
+      // 【优化3】批量插入数据
       let createdCount = 0;
       if (newData.length > 0) {
         const dataWithRoomId = newData.map(item => ({

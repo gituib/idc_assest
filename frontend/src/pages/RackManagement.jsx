@@ -23,7 +23,6 @@ import {
   Checkbox,
   Dropdown,
   Statistic,
-  Upload,
   Spin,
   Pagination,
 } from 'antd';
@@ -51,6 +50,7 @@ import {
 } from '@ant-design/icons';
 import { designTokens } from '../config/theme';
 import CloseButton from '../components/CloseButton';
+import RackImportModal from '../components/rack/RackImportModal';
 import api from '../api';
 
 const { Option } = Select;
@@ -312,10 +312,6 @@ function RackManagement() {
     showTotal: total => `共 ${total} 条记录`,
   });
   const [form] = Form.useForm();
-  const [importProgress, setImportProgress] = useState(0);
-  const [importPhase, setImportPhase] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-  const [importResult, setImportResult] = useState(null);
 
   const fetchRacks = useCallback(
     async (page = 1, pageSize = 10) => {
@@ -475,7 +471,7 @@ function RackManagement() {
       });
 
       // 创建下载链接
-      const blob = new Blob([response], {
+      const blob = new Blob([response.data], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
       const url = window.URL.createObjectURL(blob);
@@ -499,14 +495,16 @@ function RackManagement() {
   // 导出租机柜数据
   const handleExport = useCallback(async () => {
     try {
-      message.loading('正在导出租机柜数据...', 0);
+      const hasSelection = selectedRackIds.length > 0;
+      message.loading(hasSelection ? '正在导出选中机柜数据...' : '正在导出全部机柜数据...', 0);
 
       const response = await api.get('/racks/export', {
+        params: hasSelection ? { rackIds: selectedRackIds.join(',') } : {},
         responseType: 'blob',
       });
 
       // 创建下载链接
-      const blob = new Blob([response], {
+      const blob = new Blob([response.data], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
       const url = window.URL.createObjectURL(blob);
@@ -530,85 +528,82 @@ function RackManagement() {
       window.URL.revokeObjectURL(url);
 
       message.destroy();
-      message.success('机柜导出成功');
+      message.success(hasSelection ? `已导出 ${selectedRackIds.length} 个选中机柜` : '已导出全部机柜');
     } catch (error) {
       message.destroy();
       message.error('机柜导出失败');
       console.error('机柜导出失败:', error);
     }
-  }, []);
+  }, [selectedRackIds]);
 
   const handleImport = useCallback(
-    async file => {
-      try {
-        setIsImporting(true);
-        setImportProgress(0);
-        setImportPhase('正在上传文件...');
-        setImportResult(null);
+    (file, { onProgress } = {}) => {
+      return new Promise((resolve, reject) => {
+        const doImport = async () => {
+          try {
+            onProgress?.(10, '正在上传文件...');
 
-        const formData = new FormData();
-        formData.append('file', file);
+            const formData = new FormData();
+            formData.append('file', file);
 
-        const response = await api.post('/racks/import', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+            onProgress?.(50, '正在处理数据...');
 
-        setImportProgress(100);
-        setImportPhase('导入完成');
+            const response = await api.post('/racks/import', formData, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            });
 
-        const resData = response;
-        const importResult = {
-          total: resData.total || 0,
-          successCount: resData.imported || 0,
-          duplicates: resData.duplicates || 0,
-          failedCount: 0,
-          errors: [],
-          createdRacks: resData.createdRacks || [],
-          skippedRacks: resData.skippedRacks || [],
+            onProgress?.(100, '导入完成');
+
+            const resData = response;
+            const importResult = {
+              total: resData.total || 0,
+              successCount: resData.imported || 0,
+              duplicates: resData.duplicates || 0,
+              failedCount: 0,
+              errors: [],
+              createdRacks: resData.createdRacks || [],
+              skippedRacks: resData.skippedRacks || [],
+            };
+
+            if (resData.details && Array.isArray(resData.details)) {
+              importResult.failedCount = resData.details.length;
+              importResult.errors = resData.details.map(item => ({
+                row: item.row,
+                error: item.errors.join('；'),
+              }));
+            }
+
+            if (resData.success) {
+              message.success('机柜导入成功');
+            } else {
+              message.warning(resData.message || '部分记录导入失败');
+            }
+
+            fetchRacks();
+            resolve(importResult);
+          } catch (error) {
+            const errorData = error.response?.data;
+            if (errorData?.details && Array.isArray(errorData.details)) {
+              const importResult = {
+                total: errorData.total || 0,
+                successCount: 0,
+                failedCount: errorData.details.length,
+                errors: errorData.details.map(item => ({
+                  row: item.row,
+                  error: item.errors.join('；'),
+                })),
+              };
+              resolve(importResult);
+            } else {
+              message.error(errorData?.error || errorData?.message || '机柜导入失败');
+              console.error('机柜导入失败:', error);
+              reject(new Error(errorData?.error || errorData?.message || '机柜导入失败'));
+            }
+          }
         };
 
-        if (resData.details && Array.isArray(resData.details)) {
-          importResult.failedCount = resData.details.length;
-          importResult.errors = resData.details.map(item => ({
-            row: item.row,
-            error: item.errors.join('；'),
-          }));
-        }
-
-        setImportResult(importResult);
-        setIsImporting(false);
-
-        if (resData.success) {
-          message.success('机柜导入成功');
-        } else {
-          message.warning(resData.message || '部分记录导入失败');
-        }
-
-        fetchRacks();
-        return false;
-      } catch (error) {
-        setIsImporting(false);
-        setImportProgress(0);
-
-        const errorData = error.response?.data;
-        if (errorData?.details && Array.isArray(errorData.details)) {
-          const importResult = {
-            total: errorData.total || 0,
-            successCount: 0,
-            failedCount: errorData.details.length,
-            errors: errorData.details.map(item => ({
-              row: item.row,
-              error: item.errors.join('；'),
-            })),
-          };
-          setImportResult(importResult);
-          setImportPhase('导入失败');
-        } else {
-          message.error(errorData?.error || errorData?.message || '机柜导入失败');
-          console.error('机柜导入失败:', error);
-        }
-        return false;
-      }
+        doImport();
+      });
     },
     [fetchRacks]
   );
@@ -911,8 +906,12 @@ function RackManagement() {
             >
               导入
             </Button>
-            <Button icon={<DownloadOutlined />} onClick={handleExport} style={actionButtonStyle}>
-              导出
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+              style={actionButtonStyle}
+            >
+              {selectedRackIds.length > 0 ? `导出选中 (${selectedRackIds.length})` : '导出全部'}
             </Button>
             <Button
               type="primary"
@@ -1273,284 +1272,12 @@ function RackManagement() {
         )}
       </Drawer>
 
-      <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingRight: '32px' }}>
-            <div
-              style={{
-                width: '4px',
-                height: '20px',
-                background: designTokens.colors.primary.gradient,
-                borderRadius: '2px',
-              }}
-            />
-            导入机柜
-          </div>
-        }
-        open={importModalVisible}
-        closeIcon={<CloseButton />}
-        onCancel={() => {
-          setImportModalVisible(false);
-          setImportProgress(0);
-          setImportPhase('');
-          setImportResult(null);
-          setIsImporting(false);
-        }}
-        footer={null}
-        width={650}
-        destroyOnHidden
-        styles={{
-          body: { padding: '24px' },
-          header: {
-            borderBottom: '1px solid #f0f0f0',
-            padding: '16px 24px',
-            position: 'relative',
-          },
-        }}
-        style={{ borderRadius: '16px' }}
-      >
-        {!isImporting && !importResult ? (
-          <div>
-            <div
-              style={{
-                padding: '16px',
-                background: designTokens.colors.primary.bgGradient,
-                borderRadius: '12px',
-                marginBottom: '20px',
-                border: '1px solid #e8e8e8',
-              }}
-            >
-              <p style={{ margin: '0 0 12px 0', fontWeight: '600', color: '#262626' }}>
-                请上传XLSX格式的机柜数据文件
-              </p>
-              <p style={{ margin: 0, color: '#8c8c8c', fontSize: '12px' }}>支持的编码格式：UTF-8</p>
-            </div>
-
-            <div style={{ marginBottom: '24px' }}>
-              <p style={{ fontWeight: '600', marginBottom: '12px', color: '#262626' }}>
-                Excel文件格式要求：
-              </p>
-              <ul
-                style={{
-                  paddingLeft: '20px',
-                  marginBottom: '10px',
-                  color: '#595959',
-                  lineHeight: '1.8',
-                }}
-              >
-                <li>必填字段：机柜ID、机柜名称、所属机房名称、高度(U)、最大功率(W)、状态</li>
-                <li>状态值：active(在用)、maintenance(维护中)、inactive(停用)</li>
-                <li>高度和功率必须是数字格式</li>
-              </ul>
-            </div>
-
-            <div
-              style={{
-                padding: '16px',
-                background: '#f6f6f6',
-                borderRadius: '8px',
-                marginBottom: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-              }}
-            >
-              <Button
-                icon={<DownloadOutlined />}
-                onClick={handleDownloadTemplate}
-                style={actionButtonStyle}
-              >
-                下载导入模板
-              </Button>
-              <span style={{ color: '#8c8c8c', fontSize: '12px' }}>包含示例数据的XLSX模板文件</span>
-            </div>
-
-            <Upload
-              name="file"
-              accept=".xlsx, .xls"
-              showUploadList={false}
-              beforeUpload={handleImport}
-              maxCount={1}
-            >
-              <Button
-                type="primary"
-                icon={<UploadOutlined />}
-                block
-                style={{
-                  ...primaryButtonStyle,
-                  height: '48px',
-                  fontSize: '16px',
-                }}
-              >
-                选择Excel文件
-              </Button>
-            </Upload>
-          </div>
-        ) : isImporting ? (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-              <div
-                style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  background: designTokens.colors.primary.gradient,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: '16px',
-                  color: '#fff',
-                  fontSize: '20px',
-                }}
-              >
-                <UploadOutlined spin />
-              </div>
-              <div>
-                <p
-                  style={{
-                    margin: '0 0 4px 0',
-                    fontWeight: '600',
-                    color: '#333',
-                    fontSize: '16px',
-                  }}
-                >
-                  正在导入机柜数据
-                </p>
-                <p style={{ margin: 0, color: designTokens.colors.primary.main, fontSize: '14px' }}>
-                  {importPhase}
-                </p>
-              </div>
-            </div>
-            <Progress
-              percent={importProgress}
-              status="active"
-              strokeColor={{
-                '0%': '#667eea',
-                '100%': '#764ba2',
-              }}
-              format={() => `${importProgress}%`}
-            />
-          </div>
-        ) : (
-          importResult && (
-            <div>
-              <div
-                style={{
-                  padding: '20px',
-                  background: '#f6f6f6',
-                  borderRadius: '12px',
-                  marginBottom: '20px',
-                }}
-              >
-                <p style={{ marginBottom: '12px', fontWeight: '600' }}>导入结果：</p>
-                <p style={{ margin: '8px 0', color: '#52c41a' }}>
-                  ✓ 总记录数：{importResult.total || 0}
-                </p>
-                <p style={{ margin: '8px 0', color: '#52c41a' }}>
-                  ✓ 成功导入：{importResult.successCount || 0}
-                </p>
-                {importResult.failedCount > 0 && (
-                  <p style={{ margin: '8px 0', color: '#ff4d4f' }}>
-                    ✗ 导入失败：{importResult.failedCount}
-                  </p>
-                )}
-                {importResult.duplicates > 0 && (
-                  <p style={{ margin: '8px 0', color: '#faad14' }}>
-                    ⚠ 跳过（已存在）：{importResult.duplicates}
-                  </p>
-                )}
-              </div>
-
-              {importResult.createdRacks && importResult.createdRacks.length > 0 && (
-                <div style={{ marginBottom: '20px' }}>
-                  <p style={{ fontWeight: '600', marginBottom: '8px', color: '#52c41a' }}>
-                    ✓ 本次新增机柜（{importResult.createdRacks.length}）：
-                  </p>
-                  <div
-                    style={{
-                      maxHeight: '150px',
-                      overflow: 'auto',
-                      background: '#f6ffed',
-                      border: '1px solid #b7eb8f',
-                      borderRadius: '8px',
-                      padding: '12px',
-                    }}
-                  >
-                    {importResult.createdRacks.map((rack, idx) => (
-                      <div key={idx} style={{ fontSize: '13px', marginBottom: '4px' }}>
-                        • {rack.rackId} - {rack.name}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {importResult.skippedRacks && importResult.skippedRacks.length > 0 && (
-                <div style={{ marginBottom: '20px' }}>
-                  <p style={{ fontWeight: '600', marginBottom: '8px', color: '#faad14' }}>
-                    ⚠ 已跳过机柜（{importResult.skippedRacks.length}）：
-                  </p>
-                  <div
-                    style={{
-                      maxHeight: '150px',
-                      overflow: 'auto',
-                      background: '#fffbe6',
-                      border: '1px solid #ffe58f',
-                      borderRadius: '8px',
-                      padding: '12px',
-                    }}
-                  >
-                    {importResult.skippedRacks.map((rack, idx) => (
-                      <div key={idx} style={{ fontSize: '13px', marginBottom: '4px' }}>
-                        • {rack.rackId} - {rack.name}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {importResult.errors && importResult.errors.length > 0 && (
-                <div style={{ marginBottom: '20px' }}>
-                  <p style={{ fontWeight: '600', marginBottom: '8px', color: '#ff4d4f' }}>
-                    错误详情：
-                  </p>
-                  {importResult.errors.slice(0, 5).map((err, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        padding: '8px 12px',
-                        background: '#fff2f0',
-                        borderRadius: '6px',
-                        marginBottom: '8px',
-                        fontSize: '13px',
-                        color: '#cf1322',
-                      }}
-                    >
-                      第{err.row || idx + 1}行：{err.error}
-                    </div>
-                  ))}
-                  {importResult.errors.length > 5 && (
-                    <p style={{ color: '#8c8c8c', fontSize: '12px' }}>
-                      还有 {importResult.errors.length - 5} 处错误...
-                    </p>
-                  )}
-                </div>
-              )}
-              <Button
-                type="primary"
-                onClick={() => {
-                  setImportModalVisible(false);
-                  setImportResult(null);
-                  fetchRacks();
-                }}
-                style={primaryButtonStyle}
-              >
-                完成
-              </Button>
-            </div>
-          )
-        )}
-      </Modal>
+      <RackImportModal
+        visible={importModalVisible}
+        onClose={() => setImportModalVisible(false)}
+        onImport={handleImport}
+        onDownloadTemplate={handleDownloadTemplate}
+      />
     </div>
   );
 }

@@ -155,7 +155,7 @@ const ImportModal = ({ visible, deviceFields, onImport, onCancel }) => {
   const handleDownloadTemplate = async () => {
     try {
       const response = await deviceAPI.getImportTemplate();
-      const blob = new Blob([response], { type: 'text/csv; charset=gbk' });
+      const blob = new Blob([response.data], { type: 'text/csv; charset=gbk' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

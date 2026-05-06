@@ -20,20 +20,26 @@
 
 | 功能模块 | 描述 |
 |---------|------|
-| **机房管理** | 多机房管理，支持位置、面积、负责人等详细信息 |
-| **机柜管理** | 机柜增删改查，容量统计，3D可视化展示 |
-| **设备管理** | 服务器、网络设备、存储设备全生命周期管理，支持批量导入/导出 |
-| **端口管理** | 设备端口配置与管理，支持网卡绑定 |
-| **线缆管理** | 机柜间线缆连接管理，可视化追踪 |
-| **工单管理** | 故障报修、维护工单全流程管理，支持自定义字段、故障分类 |
-| **耗材管理** | 耗材库存、领用记录、统计报表管理，支持SN序列号追踪 |
-| **盘点管理** | 盘点计划制定与执行，盘点任务分配与结果记录 |
-| **数据看板** | 实时监控数据中心整体运行状态，设备趋势图表 |
-| **3D可视化** | 三维机柜可视化展示，支持设备悬停详情、LOD优化、性能模式 |
-| **系统配置** | 设备字段、工单字段自定义管理，背景配置，系统设置 |
-| **用户权限** | 基于角色的权限控制（RBAC），用户审核机制 |
+| **机房管理** | 多机房管理，支持位置、面积、负责人等详细信息，机房平面图可视化 |
+| **机柜管理** | 机柜增删改查，容量统计，3D可视化展示，批量导入/导出 |
+| **设备管理** | 服务器、网络设备、存储设备全生命周期管理，支持批量导入/导出，导入预览，自定义字段搜索 |
+| **端口管理** | 设备端口配置与管理，支持网卡绑定，批量导入/导出，端口命名模板 |
+| **线缆管理** | 机柜间线缆连接管理，可视化追踪，线缆向导 |
+| **网络拓扑** | 网络拓扑可视化展示（ReactFlow），交换机/设备拓扑查询，自定义节点 |
+| **工单管理** | 故障报修、维护工单全流程管理，支持自定义字段、故障分类、工单评价、导出 |
+| **耗材管理** | 耗材库存、领用记录、统计报表管理，支持SN序列号追踪、批量导入、日志归档 |
+| **盘点管理** | 盘点计划制定与执行，盘点任务分配与结果记录，暂存设备管理 |
+| **空闲设备** | 空闲设备管理，支持设备转入/激活空闲状态 |
+| **仓库管理** | 仓库信息管理，支持仓库与耗材关联 |
+| **数据看板** | 实时监控数据中心整体运行状态，设备趋势图表，功率监控 |
+| **3D可视化** | 三维机柜可视化展示，支持设备悬停详情、LOD优化、性能模式、U位标识 |
+| **机房平面图** | Canvas渲染机房平面图，机柜位置拖拽编辑，热力图，小地图导航 |
+| **操作日志** | 操作日志审计，支持按模块/类型/时间筛选，操作统计 |
 | **备份管理** | 数据库备份与恢复，自动定时备份，多协议远程备份（FTP/SFTP/WebDAV/SMB） |
 | **统计分析** | 设备、工单、耗材等多维度统计报表，用户增长趋势分析 |
+| **系统配置** | 设备字段、工单字段自定义管理，背景配置，系统设置导入/导出 |
+| **用户权限** | 基于角色的权限控制（RBAC），用户审核机制 |
+| **API文档** | Swagger交互式API文档，支持在线调试 |
 
 ### 项目截图
 
@@ -412,13 +418,16 @@ jigui/
 │   │   ├── components/            # 通用组件
 │   │   │   ├── 3d/                # 3D可视化组件
 │   │   │   │   ├── materials/     # 3D材质组件
+│   │   │   │   │   ├── TextureCache.js  # 纹理缓存
 │   │   │   │   │   ├── constants.jsx
 │   │   │   │   │   ├── devicePanel.jsx
 │   │   │   │   │   ├── index.jsx
 │   │   │   │   │   ├── rackFrame.jsx
 │   │   │   │   │   └── utils.jsx
+│   │   │   │   ├── CascadingRackPanel.jsx  # 级联机柜面板
 │   │   │   │   ├── DeviceModel.jsx   # 设备模型
 │   │   │   │   ├── RackModel.jsx     # 机柜模型
+│   │   │   │   ├── RackSelectorHeader.jsx  # 机柜选择头部
 │   │   │   │   ├── Scene.jsx         # 3D场景
 │   │   │   │   └── LODManager.jsx    # LOD管理器
 │   │   │   ├── dashboard/           # 数据看板组件
@@ -440,16 +449,26 @@ jigui/
 │   │   │   │   ├── ImportModal.jsx
 │   │   │   │   └── ResizableTitle.jsx
 │   │   │   ├── CableCreateModal.jsx
+│   │   │   ├── CableWizardModal.jsx
 │   │   │   ├── CloseButton.jsx
+│   │   │   ├── ConsumableTimelineModal.jsx
+│   │   │   ├── DangerConfirmModal.jsx
 │   │   │   ├── DeviceDetailDrawer.jsx
 │   │   │   ├── ErrorBoundary.jsx
+│   │   │   ├── FilterableDeviceSelect.jsx
+│   │   │   ├── MaintenanceBanner.jsx
 │   │   │   ├── NetworkCardCreateModal.jsx
+│   │   │   ├── NetworkCardImportModal.jsx
 │   │   │   ├── NetworkCardPanel.jsx
+│   │   │   ├── PortAddGuideModal.jsx
 │   │   │   ├── PortCreateModal.jsx
+│   │   │   ├── PortExportModal.jsx
 │   │   │   ├── PortManagementPanel.jsx
 │   │   │   ├── PortPanel.jsx
 │   │   │   ├── ProtectedRoute.jsx
 │   │   │   ├── ServerBackplanePanel.jsx
+│   │   │   ├── ServerNicCard.jsx
+│   │   │   ├── TicketExportModal.jsx
 │   │   │   └── VirtualDeviceList.jsx
 │   │   ├── config/                # 配置文件
 │   │   │   ├── api.js             # API配置
@@ -470,9 +489,11 @@ jigui/
 │   │   │   ├── Dashboard.jsx         # 数据看板
 │   │   │   ├── Login.jsx             # 登录页面
 │   │   │   ├── RoomManagement.jsx     # 机房管理
+│   │   │   ├── RoomFloorPlan.jsx      # 机房平面图
 │   │   │   ├── RackManagement.jsx     # 机柜管理
 │   │   │   ├── DeviceManagement.jsx   # 设备管理
 │   │   │   ├── DeviceFieldManagement.jsx # 设备字段管理
+│   │   │   ├── IdleDeviceManagement.jsx # 空闲设备管理
 │   │   │   ├── PendingDeviceManagement.jsx # 待审核设备管理
 │   │   │   ├── PortManagement.jsx     # 端口管理
 │   │   │   ├── CableManagement.jsx    # 线缆管理
@@ -486,6 +507,7 @@ jigui/
 │   │   │   ├── ConsumableStatistics.jsx # 耗材统计
 │   │   │   ├── InventoryManagement.jsx # 盘点管理
 │   │   │   ├── InventoryTaskExecution.jsx # 盘点任务执行
+│   │   │   ├── OperationLogs.jsx       # 操作日志
 │   │   │   ├── UserManagement.jsx      # 用户管理
 │   │   │   ├── RolesManagement.jsx      # 角色管理
 │   │   │   ├── SystemSettings.jsx     # 系统设置
@@ -515,6 +537,7 @@ jigui/
 │   ├── config/                    # 配置文件
 │   │   ├── index.js              # 配置统一导出
 │   │   ├── constants.js          # 常量配置
+│   │   ├── routes.js             # 路由注册配置
 │   │   ├── security.js           # 安全配置
 │   │   ├── auto-backup-settings.json # 自动备份设置
 │   │   └── remote-backup-configs.json # 远程备份配置
@@ -548,6 +571,11 @@ jigui/
 │   │   ├── UserRole.js           # 用户角色关联模型
 │   │   ├── SystemSetting.js      # 系统设置模型
 │   │   ├── PendingDevice.js      # 待审核设备模型
+│   │   ├── OperationLog.js       # 操作日志模型
+│   │   ├── BackupLog.js          # 备份日志模型
+│   │   ├── Warehouse.js          # 仓库模型
+│   │   ├── Business.js           # 业务模型
+│   │   ├── DeviceBusiness.js     # 设备业务关联模型
 │   │   └── ticketIndex.js        # 工单模型初始化
 │   ├── routes/                    # API路由
 │   │   ├── auth.js               # 认证路由
@@ -564,6 +592,7 @@ jigui/
 │   │   ├── consumables.js        # 耗材路由
 │   │   ├── consumableCategories.js # 耗材分类路由
 │   │   ├── consumableRecords.js  # 耗材记录路由
+│   │   ├── consumableImport.js   # 耗材导入路由
 │   │   ├── inventory.js          # 盘点路由
 │   │   ├── users.js              # 用户路由
 │   │   ├── roles.js              # 角色路由
@@ -571,10 +600,18 @@ jigui/
 │   │   ├── background.js         # 背景配置路由
 │   │   ├── backup.js             # 备份管理路由
 │   │   ├── statistics.js         # 统计分析路由
+│   │   ├── operationLogs.js      # 操作日志路由
+│   │   ├── idleDevices.js        # 空闲设备路由
+│   │   ├── warehouses.js         # 仓库管理路由
+│   │   ├── dangerousOperations.js # 危险操作路由
+│   │   ├── topology.js           # 拓扑管理路由
 │   │   └── ticketCategories.js   # 工单分类路由
 │   ├── scripts/                   # 数据库脚本
 │   │   ├── init-database.js      # 数据库初始化
 │   │   ├── migrate-all.js         # 执行所有迁移脚本
+│   │   ├── fix-foreign-keys.js   # 外键约束修复
+│   │   ├── migrate-logs.js       # 日志迁移
+│   │   ├── migrate-cable-fields.js # 线缆字段迁移
 │   │   ├── archive/               # 归档迁移脚本
 │   │   │   ├── migrate-v2.js
 │   │   │   ├── migrate-consumable-logs.js
@@ -590,7 +627,8 @@ jigui/
 │   │   ├── add-isSystem-mysql.js
 │   │   ├── add-isSystem-sqlite.js
 │   │   ├── update-system-fields.js
-│   │   └── update-system-fields-v2.js
+│   │   ├── update-system-fields-v2.js
+│   │   └── generate-rack-import-template.js
 │   ├── utils/                     # 工具函数
 │   │   ├── autoBackupScheduler.js # 自动备份调度器
 │   │   ├── backup.js             # 备份工具

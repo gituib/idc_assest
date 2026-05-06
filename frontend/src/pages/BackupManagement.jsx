@@ -224,9 +224,9 @@ const BackupManagement = () => {
 
   const handleDownload = async filename => {
     try {
-      const blob = await backupAPI.download(filename);
+      const response = await backupAPI.download(filename);
       // 创建临时链接并触发下载
-      const url = window.URL.createObjectURL(blob);
+      const url = window.URL.createObjectURL(response.data);
       const link = document.createElement('a');
       link.href = url;
       link.download = filename;

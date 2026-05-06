@@ -21,11 +21,16 @@
 - [耗材管理接口](#耗材管理接口)
 - [耗材分类接口](#耗材分类接口)
 - [耗材记录接口](#耗材记录接口)
+- [盘点管理接口](#盘点管理接口)
+- [空闲设备接口](#空闲设备接口)
+- [操作日志接口](#操作日志接口)
+- [备份管理接口](#备份管理接口)
+- [仓库管理接口](#仓库管理接口)
+- [拓扑管理接口](#拓扑管理接口)
 - [用户管理接口](#用户管理接口)
 - [角色管理接口](#角色管理接口)
 - [系统设置接口](#系统设置接口)
 - [背景配置接口](#背景配置接口)
-- [盘点管理接口](#盘点管理接口)
 - [健康检查接口](#健康检查接口)
 - [错误码说明](#错误码说明)
 
@@ -2310,9 +2315,418 @@ GET /health
 | /api/inventory/pending-devices/:pendingId | GET/PUT/DELETE | 暂存设备详情/更新/删除 |
 | /api/inventory/pending-devices/:pendingId/sync | POST | 同步暂存设备 |
 | /api/inventory/pending-devices/batch-sync | POST | 批量同步暂存设备 |
+
+---
+
+## 空闲设备接口
+
+### 获取空闲设备列表
+
+```http
+GET /api/idle-devices
+```
+
+**查询参数：**
+
+| 参数名 | 类型 | 描述 |
+|--------|------|------|
+| keyword | string | 关键词搜索 |
+| roomId | string | 按机房筛选 |
+| page | number | 页码 |
+| pageSize | number | 每页数量 |
+
+### 添加空闲设备
+
+```http
+POST /api/idle-devices
+```
+
+**请求参数：**
+
+| 参数名 | 类型 | 必填 | 描述 |
+|--------|------|------|------|
+| deviceId | string | 是 | 设备ID |
+
+### 激活空闲设备
+
+```http
+PUT /api/idle-devices/:deviceId/activate
+```
+
+### 删除空闲设备
+
+```http
+DELETE /api/idle-devices/:deviceId
+```
+
+---
+
+## 操作日志接口
+
+### 获取操作日志列表
+
+```http
+GET /api/operation-logs
+```
+
+**查询参数：**
+
+| 参数名 | 类型 | 描述 |
+|--------|------|------|
+| module | string | 按模块筛选 |
+| operationType | string | 按操作类型筛选 |
+| startDate | string | 开始日期 |
+| endDate | string | 结束日期 |
+| operator | string | 按操作人筛选 |
+| keyword | string | 关键词搜索 |
+| page | number | 页码 |
+| pageSize | number | 每页数量 |
+
+### 获取模块列表
+
+```http
+GET /api/operation-logs/modules
+```
+
+### 获取操作类型列表
+
+```http
+GET /api/operation-logs/types
+```
+
+### 获取操作日志统计
+
+```http
+GET /api/operation-logs/statistics
+```
+
+**查询参数：**
+
+| 参数名 | 类型 | 描述 |
+|--------|------|------|
+| startDate | string | 开始日期 |
+| endDate | string | 结束日期 |
+
+### 获取操作日志详情
+
+```http
+GET /api/operation-logs/:recordId
+```
+
+---
+
+## 备份管理接口
+
+### 创建备份
+
+```http
+POST /api/backup
+```
+
+### 获取备份列表
+
+```http
+GET /api/backup/list
+```
+
+### 验证备份文件
+
+```http
+GET /api/backup/validate/:filename
+```
+
+### 获取恢复进度（SSE）
+
+```http
+GET /api/backup/restore-progress/:filename
+```
+
+**说明：** 返回 Server-Sent Events 流，实时推送恢复进度
+
+### 恢复备份
+
+```http
+POST /api/backup/restore
+```
+
+**请求参数：**
+
+| 参数名 | 类型 | 必填 | 描述 |
+|--------|------|------|------|
+| filename | string | 是 | 备份文件名 |
+
+### 上传备份文件
+
+```http
+POST /api/backup/upload
+```
+
+**Content-Type**: `multipart/form-data`
+
+### 下载备份文件
+
+```http
+GET /api/backup/download/:filename
+```
+
+### 删除备份文件
+
+```http
+DELETE /api/backup/:filename
+```
+
+### 获取备份信息
+
+```http
+GET /api/backup/info
+```
+
+### 清理旧备份
+
+```http
+POST /api/backup/clean
+```
+
+**请求参数：**
+
+| 参数名 | 类型 | 必填 | 描述 |
+|--------|------|------|------|
+| keepCount | number | 否 | 保留的备份数量 |
+
+### 获取自动备份状态
+
+```http
+GET /api/backup/auto/status
+```
+
+### 更新自动备份设置
+
+```http
+POST /api/backup/auto/settings
+```
+
+**请求参数：**
+
+| 参数名 | 类型 | 必填 | 描述 |
+|--------|------|------|------|
+| enabled | boolean | 是 | 是否启用 |
+| cronExpression | string | 否 | Cron 表达式 |
+| keepCount | number | 否 | 保留数量 |
+
+### 立即执行自动备份
+
+```http
+POST /api/backup/auto/execute
+```
+
+### 测试 Cron 表达式
+
+```http
+POST /api/backup/auto/test-cron
+```
+
+**请求参数：**
+
+| 参数名 | 类型 | 必填 | 描述 |
+|--------|------|------|------|
+| cronExpression | string | 是 | Cron 表达式 |
+
+### 获取远端备份目标列表
+
+```http
+GET /api/backup/remote/targets
+```
+
+### 获取单个远端备份目标
+
+```http
+GET /api/backup/remote/targets/:id
+```
+
+### 添加远端备份目标
+
+```http
+POST /api/backup/remote/targets
+```
+
+**请求参数：**
+
+| 参数名 | 类型 | 必填 | 描述 |
+|--------|------|------|------|
+| name | string | 是 | 目标名称 |
+| protocol | string | 是 | 协议（ftp/sftp/webdav/smb） |
+| host | string | 是 | 主机地址 |
+| port | number | 否 | 端口号 |
+| username | string | 否 | 用户名 |
+| password | string | 否 | 密码 |
+| remotePath | string | 否 | 远程目录 |
+
+### 更新远端备份目标
+
+```http
+PUT /api/backup/remote/targets/:id
+```
+
+### 删除远端备份目标
+
+```http
+DELETE /api/backup/remote/targets/:id
+```
+
+### 测试远端连接
+
+```http
+POST /api/backup/remote/test
+```
+
+### 测试指定远端连接
+
+```http
+POST /api/backup/remote/targets/:id/test
+```
+
+### 获取远端备份设置
+
+```http
+GET /api/backup/remote/settings
+```
+
+### 更新远端备份设置
+
+```http
+PUT /api/backup/remote/settings
+```
+
+### 获取支持的协议列表
+
+```http
+GET /api/backup/remote/protocols
+```
+
+### 手动上传备份到远端
+
+```http
+POST /api/backup/remote/upload
+```
+
+**请求参数：**
+
+| 参数名 | 类型 | 必填 | 描述 |
+|--------|------|------|------|
+| filename | string | 是 | 备份文件名 |
+| targetId | string | 是 | 远端目标ID |
+
+### 获取备份日志列表
+
+```http
+GET /api/backup/logs
+```
+
+### 获取备份日志详情
+
+```http
+GET /api/backup/logs/:id
+```
+
+### 清理旧备份日志
+
+```http
+DELETE /api/backup/logs/clean
+```
+
+---
+
+## 仓库管理接口
+
+### 获取仓库列表
+
+```http
+GET /api/warehouses
+```
+
+### 创建仓库
+
+```http
+POST /api/warehouses
+```
+
+**请求参数：**
+
+| 参数名 | 类型 | 必填 | 描述 |
+|--------|------|------|------|
+| name | string | 是 | 仓库名称 |
+| location | string | 否 | 仓库位置 |
+| description | string | 否 | 描述 |
+| manager | string | 否 | 负责人 |
+| contact | string | 否 | 联系方式 |
+
+### 获取单个仓库
+
+```http
+GET /api/warehouses/:warehouseId
+```
+
+### 更新仓库
+
+```http
+PUT /api/warehouses/:warehouseId
+```
+
+### 删除仓库
+
+```http
+DELETE /api/warehouses/:warehouseId
+```
+
+---
+
+## 拓扑管理接口
+
+### 获取交换机拓扑
+
+```http
+GET /api/topology/switch/:switchId
+```
+
+**响应示例：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "switch": {
+      "deviceId": "dev001",
+      "name": "核心交换机",
+      "type": "switch"
+    },
+    "connections": [
+      {
+        "deviceId": "dev002",
+        "name": "服务器01",
+        "type": "server",
+        "port": "eth0",
+        "cableId": "cable001"
+      }
+    ]
+  }
+}
+```
+
+### 获取设备拓扑
+
+```http
+GET /api/topology/device/:deviceId
+```
+
+---
+
+## 健康检查接口
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
 | /health | GET | 服务健康检查 |
 
 ---
 
 **文档版本：** 2.0.0  
-**最后更新：** 2026-03-11
+**最后更新：** 2026年5月

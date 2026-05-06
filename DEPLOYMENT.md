@@ -658,6 +658,23 @@ server {
     location /health {
         proxy_pass http://idc_backend/health;
     }
+
+    # Swagger API文档（v2.0.0新增）
+    location /api-docs {
+        proxy_pass http://idc_backend/api-docs;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    # SSE 备份恢复进度推送（v2.0.0新增）
+    location ~ ^/api/backup/restore-progress/ {
+        proxy_pass http://idc_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection '';
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding off;
+    }
 }
 ```
 
@@ -716,6 +733,14 @@ innodb_buffer_pool_size=1G
 
 ### 数据备份
 
+#### 系统内置备份（推荐）
+
+v2.0.0 新增了内置备份管理功能，支持手动备份、自动定时备份和远端备份。
+
+1. **手动备份**：在系统管理 → 备份管理中点击「创建备份」
+2. **自动备份**：在系统管理 → 自动备份中配置 Cron 表达式定时备份
+3. **远端备份**：在系统管理 → 远端备份中配置 FTP/SFTP/WebDAV/SMB 协议上传
+
 #### SQLite备份
 
 ```bash
@@ -773,6 +798,9 @@ curl http://localhost:8000/health
 
 # API测试
 curl http://localhost:8000/api/rooms
+
+# Swagger API文档（v2.0.0新增）
+# 浏览器访问 http://localhost:8000/api-docs
 
 # 上传接口测试
 curl -X POST http://localhost:8000/api/auth/login \
@@ -837,6 +865,17 @@ node update.js --force
 - ✅ **锁机制** - 防止多个更新进程同时运行
 
 ### 方式二：手动更新
+
+#### v2.0.0 升级注意事项
+
+从 1.x 版本升级到 2.0.0 时，请注意以下事项：
+
+1. **数据库迁移**：新增了 BackupLog、OperationLog、Warehouse、Business、DeviceBusiness、ConsumableLogArchive 等数据表，务必运行迁移脚本
+2. **JWT 安全增强**：建议更新生产环境的 JWT_SECRET 配置为强随机密钥
+3. **新增依赖**：后端新增了 basic-ftp、ssh2-sftp-client、webdav、smb2、node-cron、swagger-jsdoc、swagger-ui-express 等依赖
+4. **3D 引擎升级**：Three.js 从 0.160.0 升级到 0.183.2，请确认浏览器兼容性
+5. **Swagger 文档**：新增交互式 API 文档，可通过 `/api-docs` 访问
+6. **备份目录**：确保 `backend/backups/` 目录存在且有写入权限
 
 #### 1. 备份数据
 
