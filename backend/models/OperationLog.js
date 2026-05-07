@@ -1,3 +1,9 @@
+/**
+ * 操作日志模型
+ * 支持请求追踪ID（requestId）关联
+ * 支持复合索引优化查询性能
+ */
+
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
 
@@ -72,6 +78,10 @@ const OperationLog = sequelize.define(
       type: DataTypes.STRING,
       comment: '用户代理',
     },
+    requestId: {
+      type: DataTypes.STRING,
+      comment: '请求追踪ID，关联HTTP请求日志',
+    },
     metadata: {
       type: DataTypes.JSON,
       defaultValue: {},
@@ -87,6 +97,8 @@ const OperationLog = sequelize.define(
       { fields: ['targetId'] },
       { fields: ['operatorId'] },
       { fields: ['createdAt'] },
+      { fields: ['requestId'] },
+      { fields: ['module', 'createdAt'] },
     ],
   }
 );

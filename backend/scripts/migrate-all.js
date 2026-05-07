@@ -128,6 +128,11 @@ const migrations = [
     description: '为 racks 表添加 rowPos、colPos、facing 字段，支持机柜位置定位',
     migrate: migrateRackPositionFields,
   },
+  {
+    name: '操作日志请求追踪',
+    description: '为 operation_logs 表添加 requestId 字段和复合索引，支持请求追踪',
+    migrate: migrateOperationLogRequestId,
+  },
 ];
 
 async function runMigrations() {
@@ -898,6 +903,52 @@ async function migrateRackPositionFields() {
     await addColumnIfNotExists(tableName, col.name, col.def);
   }
   console.log('    机柜位置字段迁移完成');
+}
+
+async function addIndexIfNotExists(tableName, indexName, fields) {
+  const dialect = sequelize.getDialect();
+  try {
+    if (dialect === 'sqlite') {
+      await sequelize.query(
+        `CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName}(${fields.join(', ')})`
+      );
+    } else {
+      const [indexes] = await sequelize.query(
+        `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_NAME = ? AND INDEX_NAME = ? AND TABLE_SCHEMA = DATABASE()`,
+        { replacements: [tableName, indexName], type: sequelize.QueryTypes.SELECT }
+      );
+      if (!indexes || indexes.length === 0) {
+        await sequelize.query(
+          `CREATE INDEX \`${indexName}\` ON \`${tableName}\`(\`${fields.join('`, `')}\`)`
+        );
+      } else {
+        console.log(`    索引 ${indexName} 已存在，跳过`);
+        return;
+      }
+    }
+    console.log(`    索引 ${indexName} 创建成功`);
+  } catch (error) {
+    if (error.message.includes('already exists') || error.message.includes('Duplicate key name')) {
+      console.log(`    索引 ${indexName} 已存在，跳过`);
+    } else {
+      throw error;
+    }
+  }
+}
+
+async function migrateOperationLogRequestId() {
+  const tableName = 'operation_logs';
+
+  if (!(await tableExists(tableName))) {
+    console.log(`    ${tableName} 表不存在，跳过`);
+    return;
+  }
+
+  await addColumnIfNotExists(tableName, 'requestId', 'VARCHAR(255)');
+  await addIndexIfNotExists(tableName, 'operation_logs_requestId', ['requestId']);
+  await addIndexIfNotExists(tableName, 'operation_logs_module_createdAt', ['module', 'createdAt']);
+
+  console.log('    操作日志requestId字段和索引迁移完成');
 }
 
 // 执行迁移
