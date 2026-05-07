@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { RACK_STATUS_COLORS } from '../canvas/CanvasConstants';
+import { DetailSection, DetailSectionTitle } from '../styles';
 
 const statusMap = {
   active: { text: '在用', color: 'blue' },
@@ -80,8 +81,8 @@ const RackDetailPanel = ({ rack, visible, onClose }) => {
         <Descriptions.Item label="设备数量">{rack.deviceCount || 0} 台</Descriptions.Item>
       </Descriptions>
 
-      <div style={{ marginTop: 16 }}>
-        <div style={{ marginBottom: 8, fontWeight: 500 }}>U位使用率</div>
+      <DetailSection>
+        <DetailSectionTitle>U位使用率</DetailSectionTitle>
         <Progress
           percent={utilization}
           strokeColor={
@@ -90,12 +91,12 @@ const RackDetailPanel = ({ rack, visible, onClose }) => {
           }
           format={() => `${rack.usedU || 0}/${rack.totalU || rack.height || 0}U`}
         />
-      </div>
+      </DetailSection>
 
-      <div style={{ marginTop: 16 }}>
-        <div style={{ marginBottom: 8, fontWeight: 500 }}>
+      <DetailSection>
+        <DetailSectionTitle>
           <ThunderboltOutlined /> 功率
-        </div>
+        </DetailSectionTitle>
         <Progress
           percent={powerPercent}
           strokeColor={
@@ -104,7 +105,7 @@ const RackDetailPanel = ({ rack, visible, onClose }) => {
           }
           format={() => `${rack.currentPower || 0}/${rack.maxPower || 0}W`}
         />
-      </div>
+      </DetailSection>
     </Drawer>
   );
 };

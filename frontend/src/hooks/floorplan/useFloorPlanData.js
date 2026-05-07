@@ -30,59 +30,11 @@ const useFloorPlanData = (roomId) => {
     fetchLayout();
   }, [fetchLayout]);
 
-  const updateRackPosition = useCallback(async (rackId, rowPos, colPos, facing) => {
-    try {
-      await axios.put(`/api/racks/${rackId}/position`, { rowPos, colPos, facing });
-      await fetchLayout();
-      return true;
-    } catch (err) {
-      setError(err.response?.data?.error || err.message);
-      return false;
-    }
-  }, [fetchLayout]);
-
-  const batchUpdatePositions = useCallback(async (positions) => {
-    try {
-      await axios.put(`/api/rooms/${roomId}/racks-positions`, { positions });
-      await fetchLayout();
-      return true;
-    } catch (err) {
-      setError(err.response?.data?.error || err.message);
-      return false;
-    }
-  }, [roomId, fetchLayout]);
-
-  const updateLayout = useCallback(async (gridRows, gridCols, layoutConfig) => {
-    try {
-      await axios.put(`/api/rooms/${roomId}/layout`, { gridRows, gridCols, layoutConfig });
-      await fetchLayout();
-      return true;
-    } catch (err) {
-      setError(err.response?.data?.error || err.message);
-      return false;
-    }
-  }, [roomId, fetchLayout]);
-
-  const initLayout = useCallback(async (gridRows, gridCols, layoutConfig) => {
-    try {
-      await axios.post(`/api/rooms/${roomId}/init-layout`, { gridRows, gridCols, layoutConfig });
-      await fetchLayout();
-      return true;
-    } catch (err) {
-      setError(err.response?.data?.error || err.message);
-      return false;
-    }
-  }, [roomId, fetchLayout]);
-
   return {
     layoutData,
     loading,
     error,
     refetch: fetchLayout,
-    updateRackPosition,
-    batchUpdatePositions,
-    updateLayout,
-    initLayout,
   };
 };
 

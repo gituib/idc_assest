@@ -4,13 +4,9 @@ const initialState = {
   selectedRoomId: null,
   selectedRack: null,
   hoveredRack: null,
-  viewMode: 'standard',
-  heatMapDimension: 'utilization',
-  editMode: false,
   zoom: 1,
   offsetX: 0,
   offsetY: 0,
-  searchRackId: null,
   detailRack: null,
   detailVisible: false,
 };
@@ -19,10 +15,7 @@ const actionTypes = {
   SET_SELECTED_ROOM: 'SET_SELECTED_ROOM',
   SET_SELECTED_RACK: 'SET_SELECTED_RACK',
   SET_HOVERED_RACK: 'SET_HOVERED_RACK',
-  SET_VIEW_MODE: 'SET_VIEW_MODE',
-  SET_EDIT_MODE: 'SET_EDIT_MODE',
   SET_VIEW_CHANGE: 'SET_VIEW_CHANGE',
-  SET_SEARCH_RACK: 'SET_SEARCH_RACK',
   SHOW_DETAIL: 'SHOW_DETAIL',
   HIDE_DETAIL: 'HIDE_DETAIL',
   RESET: 'RESET',
@@ -36,7 +29,6 @@ function floorPlanReducer(state, action) {
         selectedRoomId: action.payload,
         selectedRack: null,
         hoveredRack: null,
-        searchRackId: null,
         detailRack: null,
         detailVisible: false,
       };
@@ -44,14 +36,6 @@ function floorPlanReducer(state, action) {
       return { ...state, selectedRack: action.payload };
     case actionTypes.SET_HOVERED_RACK:
       return { ...state, hoveredRack: action.payload };
-    case actionTypes.SET_VIEW_MODE:
-      return {
-        ...state,
-        viewMode: action.payload.mode,
-        heatMapDimension: action.payload.dimension || state.heatMapDimension,
-      };
-    case actionTypes.SET_EDIT_MODE:
-      return { ...state, editMode: action.payload };
     case actionTypes.SET_VIEW_CHANGE:
       return {
         ...state,
@@ -59,8 +43,6 @@ function floorPlanReducer(state, action) {
         offsetX: action.payload.offsetX,
         offsetY: action.payload.offsetY,
       };
-    case actionTypes.SET_SEARCH_RACK:
-      return { ...state, searchRackId: action.payload };
     case actionTypes.SHOW_DETAIL:
       return {
         ...state,
@@ -97,20 +79,8 @@ export const FloorPlanProvider = ({ children }) => {
     dispatch({ type: actionTypes.SET_HOVERED_RACK, payload: rack });
   }, []);
 
-  const setViewMode = useCallback((mode, dimension) => {
-    dispatch({ type: actionTypes.SET_VIEW_MODE, payload: { mode, dimension } });
-  }, []);
-
-  const setEditMode = useCallback((enabled) => {
-    dispatch({ type: actionTypes.SET_EDIT_MODE, payload: enabled });
-  }, []);
-
   const setViewChange = useCallback((viewState) => {
     dispatch({ type: actionTypes.SET_VIEW_CHANGE, payload: viewState });
-  }, []);
-
-  const setSearchRack = useCallback((rackId) => {
-    dispatch({ type: actionTypes.SET_SEARCH_RACK, payload: rackId });
   }, []);
 
   const showDetail = useCallback((rack) => {
@@ -126,10 +96,7 @@ export const FloorPlanProvider = ({ children }) => {
     setSelectedRoom,
     setSelectedRack,
     setHoveredRack,
-    setViewMode,
-    setEditMode,
     setViewChange,
-    setSearchRack,
     showDetail,
     hideDetail,
   };

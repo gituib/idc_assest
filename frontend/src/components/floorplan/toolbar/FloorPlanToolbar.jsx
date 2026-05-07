@@ -1,8 +1,9 @@
 import React from 'react';
-import { Space, Tooltip } from 'antd';
-import { ReloadOutlined, FullscreenOutlined, FullscreenExitOutlined } from '@ant-design/icons';
+import { Button, Space, Tooltip } from 'antd';
+import { ReloadOutlined, FullscreenOutlined, FullscreenExitOutlined, DownloadOutlined } from '@ant-design/icons';
 import RoomSelector from './RoomSelector';
 import ZoomControls from './ZoomControls';
+import { ToolbarWrapper, ToolbarDivider } from '../styles';
 
 const FloorPlanToolbar = ({
   selectedRoomId,
@@ -14,31 +15,16 @@ const FloorPlanToolbar = ({
   onRefresh,
   isFullscreen,
   onToggleFullscreen,
+  onExport,
 }) => {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '10px 20px',
-        background: '#ffffff',
-        borderBottom: '1px solid rgba(0,0,0,0.05)',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-        flexWrap: 'wrap',
-        gap: 12,
-      }}
-    >
+    <ToolbarWrapper>
       <Space size={14} align="center">
         <RoomSelector
           selectedRoomId={selectedRoomId}
           onRoomChange={onRoomChange}
         />
-        <div style={{
-          width: 1,
-          height: 28,
-          background: '#e8e8e8',
-        }} />
+        <ToolbarDivider />
         <ZoomControls
           zoom={zoom}
           onZoomIn={onZoomIn}
@@ -48,73 +34,38 @@ const FloorPlanToolbar = ({
       </Space>
 
       <Space size={10} align="center">
+        {onExport && (
+          <Tooltip title="导出图片" placement="bottom">
+            <Button
+              type="text"
+              icon={<DownloadOutlined />}
+              onClick={onExport}
+              style={{ fontSize: 16 }}
+            />
+          </Tooltip>
+        )}
+
         <Tooltip title={isFullscreen ? '退出全屏' : '全屏查看'} placement="bottom">
-          <button
+          <Button
+            type="text"
+            icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
             onClick={onToggleFullscreen}
-            style={{
-              width: 36,
-              height: 36,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: '#fff',
-              border: '1px solid #e8e8e8',
-              borderRadius: 8,
-              cursor: 'pointer',
-              color: '#595959',
-              transition: 'all 0.2s',
-              fontSize: 16,
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.background = '#f8f9fa';
-              e.target.style.borderColor = '#d9d9d9';
-              e.target.style.color = '#262626';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = '#fff';
-              e.target.style.borderColor = '#e8e8e8';
-              e.target.style.color = '#595959';
-            }}
-          >
-            {isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
-          </button>
+            style={{ fontSize: 16 }}
+          />
         </Tooltip>
 
         {onRefresh && (
           <Tooltip title="刷新数据" placement="bottom">
-            <button
+            <Button
+              type="text"
+              icon={<ReloadOutlined />}
               onClick={onRefresh}
-              style={{
-                width: 36,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#fff',
-                border: '1px solid #e8e8e8',
-                borderRadius: 8,
-                cursor: 'pointer',
-                color: '#595959',
-                transition: 'all 0.2s',
-                fontSize: 16,
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = '#f8f9fa';
-                e.target.style.borderColor = '#d9d9d9';
-                e.target.style.color = '#262626';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = '#fff';
-                e.target.style.borderColor = '#e8e8e8';
-                e.target.style.color = '#595959';
-              }}
-            >
-              <ReloadOutlined />
-            </button>
+              style={{ fontSize: 16 }}
+            />
           </Tooltip>
         )}
       </Space>
-    </div>
+    </ToolbarWrapper>
   );
 };
 

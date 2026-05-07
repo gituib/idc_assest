@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback, forwardRef, useImperativeHandle 
 import CanvasRenderer from './CanvasRenderer';
 import CanvasInteraction from './CanvasInteraction';
 
-const FloorPlanCanvas = forwardRef(({ room, racks, viewMode, heatMapDimension, editMode, onRackClick, onRackDoubleClick, onRackHover, onDeviceHover, onRackDragEnd, onViewChange }, ref) => {
+const FloorPlanCanvas = forwardRef(({ room, racks, onRackClick, onRackDoubleClick, onRackHover, onDeviceHover, onViewChange }, ref) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
@@ -15,8 +15,7 @@ const FloorPlanCanvas = forwardRef(({ room, racks, viewMode, heatMapDimension, e
     zoomOut: () => interactionRef.current?.zoomOut(),
     zoomReset: () => interactionRef.current?.zoomReset(),
     fitToView: () => interactionRef.current?.fitToView(),
-    animateToRack: (rack) => interactionRef.current?.animateToRack(rack),
-    setSearchHighlight: (rackId) => rendererRef.current?.setSearchHighlight(rackId),
+    exportImage: (roomName) => rendererRef.current?.exportImage(roomName),
   }));
 
   const handleResize = useCallback(() => {
@@ -36,7 +35,6 @@ const FloorPlanCanvas = forwardRef(({ room, racks, viewMode, heatMapDimension, e
       onRackDoubleClick,
       onRackHover,
       onDeviceHover,
-      onRackDragEnd,
       onViewChange,
     });
     interactionRef.current = interaction;
@@ -61,7 +59,6 @@ const FloorPlanCanvas = forwardRef(({ room, racks, viewMode, heatMapDimension, e
   useEffect(() => {
     if (rendererRef.current) {
       rendererRef.current.setData(room, racks || []);
-      // 数据更新后自动居中显示
       if (room) {
         setTimeout(() => {
           interactionRef.current?.fitToView();
@@ -69,18 +66,6 @@ const FloorPlanCanvas = forwardRef(({ room, racks, viewMode, heatMapDimension, e
       }
     }
   }, [room, racks]);
-
-  useEffect(() => {
-    if (rendererRef.current) {
-      rendererRef.current.setViewMode(viewMode, heatMapDimension);
-    }
-  }, [viewMode, heatMapDimension]);
-
-  useEffect(() => {
-    if (interactionRef.current) {
-      interactionRef.current.setEditMode(editMode);
-    }
-  }, [editMode]);
 
   useEffect(() => {
     if (rendererRef.current && room) {

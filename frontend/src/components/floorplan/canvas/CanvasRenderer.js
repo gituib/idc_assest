@@ -9,8 +9,6 @@ import {
   U_LABEL_WIDTH_LEFT,
   U_LABEL_WIDTH_RIGHT,
   U_BODY_WIDTH,
-  DEVICE_INDICATOR_WIDTH,
-  COLORS,
   RACK_STATUS_COLORS,
   DEVICE_TYPE_COLORS,
   DEVICE_STATUS_COLORS,
@@ -31,10 +29,61 @@ class CanvasRenderer {
     this.hoveredRack = null;
     this.hoveredDevice = null;
     this.selectedRack = null;
-    this.viewMode = 'standard';
-    this.dragPreview = null;
-    this.dropTarget = null;
-    this.searchHighlight = null;
+
+    this.pendingRender = false;
+    this.bgCanvas = null;
+    this.bgCtx = null;
+    this.lastBgWidth = 0;
+    this.lastBgHeight = 0;
+
+    this._initBackgroundCanvas();
+  }
+
+  _initBackgroundCanvas() {
+    this.bgCanvas = document.createElement('canvas');
+    this.bgCtx = this.bgCanvas.getContext('2d');
+  }
+
+  _updateBackgroundCache(width, height) {
+    if (this.lastBgWidth === width && this.lastBgHeight === height) {
+      return;
+    }
+
+    this.lastBgWidth = width;
+    this.lastBgHeight = height;
+
+    const dpr = this.dpr;
+    this.bgCanvas.width = width * dpr;
+    this.bgCanvas.height = height * dpr;
+    this.bgCanvas.style.width = `${width}px`;
+    this.bgCanvas.style.height = `${height}px`;
+
+    const ctx = this.bgCtx;
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
+    bgGradient.addColorStop(0, '#f8fafc');
+    bgGradient.addColorStop(0.5, '#f1f5f9');
+    bgGradient.addColorStop(1, '#e2e8f0');
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(148,163,184,0.15)';
+    ctx.lineWidth = 1;
+    const gridSize = 40;
+    for (let x = 0; x < width; x += gridSize) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+    }
+    for (let y = 0; y < height; y += gridSize) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+    }
+    ctx.stroke();
+
+    ctx.restore();
   }
 
   setDPR() {
@@ -47,7 +96,8 @@ class CanvasRenderer {
     this.canvas.height = height * this.dpr;
     this.canvas.style.width = `${width}px`;
     this.canvas.style.height = `${height}px`;
-    this.render();
+    this._updateBackgroundCache(width, height);
+    this.requestRender();
   }
 
   setData(room, racks) {
@@ -61,55 +111,44 @@ class CanvasRenderer {
     this.racks.forEach(r => {
       if (r.rackId) this.rackMap.set(r.rackId, r);
     });
-    this.render();
+    this.requestRender();
   }
 
   setView(zoom, offsetX, offsetY) {
     this.zoom = zoom;
     this.offsetX = offsetX;
     this.offsetY = offsetY;
-    this.render();
+    this.requestRender();
   }
 
   setHoveredRack(rack) {
     if (this.hoveredRack !== rack) {
       this.hoveredRack = rack;
-      this.render();
+      this.requestRender();
     }
   }
 
   setHoveredDevice(device) {
     if (this.hoveredDevice !== device) {
       this.hoveredDevice = device;
-      this.render();
+      this.requestRender();
     }
   }
 
   setSelectedRack(rack) {
     if (this.selectedRack !== rack) {
       this.selectedRack = rack;
-      this.render();
+      this.requestRender();
     }
   }
 
-  setViewMode(mode, heatMapDimension) {
-    this.viewMode = mode;
-    this.render();
-  }
-
-  setDragPreview(rack, gridRow, gridCol) {
-    this.dragPreview = rack ? { rack, gridRow, gridCol } : null;
-    this.render();
-  }
-
-  setDropTarget(row, col) {
-    this.dropTarget = row != null ? { row, col } : null;
-    this.render();
-  }
-
-  setSearchHighlight(rackId) {
-    this.searchHighlight = rackId;
-    this.render();
+  requestRender() {
+    if (this.pendingRender) return;
+    this.pendingRender = true;
+    requestAnimationFrame(() => {
+      this.pendingRender = false;
+      this.render();
+    });
   }
 
   getRackBounds(rack) {
@@ -151,13 +190,36 @@ class CanvasRenderer {
     const bodyX = rackBounds.x + RACK_PADDING + leftLabelW;
     const bodyW = U_BODY_WIDTH;
     
-    // 从底部开始计算坐标（和渲染逻辑一致，设备向上扩展）
-    const bodyStartY = bodyY + 4 + (totalU * uHeight); // 底部Y坐标
+    const bodyStartY = bodyY + 4 + (totalU * uHeight);
     const deviceHeight = device.height || 1;
     const deviceStartY = bodyStartY - (device.position + deviceHeight - 1) * uHeight;
     const deviceH = uHeight * deviceHeight;
     
     return { x: bodyX, y: deviceStartY, width: bodyW, height: deviceH };
+  }
+
+  _getVisibleRacks(displayWidth, displayHeight) {
+    const visibleRacks = [];
+    const viewLeft = -this.offsetX / this.zoom;
+    const viewTop = -this.offsetY / this.zoom;
+    const viewRight = viewLeft + displayWidth / this.zoom;
+    const viewBottom = viewTop + displayHeight / this.zoom;
+
+    const padding = CELL_WIDTH + CELL_GAP;
+
+    for (let i = 0; i < this.racks.length; i++) {
+      const rack = this.racks[i];
+      const bounds = this.getRackBounds(rack);
+      
+      if (bounds.x + bounds.width + padding >= viewLeft &&
+          bounds.x - padding <= viewRight &&
+          bounds.y + bounds.height + padding >= viewTop &&
+          bounds.y - padding <= viewBottom) {
+        visibleRacks.push({ rack, bounds });
+      }
+    }
+
+    return visibleRacks;
   }
 
   hitTest(canvasX, canvasY) {
@@ -168,7 +230,6 @@ class CanvasRenderer {
       const rack = this.racks[i];
       const bounds = this.getRackBounds(rack);
       if (viewX >= bounds.x && viewX <= bounds.x + bounds.width && viewY >= bounds.y && viewY <= bounds.y + bounds.height) {
-        // 先检测设备
         const devices = rack.Devices || [];
         for (const device of devices) {
           if (device.position != null) {
@@ -191,44 +252,24 @@ class CanvasRenderer {
     const ctx = this.ctx;
     const { width, height } = this.canvas;
 
-    ctx.save();
-    ctx.scale(this.dpr, this.dpr);
-
     const displayWidth = width / this.dpr;
     const displayHeight = height / this.dpr;
 
+    ctx.save();
+    ctx.scale(this.dpr, this.dpr);
+
     ctx.clearRect(0, 0, displayWidth, displayHeight);
     
-    // 优雅的渐变背景
-    const bgGradient = ctx.createLinearGradient(0, 0, 0, displayHeight);
-    bgGradient.addColorStop(0, '#f8fafc');
-    bgGradient.addColorStop(0.5, '#f1f5f9');
-    bgGradient.addColorStop(1, '#e2e8f0');
-    ctx.fillStyle = bgGradient;
-    ctx.fillRect(0, 0, displayWidth, displayHeight);
-
-    // 细微网格效果
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(148,163,184,0.15)';
-    ctx.lineWidth = 1;
-    const gridSize = 40;
-    for (let x = 0; x < displayWidth; x += gridSize) {
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, displayHeight);
+    if (this.bgCanvas.width > 0 && this.bgCanvas.height > 0) {
+      ctx.drawImage(this.bgCanvas, 0, 0, displayWidth, displayHeight);
     }
-    for (let y = 0; y < displayHeight; y += gridSize) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(displayWidth, y);
-    }
-    ctx.stroke();
 
     ctx.save();
     ctx.translate(this.offsetX, this.offsetY);
     ctx.scale(this.zoom, this.zoom);
 
-    for (let i = 0; i < this.racks.length; i++) {
-      const rack = this.racks[i];
-      const bounds = this.getRackBounds(rack);
+    const visibleRacks = this._getVisibleRacks(displayWidth, displayHeight);
+    for (const { rack, bounds } of visibleRacks) {
       this.drawRack(ctx, rack, bounds);
     }
 
@@ -240,14 +281,12 @@ class CanvasRenderer {
     const { x, y, width, height } = bounds;
     const isSelected = this.selectedRack?.rackId === rack.rackId;
     const isHovered = this.hoveredRack?.rackId === rack.rackId;
-    const isSearchHighlight = this.searchHighlight === rack.rackId;
     const statusColor = RACK_STATUS_COLORS[rack.status] || RACK_STATUS_COLORS.active;
 
     ctx.save();
     ctx.beginPath();
     this.roundRect(ctx, x, y, width, height, 10);
 
-    // 渐变阴影
     if (isSelected) {
       ctx.shadowColor = 'rgba(22,119,255,0.25)';
       ctx.shadowBlur = 16;
@@ -265,7 +304,6 @@ class CanvasRenderer {
       ctx.shadowOffsetY = 3;
     }
 
-    // 机柜主体渐变背景
     const gradient = ctx.createLinearGradient(x, y, x, y + height);
     gradient.addColorStop(0, '#ffffff');
     gradient.addColorStop(1, '#f9fafb');
@@ -277,15 +315,6 @@ class CanvasRenderer {
     ctx.lineWidth = isSelected ? 2 : 1;
     ctx.stroke();
 
-    if (isSearchHighlight) {
-      ctx.strokeStyle = '#52c41a';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([10, 5]);
-      ctx.strokeRect(x - 5, y - 5, width + 10, height + 10);
-      ctx.setLineDash([]);
-    }
-
-    // 状态栏（带圆角）
     ctx.beginPath();
     ctx.moveTo(x + 10, y);
     ctx.lineTo(x + width - 10, y);
@@ -297,14 +326,12 @@ class CanvasRenderer {
     ctx.fillStyle = statusColor;
     ctx.fill();
 
-    // 标题栏背景（轻微渐变）
     const headerGradient = ctx.createLinearGradient(x, y + RACK_STATUS_BAR_HEIGHT, x, y + RACK_STATUS_BAR_HEIGHT + RACK_HEADER_HEIGHT);
     headerGradient.addColorStop(0, '#fafafa');
     headerGradient.addColorStop(1, '#f5f5f5');
     ctx.fillStyle = headerGradient;
     ctx.fillRect(x, y + RACK_STATUS_BAR_HEIGHT, width, RACK_HEADER_HEIGHT);
 
-    // 标题栏底部细线
     ctx.beginPath();
     ctx.moveTo(x + 10, y + RACK_STATUS_BAR_HEIGHT + RACK_HEADER_HEIGHT);
     ctx.lineTo(x + width - 10, y + RACK_STATUS_BAR_HEIGHT + RACK_HEADER_HEIGHT);
@@ -312,14 +339,12 @@ class CanvasRenderer {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // 机柜名称（居中）
     ctx.fillStyle = '#1f2937';
     ctx.font = FONT.RACK_NAME;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(rack.name, x + width / 2, y + RACK_STATUS_BAR_HEIGHT + RACK_HEADER_HEIGHT / 2);
 
-    // U位和设备数量
     const deviceCount = rack.deviceCount || 0;
     const usageText = `${rack.height || 42}U • ${deviceCount}台`;
     ctx.fillStyle = '#6b7280';
@@ -328,7 +353,6 @@ class CanvasRenderer {
     ctx.textBaseline = 'middle';
     ctx.fillText(usageText, x + width - RACK_PADDING, y + RACK_STATUS_BAR_HEIGHT + RACK_HEADER_HEIGHT / 2);
 
-    // U位区域
     const bodyY = y + RACK_STATUS_BAR_HEIGHT + RACK_HEADER_HEIGHT;
     const bodyHeight = height - RACK_STATUS_BAR_HEIGHT - RACK_HEADER_HEIGHT;
     this.drawRackBody(ctx, rack, x, bodyY, width, bodyHeight);
@@ -342,38 +366,30 @@ class CanvasRenderer {
     const rightLabelW = U_LABEL_WIDTH_RIGHT;
     const bodyW = U_BODY_WIDTH;
     
-    // 计算各区域起始位置
     const leftLabelX = x + RACK_PADDING;
     const bodyX = x + RACK_PADDING + leftLabelW;
     const rightLabelX = x + w - RACK_PADDING - rightLabelW;
     
-    // U位高度
     const uHeight = Math.min(U_HEIGHT, (h - 8) / totalU);
     
-    // 设备数据 - 按position分组（注意：设备从position向上扩展）
     const devices = (rack.Devices || []).filter(d => d.position != null);
     const deviceByU = new Map();
     devices.forEach(d => {
       const deviceHeight = d.height || 1;
       const startU = d.position;
-      const endU = startU + deviceHeight - 1; // 向上扩展
+      const endU = startU + deviceHeight - 1;
       for (let u = startU; u <= endU; u++) {
         deviceByU.set(u, d);
       }
     });
 
-    // 渲染左侧U位标签（从下到上：1U在底部，totalU在顶部）
     this.drawULabels(ctx, leftLabelX, y + 4, leftLabelW, totalU, uHeight, 'left');
     
-    // 渲染设备区域和空闲U位（从下到上：1U在底部，totalU在顶部）
-    // 从底部开始渲染
-    const bodyStartY = y + 4 + (totalU * uHeight); // 底部Y坐标
+    const bodyStartY = y + 4 + (totalU * uHeight);
     for (let u = 1; u <= totalU; u++) {
-      // 计算当前U位的Y坐标（从底部向上，u越大Y越小）
       const currentY = bodyStartY - u * uHeight;
       const d = deviceByU.get(u);
       if (d && d.position === u) {
-        // 设备从position向上显示，所以起始Y坐标要计算正确
         const deviceHeight = d.height || 1;
         const deviceStartY = bodyStartY - (u + deviceHeight - 1) * uHeight;
         const isHovered = this.hoveredDevice?.deviceId === d.deviceId;
@@ -383,7 +399,6 @@ class CanvasRenderer {
       }
     }
     
-    // 渲染右侧U位标签（从下到上：1U在底部）
     this.drawULabels(ctx, rightLabelX, y + 4, rightLabelW, totalU, uHeight, 'right');
   }
 
@@ -392,13 +407,10 @@ class CanvasRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    // 从底部开始渲染标签（1U在底部）
     for (let u = 1; u <= totalU; u++) {
-      // 从底部向上计算Y坐标
       const yPos = y + (totalU - u) * uHeight + uHeight / 2;
       const label = `${u}U`;
       
-      // 偶数U位颜色稍淡，创造层次感
       if (u % 2 === 0) {
         ctx.fillStyle = 'rgba(100,116,139,0.45)';
       } else {
@@ -410,11 +422,9 @@ class CanvasRenderer {
   }
 
   drawEmptyU(ctx, x, y, w, h) {
-    // 更淡的背景色
     ctx.fillStyle = 'rgba(148,163,184,0.08)';
     ctx.fillRect(x, y, w, h);
     
-    // 细微的分隔线
     ctx.strokeStyle = 'rgba(148,163,184,0.25)';
     ctx.lineWidth = 0.5;
     ctx.beginPath();
@@ -429,11 +439,9 @@ class CanvasRenderer {
 
     ctx.save();
     
-    // 绘制圆角
     const radius = 3;
     this.roundRect(ctx, x, y, w, h, radius);
     
-    // 悬停高亮
     if (isHovered) {
       ctx.fillStyle = 'rgba(22,119,255,0.15)';
       ctx.fill();
@@ -441,7 +449,6 @@ class CanvasRenderer {
       ctx.shadowBlur = 8;
       ctx.shadowOffsetY = 2;
     } else {
-      // 设备背景
       const bgGradient = ctx.createLinearGradient(x, y, x, y + h);
       bgGradient.addColorStop(0, '#ffffff');
       bgGradient.addColorStop(1, '#f9fafb');
@@ -451,27 +458,22 @@ class CanvasRenderer {
     
     ctx.shadowBlur = 0;
 
-    // 左侧类型色条（更宽更明显）
     ctx.fillStyle = typeColor;
     ctx.fillRect(x, y, 5, h);
 
-    // 设备边框
     ctx.strokeStyle = isHovered ? '#1677ff' : 'rgba(148,163,184,0.45)';
     ctx.lineWidth = isHovered ? 1.5 : 1;
     ctx.stroke();
 
-    // 状态圆点（更大更明显）
     ctx.fillStyle = statusColor;
     ctx.beginPath();
     ctx.arc(x + 12, y + h / 2, 4, 0, Math.PI * 2);
     ctx.fill();
     
-    // 状态圆点外圈
     ctx.strokeStyle = isHovered ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.4)';
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // 设备名称
     ctx.fillStyle = isHovered ? '#0f172a' : '#374151';
     ctx.font = FONT.DEVICE_NAME;
     ctx.textAlign = 'left';
@@ -506,6 +508,93 @@ class CanvasRenderer {
       tr = tr.slice(0, -1);
     }
     return tr + '…';
+  }
+
+  exportImage(roomName) {
+    if (!this.room || this.racks.length === 0) return null;
+
+    const padding = 60;
+    const titleHeight = 50;
+    const footerHeight = 30;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    this.racks.forEach(rack => {
+      const bounds = this.getRackBounds(rack);
+      minX = Math.min(minX, bounds.x);
+      minY = Math.min(minY, bounds.y);
+      maxX = Math.max(maxX, bounds.x + bounds.width);
+      maxY = Math.max(maxY, bounds.y + bounds.height);
+    });
+
+    const contentWidth = maxX - minX + padding * 2;
+    const contentHeight = maxY - minY + padding * 2;
+    const totalWidth = contentWidth;
+    const totalHeight = contentHeight + titleHeight + footerHeight;
+
+    const exportCanvas = document.createElement('canvas');
+    const exportCtx = exportCanvas.getContext('2d');
+    const exportDpr = 2;
+    exportCanvas.width = totalWidth * exportDpr;
+    exportCanvas.height = totalHeight * exportDpr;
+    exportCtx.scale(exportDpr, exportDpr);
+
+    const bgGradient = exportCtx.createLinearGradient(0, 0, 0, totalHeight);
+    bgGradient.addColorStop(0, '#f8fafc');
+    bgGradient.addColorStop(0.5, '#f1f5f9');
+    bgGradient.addColorStop(1, '#e2e8f0');
+    exportCtx.fillStyle = bgGradient;
+    exportCtx.fillRect(0, 0, totalWidth, totalHeight);
+
+    exportCtx.beginPath();
+    exportCtx.strokeStyle = 'rgba(148,163,184,0.15)';
+    exportCtx.lineWidth = 1;
+    const gridSize = 40;
+    for (let x = 0; x < totalWidth; x += gridSize) {
+      exportCtx.moveTo(x, 0);
+      exportCtx.lineTo(x, totalHeight);
+    }
+    for (let y = 0; y < totalHeight; y += gridSize) {
+      exportCtx.moveTo(0, y);
+      exportCtx.lineTo(totalWidth, y);
+    }
+    exportCtx.stroke();
+
+    exportCtx.fillStyle = '#1f2937';
+    exportCtx.font = 'bold 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    exportCtx.textAlign = 'center';
+    exportCtx.textBaseline = 'middle';
+    const title = roomName || this.room?.name || '机房平面图';
+    exportCtx.fillText(`${title} - 机房平面图`, totalWidth / 2, titleHeight / 2);
+
+    exportCtx.save();
+    exportCtx.translate(padding - minX, titleHeight + padding - minY);
+
+    const originalHoveredRack = this.hoveredRack;
+    const originalHoveredDevice = this.hoveredDevice;
+    const originalSelectedRack = this.selectedRack;
+    this.hoveredRack = null;
+    this.hoveredDevice = null;
+    this.selectedRack = null;
+
+    for (const rack of this.racks) {
+      const bounds = this.getRackBounds(rack);
+      this.drawRack(exportCtx, rack, bounds);
+    }
+
+    this.hoveredRack = originalHoveredRack;
+    this.hoveredDevice = originalHoveredDevice;
+    this.selectedRack = originalSelectedRack;
+
+    exportCtx.restore();
+
+    exportCtx.fillStyle = '#6b7280';
+    exportCtx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    exportCtx.textAlign = 'right';
+    exportCtx.textBaseline = 'bottom';
+    const date = new Date().toLocaleString('zh-CN');
+    exportCtx.fillText(`导出时间: ${date}`, totalWidth - 10, totalHeight - 10);
+
+    return exportCanvas.toDataURL('image/png');
   }
 }
 

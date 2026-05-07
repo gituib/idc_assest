@@ -1,4 +1,4 @@
-import { ZOOM, CELL_WIDTH, CELL_GAP } from './CanvasConstants';
+import { ZOOM } from './CanvasConstants';
 
 class CanvasInteraction {
   constructor(canvas, renderer, callbacks) {
@@ -19,7 +19,6 @@ class CanvasInteraction {
     this.onMouseUp = this.onMouseUp.bind(this);
     this.onWheel = this.onWheel.bind(this);
     this.onDoubleClick = this.onDoubleClick.bind(this);
-    this.onContextMenu = this.onContextMenu.bind(this);
     this.onTouchStart = this.onTouchStart.bind(this);
     this.onTouchMove = this.onTouchMove.bind(this);
     this.onTouchEnd = this.onTouchEnd.bind(this);
@@ -34,7 +33,6 @@ class CanvasInteraction {
     this.canvas.addEventListener('mouseleave', this.onMouseLeave);
     this.canvas.addEventListener('wheel', this.onWheel, { passive: false });
     this.canvas.addEventListener('dblclick', this.onDoubleClick);
-    this.canvas.addEventListener('contextmenu', this.onContextMenu);
     this.canvas.addEventListener('touchstart', this.onTouchStart, { passive: false });
     this.canvas.addEventListener('touchmove', this.onTouchMove, { passive: false });
     this.canvas.addEventListener('touchend', this.onTouchEnd);
@@ -47,7 +45,6 @@ class CanvasInteraction {
     this.canvas.removeEventListener('mouseleave', this.onMouseLeave);
     this.canvas.removeEventListener('wheel', this.onWheel);
     this.canvas.removeEventListener('dblclick', this.onDoubleClick);
-    this.canvas.removeEventListener('contextmenu', this.onContextMenu);
     this.canvas.removeEventListener('touchstart', this.onTouchStart);
     this.canvas.removeEventListener('touchmove', this.onTouchMove);
     this.canvas.removeEventListener('touchend', this.onTouchEnd);
@@ -182,19 +179,6 @@ class CanvasInteraction {
     }
   }
 
-  onContextMenu(e) {
-    e.preventDefault();
-    const coords = this.getCanvasCoords(e);
-    const hitResult = this.renderer.hitTest(coords.x, coords.y);
-    if (hitResult) {
-      if (hitResult.device) {
-        this.callbacks.onDeviceContextMenu?.(hitResult.device, hitResult.rack, coords.x, coords.y);
-      } else {
-        this.callbacks.onRackContextMenu?.(hitResult.rack, coords.x, coords.y);
-      }
-    }
-  }
-
   onTouchStart(e) {
     if (e.touches.length === 1) {
       e.preventDefault();
@@ -259,7 +243,6 @@ class CanvasInteraction {
       return;
     }
 
-    // 计算所有机柜的边界框
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     racks.forEach(rack => {
       const bounds = this.renderer.getRackBounds(rack);
@@ -269,7 +252,6 @@ class CanvasInteraction {
       maxY = Math.max(maxY, bounds.y + bounds.height);
     });
 
-    // 添加padding
     const padding = 40;
     minX -= padding;
     minY -= padding;
@@ -279,14 +261,12 @@ class CanvasInteraction {
     const contentWidth = maxX - minX;
     const contentHeight = maxY - minY;
 
-    // 计算合适的缩放比例
     const canvasWidth = this.canvas.clientWidth;
     const canvasHeight = this.canvas.clientHeight;
     const scaleX = canvasWidth / contentWidth;
     const scaleY = canvasHeight / contentHeight;
     const newZoom = Math.min(ZOOM.DEFAULT, scaleX, scaleY);
 
-    // 计算居中的偏移量
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
     const newOffsetX = canvasWidth / 2 - centerX * newZoom;
@@ -300,40 +280,6 @@ class CanvasInteraction {
     });
   }
 
-  animateToRack(rack) {
-    const bounds = this.renderer.getRackBounds(rack);
-    const targetX = this.canvas.clientWidth / 2 - (bounds.x + bounds.width / 2) * this.renderer.zoom;
-    const targetY = this.canvas.clientHeight / 2 - (bounds.y + bounds.height / 2) * this.renderer.zoom;
-    this.animateTo(targetX, targetY);
-    this.renderer.setSelectedRack(rack);
-    this.renderer.setSearchHighlight(rack.rackId);
-    setTimeout(() => this.renderer.setSearchHighlight(null), 3000);
-  }
-
-  animateTo(targetX, targetY) {
-    const startX = this.renderer.offsetX;
-    const startY = this.renderer.offsetY;
-    const duration = 400;
-    const startTime = performance.now();
-
-    const animate = (time) => {
-      const elapsed = time - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-
-      const currentX = startX + (targetX - startX) * eased;
-      const currentY = startY + (targetY - startY) * eased;
-
-      this.renderer.setView(this.renderer.zoom, currentX, currentY);
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-
-    requestAnimationFrame(animate);
-  }
-
   applyZoom(newZoom, centerX, centerY) {
     const scale = newZoom / this.renderer.zoom;
     const newOffsetX = centerX - (centerX - this.renderer.offsetX) * scale;
@@ -345,10 +291,6 @@ class CanvasInteraction {
       offsetX: newOffsetX,
       offsetY: newOffsetY,
     });
-  }
-
-  setEditMode(editMode) {
-    // 兼容旧API
   }
 }
 

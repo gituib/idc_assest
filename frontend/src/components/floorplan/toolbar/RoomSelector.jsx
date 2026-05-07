@@ -1,28 +1,33 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Select, Spin } from 'antd';
+import React, { useState, useEffect, useRef } from 'react';
+import { Select, Spin, message } from 'antd';
 import { HomeOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import { RoomOptionContent, RoomIndicator } from '../styles';
 
 const RoomSelector = ({ selectedRoomId, onRoomChange }) => {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  const fetchRooms = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get('/api/rooms', { params: { pageSize: 1000 } });
-      setRooms(response.data.rooms || []);
-      if (!selectedRoomId && response.data.rooms?.length > 0) {
-        onRoomChange(response.data.rooms[0].roomId);
-      }
-    } catch (err) {
-      console.error('获取机房列表失败:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedRoomId, onRoomChange]);
+  const hasAutoSelected = useRef(false);
 
   useEffect(() => {
+    const fetchRooms = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get('/api/rooms', { params: { pageSize: 1000 } });
+        const roomList = response.data.rooms || [];
+        setRooms(roomList);
+        
+        if (!hasAutoSelected.current && roomList.length > 0 && !selectedRoomId) {
+          hasAutoSelected.current = true;
+          onRoomChange(roomList[0].roomId);
+        }
+      } catch (err) {
+        message.error('获取机房列表失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchRooms();
   }, []);
 
@@ -36,15 +41,10 @@ const RoomSelector = ({ selectedRoomId, onRoomChange }) => {
       options={rooms.map(r => ({
         value: r.roomId,
         label: (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              background: '#1677ff',
-            }} />
+          <RoomOptionContent>
+            <RoomIndicator />
             {r.name}
-          </div>
+          </RoomOptionContent>
         ),
       }))}
       notFoundContent={loading ? <Spin size="small" /> : '暂无机房'}
