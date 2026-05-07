@@ -1,5 +1,6 @@
 const STORAGE_PREFIX = 'idc_';
 const KEY_STORAGE_ID = '__idc_sk';
+const BACKUP_PREFIX = 'idc_bak_';
 const SALT = new TextEncoder().encode('idc-secure-storage-salt-v1');
 const PBKDF2_ITERATIONS = 100000;
 const AES_KEY_LENGTH = 256;
@@ -98,8 +99,35 @@ async function decryptAndParse(encrypted) {
   }
 }
 
+function saveBackup(key, value) {
+  try {
+    const backupKey = `${BACKUP_PREFIX}${key}`;
+    const data = { value, timestamp: Date.now() };
+    localStorage.setItem(backupKey, JSON.stringify(data));
+  } catch {}
+}
+
+function loadBackup(key) {
+  try {
+    const backupKey = `${BACKUP_PREFIX}${key}`;
+    const raw = localStorage.getItem(backupKey);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return data.value;
+  } catch {
+    return null;
+  }
+}
+
+function removeBackup(key) {
+  try {
+    const backupKey = `${BACKUP_PREFIX}${key}`;
+    localStorage.removeItem(backupKey);
+  } catch {}
+}
+
 export const secureStorage = {
-  set: (key, value, options = {}) => {
+  set: async (key, value, options = {}) => {
     memoryCache.set(key, value);
 
     const storageKey = `${STORAGE_PREFIX}${key}`;
@@ -110,19 +138,29 @@ export const secureStorage = {
     };
     const serialized = JSON.stringify(data);
 
-    encrypt(serialized)
-      .then(encrypted => {
-        localStorage.setItem(storageKey, encrypted);
-      })
-      .catch(() => {});
+    saveBackup(key, value);
 
-    return true;
+    try {
+      const encrypted = await encrypt(serialized);
+      localStorage.setItem(storageKey, encrypted);
+      return true;
+    } catch (error) {
+      console.error('[secureStorage] 加密存储失败', key, error);
+      return false;
+    }
   },
 
   get: (key) => {
     if (memoryCache.has(key)) {
       return memoryCache.get(key);
     }
+
+    const backup = loadBackup(key);
+    if (backup !== null) {
+      memoryCache.set(key, backup);
+      return backup;
+    }
+
     return null;
   },
 
@@ -130,16 +168,35 @@ export const secureStorage = {
     try {
       const storageKey = `${STORAGE_PREFIX}${key}`;
       const encrypted = localStorage.getItem(storageKey);
-      if (!encrypted) return null;
+      if (!encrypted) {
+        const backup = loadBackup(key);
+        if (backup !== null) {
+          memoryCache.set(key, backup);
+          return backup;
+        }
+        return null;
+      }
 
       const value = await decryptAndParse(encrypted);
       if (value !== null) {
         memoryCache.set(key, value);
-      } else {
-        localStorage.removeItem(storageKey);
+        saveBackup(key, value);
+        return value;
       }
-      return value;
+
+      const backup = loadBackup(key);
+      if (backup !== null) {
+        memoryCache.set(key, backup);
+        return backup;
+      }
+
+      return null;
     } catch {
+      const backup = loadBackup(key);
+      if (backup !== null) {
+        memoryCache.set(key, backup);
+        return backup;
+      }
       return null;
     }
   },
@@ -150,6 +207,7 @@ export const secureStorage = {
       const storageKey = `${STORAGE_PREFIX}${key}`;
       localStorage.removeItem(storageKey);
     } catch {}
+    removeBackup(key);
     return true;
   },
 
@@ -159,7 +217,7 @@ export const secureStorage = {
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith(STORAGE_PREFIX)) {
+        if (key && (key.startsWith(STORAGE_PREFIX) || key.startsWith(BACKUP_PREFIX))) {
           keys.push(key);
         }
       }

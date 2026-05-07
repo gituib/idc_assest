@@ -1205,7 +1205,7 @@ function TicketManagement() {
           }}
           columnsState={{
             onChange: ({ visibleColumns }) => {
-              secureStorage.set(TICKET_COLUMNS_KEY, visibleColumns);
+              secureStorage.set(TICKET_COLUMNS_KEY, visibleColumns).catch(() => {});
             },
           }}
         />

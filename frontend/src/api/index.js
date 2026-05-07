@@ -3,9 +3,14 @@ import { API_CONFIG } from '../config/api';
 import secureStorage, { TOKEN_KEY } from '../utils/secureStorage';
 
 let maintenanceCallback = null;
+let authInitialized = false;
 
 export function setMaintenanceCallback(callback) {
   maintenanceCallback = callback;
+}
+
+export function setAuthInitialized(value) {
+  authInitialized = value;
 }
 
 // 给全局 axios 默认实例添加 Token 拦截器
@@ -22,11 +27,13 @@ axios.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401) {
-      const currentPath = window.location.pathname;
-      if (!currentPath.startsWith('/login')) {
-        secureStorage.remove(TOKEN_KEY);
-        secureStorage.remove('user');
-        window.location.href = '/login';
+      if (authInitialized) {
+        const currentPath = window.location.pathname;
+        if (!currentPath.startsWith('/login')) {
+          secureStorage.remove(TOKEN_KEY);
+          secureStorage.remove('user');
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);
@@ -86,15 +93,17 @@ api.interceptors.response.use(
       }
 
       if (status === 401) {
-        const currentPath = window.location.pathname;
+        if (authInitialized) {
+          const currentPath = window.location.pathname;
 
-        if (!currentPath.startsWith('/login')) {
-          secureStorage.remove(TOKEN_KEY);
-          secureStorage.remove('user');
-          if (window.__navigate) {
-            window.__navigate('/login');
-          } else {
-            window.location.href = '/login';
+          if (!currentPath.startsWith('/login')) {
+            secureStorage.remove(TOKEN_KEY);
+            secureStorage.remove('user');
+            if (window.__navigate) {
+              window.__navigate('/login');
+            } else {
+              window.location.href = '/login';
+            }
           }
         }
       }

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { authAPI } from '../api';
+import { authAPI, setAuthInitialized } from '../api';
 import secureStorage, { TOKEN_KEY, USER_KEY } from '../utils/secureStorage';
 
 const AuthContext = createContext({
@@ -26,10 +26,14 @@ export const AuthProvider = ({ children }) => {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     const initializeAuth = async () => {
       try {
         const storedToken = await secureStorage.loadFromStorage(TOKEN_KEY);
         const storedUser = await secureStorage.loadFromStorage(USER_KEY);
+
+        if (cancelled) return;
 
         if (!storedToken) {
           setToken(null);
@@ -44,26 +48,41 @@ export const AuthProvider = ({ children }) => {
 
         try {
           const response = await authAPI.getProfile();
+          if (cancelled) return;
+
           if (response.success) {
             setUser(response.data.user);
-            secureStorage.set(USER_KEY, response.data.user);
+            await secureStorage.set(USER_KEY, response.data.user);
           }
-        } catch {
-          secureStorage.remove(TOKEN_KEY);
-          secureStorage.remove(USER_KEY);
-          setToken(null);
-          setUser(null);
+        } catch (error) {
+          if (cancelled) return;
+
+          const status = error?.response?.status;
+          if (status === 401 || status === 403) {
+            secureStorage.remove(TOKEN_KEY);
+            secureStorage.remove(USER_KEY);
+            setToken(null);
+            setUser(null);
+          }
         }
       } catch {
+        if (cancelled) return;
         setToken(null);
         setUser(null);
       } finally {
-        setLoading(false);
-        setInitialized(true);
+        if (!cancelled) {
+          setLoading(false);
+          setInitialized(true);
+          setAuthInitialized(true);
+        }
       }
     };
 
     initializeAuth();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = useCallback(async (username, password) => {
@@ -71,8 +90,8 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.login({ username, password });
       if (response.success) {
         const { token: newToken, user: userData } = response.data;
-        secureStorage.set(TOKEN_KEY, newToken);
-        secureStorage.set(USER_KEY, userData);
+        await secureStorage.set(TOKEN_KEY, newToken);
+        await secureStorage.set(USER_KEY, userData);
         setToken(newToken);
         setUser(userData);
         return { success: true };
@@ -90,8 +109,8 @@ export const AuthProvider = ({ children }) => {
       if (response.success) {
         const { token: newToken, user: newUser, isFirstUser, pendingApproval } = response.data;
         if (newToken) {
-          secureStorage.set(TOKEN_KEY, newToken);
-          secureStorage.set(USER_KEY, newUser);
+          await secureStorage.set(TOKEN_KEY, newToken);
+          await secureStorage.set(USER_KEY, newUser);
           setToken(newToken);
           setUser(newUser);
         }
@@ -114,7 +133,7 @@ export const AuthProvider = ({ children }) => {
   const updateUser = useCallback(newUserData => {
     setUser(prev => {
       const updated = { ...prev, ...newUserData };
-      secureStorage.set(USER_KEY, updated);
+      secureStorage.set(USER_KEY, updated).catch(() => {});
       return updated;
     });
   }, []);
