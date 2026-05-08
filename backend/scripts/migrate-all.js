@@ -133,6 +133,11 @@ const migrations = [
     description: '为 operation_logs 表添加 requestId 字段和复合索引，支持请求追踪',
     migrate: migrateOperationLogRequestId,
   },
+  {
+    name: '用户账户锁定时间',
+    description: '为 users 表添加 lockedUntil 字段，支持账户自动解锁',
+    migrate: migrateUserLockedUntil,
+  },
 ];
 
 async function runMigrations() {
@@ -949,6 +954,18 @@ async function migrateOperationLogRequestId() {
   await addIndexIfNotExists(tableName, 'operation_logs_module_createdAt', ['module', 'createdAt']);
 
   console.log('    操作日志requestId字段和索引迁移完成');
+}
+
+async function migrateUserLockedUntil() {
+  const tableName = 'users';
+
+  if (!(await tableExists(tableName))) {
+    console.log(`    ${tableName} 表不存在，跳过`);
+    return;
+  }
+
+  await addColumnIfNotExists(tableName, 'lockedUntil', 'DATETIME');
+  console.log('    users 表 lockedUntil 字段迁移完成');
 }
 
 // 执行迁移

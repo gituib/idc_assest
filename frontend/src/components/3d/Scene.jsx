@@ -10,7 +10,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment } from '@react-three/drei';
 const envMapUrl = '/assets/3d/env.hdr';
 import RackModel from './RackModel';
-import { useScene3D } from '../../context/Scene3DContext';
+import { useScene3D } from '../../hooks/useScene3D';
 import * as THREE from 'three';
 import ErrorBoundary from '../ErrorBoundary';
 

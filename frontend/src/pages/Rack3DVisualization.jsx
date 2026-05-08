@@ -35,7 +35,7 @@ import DeviceDetailDrawer from '../components/DeviceDetailDrawer';
 import CloseButton from '../components/CloseButton';
 import RackSelectorHeader from '../components/3d/RackSelectorHeader';
 import { Layout } from 'antd';
-import { useScene3D } from '../context/Scene3DContext';
+import { useScene3D } from '../hooks/useScene3D';
 import { useSortedRacks } from '../hooks/useSortedRacks';
 
 const { Content } = Layout;
@@ -46,7 +46,7 @@ const Rack3DVisualization = () => {
   // Scene 组件的 ref，用于调用重置视角方法
   const sceneRef = useRef(null);
 
-  // 使用 Scene3DContext 管理3D场景状态
+  // 使用 Zustand Store 管理3D场景状态
   const {
     devices,
     setDevices,

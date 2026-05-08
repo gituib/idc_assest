@@ -8,7 +8,7 @@ module.exports = {
 
   MAX_LOGIN_ATTEMPTS: parseInt(process.env.MAX_LOGIN_ATTEMPTS, 10) || 5,
 
-  LOCK_TIME: (parseInt(process.env.LOCK_TIME_MINUTES, 10) || 30) * 60 * 1000,
+  LOCK_TIME: (parseInt(process.env.LOCK_TIME_MINUTES, 10) || 3) * 60 * 1000,
 
   TOKEN_EXPIRY: process.env.TOKEN_EXPIRY || '24h',
 

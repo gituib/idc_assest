@@ -46,9 +46,8 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
-import { ConfigProvider, useConfig } from './context/ConfigContext';
-import { Scene3DProvider } from './context/Scene3DContext';
+import { useAuth } from './hooks/useAuth';
+import { useConfig } from './hooks/useConfig';
 import { useDesignTokens } from './hooks/useDesignTokens';
 import useIdleTimeout from './hooks/useIdleTimeout';
 import { SWRConfig, swrConfig } from './hooks/useSWR';
@@ -143,10 +142,9 @@ const ProtectedRoute = ({ component: Component }) => (
   </PrivateRoute>
 );
 
-// 默认空闲超时配置
 const DEFAULT_IDLE_CONFIG = {
-  timeout: 30 * 60 * 1000, // 30分钟
-  warningTime: 60 * 1000, // 60秒
+  timeout: 30 * 60 * 1000,
+  warningTime: 60 * 1000,
 };
 
 const AppLayout = ({ children }) => {
@@ -159,7 +157,6 @@ const AppLayout = ({ children }) => {
   const location = useLocation();
   const designTokens = useDesignTokens();
 
-  // 获取空闲超时配置
   useEffect(() => {
     const fetchIdleConfig = async () => {
       try {
@@ -176,7 +173,6 @@ const AppLayout = ({ children }) => {
     fetchIdleConfig();
   }, []);
 
-  // 启用空闲超时检测
   useIdleTimeout({
     timeout: idleConfig.timeout,
     warningTime: idleConfig.warningTime,
@@ -674,9 +670,7 @@ const ThemeConfig = () => {
                       title="3D 可视化加载失败"
                       subTitle="3D 场景在加载过程中遇到错误，可能是浏览器不支持 WebGL 或模型文件加载失败"
                     >
-                      <Scene3DProvider>
-                        <Rack3DVisualization />
-                      </Scene3DProvider>
+                      <Rack3DVisualization />
                     </ErrorBoundary>
                   </PrivateRoute>
                 }
@@ -691,11 +685,7 @@ const ThemeConfig = () => {
 };
 
 function App() {
-  return (
-    <ConfigProvider>
-      <ThemeConfig />
-    </ConfigProvider>
-  );
+  return <ThemeConfig />;
 }
 
 export default App;

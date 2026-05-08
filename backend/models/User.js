@@ -54,6 +54,11 @@ const User = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
+    lockedUntil: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: '账户锁定过期时间，NULL表示未锁定或已解锁',
+    },
     remark: {
       type: DataTypes.TEXT,
       allowNull: true,

@@ -34,7 +34,8 @@
     "styled-components": "^6.3.9",
     "swr": "^2.4.0",
     "three": "^0.183.2",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

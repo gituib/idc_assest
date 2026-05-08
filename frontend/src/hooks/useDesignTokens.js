@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useConfig } from '../context/ConfigContext';
+import { useConfigStore } from '../stores/configStore';
 
 /**
  * 使用设计令牌 Hook
@@ -7,12 +7,10 @@ import { useConfig } from '../context/ConfigContext';
  * @returns {Object} 设计令牌对象
  */
 export const useDesignTokens = () => {
-  const { config } = useConfig();
+  const primaryColor = useConfigStore((s) => s.config.primary_color) || '#667eea';
+  const secondaryColor = useConfigStore((s) => s.config.secondary_color) || '#764ba2';
 
   const designTokens = useMemo(() => {
-    const primaryColor = config?.primary_color || '#667eea';
-    const secondaryColor = config?.secondary_color || '#764ba2';
-
     return {
       colors: {
         primary: {
@@ -61,7 +59,7 @@ export const useDesignTokens = () => {
         lg: '24px',
       },
     };
-  }, [config?.primary_color, config?.secondary_color]);
+  }, [primaryColor, secondaryColor]);
 
   return designTokens;
 };
@@ -72,10 +70,8 @@ export const useDesignTokens = () => {
  * @returns {string} RGB字符串 (如: "102, 126, 234")
  */
 function hexToRgb(hex) {
-  // 移除 # 号
   const cleanHex = hex.replace('#', '');
 
-  // 处理简写格式 (如: #fff)
   const fullHex =
     cleanHex.length === 3
       ? cleanHex

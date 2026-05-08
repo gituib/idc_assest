@@ -8,6 +8,7 @@ const { generateToken, authMiddleware } = require('../middleware/auth');
 const {
   SALT_ROUNDS,
   MAX_LOGIN_ATTEMPTS,
+  LOCK_TIME,
   PASSWORD_MIN_LENGTH,
   USERNAME_MIN_LENGTH,
   USERNAME_MAX_LENGTH,
@@ -154,10 +155,18 @@ router.post('/login', async (req, res) => {
     }
 
     if (user.status === 'locked') {
-      return res.status(403).json({
-        success: false,
-        message: '账户已被锁定，请联系管理员',
-      });
+      const now = new Date();
+      if (user.lockedUntil && user.lockedUntil > now) {
+        const remainingMinutes = Math.ceil((user.lockedUntil - now) / 60000);
+        return res.status(403).json({
+          success: false,
+          message: `账户已被锁定，请在 ${remainingMinutes} 分钟后重试`,
+        });
+      }
+      user.status = 'active';
+      user.loginCount = 0;
+      user.lockedUntil = null;
+      await user.save();
     }
 
     if (user.status === 'inactive') {
@@ -180,12 +189,21 @@ router.post('/login', async (req, res) => {
       user.loginCount = (user.loginCount || 0) + 1;
       if (user.loginCount >= MAX_LOGIN_ATTEMPTS) {
         user.status = 'locked';
+        user.lockedUntil = new Date(Date.now() + LOCK_TIME);
       }
       await user.save();
 
+      const remainingAttempts = MAX_LOGIN_ATTEMPTS - user.loginCount;
+      let message = '用户名或密码错误';
+      if (remainingAttempts > 0) {
+        message += `，剩余 ${remainingAttempts} 次尝试机会`;
+      } else {
+        message = `账户已被锁定，请在 3 分钟后重试`;
+      }
+
       return res.status(401).json({
         success: false,
-        message: '用户名或密码错误',
+        message,
       });
     }
 
@@ -201,6 +219,7 @@ router.post('/login', async (req, res) => {
     user.lastLoginTime = new Date();
     user.lastLoginIp = req.ip || req.connection.remoteAddress;
     user.loginCount = 0;
+    user.lockedUntil = null;
     await user.save();
 
     res.json({

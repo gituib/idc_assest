@@ -49,7 +49,7 @@ import {
   MenuUnfoldOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
-import { useConfig } from '../context/ConfigContext';
+import { useConfig } from '../hooks/useConfig';
 
 const { Option } = Select;
 const { Title, Text, Paragraph } = Typography;
