@@ -40,7 +40,10 @@ if (DB_TYPE === 'mysql') {
     dialect: 'sqlite',
     storage: process.env.DB_PATH || './idc_management.db',
     logging: sqlLogger,
-    // SQLite 连接池配置
+    dialectModule: require('better-sqlite3'),
+    dialectModuleOptions: {
+      verbose: false,
+    },
     pool: {
       max: 5,
       min: 1,
@@ -50,7 +53,6 @@ if (DB_TYPE === 'mysql') {
   });
   dbDialect = 'sqlite';
 
-  // 启用 SQLite 外键约束支持
   sequelize.query('PRAGMA foreign_keys = ON');
 }
 
