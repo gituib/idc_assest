@@ -16,7 +16,7 @@ const RoomSelector = ({ selectedRoomId, onRoomChange }) => {
         const response = await axios.get('/api/rooms', { params: { pageSize: 1000 } });
         const roomList = response.data.rooms || [];
         setRooms(roomList);
-        
+
         if (!hasAutoSelected.current && roomList.length > 0 && !selectedRoomId) {
           hasAutoSelected.current = true;
           onRoomChange(roomList[0].roomId);

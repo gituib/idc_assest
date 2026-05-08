@@ -1,6 +1,5 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
-import { Spin, Empty, message, Button } from 'antd';
-import { HomeOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Spin, Empty, message } from 'antd';
 import useFloorPlanContext from '../hooks/floorplan/useFloorPlanContext';
 import useFloorPlanData from '../hooks/floorplan/useFloorPlanData';
 import { FloorPlanCanvas, FloorPlanToolbar, RackDetailPanel } from '../components/floorplan';
@@ -16,8 +15,6 @@ import {
   CanvasContainer,
   LoadingOverlay,
   EmptyStateContainer,
-  EmptyStateTitle,
-  EmptyStateSubtitle,
   DeviceTooltipContainer,
   DeviceTooltipHeader,
   DeviceTypeIndicator,
@@ -80,12 +77,15 @@ const RoomFloorPlanContent = () => {
 
   const { layoutData, loading, error, refetch } = useFloorPlanData(selectedRoomId);
   const canvasRef = useRef(null);
-  const containerRef = useRef(null);
   const [currentZoom, setCurrentZoom] = useState(1);
   const [hoveredDevice, setHoveredDevice] = useState(null);
   const [hoveredDeviceRack, setHoveredDeviceRack] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const handleViewChange = useCallback(({ zoom }) => {
+    setCurrentZoom(zoom);
+  }, []);
 
   useEffect(() => {
     if (error) {
@@ -110,10 +110,10 @@ const RoomFloorPlanContent = () => {
   }, []);
 
   const handleToggleFullscreen = useCallback(() => {
-    if (!containerRef.current) return;
+    const elem = document.querySelector('[data-floorplan-container]');
+    if (!elem) return;
 
     if (!document.fullscreenElement) {
-      const elem = containerRef.current;
       if (elem.requestFullscreen) {
         elem.requestFullscreen();
       } else if (elem.webkitRequestFullscreen) {
@@ -132,15 +132,12 @@ const RoomFloorPlanContent = () => {
     }
   }, []);
 
-  const handleDeviceHover = useCallback((device, rack, event) => {
+  const handleDeviceHover = useCallback((device, rack, canvasX, canvasY) => {
     if (device) {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (rect) {
-        setTooltipPosition({
-          x: event.clientX - rect.left + 15,
-          y: event.clientY - rect.top + 15,
-        });
-      }
+      setTooltipPosition({
+        x: (canvasX || 0) + 15,
+        y: (canvasY || 0) + 15,
+      });
       setHoveredDevice(device);
       setHoveredDeviceRack(rack);
     } else {
@@ -155,63 +152,86 @@ const RoomFloorPlanContent = () => {
     }
   }, [showDetail]);
 
-  if (loading) {
-    return (
-      <PageContainer>
-        <LoadingOverlay>
-          <Spin size="large" />
-          <span>加载中...</span>
-        </LoadingOverlay>
-      </PageContainer>
-    );
-  }
+  const roomName = layoutData?.room?.name || '';
 
-  if (!layoutData || layoutData.racks.length === 0) {
-    return (
-      <PageContainer>
-        <EmptyStateContainer>
-          <Empty
-            description={selectedRoomId ? '该机房暂无机柜数据' : '请先选择机房'}
-          />
-        </EmptyStateContainer>
-      </PageContainer>
-    );
-  }
+  const handleZoomIn = useCallback(() => {
+    canvasRef.current?.zoomIn();
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    canvasRef.current?.zoomOut();
+  }, []);
+
+  const handleZoomReset = useCallback(() => {
+    canvasRef.current?.zoomReset();
+  }, []);
+
+  const handleExport = useCallback(() => {
+    const dataUrl = canvasRef.current?.exportImage(roomName);
+    if (!dataUrl) {
+      message.warning('暂无数据可导出');
+      return;
+    }
+    const link = document.createElement('a');
+    link.download = `${roomName || '机房'}_平面图.png`;
+    link.href = dataUrl;
+    link.click();
+  }, [roomName]);
 
   return (
     <PageContainer>
       <FloorPlanToolbar
-        roomName={layoutData.roomName}
+        roomName={roomName}
         roomId={selectedRoomId}
         onRoomChange={setSelectedRoom}
         zoom={currentZoom}
-        onZoomChange={setCurrentZoom}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onZoomReset={handleZoomReset}
         onFullscreen={handleToggleFullscreen}
         isFullscreen={isFullscreen}
         onRefresh={refetch}
+        onExport={handleExport}
       />
-      
-      <ContentWrapper ref={containerRef}>
-        <CanvasContainer>
-          <FloorPlanCanvas
-            racks={layoutData.racks}
-            rooms={layoutData.rooms}
-            selectedRoomId={selectedRoomId}
-            zoom={currentZoom}
-            onRackClick={handleRackClick}
-            onDeviceHover={handleDeviceHover}
-          />
-          
-          {hoveredDevice && (
-            <DeviceTooltip
-              device={hoveredDevice}
-              rack={hoveredDeviceRack}
-              x={tooltipPosition.x}
-              y={tooltipPosition.y}
+
+      {loading ? (
+        <ContentWrapper>
+          <LoadingOverlay>
+            <Spin size="large" />
+            <span>加载中...</span>
+          </LoadingOverlay>
+        </ContentWrapper>
+      ) : !layoutData || layoutData.racks.length === 0 ? (
+        <ContentWrapper>
+          <EmptyStateContainer>
+            <Empty
+              description={selectedRoomId ? '该机房暂无机柜数据' : '请先选择机房'}
             />
-          )}
-        </CanvasContainer>
-      </ContentWrapper>
+          </EmptyStateContainer>
+        </ContentWrapper>
+      ) : (
+        <ContentWrapper data-floorplan-container>
+          <CanvasContainer>
+            <FloorPlanCanvas
+              ref={canvasRef}
+              room={layoutData.room}
+              racks={layoutData.racks}
+              onRackClick={handleRackClick}
+              onDeviceHover={handleDeviceHover}
+              onViewChange={handleViewChange}
+            />
+
+            {hoveredDevice && (
+              <DeviceTooltip
+                device={hoveredDevice}
+                rack={hoveredDeviceRack}
+                x={tooltipPosition.x}
+                y={tooltipPosition.y}
+              />
+            )}
+          </CanvasContainer>
+        </ContentWrapper>
+      )}
 
       {detailVisible && detailRack && (
         <RackDetailPanel
