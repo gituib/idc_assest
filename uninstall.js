@@ -23,6 +23,7 @@ const readline = require('readline');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const SCRIPT_VERSION = '2.0.0';
 const BACKUP_DIR = path.join(__dirname, 'backup');
@@ -57,10 +58,12 @@ let backedUpItems = [];
 function parseArgs() {
   const args = process.argv.slice(2);
   return {
-    force: args.includes('--force') || args.includes('-f'),
+    force: args.includes('--force') || args.includes('-f') || args.includes('--yes') || args.includes('-y'),
     backup: args.includes('--backup') || args.includes('-b'),
+    dryRun: args.includes('--dry-run'),
     skipDb: args.includes('--skip-db'),
     skipDeps: args.includes('--skip-deps'),
+    skipUploads: args.includes('--skip-uploads'),
     help: args.includes('--help') || args.includes('-h')
   };
 }
@@ -73,15 +76,19 @@ ${colors.bright}IDC设备管理系统 - 卸载脚本 v${SCRIPT_VERSION}${colors.
 
 选项:
   -f, --force       强制卸载（无需确认）
+  -y, --yes         强制卸载别名（同 --force）
   -b, --backup      卸载前自动备份数据库
+  --dry-run         预览模式：仅显示将要删除的内容，不实际执行
   --skip-db         跳过数据库删除
   --skip-deps       跳过依赖删除
+  --skip-uploads    跳过上传文件目录删除
   -h, --help        显示帮助信息
 
 示例:
   node uninstall.js              # 交互式卸载
   node uninstall.js --force      # 强制卸载
   node uninstall.js --backup     # 卸载前备份
+  node uninstall.js --dry-run    # 预览将删除的内容
 `);
   process.exit(0);
 }
@@ -156,6 +163,84 @@ function commandExists(command) {
   }
 }
 
+/**
+ * 从 ecosystem.config.js 读取 PM2 服务名
+ * 如果配置文件不存在则返回默认值
+ *
+ * @returns {{ backendName: string, frontendName: string }} PM2 服务名
+ */
+function getPM2ServiceNames() {
+  const defaultNames = { backendName: 'idc-backend', frontendName: 'idc-frontend' };
+  const configPath = path.join(__dirname, 'deploy', 'ecosystem.config.js');
+
+  if (!fs.existsSync(configPath)) {
+    return defaultNames;
+  }
+
+  try {
+    const config = require(configPath);
+    if (!config || !Array.isArray(config.apps)) {
+      return defaultNames;
+    }
+
+    const names = { ...defaultNames };
+    config.apps.forEach(app => {
+      if (app.name && app.name.startsWith('idc-')) {
+        if (app.name.includes('backend') || (app.script && app.script.includes('server'))) {
+          names.backendName = app.name;
+        } else if (app.name.includes('frontend') || app.name === 'idc-frontend') {
+          names.frontendName = app.name;
+        }
+      }
+    });
+    return names;
+  } catch {
+    return defaultNames;
+  }
+}
+
+/**
+ * 从 .env 文件读取数据库配置
+ * 返回数据库类型和 SQLite 数据库文件路径
+ *
+ * @returns {{ dbType: string, sqliteDbPath: string }}
+ */
+function getDatabaseConfig() {
+  const defaultConfig = {
+    dbType: 'sqlite',
+    sqliteDbPath: path.join(__dirname, 'backend', 'idc_management.db')
+  };
+
+  const envPath = path.join(__dirname, 'backend', '.env');
+  if (!fs.existsSync(envPath)) {
+    return defaultConfig;
+  }
+
+  try {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    const config = { ...defaultConfig };
+
+    const dbTypeMatch = envContent.match(/^DB_TYPE\s*=\s*(\w+)/m);
+    if (dbTypeMatch) {
+      config.dbType = dbTypeMatch[1].toLowerCase();
+    }
+
+    const dbPathMatch = envContent.match(/^DB_PATH\s*=\s*(.+)$/m);
+    if (dbPathMatch && config.dbType === 'sqlite') {
+      const rawPath = dbPathMatch[1].trim().replace(/['"]/g, '');
+      if (path.isAbsolute(rawPath)) {
+        config.sqliteDbPath = rawPath;
+      } else {
+        config.sqliteDbPath = path.resolve(__dirname, 'backend', rawPath);
+      }
+    }
+
+    return config;
+  } catch {
+    return defaultConfig;
+  }
+}
+
 // =============================================================================
 // 检测是否以 root 用户运行
 // =============================================================================
@@ -176,36 +261,78 @@ async function stopAndDeleteServices() {
     return;
   }
 
+  const { backendName, frontendName } = getPM2ServiceNames();
   const isWindows = process.platform === 'win32';
   const nullRedirect = isWindows ? '2>nul' : '2>/dev/null';
   const orTrue = isWindows ? '|| exit 0' : '|| true';
 
-  log.info('停止后端服务 (idc-backend)...');
-  const backendStop = runCommand(`pm2 stop idc-backend ${nullRedirect} ${orTrue}`, { silent: true });
-  if (backendStop.success) {
-    log.success('后端服务已停止');
+  /**
+   * 检查 PM2 中是否存在指定名称的进程
+   *
+   * @param {string} name - 进程名称
+   * @returns {boolean} 进程是否存在
+   */
+  function pm2ProcessExists(name) {
+    const result = runCommand(`pm2 describe ${name} ${nullRedirect}`, { silent: true });
+    return result.success;
   }
 
-  log.info('删除后端服务 (idc-backend)...');
-  const backendDelete = runCommand(`pm2 delete idc-backend ${nullRedirect} ${orTrue}`, { silent: true });
-  if (backendDelete.success) {
-    log.success('后端服务已删除');
-  }
+  const services = [
+    { name: backendName, label: '后端服务' },
+    { name: frontendName, label: '前端服务' }
+  ];
 
-  log.info('停止前端服务 (idc-frontend)...');
-  const frontendStop = runCommand(`pm2 stop idc-frontend ${nullRedirect} ${orTrue}`, { silent: true });
-  if (frontendStop.success) {
-    log.success('前端服务已停止');
-  }
+  for (const service of services) {
+    if (!pm2ProcessExists(service.name)) {
+      log.info(`${service.label} (${service.name}) 不存在于 PM2 中，跳过`);
+      continue;
+    }
 
-  log.info('删除前端服务 (idc-frontend)...');
-  const frontendDelete = runCommand(`pm2 delete idc-frontend ${nullRedirect} ${orTrue}`, { silent: true });
-  if (frontendDelete.success) {
-    log.success('前端服务已删除');
+    log.info(`停止 ${service.label} (${service.name})...`);
+    const stopResult = runCommand(`pm2 stop ${service.name} ${nullRedirect} ${orTrue}`, { silent: true });
+    if (stopResult.success) {
+      log.success(`${service.label} 已停止`);
+    } else {
+      log.warning(`${service.label} 停止失败（可能已停止）`);
+    }
+
+    log.info(`删除 ${service.label} (${service.name})...`);
+    const deleteResult = runCommand(`pm2 delete ${service.name} ${nullRedirect} ${orTrue}`, { silent: true });
+    if (deleteResult.success) {
+      log.success(`${service.label} 已删除`);
+    } else {
+      log.warning(`${service.label} 删除失败`);
+    }
   }
 
   log.info('保存 PM2 配置...');
   runCommand(`pm2 save ${nullRedirect} ${orTrue}`, { silent: true });
+
+  log.info('清理 PM2 开机自启配置...');
+  const startupResult = runCommand(`pm2 unstartup ${nullRedirect} ${orTrue}`, { silent: true });
+  if (startupResult.success) {
+    log.success('PM2 开机自启配置已清理');
+  }
+
+  log.info('清理 PM2 日志文件...');
+  const pm2LogDir = path.join(os.homedir(), '.pm2', 'logs');
+  if (fs.existsSync(pm2LogDir)) {
+    const pm2LogFiles = fs.readdirSync(pm2LogDir).filter(f =>
+      f.startsWith(backendName) || f.startsWith(frontendName)
+    );
+    if (pm2LogFiles.length > 0) {
+      pm2LogFiles.forEach(f => {
+        try {
+          fs.unlinkSync(path.join(pm2LogDir, f));
+          log.subStep(`PM2 日志已清理: ${f}`);
+        } catch (e) {
+          log.warning(`PM2 日志清理失败: ${f}`);
+        }
+      });
+    } else {
+      log.subStep('未找到 PM2 相关日志文件');
+    }
+  }
 
   log.divider();
 }
@@ -214,7 +341,7 @@ async function stopAndDeleteServices() {
 // Nginx 配置清理
 // =============================================================================
 
-async function cleanupNginxConfig() {
+async function cleanupNginxConfig(cmdArgs) {
   log.step('清理 Nginx 配置');
 
   const isWindows = process.platform === 'win32';
@@ -227,9 +354,13 @@ async function cleanupNginxConfig() {
     console.log(`  2. 编辑主配置: 从 ${colors.cyan}C:/nginx/conf/nginx.conf${colors.reset} 中移除 include conf.d/*.conf;`);
     console.log(`  3. 停止 Nginx: ${colors.cyan}nginx -s stop${colors.reset}`);
 
-    const confirm = await ask('是否已手动清理 Nginx 配置? (Y/n)', 'Y');
-    if (confirm.toLowerCase() !== 'y') {
-      log.warning('请记得手动清理 Nginx 配置');
+    if (!cmdArgs?.force) {
+      const confirm = await ask('是否已手动清理 Nginx 配置? (Y/n)', 'Y');
+      if (confirm.toLowerCase() !== 'y') {
+        log.warning('请记得手动清理 Nginx 配置');
+      }
+    } else {
+      log.info('强制模式：跳过 Nginx 清理确认');
     }
   } else if (isLinux) {
     // Linux 下自动清理
@@ -240,6 +371,7 @@ async function cleanupNginxConfig() {
     const sitesAvailablePath = '/etc/nginx/sites-available/idc';
     const sitesEnabledPath = '/etc/nginx/sites-enabled/idc';
     const confDPath = '/etc/nginx/conf.d/idc';
+    const confDWithExtPath = '/etc/nginx/conf.d/idc.conf';
 
     let configExists = false;
 
@@ -267,13 +399,25 @@ async function cleanupNginxConfig() {
       }
     }
 
-    // 删除 conf.d 中的配置
+    // 删除 conf.d 中的配置（无扩展名）
     if (fs.existsSync(confDPath)) {
       configExists = true;
       log.info('删除 conf.d 配置...');
       const result = runCommand(`${sudoPrefix}rm -f "${confDPath}"`, { silent: true });
       if (result.success) {
         log.success('conf.d/idc 已删除');
+      } else {
+        log.error('删除失败');
+      }
+    }
+
+    // 删除 conf.d 中的配置（带 .conf 扩展名）
+    if (fs.existsSync(confDWithExtPath)) {
+      configExists = true;
+      log.info('删除 conf.d 配置（带扩展名）...');
+      const result = runCommand(`${sudoPrefix}rm -f "${confDWithExtPath}"`, { silent: true });
+      if (result.success) {
+        log.success('conf.d/idc.conf 已删除');
       } else {
         log.error('删除失败');
       }
@@ -359,11 +503,11 @@ async function cleanupConfigFiles() {
 // 数据库清理
 // =============================================================================
 
-async function cleanupDatabase() {
+async function cleanupDatabase(cmdArgs) {
   log.step('数据库清理');
 
-  // 检查 SQLite 数据库文件
-  const sqliteDbPath = path.join(__dirname, 'backend', 'idc_management.db');
+  const dbConfig = getDatabaseConfig();
+  const sqliteDbPath = dbConfig.sqliteDbPath;
   const sqliteExists = fs.existsSync(sqliteDbPath);
 
   // 获取数据库文件信息
@@ -375,16 +519,8 @@ async function cleanupDatabase() {
     dbCreateTime = stats.birthtime.toLocaleString();
   }
 
-  // 检测数据库类型（从 .env 文件读取）
-  const envPath = path.join(__dirname, 'backend', '.env');
-  let dbType = 'sqlite';
-  if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    const dbTypeMatch = envContent.match(/DB_TYPE\s*=\s*(\w+)/);
-    if (dbTypeMatch) {
-      dbType = dbTypeMatch[1].toLowerCase();
-    }
-  }
+  // 检测数据库类型（从 getDatabaseConfig 获取）
+  const dbType = dbConfig.dbType;
 
   console.log(`\n${colors.bright}当前数据库配置：${colors.reset}`);
   console.log(`  数据库类型: ${colors.cyan}${dbType === 'sqlite' ? 'SQLite' : 'MySQL'}${colors.reset}`);
@@ -400,7 +536,7 @@ async function cleanupDatabase() {
 
       console.log(`\n${colors.bright}删除方法：${colors.reset}`);
       console.log(`  方法1 - 脚本自动删除：输入 Y 确认删除`);
-      console.log(`  方法2 - 手动删除文件：直接删除 ${colors.cyan}backend/idc_management.db${colors.reset}`);
+      console.log(`  方法2 - 手动删除文件：直接删除 ${colors.cyan}${path.relative(__dirname, sqliteDbPath)}${colors.reset}`);
       console.log(`  方法3 - 命令行删除：`);
       if (process.platform === 'win32') {
         console.log(`    ${colors.cyan}del "${sqliteDbPath}"${colors.reset}`);
@@ -410,26 +546,56 @@ async function cleanupDatabase() {
 
       const confirm = await ask('\n是否删除 SQLite 数据库文件? (y/N)', 'N');
       if (confirm.toLowerCase() === 'y') {
+        // 先尝试备份（不管是否指定 --backup）
+        if (!cmdArgs?.backup && !cmdArgs?.force) {
+          const backupConfirm = await ask('是否先备份数据库再删除? (Y/n)', 'Y');
+          if (backupConfirm.toLowerCase() === 'y') {
+            await backupDatabase();
+          }
+        } else if (cmdArgs?.backup) {
+          await backupDatabase();
+        }
         try {
           log.info('正在删除数据库文件...');
           fs.unlinkSync(sqliteDbPath);
           log.success('SQLite 数据库已删除');
           deletedItems.push({ type: '数据库', name: `SQLite (${dbSize} MB)` });
         } catch (error) {
-          log.error(`删除失败: ${error.message}`);
-          if (error.message.includes('EBUSY') || error.message.includes('resource busy')) {
-            log.warning('数据库文件被占用，请先停止服务后再手动删除');
-            console.log(`  手动删除命令：`);
-            if (process.platform === 'win32') {
-              console.log(`  ${colors.cyan}del /f "${sqliteDbPath}"${colors.reset}`);
-            } else {
-              console.log(`  ${colors.cyan}rm -f "${sqliteDbPath}"${colors.reset}`);
+          log.error(`直接删除失败: ${error.message}`);
+          if (error.message.includes('EBUSY') || error.message.includes('resource busy') || error.message.includes('used by another process')) {
+            log.warning('数据库文件被占用，尝试强制删除...');
+            try {
+              const isWindows = process.platform === 'win32';
+              let forceResult;
+              if (isWindows) {
+                forceResult = runCommand(`del /f /q "${sqliteDbPath}" 2>nul`, { silent: true });
+                if (!forceResult.success) {
+                  forceResult = runCommand(`powershell -Command "Remove-Item -Path '${sqliteDbPath}' -Force -ErrorAction SilentlyContinue" 2>nul`, { silent: true });
+                }
+              } else {
+                forceResult = runCommand(`rm -f "${sqliteDbPath}"`, { silent: true });
+              }
+              if (forceResult.success && !fs.existsSync(sqliteDbPath)) {
+                log.success('数据库文件已强制删除');
+                deletedItems.push({ type: '数据库', name: `SQLite (${dbSize} MB)` });
+              } else {
+                log.error('强制删除失败，文件仍被占用');
+                log.warning('请手动停止占用数据库文件的进程后再删除');
+                console.log(`  手动删除命令：`);
+                if (process.platform === 'win32') {
+                  console.log(`  ${colors.cyan}del /f "${sqliteDbPath}"${colors.reset}`);
+                } else {
+                  console.log(`  ${colors.cyan}rm -f "${sqliteDbPath}"${colors.reset}`);
+                }
+              }
+            } catch (forceError) {
+              log.error(`强制删除失败: ${forceError.message}`);
             }
           }
         }
       } else {
         log.info('保留 SQLite 数据库文件');
-        console.log(`  文件位置: ${colors.cyan}${sqliteDbPath}${colors.reset}`);
+        console.log(`  文件位置: ${colors.cyan}${path.relative(__dirname, sqliteDbPath)}${colors.reset}`);
       }
     } else {
       log.info('未检测到 SQLite 数据库文件');
@@ -449,7 +615,7 @@ async function cleanupDatabase() {
   // 备份提示
   console.log(`\n${colors.bright}数据备份建议：${colors.reset}`);
   if (dbType === 'sqlite' && sqliteExists) {
-    console.log(`  备份 SQLite：直接复制 ${colors.cyan}backend/idc_management.db${colors.reset} 文件`);
+    console.log(`  备份 SQLite：直接复制 ${colors.cyan}${path.relative(__dirname, sqliteDbPath)}${colors.reset} 文件`);
   }
   console.log(`  如需保留数据，请在卸载前手动备份`);
 
@@ -474,7 +640,9 @@ async function cleanupDependencies(cmdArgs) {
   const dirsToDelete = [
     { path: path.join(__dirname, 'backend', 'node_modules'), name: '后端 node_modules', type: '依赖' },
     { path: path.join(__dirname, 'frontend', 'node_modules'), name: '前端 node_modules', type: '依赖' },
-    { path: path.join(__dirname, 'frontend', 'dist'), name: '前端构建产物 (dist)', type: '构建产物' }
+    { path: path.join(__dirname, 'frontend', 'node_modules', '.vite'), name: '前端 Vite 缓存 (.vite)', type: '构建产物' },
+    { path: path.join(__dirname, 'frontend', 'dist'), name: '前端构建产物 (dist)', type: '构建产物' },
+    { path: path.join(__dirname, 'backend', 'temp'), name: '后端临时文件 (temp)', type: '临时文件' }
   ];
 
   for (const dir of dirsToDelete) {
@@ -498,24 +666,75 @@ async function cleanupDependencies(cmdArgs) {
 // 日志清理
 // =============================================================================
 
-async function cleanupLogs() {
+async function cleanupLogs(cmdArgs) {
   log.step('日志文件清理');
 
   const logsDir = path.join(__dirname, 'backend', 'logs');
   if (fs.existsSync(logsDir)) {
+    if (cmdArgs?.force) {
+      log.info('强制模式：跳过日志文件删除');
+      return;
+    }
     const confirm = await ask('是否删除后端日志文件? (y/N)', 'N');
     if (confirm.toLowerCase() === 'y') {
       try {
         fs.rmSync(logsDir, { recursive: true, force: true });
-        log.success('日志文件已删除');
+        log.success('后端日志文件已删除');
       } catch (error) {
         log.error(`删除失败: ${error.message}`);
       }
     } else {
-      log.info('保留日志文件');
+      log.info('保留后端日志文件');
     }
   } else {
-    log.info('未找到日志目录');
+    log.info('未找到后端日志目录');
+  }
+
+  // 清理脚本自身生成的卸载日志（根目录 logs/）
+  const rootLogsDir = path.join(__dirname, 'logs');
+  if (fs.existsSync(rootLogsDir)) {
+    if (cmdArgs?.force) {
+      log.info('强制模式：跳过脚本日志删除');
+    } else {
+      const rootLogConfirm = await ask('是否删除安装/卸载脚本日志? (y/N)', 'N');
+      if (rootLogConfirm.toLowerCase() === 'y') {
+        try {
+          fs.rmSync(rootLogsDir, { recursive: true, force: true });
+          log.success('脚本日志文件已删除');
+        } catch (error) {
+          log.error(`删除失败: ${error.message}`);
+        }
+      } else {
+        log.info('保留脚本日志文件');
+      }
+    }
+  }
+
+  log.divider();
+}
+
+async function cleanupUploads(cmdArgs) {
+  log.step('上传文件清理');
+
+  const uploadsDir = path.join(__dirname, 'backend', 'uploads');
+  if (fs.existsSync(uploadsDir)) {
+    if (cmdArgs?.force) {
+      log.info('强制模式：跳过上传文件目录删除');
+      return;
+    }
+    const confirm = await ask('是否删除上传文件目录? (y/N)', 'N');
+    if (confirm.toLowerCase() === 'y') {
+      try {
+        fs.rmSync(uploadsDir, { recursive: true, force: true });
+        log.success('上传文件目录已删除');
+      } catch (error) {
+        log.error(`删除失败: ${error.message}`);
+      }
+    } else {
+      log.info('保留上传文件目录');
+    }
+  } else {
+    log.info('未找到上传文件目录');
   }
 
   log.divider();
@@ -528,7 +747,8 @@ async function cleanupLogs() {
 async function backupDatabase() {
   log.step('备份数据库');
   
-  const sqliteDbPath = path.join(__dirname, 'backend', 'idc_management.db');
+  const dbConfig = getDatabaseConfig();
+  const sqliteDbPath = dbConfig.sqliteDbPath;
   if (!fs.existsSync(sqliteDbPath)) {
     log.info('未找到 SQLite 数据库文件，跳过备份');
     return false;
@@ -549,6 +769,95 @@ async function backupDatabase() {
     log.error(`备份失败: ${error.message}`);
     return false;
   }
+}
+
+function showDryRunPreview(cmdArgs) {
+  const { backendName, frontendName } = getPM2ServiceNames();
+  const dbConfig = getDatabaseConfig();
+
+  console.log(`
+  ${colors.bright}${colors.cyan}以下是将要执行的操作（预览模式）：${colors.reset}\n`);
+
+  // PM2 服务
+  console.log(`  ${colors.bright}1. 停止并删除 PM2 服务${colors.reset}`);
+  console.log(`     - ${backendName}`);
+  console.log(`     - ${frontendName}`);
+  console.log(`     - 清理 PM2 开机自启配置`);
+  console.log(`     - 清理 PM2 相关日志文件`);
+
+  // Nginx 配置
+  console.log(`\n  ${colors.bright}2. 清理 Nginx 配置${colors.reset}`);
+  if (process.platform === 'linux') {
+    const paths = ['/etc/nginx/sites-available/idc', '/etc/nginx/sites-enabled/idc',
+      '/etc/nginx/conf.d/idc', '/etc/nginx/conf.d/idc.conf'];
+    paths.forEach(p => {
+      if (fs.existsSync(p)) {
+        console.log(`     - 删除: ${p}`);
+      }
+    });
+  } else {
+    console.log(`     - 提示手动清理（${process.platform === 'win32' ? 'Windows' : 'macOS'}）`);
+  }
+
+  // 配置文件
+  console.log(`\n  ${colors.bright}3. 清理生成的配置文件${colors.reset}`);
+  const configFiles = [
+    { path: path.join(__dirname, 'backend', '.env'), name: '后端环境变量 (.env)' },
+    { path: path.join(__dirname, 'deploy', 'ecosystem.config.js'), name: 'PM2 配置' },
+    { path: path.join(__dirname, 'deploy', 'nginx-idc.conf'), name: 'Nginx 配置' }
+  ];
+  configFiles.forEach(f => {
+    if (fs.existsSync(f.path)) {
+      console.log(`     - 删除: ${f.name}`);
+    }
+  });
+
+  // 数据库
+  console.log(`\n  ${colors.bright}4. 数据库${colors.reset}`);
+  if (dbConfig.dbType === 'sqlite' && fs.existsSync(dbConfig.sqliteDbPath)) {
+    console.log(`     - 删除 SQLite 数据库: ${path.relative(__dirname, dbConfig.sqliteDbPath)}`);
+    if (cmdArgs?.backup) {
+      console.log(`     - 备份数据库到: backup/`);
+    }
+  } else if (dbConfig.dbType === 'mysql') {
+    console.log(`     - 提示手动删除 MySQL 数据库`);
+  } else {
+    console.log(`     - 未检测到数据库文件`);
+  }
+
+  // 日志
+  console.log(`\n  ${colors.bright}5. 日志文件${colors.reset}`);
+  if (fs.existsSync(path.join(__dirname, 'backend', 'logs'))) {
+    console.log(`     - 后端日志目录 (backend/logs/)`);
+  }
+  if (fs.existsSync(path.join(__dirname, 'logs'))) {
+    console.log(`     - 脚本日志目录 (logs/)`);
+  }
+
+  // 上传文件
+  console.log(`\n  ${colors.bright}6. 上传文件${colors.reset}`);
+  if (fs.existsSync(path.join(__dirname, 'backend', 'uploads'))) {
+    console.log(`     - 上传文件目录 (backend/uploads/)`);
+  }
+
+  // 依赖和构建产物
+  console.log(`\n  ${colors.bright}7. 依赖和构建产物${colors.reset}`);
+  const depDirs = [
+    { path: path.join(__dirname, 'backend', 'node_modules'), name: '后端 node_modules' },
+    { path: path.join(__dirname, 'frontend', 'node_modules'), name: '前端 node_modules' },
+    { path: path.join(__dirname, 'frontend', 'node_modules', '.vite'), name: '前端 Vite 缓存' },
+    { path: path.join(__dirname, 'frontend', 'dist'), name: '前端构建产物' },
+    { path: path.join(__dirname, 'backend', 'temp'), name: '后端临时文件' }
+  ];
+  depDirs.forEach(d => {
+    if (fs.existsSync(d.path)) {
+      console.log(`     - 删除: ${d.name}`);
+    }
+  });
+
+  console.log(`\n${colors.gray}${'─'.repeat(60)}${colors.reset}`);
+  console.log(`  ${colors.yellow}提示: 移除 --dry-run 参数以实际执行卸载${colors.reset}`);
+  log.divider();
 }
 
 function printSummary() {
@@ -613,9 +922,13 @@ ${colors.reset}`);
     log.info('运行模式: 强制卸载（无需确认）');
   }
   
+  if (cmdArgs.dryRun) {
+    log.info('运行模式: 预览模式（不实际执行）');
+  }
+  
   log.divider();
 
-  if (!cmdArgs.force) {
+  if (!cmdArgs.force && !cmdArgs.dryRun) {
     const confirm = await ask('确认要开始卸载? (y/N)', 'N');
     if (confirm.toLowerCase() !== 'y') {
       log.info('已取消卸载');
@@ -625,25 +938,38 @@ ${colors.reset}`);
     }
   }
 
+  if (cmdArgs.dryRun) {
+    showDryRunPreview(cmdArgs);
+    rl.close();
+    closeLogFile();
+    return;
+  }
+
   try {
     if (cmdArgs.backup) {
       await backupDatabase();
     }
     
     await stopAndDeleteServices();
-    await cleanupNginxConfig();
+    await cleanupNginxConfig(cmdArgs);
     await cleanupConfigFiles();
     
     if (!cmdArgs.skipDb) {
-      await cleanupDatabase();
+      await cleanupDatabase(cmdArgs);
     } else {
       log.info('已跳过数据库删除');
     }
     
-    await cleanupLogs();
+    await cleanupLogs(cmdArgs);
+    
+    if (!cmdArgs.skipUploads) {
+      await cleanupUploads(cmdArgs);
+    } else {
+      log.info('已跳过上传文件目录删除');
+    }
     
     if (!cmdArgs.skipDeps) {
-      await cleanupDependencies();
+      await cleanupDependencies(cmdArgs);
     } else {
       log.info('已跳过依赖删除');
     }

@@ -78,6 +78,7 @@ const Login = () => {
       if (result.success) {
         message.success(result.isFirstUser ? '管理员账号创建成功' : '注册成功，请等待管理员审核');
         if (result.isFirstUser) {
+          setIsFirstUser(false);
           navigate('/dashboard');
         } else {
           setRegisterMode(false);
@@ -242,9 +243,9 @@ const Login = () => {
             )}
 
             <Form
-              name={registerMode ? 'register' : 'login'}
+              name={isFirstUser || registerMode ? 'register' : 'login'}
               layout="vertical"
-              onFinish={registerMode ? onFinishRegister : onFinishLogin}
+              onFinish={isFirstUser ? onFinishRegister : (registerMode ? onFinishRegister : onFinishLogin)}
               size="large"
               className="login-form"
             >
@@ -327,7 +328,7 @@ const Login = () => {
                 />
               </Form.Item>
 
-              {registerMode && (
+              {(registerMode || isFirstUser) && (
                 <Form.Item
                   name="confirmPassword"
                   label="确认密码"
@@ -359,7 +360,7 @@ const Login = () => {
                   loading={loading}
                   className="submit-button"
                 >
-                  {registerMode ? '立即注册' : '登 录'}
+                  {isFirstUser ? '创建管理员' : (registerMode ? '立即注册' : '登 录')}
                 </Button>
               </Form.Item>
             </Form>
