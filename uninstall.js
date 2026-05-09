@@ -346,16 +346,150 @@ async function cleanupNginxConfig(cmdArgs) {
 
   const isWindows = process.platform === 'win32';
   const isLinux = process.platform === 'linux';
+  const isMac = process.platform === 'darwin';
+
+  /**
+   * 检测 Nginx 是否已安装
+   *
+   * @returns {boolean} Nginx 是否可用
+   */
+  function nginxInstalled() {
+    return commandExists('nginx');
+  }
+
+  /**
+   * 检测 Nginx 服务进程是否在运行
+   *
+   * @returns {boolean} Nginx 是否在运行
+   */
+  function nginxRunning() {
+    if (isWindows) {
+      const result = runCommand('tasklist /FI "IMAGENAME eq nginx.exe" 2>nul', { silent: true });
+      return result.success && result.output.includes('nginx.exe');
+    }
+    const result = runCommand('pgrep -x nginx 2>/dev/null', { silent: true });
+    return result.success && result.output.trim().length > 0;
+  }
+
+  /**
+   * 停止 Nginx 服务
+   *
+   * @returns {boolean} 是否成功停止
+   */
+  function stopNginx() {
+    if (isLinux) {
+      const root = isRootUser();
+      const sudoPrefix = root ? '' : 'sudo ';
+
+      // 优先使用 systemctl
+      if (commandExists('systemctl')) {
+        const result = runCommand(`${sudoPrefix}systemctl stop nginx`, { silent: true });
+        if (result.success) {
+          log.success('Nginx 服务已停止 (systemctl)');
+          return true;
+        }
+      }
+      // 回退到 nginx -s stop
+      const result = runCommand(`${sudoPrefix}nginx -s stop`, { silent: true });
+      if (result.success) {
+        log.success('Nginx 服务已停止');
+        return true;
+      }
+      log.warning('Nginx 停止失败，可能需要手动处理');
+      return false;
+    }
+
+    if (isWindows) {
+      if (!nginxRunning()) {
+        log.info('Nginx 未在运行');
+        return true;
+      }
+      const result = runCommand('nginx -s stop', { silent: true });
+      if (result.success) {
+        log.success('Nginx 已停止');
+        return true;
+      }
+      log.warning('Nginx 停止失败，请手动执行: nginx -s stop');
+      return false;
+    }
+
+    return false;
+  }
+
+  /**
+   * 禁用 Nginx 开机自启（Linux）
+   */
+  function disableNginxStartup() {
+    if (!isLinux || !commandExists('systemctl')) return;
+
+    const root = isRootUser();
+    const sudoPrefix = root ? '' : 'sudo ';
+    const result = runCommand(`${sudoPrefix}systemctl disable nginx`, { silent: true });
+    if (result.success) {
+      log.success('Nginx 开机自启已禁用');
+    }
+  }
+
+  /**
+   * 清理 Linux 前端部署目录
+   */
+  function cleanupFrontendDeployDir() {
+    if (!isLinux) return;
+
+    const webRoot = '/var/www/idc';
+    if (!fs.existsSync(webRoot)) return;
+
+    log.info('清理前端部署目录...');
+    const root = isRootUser();
+    const sudoPrefix = root ? '' : 'sudo ';
+    const result = runCommand(`${sudoPrefix}rm -rf "${webRoot}"`, { silent: true });
+    if (result.success) {
+      log.success('前端部署目录已删除 (/var/www/idc)');
+      deletedItems.push({ type: '目录', name: '/var/www/idc' });
+    } else {
+      log.warning('前端部署目录删除失败，请手动清理');
+    }
+  }
 
   if (isWindows) {
-    // Windows 下提示手动清理
-    log.info('Windows 系统请手动清理 Nginx 配置：');
+    log.info('Windows Nginx 清理：');
+
+    if (nginxInstalled() && nginxRunning()) {
+      log.info('检测到 Nginx 正在运行');
+      if (!cmdArgs?.force) {
+        const stopConfirm = await ask('是否停止 Nginx 服务? (Y/n)', 'Y');
+        if (stopConfirm.toLowerCase() === 'y') {
+          stopNginx();
+        }
+      } else {
+        stopNginx();
+      }
+    }
+
+    console.log(`\n  请手动完成以下操作：`);
     console.log(`  1. 删除配置文件: ${colors.cyan}C:/nginx/conf/conf.d/idc.conf${colors.reset}`);
-    console.log(`  2. 编辑主配置: 从 ${colors.cyan}C:/nginx/conf/nginx.conf${colors.reset} 中移除 include conf.d/*.conf;`);
+    console.log(`  2. 编辑主配置: 从 ${colors.cyan}C:/nginx/conf/nginx.conf${colors.reset} 中移除 include 语句`);
     console.log(`  3. 停止 Nginx: ${colors.cyan}nginx -s stop${colors.reset}`);
 
+    // 检测 Nginx 安装方式，提供卸载指引
+    log.info('检测 Nginx 安装方式...');
+    const chocoCheck = runCommand('choco list nginx --local-only 2>nul', { silent: true });
+    if (chocoCheck.success && chocoCheck.output.includes('nginx')) {
+      console.log(`\n  检测到 Chocolatey 安装的 Nginx，卸载命令：`);
+      console.log(`  ${colors.cyan}choco uninstall nginx${colors.reset}`);
+    } else {
+      const scoopCheck = runCommand('scoop list nginx 2>nul', { silent: true });
+      if (scoopCheck.success && scoopCheck.output.includes('nginx')) {
+        console.log(`\n  检测到 Scoop 安装的 Nginx，卸载命令：`);
+        console.log(`  ${colors.cyan}scoop uninstall nginx${colors.reset}`);
+      } else if (fs.existsSync('C:/nginx')) {
+        console.log(`\n  检测到 Nginx 安装在 ${colors.cyan}C:/nginx${colors.reset}`);
+        console.log(`  如需完整卸载，请手动删除该目录`);
+      }
+    }
+
     if (!cmdArgs?.force) {
-      const confirm = await ask('是否已手动清理 Nginx 配置? (Y/n)', 'Y');
+      const confirm = await ask('\n是否已完成以上清理操作? (Y/n)', 'Y');
       if (confirm.toLowerCase() !== 'y') {
         log.warning('请记得手动清理 Nginx 配置');
       }
@@ -363,11 +497,26 @@ async function cleanupNginxConfig(cmdArgs) {
       log.info('强制模式：跳过 Nginx 清理确认');
     }
   } else if (isLinux) {
-    // Linux 下自动清理
     const root = isRootUser();
     const sudoPrefix = root ? '' : 'sudo ';
 
-    // 检测配置文件位置
+    // 1. 停止 Nginx 服务
+    if (nginxInstalled()) {
+      log.info('停止 Nginx 服务...');
+      if (nginxRunning()) {
+        stopNginx();
+      } else {
+        log.info('Nginx 未在运行');
+      }
+    }
+
+    // 2. 禁用开机自启
+    disableNginxStartup();
+
+    // 3. 清理前端部署目录
+    cleanupFrontendDeployDir();
+
+    // 4. 检测并清理 Nginx 配置文件
     const sitesAvailablePath = '/etc/nginx/sites-available/idc';
     const sitesEnabledPath = '/etc/nginx/sites-enabled/idc';
     const confDPath = '/etc/nginx/conf.d/idc';
@@ -375,7 +524,6 @@ async function cleanupNginxConfig(cmdArgs) {
 
     let configExists = false;
 
-    // 删除 sites-available 中的配置
     if (fs.existsSync(sitesAvailablePath)) {
       configExists = true;
       log.info('删除 sites-available 配置...');
@@ -387,7 +535,6 @@ async function cleanupNginxConfig(cmdArgs) {
       }
     }
 
-    // 删除 sites-enabled 中的软链接
     if (fs.existsSync(sitesEnabledPath)) {
       configExists = true;
       log.info('删除 sites-enabled 软链接...');
@@ -399,7 +546,6 @@ async function cleanupNginxConfig(cmdArgs) {
       }
     }
 
-    // 删除 conf.d 中的配置（无扩展名）
     if (fs.existsSync(confDPath)) {
       configExists = true;
       log.info('删除 conf.d 配置...');
@@ -411,7 +557,6 @@ async function cleanupNginxConfig(cmdArgs) {
       }
     }
 
-    // 删除 conf.d 中的配置（带 .conf 扩展名）
     if (fs.existsSync(confDWithExtPath)) {
       configExists = true;
       log.info('删除 conf.d 配置（带扩展名）...');
@@ -425,29 +570,60 @@ async function cleanupNginxConfig(cmdArgs) {
 
     if (!configExists) {
       log.info('未找到系统 Nginx 配置文件');
-    } else {
-      // 测试并重载 Nginx
+    } else if (nginxInstalled()) {
       log.info('测试 Nginx 配置...');
       const testResult = runCommand(`${sudoPrefix}nginx -t`, { silent: true });
       if (testResult.success) {
-        log.success('Nginx 配置测试通过');
-
-        log.info('重载 Nginx 服务...');
-        const reloadResult = runCommand(`${sudoPrefix}nginx -s reload`, { silent: true });
-        if (reloadResult.success) {
-          log.success('Nginx 已重载');
-        } else {
-          log.warning('Nginx 重载失败，可能需要手动重启');
-        }
+        log.success('Nginx 配置测试通过（已无残留配置）');
       } else {
-        log.warning('Nginx 配置测试失败，请手动检查');
+        log.success('Nginx 配置已清理完成');
       }
     }
-  } else {
-    // macOS 或其他系统
-    log.info('请手动清理 Nginx 配置');
+  } else if (isMac) {
+    log.info('macOS Nginx 清理：');
+
+    if (nginxInstalled() && nginxRunning()) {
+      log.info('检测到 Nginx 正在运行');
+      if (!cmdArgs?.force) {
+        const stopConfirm = await ask('是否停止 Nginx 服务? (Y/n)', 'Y');
+        if (stopConfirm.toLowerCase() === 'y') {
+          // 优先使用 brew
+          if (commandExists('brew')) {
+            const brewResult = runCommand('brew services stop nginx', { silent: true });
+            if (brewResult.success) {
+              log.success('Nginx 已停止 (brew)');
+            } else {
+              runCommand('nginx -s stop', { silent: true });
+            }
+          } else {
+            runCommand('nginx -s stop', { silent: true });
+          }
+        }
+      } else {
+        if (commandExists('brew')) {
+          runCommand('brew services stop nginx', { silent: true });
+        } else {
+          runCommand('nginx -s stop', { silent: true });
+        }
+      }
+    }
+
+    console.log(`\n  请手动完成以下操作：`);
     console.log(`  配置文件可能位于: ${colors.cyan}/usr/local/etc/nginx/servers/${colors.reset}`);
     console.log(`  或使用: ${colors.cyan}brew services stop nginx${colors.reset}`);
+
+    if (commandExists('brew')) {
+      console.log(`  如需卸载 Nginx：${colors.cyan}brew uninstall nginx${colors.reset}`);
+    }
+
+    if (!cmdArgs?.force) {
+      const confirm = await ask('\n是否已完成以上清理操作? (Y/n)', 'Y');
+      if (confirm.toLowerCase() !== 'y') {
+        log.warning('请记得手动清理 Nginx 配置');
+      }
+    } else {
+      log.info('强制模式：跳过 Nginx 清理确认');
+    }
   }
 
   log.divider();
@@ -787,16 +963,35 @@ function showDryRunPreview(cmdArgs) {
 
   // Nginx 配置
   console.log(`\n  ${colors.bright}2. 清理 Nginx 配置${colors.reset}`);
+
+  // 停止 Nginx 服务
+  if (nginxRunning()) {
+    console.log(`     - 停止 Nginx 服务`);
+  }
+
+  // Linux 下额外操作
   if (process.platform === 'linux') {
-    const paths = ['/etc/nginx/sites-available/idc', '/etc/nginx/sites-enabled/idc',
+    console.log(`     - 禁用 Nginx 开机自启 (systemctl disable nginx)`);
+
+    if (fs.existsSync('/var/www/idc')) {
+      console.log(`     - 删除前端部署目录 (/var/www/idc)`);
+    }
+
+    const nginxConfigPaths = ['/etc/nginx/sites-available/idc', '/etc/nginx/sites-enabled/idc',
       '/etc/nginx/conf.d/idc', '/etc/nginx/conf.d/idc.conf'];
-    paths.forEach(p => {
+    nginxConfigPaths.forEach(p => {
       if (fs.existsSync(p)) {
-        console.log(`     - 删除: ${p}`);
+        console.log(`     - 删除 Nginx 配置: ${p}`);
       }
     });
-  } else {
-    console.log(`     - 提示手动清理（${process.platform === 'win32' ? 'Windows' : 'macOS'}）`);
+  } else if (process.platform === 'win32') {
+    console.log(`     - 删除 Nginx 配置文件 (C:/nginx/conf/conf.d/idc.conf)`);
+    console.log(`     - 提供 Chocolatey/Scoop 卸载指引`);
+  } else if (process.platform === 'darwin') {
+    if (commandExists('brew')) {
+      console.log(`     - 停止 Nginx (brew services)`);
+    }
+    console.log(`     - 删除 Nginx 配置 (/usr/local/etc/nginx/servers/)`);
   }
 
   // 配置文件
