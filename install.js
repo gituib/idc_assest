@@ -1683,11 +1683,6 @@ server {
   fs.writeFileSync(path.join(deployDir, 'nginx-idc.conf'), nginxConfig);
   log.success('Nginx 配置文件已生成 (deploy/nginx-idc.conf)');
 
-  // 自动配置 Nginx（Linux 系统）
-  if (!isWindows && config.frontendDeploy === 'nginx') {
-    autoConfigureNginx();
-  }
-
   // 输出平台特定的配置指引
   if (isWindows) {
     log.info('Windows Nginx 配置路径示例:');
@@ -1702,14 +1697,36 @@ server {
  * 自动复制配置文件到系统目录并启用
  */
 function autoConfigureNginx() {
-  log.step('自动配置 Nginx');
+  log.step('配置 Nginx');
+
+  if (!isNginxInstalled()) {
+    log.warning('Nginx 未安装，尝试自动安装...');
+    if (process.platform === 'linux') {
+      const installed = autoInstallNginxLinux();
+      if (!installed) {
+        log.error('Nginx 自动安装失败');
+        log.info('请手动安装 Nginx 后执行:');
+        console.log(`  ${colors.cyan}sudo cp deploy/nginx-idc.conf /etc/nginx/sites-available/idc${colors.reset}`);
+        console.log(`  ${colors.cyan}sudo ln -sf /etc/nginx/sites-available/idc /etc/nginx/sites-enabled/idc${colors.reset}`);
+        console.log(`  ${colors.cyan}sudo nginx -t && sudo systemctl restart nginx${colors.reset}`);
+        return;
+      }
+    } else {
+      log.error('当前平台不支持自动安装 Nginx，请手动安装');
+      return;
+    }
+  }
 
   const root = isRootUser();
   const sudoPrefix = root ? '' : 'sudo ';
   const configSource = path.join(__dirname, 'deploy', 'nginx-idc.conf');
 
+  if (!fs.existsSync(configSource)) {
+    log.error('Nginx 配置文件不存在，请先运行安装脚本');
+    return;
+  }
+
   try {
-    // 检测 Nginx 配置目录结构
     let configDir = '';
     let useSitesAvailable = false;
 
@@ -1724,7 +1741,6 @@ function autoConfigureNginx() {
       return;
     }
 
-    // 复制配置文件
     const configDest = path.join(configDir, 'idc');
     log.info(`复制配置到 ${configDest}...`);
 
@@ -1734,37 +1750,36 @@ function autoConfigureNginx() {
       return;
     }
 
-    // 如果使用 sites-available，创建软链接
     if (useSitesAvailable) {
       log.info('创建站点软链接...');
-      const linkResult = runCommand(`${sudoPrefix}ln -sf "${configDest}" /etc/nginx/sites-enabled/idc`);
-      if (!linkResult.success) {
-        log.warning('软链接创建失败');
-      }
+      runCommand(`${sudoPrefix}ln -sf "${configDest}" /etc/nginx/sites-enabled/idc`);
 
-      // 删除默认配置（如果存在）
       if (fs.existsSync('/etc/nginx/sites-enabled/default')) {
         log.info('删除默认站点配置...');
         runCommand(`${sudoPrefix}rm -f /etc/nginx/sites-enabled/default`, { silent: true });
       }
     }
 
-    // 测试配置
     log.info('测试 Nginx 配置...');
     const testResult = runCommand(`${sudoPrefix}nginx -t`);
     if (!testResult.success) {
       log.error('Nginx 配置测试失败');
+      log.info('请检查配置文件: ' + configDest);
       return;
     }
 
-    // 重载 Nginx
-    log.info('重载 Nginx 服务...');
-    const reloadResult = runCommand(`${sudoPrefix}nginx -s reload`);
-    if (reloadResult.success) {
+    log.info('重启 Nginx 服务...');
+    const restartResult = runCommand(`${sudoPrefix}systemctl restart nginx`);
+    if (restartResult.success) {
       log.success('Nginx 配置完成并已生效');
     } else {
-      log.warning('Nginx 重载失败，尝试启动服务...');
-      runCommand(`${sudoPrefix}systemctl start nginx`, { silent: true });
+      log.warning('systemctl 重启失败，尝试直接重载...');
+      const reloadResult = runCommand(`${sudoPrefix}nginx -s reload`);
+      if (reloadResult.success) {
+        log.success('Nginx 配置完成并已生效');
+      } else {
+        log.warning('Nginx 重载失败，请手动重启: sudo systemctl restart nginx');
+      }
     }
 
   } catch (error) {
@@ -2026,6 +2041,11 @@ ${colors.reset}`);
     }
     
     await startServices();
+
+    if (!isWindows && config.frontendDeploy === 'nginx') {
+      autoConfigureNginx();
+    }
+
     await healthCheck();
     printSummary();
 
