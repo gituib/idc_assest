@@ -1618,7 +1618,13 @@ function generateNginxConfig() {
   }
 
   const isWindows = process.platform === 'win32';
-  const frontendPath = path.join(__dirname, 'frontend', 'dist').replace(/\\/g, '/');
+
+  let frontendPath;
+  if (isWindows) {
+    frontendPath = path.join(__dirname, 'frontend', 'dist').replace(/\\/g, '/');
+  } else {
+    frontendPath = '/var/www/idc';
+  }
 
   const nginxConfig = `# IDC设备管理系统 - Nginx配置
 # 生成时间: ${new Date().toISOString()}
@@ -1720,6 +1726,26 @@ function autoConfigureNginx() {
 
   const root = isRootUser();
   const sudoPrefix = root ? '' : 'sudo ';
+
+  // 复制前端构建产物到 /var/www/idc（Nginx 可访问的目录）
+  const wwwDir = '/var/www/idc';
+  const distDir = path.join(__dirname, 'frontend', 'dist');
+
+  if (fs.existsSync(distDir)) {
+    log.info(`复制前端文件到 ${wwwDir}...`);
+    runCommand(`${sudoPrefix}mkdir -p ${wwwDir}`, { silent: true });
+    const copyResult = runCommand(`${sudoPrefix}cp -r ${distDir}/* ${wwwDir}/`, { silent: true });
+    if (copyResult.success) {
+      runCommand(`${sudoPrefix}chmod -R 755 ${wwwDir}`, { silent: true });
+      log.success('前端文件部署完成');
+    } else {
+      log.warning('前端文件复制失败，Nginx 可能无法访问前端页面');
+    }
+  } else {
+    log.warning(`前端构建产物不存在: ${distDir}`);
+    log.info('请先完成前端构建后再配置 Nginx');
+  }
+
   const configSource = path.join(__dirname, 'deploy', 'nginx-idc.conf');
 
   if (!fs.existsSync(configSource)) {
