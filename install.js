@@ -61,6 +61,7 @@ const log = {
 
 let logFileStream = null;
 let installStartTime = null;
+const rollbackSteps = [];
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -1789,6 +1790,64 @@ function autoConfigureNginx() {
 }
 
 // =============================================================================
+// 回滚机制
+// =============================================================================
+
+/**
+ * 执行回滚操作
+ * 
+ * 按照安装步骤的逆序执行清理操作
+ */
+async function rollback() {
+  if (rollbackSteps.length === 0) {
+    log.info('无需回滚');
+    return;
+  }
+
+  log.step('回滚');
+  log.warning('安装失败，正在清理已安装的内容...');
+
+  const totalSteps = rollbackSteps.length;
+  let completedSteps = 0;
+
+  for (const step of rollbackSteps.reverse()) {
+    try {
+      await step();
+      completedSteps++;
+    } catch {
+      // 回滚步骤失败时继续执行后续步骤
+    }
+  }
+
+  // 清理生成的配置文件
+  const configFiles = [
+    path.join(__dirname, 'backend', '.env'),
+    path.join(__dirname, 'ecosystem.config.js'),
+    path.join(__dirname, 'deploy', 'nginx-idc.conf'),
+  ];
+
+  for (const file of configFiles) {
+    try {
+      if (fs.existsSync(file)) {
+        fs.unlinkSync(file);
+      }
+    } catch {
+      // 忽略清理失败
+    }
+  }
+
+  // 保存 PM2 状态（清理已删除的服务）
+  try {
+    runCommand('pm2 save', { silent: true });
+  } catch {
+    // 忽略
+  }
+
+  log.info(`已回滚 ${completedSteps}/${totalSteps} 个步骤`);
+  log.info('如需重新安装，请再次运行: node install.js');
+}
+
+// =============================================================================
 // 部署执行函数
 // =============================================================================
 
@@ -1800,21 +1859,30 @@ function autoConfigureNginx() {
 async function installDependencies() {
   log.step('安装依赖');
 
-  // 安装后端依赖
+  const backendDir = path.join(__dirname, 'backend');
+  const frontendDir = path.join(__dirname, 'frontend');
+
   log.info('安装后端依赖...');
-  const backendResult = runCommand('npm install', { cwd: path.join(__dirname, 'backend') });
+  const backendResult = runCommand('npm install', { cwd: backendDir });
   if (backendResult.success) {
     log.success('后端依赖安装完成');
+    rollbackSteps.push(() => {
+      const rmCmd = process.platform === 'win32' ? 'rmdir /s /q node_modules' : 'rm -rf node_modules';
+      runCommand(rmCmd, { cwd: backendDir, silent: true });
+    });
   } else {
     log.error('后端依赖安装失败');
     throw new Error('Backend install failed');
   }
 
-  // 安装前端依赖
   log.info('安装前端依赖...');
-  const frontendResult = runCommand('npm install', { cwd: path.join(__dirname, 'frontend') });
+  const frontendResult = runCommand('npm install', { cwd: frontendDir });
   if (frontendResult.success) {
     log.success('前端依赖安装完成');
+    rollbackSteps.push(() => {
+      const rmCmd = process.platform === 'win32' ? 'rmdir /s /q node_modules' : 'rm -rf node_modules';
+      runCommand(rmCmd, { cwd: frontendDir, silent: true });
+    });
   } else {
     log.error('前端依赖安装失败');
     throw new Error('Frontend install failed');
@@ -1858,11 +1926,20 @@ async function initDatabase() {
 async function buildFrontend() {
   log.step('构建前端');
 
+  const frontendDir = path.join(__dirname, 'frontend');
+
   log.info('执行 npm run build...');
-  const result = runCommand('npm run build', { cwd: path.join(__dirname, 'frontend') });
+  const result = runCommand('npm run build', { cwd: frontendDir });
 
   if (result.success) {
     log.success('前端构建完成');
+    rollbackSteps.push(() => {
+      const distDir = path.join(frontendDir, 'dist');
+      if (fs.existsSync(distDir)) {
+        const rmCmd = process.platform === 'win32' ? 'rmdir /s /q dist' : 'rm -rf dist';
+        runCommand(rmCmd, { cwd: frontendDir, silent: true });
+      }
+    });
   } else {
     log.error('前端构建失败');
     throw new Error('Frontend build failed');
@@ -1899,6 +1976,10 @@ async function startServices() {
 
   if (backendResult.success) {
     log.success(`后端服务已启动 (端口: ${config.backendPort})`);
+    rollbackSteps.push(() => {
+      runCommand('pm2 stop idc-backend', { silent: true });
+      runCommand('pm2 delete idc-backend', { silent: true });
+    });
   } else {
     log.error('后端服务启动失败');
   }
@@ -1916,6 +1997,10 @@ async function startServices() {
 
     if (frontendResult.success) {
       log.success(`前端服务已启动 (端口: ${config.frontendPort})`);
+      rollbackSteps.push(() => {
+        runCommand('pm2 stop idc-frontend', { silent: true });
+        runCommand('pm2 delete idc-frontend', { silent: true });
+      });
     } else {
       log.error('前端服务启动失败');
     }
@@ -2042,7 +2127,7 @@ ${colors.reset}`);
     
     await startServices();
 
-    if (!isWindows && config.frontendDeploy === 'nginx') {
+    if (process.platform !== 'win32' && config.frontendDeploy === 'nginx') {
       autoConfigureNginx();
     }
 
@@ -2052,6 +2137,7 @@ ${colors.reset}`);
   } catch (error) {
     log.error(`部署失败: ${error.message}`);
     console.error(error);
+    await rollback();
     process.exit(1);
   } finally {
     rl.close();
