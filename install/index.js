@@ -70,25 +70,49 @@ ${colors.reset}`);
     log.info('运行模式: 非交互式（使用默认配置）');
   }
 
+  let useSavedConfig = false;
+
   const savedConfig = loadSavedConfig();
   if (savedConfig) {
     log.info(`检测到上次安装配置 (${savedConfig.savedAt || '未知时间'})`);
     if (!cmdArgs.nonInteractive) {
-      const useSaved = await ask('是否使用上次配置作为默认值? (Y/n)', 'Y');
+      const useSaved = await ask('是否使用上次配置? (Y/n)', 'Y');
       if (useSaved.toLowerCase() === 'y') {
         applySavedConfig(savedConfig);
         log.success('已加载上次配置');
+        useSavedConfig = true;
       }
     } else {
       applySavedConfig(savedConfig);
       log.success('已加载上次配置');
+      useSavedConfig = true;
     }
   }
 
   try {
     await checkEnvironment();
-    await configureDatabase(cmdArgs);
-    await configureServices(cmdArgs);
+
+    if (useSavedConfig) {
+      log.step('数据库配置');
+      log.info(`数据库类型: ${config.dbType}`);
+      if (config.dbType === 'mysql') {
+        log.info(`MySQL: ${config.dbConfig.host}:${config.dbConfig.port}/${config.dbConfig.database}`);
+      }
+      log.divider();
+
+      log.step('服务配置');
+      log.info(`后端端口: ${config.backendPort}`);
+      log.info(`运行环境: ${config.nodeEnv}`);
+      log.info(`前端部署: ${config.frontendDeploy}`);
+      log.info(`前端端口: ${config.frontendPort}`);
+      if (config.frontendDeploy === 'nginx') {
+        log.info(`域名: ${config.domain}`);
+      }
+      log.divider();
+    } else {
+      await configureDatabase(cmdArgs);
+      await configureServices(cmdArgs);
+    }
     
     if (!cmdArgs.nonInteractive) {
       await confirmConfiguration();
