@@ -38,6 +38,21 @@ const SCRIPT_VERSION = '2.0.0';
 const MIN_NODE_VERSION = 16;
 const LOG_DIR = path.join(__dirname, 'logs');
 
+const INSTALL_STEPS = [
+  '环境检测',
+  '数据库配置',
+  '服务配置',
+  '生成配置文件',
+  '安装依赖',
+  '数据库初始化',
+  '构建前端',
+  '启动服务',
+  '配置 Nginx',
+  '健康检查',
+];
+
+let currentStepIndex = 0;
+
 const colors = {
   reset: '\x1b[0m',
   bright: '\x1b[1m',
@@ -54,7 +69,16 @@ const log = {
   success: (msg) => console.log(`${colors.green}✓${colors.reset} ${msg}`),
   warning: (msg) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`),
   error: (msg) => console.log(`${colors.red}✗${colors.reset} ${msg}`),
-  step: (msg) => console.log(`\n${colors.bright}${colors.cyan}▶ ${msg}${colors.reset}`),
+  step: (msg) => {
+    const idx = INSTALL_STEPS.indexOf(msg);
+    if (idx >= 0) {
+      currentStepIndex = idx;
+    }
+    const progress = currentStepIndex < INSTALL_STEPS.length
+      ? `${colors.gray}[${currentStepIndex + 1}/${INSTALL_STEPS.length}]${colors.reset} `
+      : '';
+    console.log(`\n${progress}${colors.bright}${colors.cyan}▶ ${msg}${colors.reset}`);
+  },
   divider: () => console.log(`${colors.gray}${'─'.repeat(60)}${colors.reset}`),
   subStep: (msg) => console.log(`  ${colors.gray}└${colors.reset} ${msg}`)
 };
@@ -140,14 +164,84 @@ function closeLogFile() {
  * @property {string} domain - 域名配置（Nginx 使用）
  */
 const config = {
-  dbType: 'sqlite',           // 默认使用 SQLite
-  dbConfig: {},               // MySQL 配置初始为空
-  backendPort: 8000,          // 默认后端端口
-  nodeEnv: 'production',      // 默认运行环境
-  frontendDeploy: 'nginx',    // 默认使用 Nginx
-  frontendPort: 80,           // 默认 Nginx 端口
-  domain: 'localhost'         // 默认域名
+  dbType: 'sqlite',
+  dbConfig: {},
+  backendPort: 8000,
+  nodeEnv: 'production',
+  frontendDeploy: 'nginx',
+  frontendPort: 80,
+  domain: 'localhost'
 };
+
+const SAVED_CONFIG_PATH = path.join(__dirname, 'deploy', 'install-config.json');
+
+/**
+ * 保存当前配置到文件
+ *
+ * 将配置写入 deploy/install-config.json，供下次安装时读取
+ * 不保存敏感信息（MySQL 密码）
+ */
+function saveConfig() {
+  const deployDir = path.dirname(SAVED_CONFIG_PATH);
+  if (!fs.existsSync(deployDir)) {
+    fs.mkdirSync(deployDir, { recursive: true });
+  }
+
+  const savedConfig = {
+    dbType: config.dbType,
+    dbConfig: {
+      host: config.dbConfig.host,
+      port: config.dbConfig.port,
+      username: config.dbConfig.username,
+      database: config.dbConfig.database,
+    },
+    backendPort: config.backendPort,
+    nodeEnv: config.nodeEnv,
+    frontendDeploy: config.frontendDeploy,
+    frontendPort: config.frontendPort,
+    domain: config.domain,
+    savedAt: new Date().toISOString(),
+  };
+
+  fs.writeFileSync(SAVED_CONFIG_PATH, JSON.stringify(savedConfig, null, 2));
+  log.subStep('配置已保存到 deploy/install-config.json');
+}
+
+/**
+ * 读取上次保存的配置
+ *
+ * @returns {Object|null} 上次保存的配置，无则返回 null
+ */
+function loadSavedConfig() {
+  try {
+    if (!fs.existsSync(SAVED_CONFIG_PATH)) {
+      return null;
+    }
+    const content = fs.readFileSync(SAVED_CONFIG_PATH, 'utf8');
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 将保存的配置应用到当前 config 对象
+ *
+ * @param {Object} saved - 上次保存的配置
+ */
+function applySavedConfig(saved) {
+  if (!saved) return;
+
+  if (saved.dbType) config.dbType = saved.dbType;
+  if (saved.dbConfig) {
+    config.dbConfig = { ...config.dbConfig, ...saved.dbConfig };
+  }
+  if (saved.backendPort) config.backendPort = saved.backendPort;
+  if (saved.nodeEnv) config.nodeEnv = saved.nodeEnv;
+  if (saved.frontendDeploy) config.frontendDeploy = saved.frontendDeploy;
+  if (saved.frontendPort) config.frontendPort = saved.frontendPort;
+  if (saved.domain) config.domain = saved.domain;
+}
 
 // =============================================================================
 // 交互式输入函数
@@ -407,29 +501,6 @@ function checkNodeAndNpm() {
   npmInstalled = commandExists('npm');
 
   return { nodeInstalled, npmInstalled, version };
-}
-
-/**
- * 检测 Linux 发行版类型
- * 
- * @returns {string} 发行版类型：'ubuntu' | 'debian' | 'centos' | 'rhel' | 'fedora' | 'arch' | 'unknown'
- */
-function detectLinuxDistro() {
-  try {
-    // 尝试读取 /etc/os-release 文件
-    const osRelease = fs.readFileSync('/etc/os-release', 'utf8');
-    
-    if (osRelease.includes('Ubuntu')) return 'ubuntu';
-    if (osRelease.includes('Debian')) return 'debian';
-    if (osRelease.includes('CentOS')) return 'centos';
-    if (osRelease.includes('Red Hat')) return 'rhel';
-    if (osRelease.includes('Fedora')) return 'fedora';
-    if (osRelease.includes('Arch')) return 'arch';
-    
-    return 'unknown';
-  } catch {
-    return 'unknown';
-  }
 }
 
 /**
@@ -1495,7 +1566,8 @@ async function autoInstallNginx() {
 function generateBackendEnv() {
   const envPath = path.join(__dirname, 'backend', '.env');
 
-  const jwtSecret = generateSecretKey(64);
+  try {
+    const jwtSecret = generateSecretKey(64);
 
   let envContent = `# IDC设备管理系统 - 环境配置
 # 生成时间: ${new Date().toISOString()}
@@ -1542,8 +1614,23 @@ MYSQL_DATABASE=${config.dbConfig.database}
   }
 
   fs.writeFileSync(envPath, envContent);
+
+  if (process.platform !== 'win32') {
+    try {
+      fs.chmodSync(envPath, 0o600);
+      log.success('.env 文件权限已设为 600（仅所有者可读写）');
+    } catch {
+      log.warning('.env 文件权限设置失败，建议手动执行: chmod 600 backend/.env');
+    }
+  }
+
   log.success('后端环境变量文件已生成 (.env)');
   log.info(`JWT_SECRET 已自动生成 (${jwtSecret.length}位)`);
+  log.warning('请妥善保管 .env 文件，切勿提交到版本控制系统');
+  } catch (error) {
+    log.error(`后端环境变量文件生成失败: ${error.message}`);
+    throw new Error('Backend env generation failed');
+  }
 }
 
 /**
@@ -1552,11 +1639,12 @@ MYSQL_DATABASE=${config.dbConfig.database}
  * 生成 ecosystem.config.js 用于 PM2 进程管理
  */
 function generatePM2Config() {
-  // 创建 deploy 目录
   const deployDir = path.join(__dirname, 'deploy');
-  if (!fs.existsSync(deployDir)) {
-    fs.mkdirSync(deployDir, { recursive: true });
-  }
+
+  try {
+    if (!fs.existsSync(deployDir)) {
+      fs.mkdirSync(deployDir, { recursive: true });
+    }
 
   // 构建 PM2 配置对象
   const pm2Config = {
@@ -1601,6 +1689,10 @@ function generatePM2Config() {
     `module.exports = ${JSON.stringify(pm2Config, null, 2)};`
   );
   log.success('PM2 配置文件已生成 (deploy/ecosystem.config.js)');
+  } catch (error) {
+    log.error(`PM2 配置文件生成失败: ${error.message}`);
+    throw new Error('PM2 config generation failed');
+  }
 }
 
 /**
@@ -1611,11 +1703,12 @@ function generatePM2Config() {
 function generateNginxConfig() {
   if (config.frontendDeploy !== 'nginx') return;
 
-  // 创建 deploy 目录
   const deployDir = path.join(__dirname, 'deploy');
-  if (!fs.existsSync(deployDir)) {
-    fs.mkdirSync(deployDir, { recursive: true });
-  }
+
+  try {
+    if (!fs.existsSync(deployDir)) {
+      fs.mkdirSync(deployDir, { recursive: true });
+    }
 
   const isWindows = process.platform === 'win32';
 
@@ -1690,11 +1783,14 @@ server {
   fs.writeFileSync(path.join(deployDir, 'nginx-idc.conf'), nginxConfig);
   log.success('Nginx 配置文件已生成 (deploy/nginx-idc.conf)');
 
-  // 输出平台特定的配置指引
   if (isWindows) {
     log.info('Windows Nginx 配置路径示例:');
     console.log(`  将配置文件复制到: ${colors.cyan}C:/nginx/conf/conf.d/idc.conf${colors.reset}`);
     console.log(`  或修改主配置 include: ${colors.cyan}C:/nginx/conf/nginx.conf${colors.reset}`);
+  }
+  } catch (error) {
+    log.error(`Nginx 配置文件生成失败: ${error.message}`);
+    throw new Error('Nginx config generation failed');
   }
 }
 
@@ -1709,7 +1805,7 @@ function autoConfigureNginx() {
   if (!isNginxInstalled()) {
     log.warning('Nginx 未安装，尝试自动安装...');
     if (process.platform === 'linux') {
-      const installed = autoInstallNginxLinux();
+      const installed = await autoInstallNginxLinux();
       if (!installed) {
         log.error('Nginx 自动安装失败');
         log.info('请手动安装 Nginx 后执行:');
@@ -1878,9 +1974,101 @@ async function rollback() {
 // =============================================================================
 
 /**
+ * npm 镜像源列表
+ * 当默认 registry 不可用时依次尝试
+ */
+const NPM_MIRRORS = [
+  { name: 'npm 官方', registry: 'https://registry.npmjs.org' },
+  { name: '淘宝镜像', registry: 'https://registry.npmmirror.com' },
+  { name: '腾讯镜像', registry: 'https://mirrors.tencent.com/npm' },
+];
+
+/**
+ * 检测 npm registry 连通性
+ *
+ * @param {string} registry - registry URL
+ * @param {number} timeout - 超时时间（毫秒）
+ * @returns {Promise<boolean>} 是否可达
+ */
+function checkRegistryReachable(registry, timeout = 10000) {
+  return new Promise((resolve) => {
+    const url = new URL(registry);
+    const http = url.protocol === 'https:' ? require('https') : require('http');
+    const req = http.get(`${registry}/-/ping`, { timeout }, (res) => {
+      res.resume();
+      resolve(res.statusCode >= 200 && res.statusCode < 500);
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+  });
+}
+
+/**
+ * 检测可用的 npm 镜像源
+ *
+ * @returns {Promise<string>} 可用的 registry URL
+ */
+async function detectAvailableRegistry() {
+  for (const mirror of NPM_MIRRORS) {
+    log.subStep(`检测 ${mirror.name} (${mirror.registry})...`);
+    const reachable = await checkRegistryReachable(mirror.registry);
+    if (reachable) {
+      log.success(`${mirror.name} 可用`);
+      return mirror.registry;
+    }
+    log.subStep(`${mirror.name} 不可达`);
+  }
+  return NPM_MIRRORS[0].registry;
+}
+
+/**
+ * 带重试和镜像源切换的 npm install
+ *
+ * @param {string} cwd - 工作目录
+ * @param {string} label - 显示标签（如"后端"/"前端"）
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+async function npmInstallWithRetry(cwd, label) {
+  const maxRetries = 3;
+  const baseDelay = 3000;
+
+  const availableRegistry = await detectAvailableRegistry();
+  const isDefaultRegistry = availableRegistry === NPM_MIRRORS[0].registry;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    if (attempt > 1) {
+      const delay = baseDelay * Math.pow(2, attempt - 2);
+      log.subStep(`第 ${attempt}/${maxRetries} 次重试，${delay / 1000}秒后...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    let command = 'npm install';
+    if (!isDefaultRegistry) {
+      command += ` --registry=${availableRegistry}`;
+    }
+
+    log.info(`安装${label}依赖${attempt > 1 ? ` (第${attempt}次尝试)` : ''}...`);
+    const result = runCommand(command, { cwd });
+
+    if (result.success) {
+      const nodeModulesPath = path.join(cwd, 'node_modules');
+      if (fs.existsSync(nodeModulesPath)) {
+        return { success: true };
+      }
+      log.subStep(`${label} node_modules 不存在，安装可能未完成`);
+    } else {
+      log.subStep(`${label}依赖安装失败: ${result.error || '未知错误'}`);
+    }
+  }
+
+  return { success: false, error: `${label}依赖安装失败（已重试${maxRetries}次）` };
+}
+
+/**
  * 安装项目依赖
- * 
+ *
  * 依次安装后端和前端的 npm 依赖
+ * 支持镜像源自动切换和指数退避重试
  */
 async function installDependencies() {
   log.step('安装依赖');
@@ -1889,7 +2077,7 @@ async function installDependencies() {
   const frontendDir = path.join(__dirname, 'frontend');
 
   log.info('安装后端依赖...');
-  const backendResult = runCommand('npm install', { cwd: backendDir });
+  const backendResult = await npmInstallWithRetry(backendDir, '后端');
   if (backendResult.success) {
     log.success('后端依赖安装完成');
     rollbackSteps.push(() => {
@@ -1897,12 +2085,12 @@ async function installDependencies() {
       runCommand(rmCmd, { cwd: backendDir, silent: true });
     });
   } else {
-    log.error('后端依赖安装失败');
+    log.error(backendResult.error);
     throw new Error('Backend install failed');
   }
 
   log.info('安装前端依赖...');
-  const frontendResult = runCommand('npm install', { cwd: frontendDir });
+  const frontendResult = await npmInstallWithRetry(frontendDir, '前端');
   if (frontendResult.success) {
     log.success('前端依赖安装完成');
     rollbackSteps.push(() => {
@@ -1910,7 +2098,7 @@ async function installDependencies() {
       runCommand(rmCmd, { cwd: frontendDir, silent: true });
     });
   } else {
-    log.error('前端依赖安装失败');
+    log.error(frontendResult.error);
     throw new Error('Frontend install failed');
   }
 }
@@ -1925,7 +2113,6 @@ async function initDatabase() {
 
   const initScript = path.join(__dirname, 'backend', 'scripts', 'init-database.js');
 
-  // 检查初始化脚本是否存在
   if (!fs.existsSync(initScript)) {
     log.warning('未找到数据库初始化脚本，跳过');
     return;
@@ -1941,21 +2128,50 @@ async function initDatabase() {
   } else {
     log.error('数据库初始化失败');
     log.info('请检查数据库配置并手动运行: node backend/scripts/init-database.js');
+    throw new Error('Database initialization failed');
+  }
+}
+
+/**
+ * 获取系统可用内存（MB）
+ *
+ * @returns {number|null} 可用内存（MB），获取失败返回 null
+ */
+function getAvailableMemoryMB() {
+  try {
+    const os = require('os');
+    return Math.round(os.freemem() / 1024 / 1024);
+  } catch {
+    return null;
   }
 }
 
 /**
  * 构建前端项目
- * 
+ *
  * 执行 npm run build 生成生产环境静态文件
+ * 自动检测系统内存，小内存环境下限制 Node 堆栈大小
  */
 async function buildFrontend() {
   log.step('构建前端');
 
   const frontendDir = path.join(__dirname, 'frontend');
 
-  log.info('执行 npm run build...');
-  const result = runCommand('npm run build', { cwd: frontendDir });
+  const freeMemMB = getAvailableMemoryMB();
+  let buildCommand = 'npm run build';
+
+  if (freeMemMB !== null) {
+    if (freeMemMB < 512) {
+      log.warning(`系统可用内存较低 (${freeMemMB}MB)，前端构建可能失败`);
+      log.info('建议增加内存或创建 swap 分区后再试');
+    } else if (freeMemMB < 1024) {
+      log.info(`可用内存 ${freeMemMB}MB，限制 Node 堆栈为 512MB...`);
+      buildCommand = 'node --max_old_space_size=512 node_modules/vite/bin/vite.js build';
+    }
+  }
+
+  log.info('执行前端构建...');
+  const result = runCommand(buildCommand, { cwd: frontendDir });
 
   if (result.success) {
     log.success('前端构建完成');
@@ -1980,20 +2196,17 @@ async function buildFrontend() {
 async function startServices() {
   log.step('启动服务');
 
-  // 确保日志目录存在
   const logDir = path.join(__dirname, 'backend', 'logs');
   if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
   }
 
-  // 停止已有服务（避免冲突）
   log.info('停止已有服务...');
   const stopCmd = process.platform === 'win32' 
     ? 'pm2 stop idc-backend idc-frontend 2>nul || exit 0' 
     : 'pm2 stop idc-backend idc-frontend 2>/dev/null || true';
   runCommand(stopCmd, { silent: true });
 
-  // 启动后端服务
   log.info('启动后端服务...');
   const backendResult = runCommand(
     `pm2 start server.js --name "idc-backend" --env ${config.nodeEnv}`,
@@ -2008,9 +2221,10 @@ async function startServices() {
     });
   } else {
     log.error('后端服务启动失败');
+    log.info('请检查后端日志: pm2 logs idc-backend');
+    throw new Error('Backend service start failed');
   }
 
-  // 如果使用 PM2 serve，启动前端服务
   if (config.frontendDeploy === 'pm2') {
     log.info('安装 serve 包...');
     runCommand('npm install -g serve', { silent: true });
@@ -2029,10 +2243,11 @@ async function startServices() {
       });
     } else {
       log.error('前端服务启动失败');
+      log.info('请检查前端日志: pm2 logs idc-frontend');
+      throw new Error('Frontend service start failed');
     }
   }
 
-  // 保存 PM2 配置（开机自启）
   runCommand('pm2 save', { silent: true });
 
   log.divider();
@@ -2129,6 +2344,21 @@ ${colors.reset}`);
     log.info('运行模式: 非交互式（使用默认配置）');
   }
 
+  const savedConfig = loadSavedConfig();
+  if (savedConfig) {
+    log.info(`检测到上次安装配置 (${savedConfig.savedAt || '未知时间'})`);
+    if (!cmdArgs.nonInteractive) {
+      const useSaved = await ask('是否使用上次配置作为默认值? (Y/n)', 'Y');
+      if (useSaved.toLowerCase() === 'y') {
+        applySavedConfig(savedConfig);
+        log.success('已加载上次配置');
+      }
+    } else {
+      applySavedConfig(savedConfig);
+      log.success('已加载上次配置');
+    }
+  }
+
   try {
     await checkEnvironment();
     await configureDatabase(cmdArgs);
@@ -2138,9 +2368,13 @@ ${colors.reset}`);
       await confirmConfiguration();
     }
 
+    saveConfig();
+
     generateBackendEnv();
     generatePM2Config();
     generateNginxConfig();
+    log.step('生成配置文件');
+    log.success('所有配置文件已生成');
 
     await installDependencies();
     await initDatabase();
@@ -2154,7 +2388,7 @@ ${colors.reset}`);
     await startServices();
 
     if (process.platform !== 'win32' && config.frontendDeploy === 'nginx') {
-      autoConfigureNginx();
+      await autoConfigureNginx();
     }
 
     await healthCheck();
@@ -2171,6 +2405,35 @@ ${colors.reset}`);
   }
 }
 
+/**
+ * 使用 Node.js http 模块进行健康检查
+ *
+ * @param {string} host - 主机地址
+ * @param {number} port - 端口号
+ * @param {string} path - 请求路径
+ * @param {number} timeout - 超时时间（毫秒）
+ * @returns {Promise<{success: boolean, statusCode?: number, error?: string}>}
+ */
+function httpHealthCheck(host, port, path = '/health', timeout = 5000) {
+  return new Promise((resolve) => {
+    const http = require('http');
+    const req = http.get({ hostname: host, port, path, timeout }, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        resolve({ success: res.statusCode >= 200 && res.statusCode < 400, statusCode: res.statusCode });
+      });
+    });
+    req.on('error', (err) => {
+      resolve({ success: false, error: err.message });
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ success: false, error: 'timeout' });
+    });
+  });
+}
+
 async function healthCheck() {
   log.step('健康检查');
   log.subStep('检查后端服务状态...');
@@ -2179,27 +2442,17 @@ async function healthCheck() {
   const retryDelay = 3000;
   
   for (let i = 1; i <= maxRetries; i++) {
-    try {
-      const result = execSync('curl -s -o /dev/null -w "%{http_code}" http://localhost:' + config.backendPort + '/health 2>nul || echo "000"', {
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: 5000
-      }).trim();
-      
-      if (result === '200') {
-        log.success('后端服务健康检查通过');
-        return { success: true };
-      }
-      
-      if (i < maxRetries) {
-        log.subStep(`第 ${i} 次检查失败 (HTTP ${result})，${retryDelay/1000}秒后重试...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      }
-    } catch (error) {
-      if (i < maxRetries) {
-        log.subStep(`第 ${i} 次检查失败，${retryDelay/1000}秒后重试...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      }
+    const result = await httpHealthCheck('localhost', parseInt(config.backendPort));
+    
+    if (result.success) {
+      log.success('后端服务健康检查通过');
+      return { success: true };
+    }
+    
+    const detail = result.statusCode ? `HTTP ${result.statusCode}` : (result.error || '无响应');
+    if (i < maxRetries) {
+      log.subStep(`第 ${i} 次检查失败 (${detail})，${retryDelay/1000}秒后重试...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
   }
 

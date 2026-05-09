@@ -111,3 +111,4 @@ backend/config/remote-backup-configs.json
 .vercel/
 .gitignore
 .vercelignore
+docs/install-improvement-plan.md
