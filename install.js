@@ -1799,7 +1799,7 @@ server {
  * 
  * 自动复制配置文件到系统目录并启用
  */
-function autoConfigureNginx() {
+async function autoConfigureNginx() {
   log.step('配置 Nginx');
 
   if (!isNginxInstalled()) {
