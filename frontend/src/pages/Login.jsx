@@ -33,8 +33,6 @@ const Login = () => {
   const { login, register, checkAdmin } = useAuth();
   const navigate = useNavigate();
 
-  const isSetupMode = isFirstUser && !registerMode;
-
   useEffect(() => {
     checkIsFirstUser();
   }, []);
@@ -78,12 +76,10 @@ const Login = () => {
         realName: values.realName,
       });
       if (result.success) {
+        message.success(result.isFirstUser ? '管理员账号创建成功' : '注册成功，请等待管理员审核');
         if (result.isFirstUser) {
-          message.success('管理员账号创建成功');
-          setIsFirstUser(false);
           navigate('/dashboard');
         } else {
-          message.success('注册成功，请等待管理员审核');
           setRegisterMode(false);
         }
       } else {
@@ -246,13 +242,13 @@ const Login = () => {
             )}
 
             <Form
-              name={isSetupMode || registerMode ? 'register' : 'login'}
+              name={registerMode ? 'register' : 'login'}
               layout="vertical"
-              onFinish={isSetupMode ? onFinishRegister : (registerMode ? onFinishRegister : onFinishLogin)}
+              onFinish={registerMode ? onFinishRegister : onFinishLogin}
               size="large"
               className="login-form"
             >
-              {registerMode && !isFirstUser && (
+              {registerMode && (
                 <>
                   <Form.Item
                     name="realName"
@@ -261,6 +257,17 @@ const Login = () => {
                   >
                     <Input
                       placeholder="请输入真实姓名"
+                      className="login-input"
+                      prefix={<UserOutlined className="input-icon" />}
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    name="username"
+                    label="用户名"
+                    rules={[{ required: true, message: '请输入用户名' }]}
+                  >
+                    <Input
+                      placeholder="请输入用户名"
                       className="login-input"
                       prefix={<UserOutlined className="input-icon" />}
                     />
@@ -295,32 +302,32 @@ const Login = () => {
 
               <Form.Item
                 name="username"
-                label={isSetupMode ? '管理员账号' : (registerMode ? '用户名' : '用户名')}
-                rules={[{ required: true, message: isSetupMode ? '请设置管理员账号' : '请输入用户名' }]}
+                label={isFirstUser ? '管理员账号' : '用户名'}
+                rules={[{ required: true, message: isFirstUser ? '请设置管理员账号' : '请输入用户名' }]}
               >
                 <Input
                   prefix={<UserOutlined className="input-icon" />}
-                  placeholder={isSetupMode ? '请设置管理员账号' : '请输入用户名'}
+                  placeholder={isFirstUser ? '请设置管理员账号' : '请输入用户名'}
                   className="login-input"
                 />
               </Form.Item>
 
               <Form.Item
                 name="password"
-                label={isSetupMode ? '管理员密码' : '密码'}
+                label={isFirstUser ? '管理员密码' : '密码'}
                 rules={[
-                  { required: true, message: isSetupMode ? '请设置管理员密码' : '请输入密码' },
+                  { required: true, message: isFirstUser ? '请设置管理员密码' : '请输入密码' },
                   { min: 6, message: '密码长度不能少于6位' },
                 ]}
               >
                 <Input.Password
                   prefix={<LockOutlined className="input-icon" />}
-                  placeholder={isSetupMode ? '请设置管理员密码' : '请输入密码'}
+                  placeholder={isFirstUser ? '请设置管理员密码' : '请输入密码'}
                   className="login-input"
                 />
               </Form.Item>
 
-              {(registerMode || isSetupMode) && (
+              {registerMode && (
                 <Form.Item
                   name="confirmPassword"
                   label="确认密码"
@@ -352,7 +359,7 @@ const Login = () => {
                   loading={loading}
                   className="submit-button"
                 >
-                  {isSetupMode ? '创建管理员' : (registerMode ? '立即注册' : '登 录')}
+                  {registerMode ? '立即注册' : '登 录'}
                 </Button>
               </Form.Item>
             </Form>
