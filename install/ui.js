@@ -77,14 +77,14 @@ function askPassword(question) {
   });
 }
 
-async function select(question, options) {
+async function select(question, options, defaultIndex = 1) {
   const { colors } = require('./logger');
   console.log(`\n${question}`);
   options.forEach((opt, idx) => {
     console.log(`  ${colors.cyan}${idx + 1}.${colors.reset} ${opt.label}`);
   });
 
-  const answer = await ask('请选择', '1');
+  const answer = await ask('请选择', String(defaultIndex));
   const index = parseInt(answer) - 1;
 
   return options[index]?.value || options[0].value;

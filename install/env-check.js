@@ -403,7 +403,7 @@ async function checkEnvironment() {
     }
   }
 
-  if (commandExists('nginx') || commandExists('nginx.exe')) {
+  if (isNginxInstalled()) {
     log.success('Nginx 已安装');
   } else {
     log.warning('未检测到 Nginx（可选，仅在使用Nginx部署时需要）');

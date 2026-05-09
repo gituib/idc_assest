@@ -311,17 +311,18 @@ async function configureServices(cmdArgs) {
     config.backendPort = '8000';
     log.info('使用默认配置: 后端端口 = 8000');
   } else {
-    config.backendPort = await ask('后端服务端口', '8000');
+    config.backendPort = await ask('后端服务端口', config.backendPort || '8000');
   }
 
   if (cmdArgs?.nonInteractive) {
     config.nodeEnv = 'production';
     log.info('使用默认配置: 运行环境 = production');
   } else {
+    const defaultEnvIndex = (config.nodeEnv || 'production') === 'development' ? 2 : 1;
     config.nodeEnv = await select('选择运行环境：', [
       { label: 'production（生产模式，性能优化，推荐正式部署）', value: 'production' },
       { label: 'development（开发模式，详细日志，便于调试）', value: 'development' }
-    ]);
+    ], defaultEnvIndex);
   }
 
   if (cmdArgs?.nonInteractive || cmdArgs?.skipNginx) {
@@ -329,10 +330,11 @@ async function configureServices(cmdArgs) {
     config.frontendPort = '3000';
     log.info('使用默认配置: 前端部署 = PM2 serve (端口 3000)');
   } else {
+    const defaultDeployIndex = (config.frontendDeploy || 'nginx') === 'pm2' ? 2 : 1;
     config.frontendDeploy = await select('前端部署方式：', [
       { label: 'Nginx（性能最优，推荐生产环境）', value: 'nginx' },
       { label: 'PM2 serve（简单快捷，无需额外安装）', value: 'pm2' }
-    ]);
+    ], defaultDeployIndex);
   }
 
   if (config.frontendDeploy === 'nginx') {
@@ -380,15 +382,15 @@ async function configureServices(cmdArgs) {
     }
 
     if (!cmdArgs?.nonInteractive) {
-      config.frontendPort = await ask('Nginx 监听端口', '80');
-      config.domain = await ask('域名（没有则填localhost）', 'localhost');
+      config.frontendPort = await ask('Nginx 监听端口', config.frontendPort || '80');
+      config.domain = await ask('域名（没有则填localhost）', config.domain || 'localhost');
     } else {
-      config.frontendPort = '80';
-      config.domain = 'localhost';
+      config.frontendPort = config.frontendPort || '80';
+      config.domain = config.domain || 'localhost';
     }
   } else {
     if (!cmdArgs?.nonInteractive) {
-      config.frontendPort = await ask('前端服务端口', '3000');
+      config.frontendPort = await ask('前端服务端口', config.frontendPort || '3000');
     }
   }
 

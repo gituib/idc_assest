@@ -15,10 +15,12 @@ async function configureDatabase(cmdArgs) {
     config.dbType = 'sqlite';
     log.info('使用默认配置: 数据库类型 = sqlite');
   } else {
+    const defaultDbType = config.dbType || 'sqlite';
+    const defaultIndex = defaultDbType === 'mysql' ? 2 : 1;
     config.dbType = await select('选择数据库类型：', [
       { label: 'SQLite（零配置，适合开发/小规模）', value: 'sqlite' },
       { label: 'MySQL（生产环境推荐）', value: 'mysql' }
-    ]);
+    ], defaultIndex);
   }
 
   if (config.dbType === 'mysql') {
@@ -74,11 +76,11 @@ async function configureExistingMySQL() {
   console.log('\n' + colors.yellow + '请确保 MySQL 服务已启动并创建了数据库' + colors.reset);
   console.log(colors.gray + '创建数据库命令: CREATE DATABASE idc_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;' + colors.reset + '\n');
 
-  config.dbConfig.host = await ask('MySQL 主机地址', 'localhost');
-  config.dbConfig.port = await ask('MySQL 端口', '3306');
-  config.dbConfig.username = await ask('MySQL 用户名', 'root');
+  config.dbConfig.host = await ask('MySQL 主机地址', config.dbConfig.host || 'localhost');
+  config.dbConfig.port = await ask('MySQL 端口', config.dbConfig.port || '3306');
+  config.dbConfig.username = await ask('MySQL 用户名', config.dbConfig.username || 'root');
   config.dbConfig.password = await askPassword('MySQL 密码');
-  config.dbConfig.database = await ask('数据库名称', 'idc_management');
+  config.dbConfig.database = await ask('数据库名称', config.dbConfig.database || 'idc_management');
 }
 
 async function installMySQL() {
