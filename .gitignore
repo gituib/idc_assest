@@ -112,3 +112,4 @@ backend/config/remote-backup-configs.json
 .gitignore
 .vercelignore
 docs/install-improvement-plan.md
+docs/install-split-plan.md
