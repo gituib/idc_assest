@@ -1617,61 +1617,64 @@ function generateNginxConfig() {
   }
 
   const isWindows = process.platform === 'win32';
-  // 转换路径分隔符（Windows 反斜杠转斜杠）
   const frontendPath = path.join(__dirname, 'frontend', 'dist').replace(/\\/g, '/');
 
-  // 构建 Nginx 配置内容
   const nginxConfig = `# IDC设备管理系统 - Nginx配置
 # 生成时间: ${new Date().toISOString()}
-
-# 全局请求体大小限制（支持大文件上传）
-client_max_body_size 100M;
 
 server {
     listen ${config.frontendPort};
     server_name ${config.domain};
-    
+
+    client_max_body_size 100M;
+
     # 前端静态文件目录
     root "${frontendPath}";
     index index.html;
-    
+
     # Gzip压缩
     gzip on;
     gzip_vary on;
     gzip_min_length 1024;
-    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
-    
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json application/x-javascript image/svg+xml;
+
     # 静态资源缓存（1年）
-    location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+    location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|hdr)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+        try_files $uri =404;
     }
-    
-    # 前端路由支持（SPA单页应用）
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-    
+
     # API代理到后端
-    location /api {
-        proxy_pass http://127.0.0.1:${config.backendPort};
+    location /api/ {
+        proxy_pass http://127.0.0.1:${config.backendPort}/api/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+        proxy_read_timeout 300s;
+        proxy_buffering off;
     }
-    
+
     # 文件上传代理
-    location /uploads {
-        proxy_pass http://127.0.0.1:${config.backendPort};
+    location /uploads/ {
+        proxy_pass http://127.0.0.1:${config.backendPort}/uploads/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         client_max_body_size 100M;
+    }
+
+    # 前端路由支持（SPA单页应用，必须放在最后）
+    location / {
+        try_files $uri $uri/ /index.html =404;
     }
 }
 `;
