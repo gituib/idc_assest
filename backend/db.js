@@ -40,10 +40,6 @@ if (DB_TYPE === 'mysql') {
     dialect: 'sqlite',
     storage: process.env.DB_PATH || './idc_management.db',
     logging: sqlLogger,
-    dialectModule: require('better-sqlite3'),
-    dialectModuleOptions: {
-      verbose: false,
-    },
     pool: {
       max: 5,
       min: 1,

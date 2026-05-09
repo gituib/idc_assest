@@ -36,7 +36,7 @@
     "node-cron": "^4.2.1",
     "sequelize": "^6.37.8",
     "smb2": "^0.2.2",
-    "better-sqlite3": "^11.7.0",
+    "sqlite3": "^5.1.7",
     "ssh2-sftp-client": "^9.1.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
