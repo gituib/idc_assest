@@ -1,0 +1,11 @@
+{
+  "targets": [],
+  "globalSettings": {
+    "enabled": false,
+    "uploadAfterBackup": false,
+    "deleteLocalAfterUpload": false,
+    "retryCount": 3,
+    "retryDelay": 5000,
+    "timeout": 300000
+  }
+}
