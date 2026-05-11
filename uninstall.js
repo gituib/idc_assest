@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * ============================================================================
  * IDC设备管理系统 - 卸载脚本 v2.0.0
- * ============================================================================
  *
  * 功能说明：
  *   - 停止并删除 PM2 管理的后端和前端服务
@@ -19,36 +17,16 @@
  *   node uninstall.js --backup     # 卸载前自动备份
  */
 
-const readline = require('readline');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { colors, ICONS, log, padCenter, initLogFile, closeLogFile } = require('./install/logger');
+const { ask, closeReadline } = require('./install/ui');
+const { SCRIPT_VERSION } = require('./install/constants');
 
-const SCRIPT_VERSION = '2.0.0';
 const BACKUP_DIR = path.join(__dirname, 'backup');
 const LOG_DIR = path.join(__dirname, 'logs');
-
-const colors = {
-  reset: '\x1b[0m',
-  bright: '\x1b[1m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  red: '\x1b[31m',
-  cyan: '\x1b[36m',
-  gray: '\x1b[90m',
-  magenta: '\x1b[35m'
-};
-
-const log = {
-  info: (msg) => console.log(`${colors.cyan}ℹ${colors.reset} ${msg}`),
-  success: (msg) => console.log(`${colors.green}✓${colors.reset} ${msg}`),
-  warning: (msg) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`),
-  error: (msg) => console.log(`${colors.red}✗${colors.reset} ${msg}`),
-  step: (msg) => console.log(`\n${colors.bright}${colors.cyan}▶ ${msg}${colors.reset}`),
-  divider: () => console.log(`${colors.gray}${'─'.repeat(60)}${colors.reset}`),
-  subStep: (msg) => console.log(`  ${colors.gray}└${colors.reset} ${msg}`)
-};
 
 let logFileStream = null;
 let uninstallStartTime = null;
@@ -70,75 +48,28 @@ function parseArgs() {
 
 function showHelp() {
   console.log(`
-${colors.bright}IDC设备管理系统 - 卸载脚本 v${SCRIPT_VERSION}${colors.reset}
+  ${colors.bright}IDC设备管理系统 - 卸载脚本 v${SCRIPT_VERSION}${colors.reset}
 
-用法: node uninstall.js [选项]
+  ${colors.bright}用法:${colors.reset} node uninstall.js [选项]
 
-选项:
-  -f, --force       强制卸载（无需确认）
-  -y, --yes         强制卸载别名（同 --force）
-  -b, --backup      卸载前自动备份数据库
-  --dry-run         预览模式：仅显示将要删除的内容，不实际执行
-  --skip-db         跳过数据库删除
-  --skip-deps       跳过依赖删除
-  --skip-uploads    跳过上传文件目录删除
-  -h, --help        显示帮助信息
+  ${colors.bright}选项:${colors.reset}
+    ${ICONS.pointer} ${colors.cyan}-f, --force${colors.reset}       强制卸载（无需确认）
+    ${ICONS.pointer} ${colors.cyan}-y, --yes${colors.reset}         强制卸载别名（同 --force）
+    ${ICONS.pointer} ${colors.cyan}-b, --backup${colors.reset}      卸载前自动备份数据库
+      ${colors.dim}--dry-run${colors.reset}         预览模式：仅显示将要删除的内容
+      ${colors.dim}--skip-db${colors.reset}         跳过数据库删除
+      ${colors.dim}--skip-deps${colors.reset}       跳过依赖删除
+      ${colors.dim}--skip-uploads${colors.reset}    跳过上传文件目录删除
+      ${colors.dim}-h, --help${colors.reset}        显示帮助信息
 
-示例:
-  node uninstall.js              # 交互式卸载
-  node uninstall.js --force      # 强制卸载
-  node uninstall.js --backup     # 卸载前备份
-  node uninstall.js --dry-run    # 预览将删除的内容
+  ${colors.bright}示例:${colors.reset}
+    ${colors.cyan}node uninstall.js${colors.reset}              # 交互式卸载
+    ${colors.cyan}node uninstall.js --force${colors.reset}      # 强制卸载
+    ${colors.cyan}node uninstall.js --backup${colors.reset}     # 卸载前备份
+    ${colors.cyan}node uninstall.js --dry-run${colors.reset}    # 预览将删除的内容
 `);
   process.exit(0);
 }
-
-function initLogFile() {
-  if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-  }
-  const logFileName = `uninstall_${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
-  const logFilePath = path.join(LOG_DIR, logFileName);
-  logFileStream = fs.createWriteStream(logFilePath, { flags: 'a' });
-  
-  const originalConsoleLog = console.log;
-  console.log = (...args) => {
-    const timestamp = new Date().toISOString();
-    const message = args.map(arg => 
-      typeof arg === 'string' ? arg.replace(/\x1b\[[0-9;]*m/g, '') : String(arg)
-    ).join(' ');
-    logFileStream.write(`[${timestamp}] ${message}\n`);
-    originalConsoleLog.apply(console, args);
-  };
-}
-
-function closeLogFile() {
-  if (logFileStream) {
-    logFileStream.end();
-  }
-}
-
-// =============================================================================
-// 交互式输入函数
-// =============================================================================
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
-
-function ask(question, defaultValue = '') {
-  return new Promise((resolve) => {
-    const prompt = defaultValue ? `${question} (${defaultValue}): ` : `${question}: `;
-    rl.question(prompt, (answer) => {
-      resolve(answer.trim() || defaultValue);
-    });
-  });
-}
-
-// =============================================================================
-// 系统命令执行函数
-// =============================================================================
 
 function runCommand(command, options = {}) {
   try {
@@ -163,12 +94,6 @@ function commandExists(command) {
   }
 }
 
-/**
- * 从 ecosystem.config.js 读取 PM2 服务名
- * 如果配置文件不存在则返回默认值
- *
- * @returns {{ backendName: string, frontendName: string }} PM2 服务名
- */
 function getPM2ServiceNames() {
   const defaultNames = { backendName: 'idc-backend', frontendName: 'idc-frontend' };
   const configPath = path.join(__dirname, 'deploy', 'ecosystem.config.js');
@@ -199,12 +124,6 @@ function getPM2ServiceNames() {
   }
 }
 
-/**
- * 从 .env 文件读取数据库配置
- * 返回数据库类型和 SQLite 数据库文件路径
- *
- * @returns {{ dbType: string, sqliteDbPath: string }}
- */
 function getDatabaseConfig() {
   const defaultConfig = {
     dbType: 'sqlite',
@@ -241,17 +160,9 @@ function getDatabaseConfig() {
   }
 }
 
-// =============================================================================
-// 检测是否以 root 用户运行
-// =============================================================================
-
 function isRootUser() {
   return process.getuid && process.getuid() === 0;
 }
-
-// =============================================================================
-// 服务停止与删除
-// =============================================================================
 
 async function stopAndDeleteServices() {
   log.step('停止并删除服务');
@@ -266,12 +177,6 @@ async function stopAndDeleteServices() {
   const nullRedirect = isWindows ? '2>nul' : '2>/dev/null';
   const orTrue = isWindows ? '|| exit 0' : '|| true';
 
-  /**
-   * 检查 PM2 中是否存在指定名称的进程
-   *
-   * @param {string} name - 进程名称
-   * @returns {boolean} 进程是否存在
-   */
   function pm2ProcessExists(name) {
     const result = runCommand(`pm2 describe ${name} ${nullRedirect}`, { silent: true });
     return result.success;
@@ -337,10 +242,6 @@ async function stopAndDeleteServices() {
   log.divider();
 }
 
-// =============================================================================
-// Nginx 配置清理
-// =============================================================================
-
 async function cleanupNginxConfig(cmdArgs) {
   log.step('清理 Nginx 配置');
 
@@ -348,20 +249,10 @@ async function cleanupNginxConfig(cmdArgs) {
   const isLinux = process.platform === 'linux';
   const isMac = process.platform === 'darwin';
 
-  /**
-   * 检测 Nginx 是否已安装
-   *
-   * @returns {boolean} Nginx 是否可用
-   */
   function nginxInstalled() {
     return commandExists('nginx');
   }
 
-  /**
-   * 检测 Nginx 服务进程是否在运行
-   *
-   * @returns {boolean} Nginx 是否在运行
-   */
   function nginxRunning() {
     if (isWindows) {
       const result = runCommand('tasklist /FI "IMAGENAME eq nginx.exe" 2>nul', { silent: true });
@@ -371,17 +262,11 @@ async function cleanupNginxConfig(cmdArgs) {
     return result.success && result.output.trim().length > 0;
   }
 
-  /**
-   * 停止 Nginx 服务
-   *
-   * @returns {boolean} 是否成功停止
-   */
   function stopNginx() {
     if (isLinux) {
       const root = isRootUser();
       const sudoPrefix = root ? '' : 'sudo ';
 
-      // 优先使用 systemctl
       if (commandExists('systemctl')) {
         const result = runCommand(`${sudoPrefix}systemctl stop nginx`, { silent: true });
         if (result.success) {
@@ -389,7 +274,6 @@ async function cleanupNginxConfig(cmdArgs) {
           return true;
         }
       }
-      // 回退到 nginx -s stop
       const result = runCommand(`${sudoPrefix}nginx -s stop`, { silent: true });
       if (result.success) {
         log.success('Nginx 服务已停止');
@@ -416,9 +300,6 @@ async function cleanupNginxConfig(cmdArgs) {
     return false;
   }
 
-  /**
-   * 禁用 Nginx 开机自启（Linux）
-   */
   function disableNginxStartup() {
     if (!isLinux || !commandExists('systemctl')) return;
 
@@ -430,9 +311,6 @@ async function cleanupNginxConfig(cmdArgs) {
     }
   }
 
-  /**
-   * 清理 Linux 前端部署目录
-   */
   function cleanupFrontendDeployDir() {
     if (!isLinux) return;
 
@@ -466,30 +344,29 @@ async function cleanupNginxConfig(cmdArgs) {
       }
     }
 
-    console.log(`\n  请手动完成以下操作：`);
-    console.log(`  1. 删除配置文件: ${colors.cyan}C:/nginx/conf/conf.d/idc.conf${colors.reset}`);
-    console.log(`  2. 编辑主配置: 从 ${colors.cyan}C:/nginx/conf/nginx.conf${colors.reset} 中移除 include 语句`);
-    console.log(`  3. 停止 Nginx: ${colors.cyan}nginx -s stop${colors.reset}`);
+    console.log(`  ${ICONS.pipe}  请手动完成以下操作：`);
+    console.log(`  ${ICONS.pipe}  删除配置文件: ${colors.cyan}C:/nginx/conf/conf.d/idc.conf${colors.reset}`);
+    console.log(`  ${ICONS.pipe}  编辑主配置: 从 ${colors.cyan}C:/nginx/conf/nginx.conf${colors.reset} 中移除 include 语句`);
+    console.log(`  ${ICONS.pipe}  停止 Nginx: ${colors.cyan}nginx -s stop${colors.reset}`);
 
-    // 检测 Nginx 安装方式，提供卸载指引
     log.info('检测 Nginx 安装方式...');
     const chocoCheck = runCommand('choco list nginx --local-only 2>nul', { silent: true });
     if (chocoCheck.success && chocoCheck.output.includes('nginx')) {
-      console.log(`\n  检测到 Chocolatey 安装的 Nginx，卸载命令：`);
-      console.log(`  ${colors.cyan}choco uninstall nginx${colors.reset}`);
+      console.log(`  ${ICONS.pipe}  检测到 Chocolatey 安装的 Nginx，卸载命令：`);
+      console.log(`  ${ICONS.pipe}    ${colors.cyan}choco uninstall nginx${colors.reset}`);
     } else {
       const scoopCheck = runCommand('scoop list nginx 2>nul', { silent: true });
       if (scoopCheck.success && scoopCheck.output.includes('nginx')) {
-        console.log(`\n  检测到 Scoop 安装的 Nginx，卸载命令：`);
-        console.log(`  ${colors.cyan}scoop uninstall nginx${colors.reset}`);
+        console.log(`  ${ICONS.pipe}  检测到 Scoop 安装的 Nginx，卸载命令：`);
+        console.log(`  ${ICONS.pipe}    ${colors.cyan}scoop uninstall nginx${colors.reset}`);
       } else if (fs.existsSync('C:/nginx')) {
-        console.log(`\n  检测到 Nginx 安装在 ${colors.cyan}C:/nginx${colors.reset}`);
-        console.log(`  如需完整卸载，请手动删除该目录`);
+        console.log(`  ${ICONS.pipe}  检测到 Nginx 安装在 ${colors.cyan}C:/nginx${colors.reset}`);
+        console.log(`  ${ICONS.pipe}  如需完整卸载，请手动删除该目录`);
       }
     }
 
     if (!cmdArgs?.force) {
-      const confirm = await ask('\n是否已完成以上清理操作? (Y/n)', 'Y');
+      const confirm = await ask('是否已完成以上清理操作? (Y/n)', 'Y');
       if (confirm.toLowerCase() !== 'y') {
         log.warning('请记得手动清理 Nginx 配置');
       }
@@ -500,7 +377,6 @@ async function cleanupNginxConfig(cmdArgs) {
     const root = isRootUser();
     const sudoPrefix = root ? '' : 'sudo ';
 
-    // 1. 停止 Nginx 服务
     if (nginxInstalled()) {
       log.info('停止 Nginx 服务...');
       if (nginxRunning()) {
@@ -510,13 +386,9 @@ async function cleanupNginxConfig(cmdArgs) {
       }
     }
 
-    // 2. 禁用开机自启
     disableNginxStartup();
-
-    // 3. 清理前端部署目录
     cleanupFrontendDeployDir();
 
-    // 4. 检测并清理 Nginx 配置文件
     const sitesAvailablePath = '/etc/nginx/sites-available/idc';
     const sitesEnabledPath = '/etc/nginx/sites-enabled/idc';
     const confDPath = '/etc/nginx/conf.d/idc';
@@ -587,7 +459,6 @@ async function cleanupNginxConfig(cmdArgs) {
       if (!cmdArgs?.force) {
         const stopConfirm = await ask('是否停止 Nginx 服务? (Y/n)', 'Y');
         if (stopConfirm.toLowerCase() === 'y') {
-          // 优先使用 brew
           if (commandExists('brew')) {
             const brewResult = runCommand('brew services stop nginx', { silent: true });
             if (brewResult.success) {
@@ -608,16 +479,16 @@ async function cleanupNginxConfig(cmdArgs) {
       }
     }
 
-    console.log(`\n  请手动完成以下操作：`);
-    console.log(`  配置文件可能位于: ${colors.cyan}/usr/local/etc/nginx/servers/${colors.reset}`);
-    console.log(`  或使用: ${colors.cyan}brew services stop nginx${colors.reset}`);
+    console.log(`  ${ICONS.pipe}  请手动完成以下操作：`);
+    console.log(`  ${ICONS.pipe}  配置文件可能位于: ${colors.cyan}/usr/local/etc/nginx/servers/${colors.reset}`);
+    console.log(`  ${ICONS.pipe}  或使用: ${colors.cyan}brew services stop nginx${colors.reset}`);
 
     if (commandExists('brew')) {
-      console.log(`  如需卸载 Nginx：${colors.cyan}brew uninstall nginx${colors.reset}`);
+      console.log(`  ${ICONS.pipe}  如需卸载 Nginx：${colors.cyan}brew uninstall nginx${colors.reset}`);
     }
 
     if (!cmdArgs?.force) {
-      const confirm = await ask('\n是否已完成以上清理操作? (Y/n)', 'Y');
+      const confirm = await ask('是否已完成以上清理操作? (Y/n)', 'Y');
       if (confirm.toLowerCase() !== 'y') {
         log.warning('请记得手动清理 Nginx 配置');
       }
@@ -628,10 +499,6 @@ async function cleanupNginxConfig(cmdArgs) {
 
   log.divider();
 }
-
-// =============================================================================
-// 配置文件清理
-// =============================================================================
 
 async function cleanupConfigFiles() {
   log.step('清理生成的配置文件');
@@ -675,10 +542,6 @@ async function cleanupConfigFiles() {
   log.divider();
 }
 
-// =============================================================================
-// 数据库清理
-// =============================================================================
-
 async function cleanupDatabase(cmdArgs) {
   log.step('数据库清理');
 
@@ -686,43 +549,31 @@ async function cleanupDatabase(cmdArgs) {
   const sqliteDbPath = dbConfig.sqliteDbPath;
   const sqliteExists = fs.existsSync(sqliteDbPath);
 
-  // 获取数据库文件信息
   let dbSize = 0;
   let dbCreateTime = '';
   if (sqliteExists) {
     const stats = fs.statSync(sqliteDbPath);
-    dbSize = (stats.size / 1024 / 1024).toFixed(2); // MB
+    dbSize = (stats.size / 1024 / 1024).toFixed(2);
     dbCreateTime = stats.birthtime.toLocaleString();
   }
 
-  // 检测数据库类型（从 getDatabaseConfig 获取）
   const dbType = dbConfig.dbType;
 
-  console.log(`\n${colors.bright}当前数据库配置：${colors.reset}`);
-  console.log(`  数据库类型: ${colors.cyan}${dbType === 'sqlite' ? 'SQLite' : 'MySQL'}${colors.reset}`);
+  log.section('当前数据库配置');
+  log.keyValue('数据库类型', dbType === 'sqlite' ? 'SQLite' : 'MySQL');
 
   if (dbType === 'sqlite') {
-    // SQLite 数据库处理
-    console.log(`\n${colors.bright}SQLite 数据库信息：${colors.reset}`);
     if (sqliteExists) {
-      console.log(`  文件路径: ${colors.cyan}${sqliteDbPath}${colors.reset}`);
-      console.log(`  文件大小: ${colors.cyan}${dbSize} MB${colors.reset}`);
-      console.log(`  创建时间: ${colors.cyan}${dbCreateTime}${colors.reset}`);
-      console.log(`\n${colors.yellow}⚠ 警告：删除数据库将永久丢失所有数据！${colors.reset}`);
+      log.keyValue('文件路径', sqliteDbPath);
+      log.keyValue('文件大小', `${dbSize} MB`);
+      log.keyValue('创建时间', dbCreateTime);
 
-      console.log(`\n${colors.bright}删除方法：${colors.reset}`);
-      console.log(`  方法1 - 脚本自动删除：输入 Y 确认删除`);
-      console.log(`  方法2 - 手动删除文件：直接删除 ${colors.cyan}${path.relative(__dirname, sqliteDbPath)}${colors.reset}`);
-      console.log(`  方法3 - 命令行删除：`);
-      if (process.platform === 'win32') {
-        console.log(`    ${colors.cyan}del "${sqliteDbPath}"${colors.reset}`);
-      } else {
-        console.log(`    ${colors.cyan}rm "${sqliteDbPath}"${colors.reset}`);
-      }
+      log.divider();
+      log.warning('删除数据库将永久丢失所有数据！');
+      log.divider();
 
-      const confirm = await ask('\n是否删除 SQLite 数据库文件? (y/N)', 'N');
+      const confirm = await ask('是否删除 SQLite 数据库文件? (y/N)', 'N');
       if (confirm.toLowerCase() === 'y') {
-        // 先尝试备份（不管是否指定 --backup）
         if (!cmdArgs?.backup && !cmdArgs?.force) {
           const backupConfirm = await ask('是否先备份数据库再删除? (Y/n)', 'Y');
           if (backupConfirm.toLowerCase() === 'y') {
@@ -757,11 +608,11 @@ async function cleanupDatabase(cmdArgs) {
               } else {
                 log.error('强制删除失败，文件仍被占用');
                 log.warning('请手动停止占用数据库文件的进程后再删除');
-                console.log(`  手动删除命令：`);
+                console.log(`  ${ICONS.pipe}  手动删除命令：`);
                 if (process.platform === 'win32') {
-                  console.log(`  ${colors.cyan}del /f "${sqliteDbPath}"${colors.reset}`);
+                  console.log(`  ${ICONS.pipe}    ${colors.cyan}del /f "${sqliteDbPath}"${colors.reset}`);
                 } else {
-                  console.log(`  ${colors.cyan}rm -f "${sqliteDbPath}"${colors.reset}`);
+                  console.log(`  ${ICONS.pipe}    ${colors.cyan}rm -f "${sqliteDbPath}"${colors.reset}`);
                 }
               }
             } catch (forceError) {
@@ -771,36 +622,33 @@ async function cleanupDatabase(cmdArgs) {
         }
       } else {
         log.info('保留 SQLite 数据库文件');
-        console.log(`  文件位置: ${colors.cyan}${path.relative(__dirname, sqliteDbPath)}${colors.reset}`);
+        log.keyValue('文件位置', path.relative(__dirname, sqliteDbPath));
       }
     } else {
       log.info('未检测到 SQLite 数据库文件');
     }
   } else {
-    // MySQL 数据库提示
-    console.log(`\n${colors.yellow}⚠ 注意：当前使用 MySQL 数据库${colors.reset}`);
-    console.log(`  卸载脚本不会自动删除 MySQL 数据库，请手动清理：`);
-    console.log(`\n${colors.bright}MySQL 删除方法：${colors.reset}`);
-    console.log(`  方法1 - MySQL 命令行：`);
-    console.log(`    ${colors.cyan}mysql -u root -p${colors.reset}`);
-    console.log(`    ${colors.cyan}DROP DATABASE idc_management;${colors.reset}`);
-    console.log(`  方法2 - 使用数据库管理工具（如 Navicat、DBeaver、phpMyAdmin）`);
-    console.log(`  方法3 - 如果不再需要 MySQL 数据，可直接卸载 MySQL 服务`);
+    log.divider();
+    log.warning('当前使用 MySQL 数据库');
+    log.info('卸载脚本不会自动删除 MySQL 数据库，请手动清理：');
+
+    log.section('MySQL 删除方法');
+    console.log(`  ${ICONS.pipe}  方法1 - MySQL 命令行：`);
+    console.log(`  ${ICONS.pipe}    ${colors.cyan}mysql -u root -p${colors.reset}`);
+    console.log(`  ${ICONS.pipe}    ${colors.cyan}DROP DATABASE idc_management;${colors.reset}`);
+    console.log(`  ${ICONS.pipe}  方法2 - 使用数据库管理工具（如 Navicat、DBeaver、phpMyAdmin）`);
+    console.log(`  ${ICONS.pipe}  方法3 - 如果不再需要 MySQL 数据，可直接卸载 MySQL 服务`);
   }
 
-  // 备份提示
-  console.log(`\n${colors.bright}数据备份建议：${colors.reset}`);
+  log.divider();
+  log.section('数据备份建议');
   if (dbType === 'sqlite' && sqliteExists) {
-    console.log(`  备份 SQLite：直接复制 ${colors.cyan}${path.relative(__dirname, sqliteDbPath)}${colors.reset} 文件`);
+    console.log(`  ${ICONS.pipe}  备份 SQLite：直接复制 ${colors.cyan}${path.relative(__dirname, sqliteDbPath)}${colors.reset} 文件`);
   }
-  console.log(`  如需保留数据，请在卸载前手动备份`);
+  console.log(`  ${ICONS.pipe}  如需保留数据，请在卸载前手动备份`);
 
   log.divider();
 }
-
-// =============================================================================
-// 依赖和构建产物清理
-// =============================================================================
 
 async function cleanupDependencies(cmdArgs) {
   log.step('依赖和构建产物清理');
@@ -838,10 +686,6 @@ async function cleanupDependencies(cmdArgs) {
   log.divider();
 }
 
-// =============================================================================
-// 日志清理
-// =============================================================================
-
 async function cleanupLogs(cmdArgs) {
   log.step('日志文件清理');
 
@@ -866,7 +710,6 @@ async function cleanupLogs(cmdArgs) {
     log.info('未找到后端日志目录');
   }
 
-  // 清理脚本自身生成的卸载日志（根目录 logs/）
   const rootLogsDir = path.join(__dirname, 'logs');
   if (fs.existsSync(rootLogsDir)) {
     if (cmdArgs?.force) {
@@ -916,26 +759,22 @@ async function cleanupUploads(cmdArgs) {
   log.divider();
 }
 
-// =============================================================================
-// 主函数
-// =============================================================================
-
 async function backupDatabase() {
   log.step('备份数据库');
-  
+
   const dbConfig = getDatabaseConfig();
   const sqliteDbPath = dbConfig.sqliteDbPath;
   if (!fs.existsSync(sqliteDbPath)) {
     log.info('未找到 SQLite 数据库文件，跳过备份');
     return false;
   }
-  
+
   if (!fs.existsSync(BACKUP_DIR)) {
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
   }
-  
+
   const backupPath = path.join(BACKUP_DIR, `database_backup_${Date.now()}.db`);
-  
+
   try {
     fs.copyFileSync(sqliteDbPath, backupPath);
     backedUpItems.push({ type: '数据库', path: backupPath });
@@ -951,51 +790,41 @@ function showDryRunPreview(cmdArgs) {
   const { backendName, frontendName } = getPM2ServiceNames();
   const dbConfig = getDatabaseConfig();
 
-  console.log(`
-  ${colors.bright}${colors.cyan}以下是将要执行的操作（预览模式）：${colors.reset}\n`);
+  log.banner('卸载预览', 'Dry Run Mode', null);
 
-  // PM2 服务
-  console.log(`  ${colors.bright}1. 停止并删除 PM2 服务${colors.reset}`);
-  console.log(`     - ${backendName}`);
-  console.log(`     - ${frontendName}`);
-  console.log(`     - 清理 PM2 开机自启配置`);
-  console.log(`     - 清理 PM2 相关日志文件`);
+  console.log(`  ${colors.bright}${colors.cyan}以下是将要执行的操作（预览模式）：${colors.reset}\n`);
 
-  // Nginx 配置
-  console.log(`\n  ${colors.bright}2. 清理 Nginx 配置${colors.reset}`);
+  console.log(`  ${ICONS.pointer} ${colors.bright}1. 停止并删除 PM2 服务${colors.reset}`);
+  console.log(`  ${ICONS.pipe}    ${backendName}`);
+  console.log(`  ${ICONS.pipe}    ${frontendName}`);
+  console.log(`  ${ICONS.pipe}    清理 PM2 开机自启配置`);
+  console.log(`  ${ICONS.pipe}    清理 PM2 相关日志文件`);
 
-  // 停止 Nginx 服务
-  if (nginxRunning()) {
-    console.log(`     - 停止 Nginx 服务`);
-  }
+  console.log(`\n  ${ICONS.pointer} ${colors.bright}2. 清理 Nginx 配置${colors.reset}`);
 
-  // Linux 下额外操作
   if (process.platform === 'linux') {
-    console.log(`     - 禁用 Nginx 开机自启 (systemctl disable nginx)`);
-
+    console.log(`  ${ICONS.pipe}    禁用 Nginx 开机自启 (systemctl disable nginx)`);
     if (fs.existsSync('/var/www/idc')) {
-      console.log(`     - 删除前端部署目录 (/var/www/idc)`);
+      console.log(`  ${ICONS.pipe}    删除前端部署目录 (/var/www/idc)`);
     }
-
     const nginxConfigPaths = ['/etc/nginx/sites-available/idc', '/etc/nginx/sites-enabled/idc',
       '/etc/nginx/conf.d/idc', '/etc/nginx/conf.d/idc.conf'];
     nginxConfigPaths.forEach(p => {
       if (fs.existsSync(p)) {
-        console.log(`     - 删除 Nginx 配置: ${p}`);
+        console.log(`  ${ICONS.pipe}    删除 Nginx 配置: ${p}`);
       }
     });
   } else if (process.platform === 'win32') {
-    console.log(`     - 删除 Nginx 配置文件 (C:/nginx/conf/conf.d/idc.conf)`);
-    console.log(`     - 提供 Chocolatey/Scoop 卸载指引`);
+    console.log(`  ${ICONS.pipe}    删除 Nginx 配置文件 (C:/nginx/conf/conf.d/idc.conf)`);
+    console.log(`  ${ICONS.pipe}    提供 Chocolatey/Scoop 卸载指引`);
   } else if (process.platform === 'darwin') {
     if (commandExists('brew')) {
-      console.log(`     - 停止 Nginx (brew services)`);
+      console.log(`  ${ICONS.pipe}    停止 Nginx (brew services)`);
     }
-    console.log(`     - 删除 Nginx 配置 (/usr/local/etc/nginx/servers/)`);
+    console.log(`  ${ICONS.pipe}    删除 Nginx 配置 (/usr/local/etc/nginx/servers/)`);
   }
 
-  // 配置文件
-  console.log(`\n  ${colors.bright}3. 清理生成的配置文件${colors.reset}`);
+  console.log(`\n  ${ICONS.pointer} ${colors.bright}3. 清理生成的配置文件${colors.reset}`);
   const configFiles = [
     { path: path.join(__dirname, 'backend', '.env'), name: '后端环境变量 (.env)' },
     { path: path.join(__dirname, 'deploy', 'ecosystem.config.js'), name: 'PM2 配置' },
@@ -1003,40 +832,36 @@ function showDryRunPreview(cmdArgs) {
   ];
   configFiles.forEach(f => {
     if (fs.existsSync(f.path)) {
-      console.log(`     - 删除: ${f.name}`);
+      console.log(`  ${ICONS.pipe}    删除: ${f.name}`);
     }
   });
 
-  // 数据库
-  console.log(`\n  ${colors.bright}4. 数据库${colors.reset}`);
+  console.log(`\n  ${ICONS.pointer} ${colors.bright}4. 数据库${colors.reset}`);
   if (dbConfig.dbType === 'sqlite' && fs.existsSync(dbConfig.sqliteDbPath)) {
-    console.log(`     - 删除 SQLite 数据库: ${path.relative(__dirname, dbConfig.sqliteDbPath)}`);
+    console.log(`  ${ICONS.pipe}    删除 SQLite 数据库: ${path.relative(__dirname, dbConfig.sqliteDbPath)}`);
     if (cmdArgs?.backup) {
-      console.log(`     - 备份数据库到: backup/`);
+      console.log(`  ${ICONS.pipe}    备份数据库到: backup/`);
     }
   } else if (dbConfig.dbType === 'mysql') {
-    console.log(`     - 提示手动删除 MySQL 数据库`);
+    console.log(`  ${ICONS.pipe}    提示手动删除 MySQL 数据库`);
   } else {
-    console.log(`     - 未检测到数据库文件`);
+    console.log(`  ${ICONS.pipe}    未检测到数据库文件`);
   }
 
-  // 日志
-  console.log(`\n  ${colors.bright}5. 日志文件${colors.reset}`);
+  console.log(`\n  ${ICONS.pointer} ${colors.bright}5. 日志文件${colors.reset}`);
   if (fs.existsSync(path.join(__dirname, 'backend', 'logs'))) {
-    console.log(`     - 后端日志目录 (backend/logs/)`);
+    console.log(`  ${ICONS.pipe}    后端日志目录 (backend/logs/)`);
   }
   if (fs.existsSync(path.join(__dirname, 'logs'))) {
-    console.log(`     - 脚本日志目录 (logs/)`);
+    console.log(`  ${ICONS.pipe}    脚本日志目录 (logs/)`);
   }
 
-  // 上传文件
-  console.log(`\n  ${colors.bright}6. 上传文件${colors.reset}`);
+  console.log(`\n  ${ICONS.pointer} ${colors.bright}6. 上传文件${colors.reset}`);
   if (fs.existsSync(path.join(__dirname, 'backend', 'uploads'))) {
-    console.log(`     - 上传文件目录 (backend/uploads/)`);
+    console.log(`  ${ICONS.pipe}    上传文件目录 (backend/uploads/)`);
   }
 
-  // 依赖和构建产物
-  console.log(`\n  ${colors.bright}7. 依赖和构建产物${colors.reset}`);
+  console.log(`\n  ${ICONS.pointer} ${colors.bright}7. 依赖和构建产物${colors.reset}`);
   const depDirs = [
     { path: path.join(__dirname, 'backend', 'node_modules'), name: '后端 node_modules' },
     { path: path.join(__dirname, 'frontend', 'node_modules'), name: '前端 node_modules' },
@@ -1046,48 +871,44 @@ function showDryRunPreview(cmdArgs) {
   ];
   depDirs.forEach(d => {
     if (fs.existsSync(d.path)) {
-      console.log(`     - 删除: ${d.name}`);
+      console.log(`  ${ICONS.pipe}    删除: ${d.name}`);
     }
   });
 
-  console.log(`\n${colors.gray}${'─'.repeat(60)}${colors.reset}`);
-  console.log(`  ${colors.yellow}提示: 移除 --dry-run 参数以实际执行卸载${colors.reset}`);
+  log.divider();
+  log.warning('移除 --dry-run 参数以实际执行卸载');
   log.divider();
 }
 
 function printSummary() {
   const duration = ((Date.now() - uninstallStartTime) / 1000).toFixed(1);
-  
-  console.log(`
-${colors.bright}${colors.magenta}
-╔══════════════════════════════════════════════════════════╗
-║                    卸载摘要                               ║
-╚══════════════════════════════════════════════════════════╝${colors.reset}`);
 
-  console.log(`\n  ${colors.cyan}卸载耗时:${colors.reset} ${duration} 秒`);
-  
+  log.banner('卸载完成', 'Uninstallation Complete', null);
+
+  log.keyValue('卸载耗时', `${duration} 秒`);
+
   if (deletedItems.length > 0) {
-    console.log(`\n  ${colors.cyan}已删除项目:${colors.reset}`);
+    log.section('已删除项目');
     deletedItems.forEach(item => {
-      console.log(`    - ${item.type}: ${item.name}`);
+      console.log(`  ${ICONS.pipe}    ${colors.dim}${item.type}:${colors.reset} ${item.name}`);
     });
   }
-  
+
   if (backedUpItems.length > 0) {
-    console.log(`\n  ${colors.cyan}已备份项目:${colors.reset}`);
+    log.section('已备份项目');
     backedUpItems.forEach(item => {
-      console.log(`    - ${item.type}: ${path.basename(item.path)}`);
+      console.log(`  ${ICONS.pipe}    ${colors.dim}${item.type}:${colors.reset} ${path.basename(item.path)}`);
     });
-    console.log(`\n  ${colors.yellow}备份位置:${colors.reset} ${BACKUP_DIR}`);
+    log.keyValue('备份位置', BACKUP_DIR);
   }
-  
-  console.log(`\n  ${colors.cyan}保留的文件:${colors.reset}`);
-  console.log(`    - 项目源代码 (backend/, frontend/)`);
-  console.log(`    - 上传的文件 (backend/uploads/)`);
-  
-  console.log(`\n  ${colors.cyan}重新部署:${colors.reset}`);
-  console.log(`    node install.js`);
-  
+
+  log.section('保留的文件');
+  console.log(`  ${ICONS.pipe}    项目源代码 (backend/, frontend/)`);
+  console.log(`  ${ICONS.pipe}    上传的文件 (backend/uploads/)`);
+
+  log.section('重新部署');
+  console.log(`  ${ICONS.pipe}    ${colors.cyan}node install.js${colors.reset}`);
+
   log.divider();
   log.success('卸载完成！');
 }
@@ -1095,39 +916,37 @@ ${colors.bright}${colors.magenta}
 async function main() {
   uninstallStartTime = Date.now();
   const cmdArgs = parseArgs();
-  
+
   if (cmdArgs.help) {
     showHelp();
     return;
   }
-  
-  initLogFile();
 
-  console.log(`
-${colors.bright}${colors.yellow}
-╔══════════════════════════════════════════════════════════╗
-║     IDC设备管理系统 - 卸载脚本 v${SCRIPT_VERSION}                  ║
-║     Uninstallation Script                                 ║
-╚══════════════════════════════════════════════════════════╝
-${colors.reset}`);
+  initLogFile(LOG_DIR);
 
-  log.warning('此脚本将卸载 IDC设备管理系统');
-  
+  log.banner(
+    'IDC 设备管理系统',
+    '卸载脚本',
+    SCRIPT_VERSION
+  );
+
+  log.warning('此脚本将卸载 IDC 设备管理系统');
+
   if (cmdArgs.force) {
     log.info('运行模式: 强制卸载（无需确认）');
   }
-  
+
   if (cmdArgs.dryRun) {
     log.info('运行模式: 预览模式（不实际执行）');
   }
-  
+
   log.divider();
 
   if (!cmdArgs.force && !cmdArgs.dryRun) {
     const confirm = await ask('确认要开始卸载? (y/N)', 'N');
     if (confirm.toLowerCase() !== 'y') {
       log.info('已取消卸载');
-      rl.close();
+      closeReadline();
       closeLogFile();
       return;
     }
@@ -1135,7 +954,7 @@ ${colors.reset}`);
 
   if (cmdArgs.dryRun) {
     showDryRunPreview(cmdArgs);
-    rl.close();
+    closeReadline();
     closeLogFile();
     return;
   }
@@ -1144,25 +963,25 @@ ${colors.reset}`);
     if (cmdArgs.backup) {
       await backupDatabase();
     }
-    
+
     await stopAndDeleteServices();
     await cleanupNginxConfig(cmdArgs);
     await cleanupConfigFiles();
-    
+
     if (!cmdArgs.skipDb) {
       await cleanupDatabase(cmdArgs);
     } else {
       log.info('已跳过数据库删除');
     }
-    
+
     await cleanupLogs(cmdArgs);
-    
+
     if (!cmdArgs.skipUploads) {
       await cleanupUploads(cmdArgs);
     } else {
       log.info('已跳过上传文件目录删除');
     }
-    
+
     if (!cmdArgs.skipDeps) {
       await cleanupDependencies(cmdArgs);
     } else {
@@ -1176,7 +995,7 @@ ${colors.reset}`);
     console.error(error);
     process.exit(1);
   } finally {
-    rl.close();
+    closeReadline();
     closeLogFile();
   }
 }
