@@ -58,9 +58,9 @@ show_banner() {
 
     echo -e ""
     echo -e "  ${CYAN}╔${line}╗${RESET}"
-    echo -e "  ${CYAN}║${BRIGHT}${WHITE}    IDC 设备管理系统 - Linux 安装引导脚本${RESET}    ${CYAN}║${RESET}"
-    echo -e "  ${CYAN}║${DIM}         Linux Bootstrap Installation Script${RESET}         ${CYAN}║${RESET}"
-    echo -e "  ${CYAN}║$(printf '%*s' $width '')║${RESET}" | sed "s/  /  v${SCRIPT_VERSION}  /2"
+    echo -e "  ${CYAN}║${BRIGHT}${WHITE}       IDC 设备管理系统 - Linux 安装引导脚本       ${CYAN}║${RESET}"
+    echo -e "  ${CYAN}║${DIM}            Linux Bootstrap Installation Script           ${CYAN}║${RESET}"
+    echo -e "  ${CYAN}║                      v${SCRIPT_VERSION}                       ${CYAN}║${RESET}"
     echo -e "  ${CYAN}╚${line}╝${RESET}"
     echo -e ""
 }
@@ -216,7 +216,7 @@ auto_install_node() {
 show_manual_install_guide() {
     echo -e ""
     echo -e "  ${BRIGHT}${MAGENTA}${DIAMOND}${RESET} ${BRIGHT}Node.js 手动安装指引${RESET}"
-    log_divider()
+    log_divider
 
     echo -e "  ${PIPE}  ${YELLOW}Ubuntu/Debian:${RESET}"
     echo -e "  ${PIPE}    ${CYAN}curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -${RESET}"
@@ -236,7 +236,7 @@ show_manual_install_guide() {
     echo -e "  ${PIPE}  ${YELLOW}验证安装:${RESET}"
     echo -e "  ${PIPE}    ${CYAN}node -v${RESET}   # 应显示 v20.x.x"
     echo -e "  ${PIPE}    ${CYAN}npm -v${RESET}    # 应显示 10.x.x"
-    log_divider()
+    log_divider
     log_info "安装完成后，请重新运行此脚本继续安装 IDC 设备管理系统"
 }
 
