@@ -1,5 +1,5 @@
 const { SCRIPT_VERSION, LOG_DIR } = require('./constants');
-const { colors, ICONS, log, padCenter } = require('./logger');
+const { colors, ICONS, log, padCenter, initLogFile, closeLogFile } = require('./logger');
 const { ask, closeReadline } = require('./ui');
 const { config, saveConfig, loadSavedConfig, applySavedConfig, parseArgs, showHelp } = require('./config');
 const { checkEnvironment } = require('./env-check');
