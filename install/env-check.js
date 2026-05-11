@@ -1,7 +1,7 @@
 const fs = require('fs');
 const { execSync } = require('child_process');
 const { MIN_NODE_VERSION } = require('./constants');
-const { colors, log } = require('./logger');
+const { colors, ICONS, log } = require('./logger');
 const { runCommand, commandExists } = require('./utils');
 const { ask } = require('./ui');
 
@@ -75,7 +75,7 @@ function showNodeInstallGuide() {
   const isMac = platform === 'darwin';
   const isLinux = platform === 'linux';
 
-  console.log('\n' + colors.bright + 'Node.js 安装指引：' + colors.reset);
+  log.section('Node.js 安装指引');
 
   if (isLinux) {
     const distro = detectLinuxDistro();
@@ -293,9 +293,8 @@ async function installNodeViaNvm() {
 async function handleNodeNotInstalledLinux() {
   log.error('未检测到 Node.js');
 
-  console.log('\n' + colors.yellow + '您可以选择：' + colors.reset);
-  console.log(`  ${colors.cyan}1.${colors.reset} 自动安装 Node.js 20.x（推荐，需要 sudo 权限）`);
-  console.log(`  ${colors.cyan}2.${colors.reset} 显示手动安装指引，退出脚本`);
+  console.log(`  ${ICONS.pointer} ${colors.cyan}1.${colors.reset} 自动安装 Node.js 20.x（推荐，需要 sudo 权限）`);
+  console.log(`    ${colors.dim}2.${colors.reset} 显示手动安装指引，退出脚本`);
 
   const choice = await ask('请选择', '1');
 
@@ -362,9 +361,8 @@ async function checkEnvironment() {
     log.error(`Node.js 版本过低 (${version})，需要 >= 14.0.0`);
 
     if (isLinux) {
-      console.log('\n' + colors.yellow + '您可以选择：' + colors.reset);
-      console.log(`  ${colors.cyan}1.${colors.reset} 自动升级到 Node.js 20.x`);
-      console.log(`  ${colors.cyan}2.${colors.reset} 显示手动升级指引，退出脚本`);
+      console.log(`  ${ICONS.pointer} ${colors.cyan}1.${colors.reset} 自动升级到 Node.js 20.x`);
+      console.log(`    ${colors.dim}2.${colors.reset} 显示手动升级指引，退出脚本`);
 
       const upgradeChoice = await ask('请选择', '1');
       if (upgradeChoice === '1') {

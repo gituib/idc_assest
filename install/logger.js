@@ -6,31 +6,119 @@ let logFileStream = null;
 const colors = {
   reset: '\x1b[0m',
   bright: '\x1b[1m',
+  dim: '\x1b[2m',
   green: '\x1b[32m',
   yellow: '\x1b[33m',
   red: '\x1b[31m',
   cyan: '\x1b[36m',
   gray: '\x1b[90m',
-  magenta: '\x1b[35m'
+  magenta: '\x1b[35m',
+  blue: '\x1b[34m',
+  bgCyan: '\x1b[46m',
+  bgBlue: '\x1b[44m',
+  white: '\x1b[37m',
 };
 
+const ICONS = {
+  info: 'ℹ',
+  success: '✔',
+  warning: '⚠',
+  error: '✖',
+  arrow: '▶',
+  bullet: '●',
+  pointer: '❯',
+  check: '✓',
+  cross: '✗',
+  dash: '─',
+  doubleDash: '═',
+  corner: '└',
+  pipe: '│',
+  diamond: '◆',
+  star: '★',
+};
+
+function padCenter(text, width) {
+  const stripped = text.replace(/\x1b\[[0-9;]*m/g, '');
+  const len = stripped.length;
+  const pad = Math.max(0, width - len);
+  const left = Math.floor(pad / 2);
+  const right = pad - left;
+  return ' '.repeat(left) + text + ' '.repeat(right);
+}
+
+function progressBar(current, total, width = 20) {
+  const filled = Math.round((current / total) * width);
+  const empty = width - filled;
+  const bar = `${colors.cyan}${'━'.repeat(filled)}${colors.dim}${'╌'.repeat(empty)}${colors.reset}`;
+  return bar;
+}
+
 const log = {
-  info: (msg) => console.log(`${colors.cyan}ℹ${colors.reset} ${msg}`),
-  success: (msg) => console.log(`${colors.green}✓${colors.reset} ${msg}`),
-  warning: (msg) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`),
-  error: (msg) => console.log(`${colors.red}✗${colors.reset} ${msg}`),
+  info: (msg) => console.log(`  ${colors.cyan}${ICONS.info}${colors.reset}  ${msg}`),
+  success: (msg) => console.log(`  ${colors.green}${ICONS.success}${colors.reset}  ${msg}`),
+  warning: (msg) => console.log(`  ${colors.yellow}${ICONS.warning}${colors.reset}  ${msg}`),
+  error: (msg) => console.log(`  ${colors.red}${ICONS.error}${colors.reset}  ${msg}`),
+
   step: (msg) => {
     const idx = INSTALL_STEPS.indexOf(msg);
     if (idx >= 0) {
       currentStepIndex = idx;
     }
-    const progress = currentStepIndex < INSTALL_STEPS.length
-      ? `${colors.gray}[${currentStepIndex + 1}/${INSTALL_STEPS.length}]${colors.reset} `
-      : '';
-    console.log(`\n${progress}${colors.bright}${colors.cyan}▶ ${msg}${colors.reset}`);
+    const current = currentStepIndex + 1;
+    const total = INSTALL_STEPS.length;
+    const bar = progressBar(current, total, 15);
+    const progress = `${colors.dim}[${current}/${total}]${colors.reset} ${bar}`;
+    console.log('');
+    console.log(`${progress}`);
+    console.log(`  ${colors.bright}${colors.cyan}${ICONS.arrow}${colors.reset} ${colors.bright}${msg}${colors.reset}`);
   },
-  divider: () => console.log(`${colors.gray}${'─'.repeat(60)}${colors.reset}`),
-  subStep: (msg) => console.log(`  ${colors.gray}└${colors.reset} ${msg}`)
+
+  divider: () => console.log(`  ${colors.dim}${ICONS.dash.repeat(56)}${colors.reset}`),
+  thickDivider: () => console.log(`  ${colors.dim}${ICONS.doubleDash.repeat(56)}${colors.reset}`),
+
+  subStep: (msg) => console.log(`  ${colors.dim}${ICONS.corner}${colors.reset} ${msg}`),
+
+  keyValue: (key, value) => {
+    const keyStr = `${colors.dim}${key}${colors.reset}`;
+    const valueStr = `${colors.cyan}${value}${colors.reset}`;
+    console.log(`  ${ICONS.pipe}  ${keyStr}  ${valueStr}`);
+  },
+
+  banner: (title, subtitle, version) => {
+    const width = 58;
+    const top = `${colors.bright}${colors.cyan}${ICONS.doubleDash.repeat(width + 2)}${colors.reset}`;
+    const bottom = top;
+    const titleLine = padCenter(`${colors.bright}${colors.white}${title}${colors.reset}`, width);
+    const subtitleLine = padCenter(`${colors.dim}${subtitle}${colors.reset}`, width);
+    const versionLine = version ? padCenter(`${colors.cyan}v${version}${colors.reset}`, width) : '';
+
+    console.log('');
+    console.log(`  ${colors.cyan}╔${top.substring(2)}╗${colors.reset}`);
+    console.log(`  ${colors.cyan}║${titleLine}║${colors.reset}`);
+    if (subtitle) {
+      console.log(`  ${colors.cyan}║${subtitleLine}║${colors.reset}`);
+    }
+    if (version) {
+      console.log(`  ${colors.cyan}║${versionLine}║${colors.reset}`);
+    }
+    console.log(`  ${colors.cyan}╚${bottom.substring(2)}╝${colors.reset}`);
+    console.log('');
+  },
+
+  section: (title) => {
+    console.log('');
+    console.log(`  ${colors.bright}${colors.magenta}${ICONS.diamond}${colors.reset} ${colors.bright}${title}${colors.reset}`);
+    log.divider();
+  },
+
+  tableRow: (items, widths) => {
+    const parts = items.map((item, i) => {
+      const stripped = item.replace(/\x1b\[[0-9;]*m/g, '');
+      const pad = Math.max(0, (widths[i] || 20) - stripped.length);
+      return item + ' '.repeat(pad);
+    });
+    console.log(`  ${ICONS.pipe}  ${parts.join('  ')}`);
+  },
 };
 
 function initLogFile(LOG_DIR) {
@@ -62,7 +150,9 @@ function closeLogFile() {
 
 module.exports = {
   colors,
+  ICONS,
   log,
+  padCenter,
   initLogFile,
   closeLogFile,
 };

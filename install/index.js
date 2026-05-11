@@ -1,5 +1,5 @@
 const { SCRIPT_VERSION, LOG_DIR } = require('./constants');
-const { colors, log, initLogFile, closeLogFile } = require('./logger');
+const { colors, ICONS, log, padCenter } = require('./logger');
 const { ask, closeReadline } = require('./ui');
 const { config, saveConfig, loadSavedConfig, applySavedConfig, parseArgs, showHelp } = require('./config');
 const { checkEnvironment } = require('./env-check');
@@ -14,35 +14,45 @@ let installStartTime = Date.now();
 
 function printSummary() {
   const duration = ((Date.now() - installStartTime) / 1000).toFixed(1);
-  
-  console.log(`
-${colors.bright}${colors.magenta}
-╔══════════════════════════════════════════════════════════╗
-║                    安装摘要                               ║
-╚══════════════════════════════════════════════════════════╝${colors.reset}`);
 
-  console.log(`\n  ${colors.cyan}安装耗时:${colors.reset} ${duration} 秒`);
-  console.log(`  ${colors.cyan}数据库类型:${colors.reset} ${config.dbType}`);
-  console.log(`  ${colors.cyan}后端端口:${colors.reset} ${config.backendPort}`);
-  console.log(`  ${colors.cyan}前端部署:${colors.reset} ${config.frontendDeploy}`);
-  
-  console.log(`\n${colors.bright}服务管理命令：${colors.reset}`);
-  console.log(`  ${colors.cyan}pm2 status${colors.reset}              查看服务状态`);
-  console.log(`  ${colors.cyan}pm2 logs idc-backend${colors.reset}      查看后端日志`);
-  console.log(`  ${colors.cyan}pm2 restart idc-backend${colors.reset}   重启后端`);
-  console.log(`  ${colors.cyan}pm2 stop idc-backend${colors.reset}      停止后端`);
-  
-  console.log(`\n${colors.bright}访问地址：${colors.reset}`);
-  console.log(`  后端API: ${colors.cyan}http://localhost:${config.backendPort}/api${colors.reset}`);
+  log.banner(
+    '安装部署完成',
+    'Installation Complete',
+    null
+  );
+
+  console.log(`  ${ICONS.pipe}  ${colors.dim}安装耗时${colors.reset}    ${colors.cyan}${duration} 秒${colors.reset}`);
+  console.log(`  ${ICONS.pipe}  ${colors.dim}数据库类型${colors.reset}    ${colors.cyan}${config.dbType}${colors.reset}`);
+  console.log(`  ${ICONS.pipe}  ${colors.dim}后端端口${colors.reset}      ${colors.cyan}${config.backendPort}${colors.reset}`);
+  console.log(`  ${ICONS.pipe}  ${colors.dim}前端部署${colors.reset}      ${colors.cyan}${config.frontendDeploy}${colors.reset}`);
   if (config.frontendDeploy === 'nginx') {
-    console.log(`  前端页面: ${colors.cyan}http://${config.domain}:${config.frontendPort}${colors.reset}`);
-  } else {
-    console.log(`  前端页面: ${colors.cyan}http://localhost:${config.frontendPort}${colors.reset}`);
+    console.log(`  ${ICONS.pipe}  ${colors.dim}前端端口${colors.reset}      ${colors.cyan}${config.frontendPort}${colors.reset}`);
+    console.log(`  ${ICONS.pipe}  ${colors.dim}域名${colors.reset}          ${colors.cyan}${config.domain}${colors.reset}`);
   }
-  
-  console.log(`\n${colors.bright}更新升级：${colors.reset}`);
-  console.log(`  ${colors.cyan}node update.js${colors.reset}            一键更新`);
-  
+
+  log.divider();
+
+  log.section('服务管理命令');
+  console.log(`  ${ICONS.pipe}  ${colors.cyan}pm2 status${colors.reset}                查看服务状态`);
+  console.log(`  ${ICONS.pipe}  ${colors.cyan}pm2 logs idc-backend${colors.reset}        查看后端日志`);
+  console.log(`  ${ICONS.pipe}  ${colors.cyan}pm2 restart idc-backend${colors.reset}     重启后端`);
+  console.log(`  ${ICONS.pipe}  ${colors.cyan}pm2 stop idc-backend${colors.reset}        停止后端`);
+
+  log.divider();
+
+  log.section('访问地址');
+  console.log(`  ${ICONS.pipe}  ${colors.dim}后端 API${colors.reset}    ${colors.cyan}http://localhost:${config.backendPort}/api${colors.reset}`);
+  if (config.frontendDeploy === 'nginx') {
+    console.log(`  ${ICONS.pipe}  ${colors.dim}前端页面${colors.reset}    ${colors.cyan}http://${config.domain}:${config.frontendPort}${colors.reset}`);
+  } else {
+    console.log(`  ${ICONS.pipe}  ${colors.dim}前端页面${colors.reset}    ${colors.cyan}http://localhost:${config.frontendPort}${colors.reset}`);
+  }
+
+  log.divider();
+
+  log.section('更新升级');
+  console.log(`  ${ICONS.pipe}  ${colors.cyan}node update.js${colors.reset}              一键更新`);
+
   log.divider();
   log.success('安装部署完成！');
 }
@@ -58,13 +68,11 @@ async function main() {
 
   initLogFile(LOG_DIR);
 
-  console.log(`
-${colors.bright}${colors.cyan}
-╔══════════════════════════════════════════════════════════╗
-║     IDC设备管理系统 - 安装部署脚本 v${SCRIPT_VERSION}                  ║
-║     Interactive Installation & Deployment Script          ║
-╚══════════════════════════════════════════════════════════╝
-${colors.reset}`);
+  log.banner(
+    'IDC 设备管理系统',
+    '安装部署脚本',
+    SCRIPT_VERSION
+  );
 
   if (cmdArgs.nonInteractive) {
     log.info('运行模式: 非交互式（使用默认配置）');
@@ -94,26 +102,26 @@ ${colors.reset}`);
 
     if (useSavedConfig) {
       log.step('数据库配置');
-      log.info(`数据库类型: ${config.dbType}`);
+      log.keyValue('数据库类型', config.dbType);
       if (config.dbType === 'mysql') {
-        log.info(`MySQL: ${config.dbConfig.host}:${config.dbConfig.port}/${config.dbConfig.database}`);
+        log.keyValue('MySQL 地址', `${config.dbConfig.host}:${config.dbConfig.port}/${config.dbConfig.database}`);
       }
       log.divider();
 
       log.step('服务配置');
-      log.info(`后端端口: ${config.backendPort}`);
-      log.info(`运行环境: ${config.nodeEnv}`);
-      log.info(`前端部署: ${config.frontendDeploy}`);
-      log.info(`前端端口: ${config.frontendPort}`);
+      log.keyValue('后端端口', String(config.backendPort));
+      log.keyValue('运行环境', config.nodeEnv);
+      log.keyValue('前端部署', config.frontendDeploy);
+      log.keyValue('前端端口', String(config.frontendPort));
       if (config.frontendDeploy === 'nginx') {
-        log.info(`域名: ${config.domain}`);
+        log.keyValue('域名', config.domain);
       }
       log.divider();
     } else {
       await configureDatabase(cmdArgs);
       await configureServices(cmdArgs);
     }
-    
+
     if (!cmdArgs.nonInteractive) {
       await confirmConfiguration();
     }
@@ -128,13 +136,13 @@ ${colors.reset}`);
 
     await installDependencies();
     await initDatabase();
-    
+
     if (!cmdArgs.skipBuild) {
       await buildFrontend();
     } else {
       log.info('已跳过前端构建');
     }
-    
+
     await startServices();
 
     if (process.platform !== 'win32' && config.frontendDeploy === 'nginx') {

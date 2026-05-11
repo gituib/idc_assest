@@ -1,5 +1,5 @@
 const readline = require('readline');
-const { log } = require('./logger');
+const { colors, ICONS, log } = require('./logger');
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -17,7 +17,8 @@ rl.on('error', (err) => {
 
 function ask(question, defaultValue = '') {
   return new Promise((resolve) => {
-    const prompt = defaultValue ? `${question} (${defaultValue}): ` : `${question}: `;
+    const defaultHint = defaultValue ? `${colors.dim}(${defaultValue})${colors.reset}` : '';
+    const prompt = `  ${colors.cyan}${ICONS.pointer}${colors.reset} ${colors.bright}${question}${colors.reset} ${defaultHint}${colors.dim}:${colors.reset} `;
     rl.question(prompt, (answer) => {
       resolve(answer.trim() || defaultValue);
     });
@@ -25,10 +26,10 @@ function ask(question, defaultValue = '') {
 }
 
 function askPassword(question) {
-  return new Promise((resolve) => {
-    const prompt = `${question}: `;
-    process.stdout.write(prompt);
+  const prompt = `  ${colors.cyan}${ICONS.pointer}${colors.reset} ${colors.bright}${question}${colors.reset} ${colors.dim}:${colors.reset} `;
+  process.stdout.write(prompt);
 
+  return new Promise((resolve) => {
     let password = '';
     const stdin = process.stdin;
     const stdout = process.stdout;
@@ -52,7 +53,8 @@ function askPassword(question) {
         resolve(password);
       } else if (code === 3) {
         cleanup();
-        stdout.write('\n已取消\n');
+        stdout.write('\n');
+        log.warning('已取消');
         process.exit(0);
       } else if (code === 127 || code === 8) {
         if (password.length > 0) {
@@ -78,10 +80,22 @@ function askPassword(question) {
 }
 
 async function select(question, options, defaultIndex = 1) {
-  const { colors } = require('./logger');
-  console.log(`\n${question}`);
+  console.log('');
+  console.log(`  ${colors.bright}${question}${colors.reset}`);
+  log.divider();
+
   options.forEach((opt, idx) => {
-    console.log(`  ${colors.cyan}${idx + 1}.${colors.reset} ${opt.label}`);
+    const isDefault = idx + 1 === defaultIndex;
+    const marker = isDefault
+      ? `${colors.cyan}${ICONS.pointer}${colors.reset}`
+      : ` `;
+    const label = isDefault
+      ? `${colors.bright}${opt.label}${colors.reset}`
+      : `${colors.dim}${opt.label}${colors.reset}`;
+    const num = isDefault
+      ? `${colors.cyan}${idx + 1}${colors.reset}`
+      : `${colors.dim}${idx + 1}${colors.reset}`;
+    console.log(`  ${marker} ${num}. ${label}`);
   });
 
   const answer = await ask('请选择', String(defaultIndex));

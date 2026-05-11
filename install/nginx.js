@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { colors, log } = require('./logger');
+const { colors, ICONS, log } = require('./logger');
 const { ask, select } = require('./ui');
 const { config } = require('./config');
 const { runCommand } = require('./utils');
@@ -12,9 +12,9 @@ function showNginxInstallGuideLinux() {
   const root = isRootUser();
   const sudoPrefix = root ? '' : 'sudo ';
 
-  console.log('\n' + colors.bright + 'Nginx 安装命令：' + colors.reset);
+  log.section('Nginx 安装命令');
   if (root) {
-    console.log(colors.gray + '（当前以 root 用户运行，无需 sudo）' + colors.reset);
+    console.log(`  ${ICONS.pipe}  ${colors.gray}（当前以 root 用户运行，无需 sudo）${colors.reset}`);
   }
 
   switch (distro) {

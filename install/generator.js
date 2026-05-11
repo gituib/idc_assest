@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { colors, log } = require('./logger');
+const { colors, ICONS, log } = require('./logger');
 const { generateSecretKey } = require('./utils');
 const { config } = require('./config');
 const { ask } = require('./ui');
@@ -213,8 +213,8 @@ server {
 
   if (isWindows) {
     log.info('Windows Nginx 配置路径示例:');
-    console.log(`  将配置文件复制到: ${colors.cyan}C:/nginx/conf/conf.d/idc.conf${colors.reset}`);
-    console.log(`  或修改主配置 include: ${colors.cyan}C:/nginx/conf/nginx.conf${colors.reset}`);
+    console.log(`  ${ICONS.pipe}  将配置文件复制到: ${colors.cyan}C:/nginx/conf/conf.d/idc.conf${colors.reset}`);
+    console.log(`  ${ICONS.pipe}  或修改主配置 include: ${colors.cyan}C:/nginx/conf/nginx.conf${colors.reset}`);
   }
   } catch (error) {
     log.error(`Nginx 配置文件生成失败: ${error.message}`);
@@ -225,22 +225,26 @@ server {
 async function confirmConfiguration() {
   log.step('配置确认');
 
-  console.log('\n' + colors.bright + '部署配置摘要：' + colors.reset);
-  console.log(`  数据库类型: ${colors.cyan}${config.dbType}${colors.reset}`);
+  console.log(`  ${colors.bright}部署配置摘要${colors.reset}`);
+  log.thickDivider();
+
+  log.keyValue('数据库类型', config.dbType);
   if (config.dbType === 'mysql') {
-    console.log(`  MySQL主机: ${colors.cyan}${config.dbConfig.host}:${config.dbConfig.port}${colors.reset}`);
-    console.log(`  数据库名: ${colors.cyan}${config.dbConfig.database}${colors.reset}`);
-    console.log(`  用户名: ${colors.cyan}${config.dbConfig.username}${colors.reset}`);
+    log.keyValue('MySQL 主机', `${config.dbConfig.host}:${config.dbConfig.port}`);
+    log.keyValue('数据库名', config.dbConfig.database);
+    log.keyValue('用户名', config.dbConfig.username);
   }
-  console.log(`  后端端口: ${colors.cyan}${config.backendPort}${colors.reset}`);
-  console.log(`  运行环境: ${colors.cyan}${config.nodeEnv}${colors.reset}`);
-  console.log(`  前端部署: ${colors.cyan}${config.frontendDeploy}${colors.reset}`);
-  console.log(`  前端端口: ${colors.cyan}${config.frontendPort}${colors.reset}`);
+  log.keyValue('后端端口', String(config.backendPort));
+  log.keyValue('运行环境', config.nodeEnv);
+  log.keyValue('前端部署', config.frontendDeploy);
+  log.keyValue('前端端口', String(config.frontendPort));
   if (config.frontendDeploy === 'nginx') {
-    console.log(`  域名: ${colors.cyan}${config.domain}${colors.reset}`);
+    log.keyValue('域名', config.domain);
   }
 
-  const confirm = await ask('\n确认以上配置并开始部署? (Y/n)', 'Y');
+  log.thickDivider();
+
+  const confirm = await ask('确认以上配置并开始部署? (Y/n)', 'Y');
   if (confirm.toLowerCase() !== 'y') {
     log.info('已取消部署');
     process.exit(0);
