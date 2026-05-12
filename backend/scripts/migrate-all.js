@@ -797,7 +797,6 @@ async function migrateIdleDeviceAndBusiness() {
 }
 
 async function migrateDevicePositionIndexes() {
-  const dialect = sequelize.getDialect();
   const tableName = 'devices';
 
   if (!(await tableExists(tableName))) {
@@ -811,37 +810,7 @@ async function migrateDevicePositionIndexes() {
   ];
 
   for (const idx of indexesToCreate) {
-    console.log(`   → 为 ${tableName} 表添加复合索引 ${idx.name}...`);
-    try {
-      const existingIndexes = await sequelize.query(`SHOW INDEX FROM ${tableName}`, {
-        type: sequelize.QueryTypes.SELECT,
-      });
-      const indexExists = existingIndexes.some(existing => existing.Key_name === idx.name);
-
-      if (indexExists) {
-        console.log('     → 索引已存在，跳过');
-      } else {
-        if (dialect === 'sqlite') {
-          await sequelize.query(
-            `CREATE INDEX IF NOT EXISTS ${idx.name} ON ${tableName}(${idx.fields.join(', ')})`
-          );
-        } else {
-          await sequelize.query(
-            `CREATE INDEX \`${idx.name}\` ON \`${tableName}\`(\`${idx.fields.join('`, `')}\`)`
-          );
-        }
-        console.log('     ✓ 索引创建成功');
-      }
-    } catch (error) {
-      if (
-        error.message.includes('already exists') ||
-        error.message.includes('Duplicate key name')
-      ) {
-        console.log('     → 索引已存在，跳过');
-      } else {
-        throw error;
-      }
-    }
+    await addIndexIfNotExists(tableName, idx.name, idx.fields);
   }
 }
 
