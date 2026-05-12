@@ -801,37 +801,37 @@ async function main() {
       process.exit(130);
     });
 
-    log.step('备份数据', 0);
+    log.step('备份数据', 0, 7);
     results.backup = backupDatabase(options);
     if (!results.backup.success && !options.dryRun) {
       throw new Error('数据库备份失败');
     }
 
-    log.step('拉取代码', 1);
+    log.step('拉取代码', 1, 7);
     results.git = pullCode(options);
 
-    log.step('安装依赖', 2);
+    log.step('安装依赖', 2, 7);
     results.deps = installDependencies(options);
     if (!results.deps.success && !options.dryRun) {
       throw new Error('依赖安装失败');
     }
 
-    log.step('数据库迁移', 3);
+    log.step('数据库迁移', 3, 7);
     results.migrate = runMigrations(options);
 
-    log.step('构建前端', 4);
+    log.step('构建前端', 4, 7);
     results.build = buildFrontend(options);
     if (!results.build.success && !options.dryRun) {
       throw new Error('前端构建失败');
     }
 
-    log.step('重启服务', 5);
+    log.step('重启服务', 5, 7);
     results.restart = restartServices(options);
     if (!results.restart.success && !options.dryRun) {
       throw new Error('服务重启失败');
     }
 
-    log.step('健康检查', 6);
+    log.step('健康检查', 6, 7);
     results.health = await healthCheck();
 
     log.divider();

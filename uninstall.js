@@ -175,7 +175,7 @@ function isRootUser() {
 }
 
 async function stopAndDeleteServices() {
-  log.step('停止服务');
+  log.step('停止服务', 0, 7);
 
   if (!commandExists('pm2')) {
     log.warning('未检测到 PM2，跳过服务停止步骤');
@@ -253,7 +253,7 @@ async function stopAndDeleteServices() {
 }
 
 async function cleanupNginxConfig(cmdArgs) {
-  log.step('清理 Nginx');
+  log.step('清理 Nginx', 1, 7);
 
   const isWindows = process.platform === 'win32';
   const isLinux = process.platform === 'linux';
@@ -511,7 +511,7 @@ async function cleanupNginxConfig(cmdArgs) {
 }
 
 async function cleanupConfigFiles() {
-  log.step('清理配置');
+  log.step('清理配置', 2, 7);
 
   const filesToDelete = [
     { path: path.join(__dirname, 'backend', '.env'), name: '后端环境变量 (.env)', type: '配置文件' },
@@ -553,7 +553,7 @@ async function cleanupConfigFiles() {
 }
 
 async function cleanupDatabase(cmdArgs) {
-  log.step('数据库清理');
+  log.step('数据库清理', 3, 7);
 
   const dbConfig = getDatabaseConfig();
   const sqliteDbPath = dbConfig.sqliteDbPath;
@@ -661,7 +661,7 @@ async function cleanupDatabase(cmdArgs) {
 }
 
 async function cleanupDependencies(cmdArgs) {
-  log.step('依赖和构建产物清理');
+  log.step('依赖和构建产物清理', 6, 7);
 
   log.warning('此操作将删除 node_modules 和构建产物，需要重新安装依赖才能再次运行');
   const confirm = cmdArgs?.force ? 'y' : await ask('是否删除依赖和构建产物? (y/N)', 'N');
@@ -697,7 +697,7 @@ async function cleanupDependencies(cmdArgs) {
 }
 
 async function cleanupLogs(cmdArgs) {
-  log.step('日志清理');
+  log.step('日志清理', 4, 7);
 
   const logsDir = path.join(__dirname, 'backend', 'logs');
   if (fs.existsSync(logsDir)) {
@@ -743,7 +743,7 @@ async function cleanupLogs(cmdArgs) {
 }
 
 async function cleanupUploads(cmdArgs) {
-  log.step('上传清理');
+  log.step('上传清理', 5, 7);
 
   const uploadsDir = path.join(__dirname, 'backend', 'uploads');
   if (fs.existsSync(uploadsDir)) {
@@ -770,7 +770,7 @@ async function cleanupUploads(cmdArgs) {
 }
 
 async function backupDatabase() {
-  log.step('备份数据库');
+  log.step('备份数据库', 0, 7);
 
   const dbConfig = getDatabaseConfig();
   const sqliteDbPath = dbConfig.sqliteDbPath;

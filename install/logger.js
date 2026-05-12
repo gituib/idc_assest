@@ -58,13 +58,18 @@ function progressBar(current, total, width = 20) {
   return bar;
 }
 
+let currentStepTotal = INSTALL_STEPS.length;
+
 const log = {
   info: (msg) => console.log(`  ${colors.cyan}${ICONS.info}${colors.reset}  ${msg}`),
   success: (msg) => console.log(`  ${colors.green}${ICONS.success}${colors.reset}  ${msg}`),
   warning: (msg) => console.log(`  ${colors.yellow}${ICONS.warning}${colors.reset}  ${msg}`),
   error: (msg) => console.log(`  ${colors.red}${ICONS.error}${colors.reset}  ${msg}`),
 
-  step: (msg, stepIndex) => {
+  step: (msg, stepIndex, stepTotal) => {
+    if (stepTotal !== undefined) {
+      currentStepTotal = stepTotal;
+    }
     if (stepIndex !== undefined) {
       currentStepIndex = stepIndex;
     } else {
@@ -74,7 +79,7 @@ const log = {
       }
     }
     const current = currentStepIndex + 1;
-    const total = INSTALL_STEPS.length;
+    const total = currentStepTotal;
     const bar = progressBar(current, total, 15);
     const progress = `${colors.dim}[${current}/${total}]${colors.reset} ${bar}`;
     console.log('');
