@@ -2,21 +2,26 @@ const { INSTALL_STEPS } = require('./constants');
 
 let currentStepIndex = 0;
 let logFileStream = null;
+const NO_COLOR = process.env.NO_COLOR === '1' || process.env.NO_COLOR === 'true';
+const IS_TTY = process.stdout.isTTY !== undefined && process.stdout.isTTY !== null;
+const FORCE_COLOR = process.env.FORCE_COLOR !== undefined;
+const USE_COLOR = !NO_COLOR && (IS_TTY || FORCE_COLOR);
+const ESC = USE_COLOR ? '\x1b' : '';
 
 const colors = {
-  reset: '\x1b[0m',
-  bright: '\x1b[1m',
-  dim: '\x1b[2m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  red: '\x1b[31m',
-  cyan: '\x1b[36m',
-  gray: '\x1b[90m',
-  magenta: '\x1b[35m',
-  blue: '\x1b[34m',
-  bgCyan: '\x1b[46m',
-  bgBlue: '\x1b[44m',
-  white: '\x1b[37m',
+  reset: `${ESC}[0m`,
+  bright: `${ESC}[1m`,
+  dim: `${ESC}[2m`,
+  green: `${ESC}[32m`,
+  yellow: `${ESC}[33m`,
+  red: `${ESC}[31m`,
+  cyan: `${ESC}[36m`,
+  gray: `${ESC}[90m`,
+  magenta: `${ESC}[35m`,
+  blue: `${ESC}[34m`,
+  bgCyan: `${ESC}[46m`,
+  bgBlue: `${ESC}[44m`,
+  white: `${ESC}[37m`,
 };
 
 const ICONS = {
@@ -59,10 +64,14 @@ const log = {
   warning: (msg) => console.log(`  ${colors.yellow}${ICONS.warning}${colors.reset}  ${msg}`),
   error: (msg) => console.log(`  ${colors.red}${ICONS.error}${colors.reset}  ${msg}`),
 
-  step: (msg) => {
-    const idx = INSTALL_STEPS.indexOf(msg);
-    if (idx >= 0) {
-      currentStepIndex = idx;
+  step: (msg, stepIndex) => {
+    if (stepIndex !== undefined) {
+      currentStepIndex = stepIndex;
+    } else {
+      const idx = INSTALL_STEPS.findIndex(step => msg.includes(step) || step.includes(msg));
+      if (idx >= 0) {
+        currentStepIndex = idx;
+      }
     }
     const current = currentStepIndex + 1;
     const total = INSTALL_STEPS.length;

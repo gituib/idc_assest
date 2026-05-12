@@ -21,13 +21,14 @@ function printSummary() {
     null
   );
 
-  console.log(`  ${ICONS.pipe}  ${colors.dim}安装耗时${colors.reset}    ${colors.cyan}${duration} 秒${colors.reset}`);
-  console.log(`  ${ICONS.pipe}  ${colors.dim}数据库类型${colors.reset}    ${colors.cyan}${config.dbType}${colors.reset}`);
-  console.log(`  ${ICONS.pipe}  ${colors.dim}后端端口${colors.reset}      ${colors.cyan}${config.backendPort}${colors.reset}`);
-  console.log(`  ${ICONS.pipe}  ${colors.dim}前端部署${colors.reset}      ${colors.cyan}${config.frontendDeploy}${colors.reset}`);
+  log.keyValue('安装耗时', `${duration} 秒`);
+  log.keyValue('数据库类型', config.dbType);
+  log.keyValue('后端端口', String(config.backendPort));
+  log.keyValue('运行环境', config.nodeEnv);
+  log.keyValue('前端部署', config.frontendDeploy);
+  log.keyValue('前端端口', String(config.frontendPort));
   if (config.frontendDeploy === 'nginx') {
-    console.log(`  ${ICONS.pipe}  ${colors.dim}前端端口${colors.reset}      ${colors.cyan}${config.frontendPort}${colors.reset}`);
-    console.log(`  ${ICONS.pipe}  ${colors.dim}域名${colors.reset}          ${colors.cyan}${config.domain}${colors.reset}`);
+    log.keyValue('域名', config.domain);
   }
 
   log.divider();

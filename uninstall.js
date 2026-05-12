@@ -28,6 +28,16 @@ const { SCRIPT_VERSION } = require('./install/constants');
 const BACKUP_DIR = path.join(__dirname, 'backup');
 const LOG_DIR = path.join(__dirname, 'logs');
 
+const UNINSTALL_STEPS = [
+  '停止服务',
+  '清理 Nginx',
+  '清理配置',
+  '数据库清理',
+  '日志清理',
+  '上传清理',
+  '依赖清理',
+];
+
 let logFileStream = null;
 let uninstallStartTime = null;
 let deletedItems = [];
@@ -53,20 +63,20 @@ function showHelp() {
   ${colors.bright}用法:${colors.reset} node uninstall.js [选项]
 
   ${colors.bright}选项:${colors.reset}
-    ${ICONS.pointer} ${colors.cyan}-f, --force${colors.reset}       强制卸载（无需确认）
-    ${ICONS.pointer} ${colors.cyan}-y, --yes${colors.reset}         强制卸载别名（同 --force）
-    ${ICONS.pointer} ${colors.cyan}-b, --backup${colors.reset}      卸载前自动备份数据库
-      ${colors.dim}--dry-run${colors.reset}         预览模式：仅显示将要删除的内容
-      ${colors.dim}--skip-db${colors.reset}         跳过数据库删除
-      ${colors.dim}--skip-deps${colors.reset}       跳过依赖删除
-      ${colors.dim}--skip-uploads${colors.reset}    跳过上传文件目录删除
-      ${colors.dim}-h, --help${colors.reset}        显示帮助信息
+    ${ICONS.pointer} ${colors.cyan}-f, --force${colors.reset}      强制卸载（无需确认）
+    ${ICONS.pointer} ${colors.cyan}-y, --yes${colors.reset}        强制卸载别名（同 --force）
+    ${ICONS.pointer} ${colors.cyan}-b, --backup${colors.reset}     卸载前自动备份数据库
+    ${colors.dim}--dry-run${colors.reset}        预览模式：仅显示将要删除的内容
+    ${colors.dim}--skip-db${colors.reset}        跳过数据库删除
+    ${colors.dim}--skip-deps${colors.reset}      跳过依赖删除
+    ${colors.dim}--skip-uploads${colors.reset}   跳过上传文件目录删除
+    ${colors.dim}-h, --help${colors.reset}       显示帮助信息
 
   ${colors.bright}示例:${colors.reset}
-    ${colors.cyan}node uninstall.js${colors.reset}              # 交互式卸载
-    ${colors.cyan}node uninstall.js --force${colors.reset}      # 强制卸载
-    ${colors.cyan}node uninstall.js --backup${colors.reset}     # 卸载前备份
-    ${colors.cyan}node uninstall.js --dry-run${colors.reset}    # 预览将删除的内容
+    ${colors.cyan}node uninstall.js${colors.reset}             # 交互式卸载
+    ${colors.cyan}node uninstall.js --force${colors.reset}     # 强制卸载
+    ${colors.cyan}node uninstall.js --backup${colors.reset}   # 卸载前备份
+    ${colors.cyan}node uninstall.js --dry-run${colors.reset}  # 预览将删除的内容
 `);
   process.exit(0);
 }
@@ -165,7 +175,7 @@ function isRootUser() {
 }
 
 async function stopAndDeleteServices() {
-  log.step('停止并删除服务');
+  log.step('停止服务');
 
   if (!commandExists('pm2')) {
     log.warning('未检测到 PM2，跳过服务停止步骤');
@@ -243,7 +253,7 @@ async function stopAndDeleteServices() {
 }
 
 async function cleanupNginxConfig(cmdArgs) {
-  log.step('清理 Nginx 配置');
+  log.step('清理 Nginx');
 
   const isWindows = process.platform === 'win32';
   const isLinux = process.platform === 'linux';
@@ -501,7 +511,7 @@ async function cleanupNginxConfig(cmdArgs) {
 }
 
 async function cleanupConfigFiles() {
-  log.step('清理生成的配置文件');
+  log.step('清理配置');
 
   const filesToDelete = [
     { path: path.join(__dirname, 'backend', '.env'), name: '后端环境变量 (.env)', type: '配置文件' },
@@ -687,7 +697,7 @@ async function cleanupDependencies(cmdArgs) {
 }
 
 async function cleanupLogs(cmdArgs) {
-  log.step('日志文件清理');
+  log.step('日志清理');
 
   const logsDir = path.join(__dirname, 'backend', 'logs');
   if (fs.existsSync(logsDir)) {
@@ -733,7 +743,7 @@ async function cleanupLogs(cmdArgs) {
 }
 
 async function cleanupUploads(cmdArgs) {
-  log.step('上传文件清理');
+  log.step('上传清理');
 
   const uploadsDir = path.join(__dirname, 'backend', 'uploads');
   if (fs.existsSync(uploadsDir)) {
@@ -837,7 +847,9 @@ function showDryRunPreview(cmdArgs) {
   });
 
   console.log(`\n  ${ICONS.pointer} ${colors.bright}4. 数据库${colors.reset}`);
-  if (dbConfig.dbType === 'sqlite' && fs.existsSync(dbConfig.sqliteDbPath)) {
+  if (cmdArgs?.skipDb) {
+    console.log(`  ${ICONS.pipe}    ${colors.dim}[跳过] 数据库清理${colors.reset}`);
+  } else if (dbConfig.dbType === 'sqlite' && fs.existsSync(dbConfig.sqliteDbPath)) {
     console.log(`  ${ICONS.pipe}    删除 SQLite 数据库: ${path.relative(__dirname, dbConfig.sqliteDbPath)}`);
     if (cmdArgs?.backup) {
       console.log(`  ${ICONS.pipe}    备份数据库到: backup/`);
@@ -857,23 +869,31 @@ function showDryRunPreview(cmdArgs) {
   }
 
   console.log(`\n  ${ICONS.pointer} ${colors.bright}6. 上传文件${colors.reset}`);
-  if (fs.existsSync(path.join(__dirname, 'backend', 'uploads'))) {
+  if (cmdArgs?.skipUploads) {
+    console.log(`  ${ICONS.pipe}    ${colors.dim}[跳过] 上传文件目录${colors.reset}`);
+  } else if (fs.existsSync(path.join(__dirname, 'backend', 'uploads'))) {
     console.log(`  ${ICONS.pipe}    上传文件目录 (backend/uploads/)`);
+  } else {
+    console.log(`  ${ICONS.pipe}    ${colors.dim}未检测到上传文件目录${colors.reset}`);
   }
 
   console.log(`\n  ${ICONS.pointer} ${colors.bright}7. 依赖和构建产物${colors.reset}`);
-  const depDirs = [
-    { path: path.join(__dirname, 'backend', 'node_modules'), name: '后端 node_modules' },
-    { path: path.join(__dirname, 'frontend', 'node_modules'), name: '前端 node_modules' },
-    { path: path.join(__dirname, 'frontend', 'node_modules', '.vite'), name: '前端 Vite 缓存' },
-    { path: path.join(__dirname, 'frontend', 'dist'), name: '前端构建产物' },
-    { path: path.join(__dirname, 'backend', 'temp'), name: '后端临时文件' }
-  ];
-  depDirs.forEach(d => {
-    if (fs.existsSync(d.path)) {
-      console.log(`  ${ICONS.pipe}    删除: ${d.name}`);
-    }
-  });
+  if (cmdArgs?.skipDeps) {
+    console.log(`  ${ICONS.pipe}    ${colors.dim}[跳过] 依赖和构建产物清理${colors.reset}`);
+  } else {
+    const depDirs = [
+      { path: path.join(__dirname, 'backend', 'node_modules'), name: '后端 node_modules' },
+      { path: path.join(__dirname, 'frontend', 'node_modules'), name: '前端 node_modules' },
+      { path: path.join(__dirname, 'frontend', 'node_modules', '.vite'), name: '前端 Vite 缓存' },
+      { path: path.join(__dirname, 'frontend', 'dist'), name: '前端构建产物' },
+      { path: path.join(__dirname, 'backend', 'temp'), name: '后端临时文件' }
+    ];
+    depDirs.forEach(d => {
+      if (fs.existsSync(d.path)) {
+        console.log(`  ${ICONS.pipe}    删除: ${d.name}`);
+      }
+    });
+  }
 
   log.divider();
   log.warning('移除 --dry-run 参数以实际执行卸载');
@@ -903,8 +923,19 @@ function printSummary() {
   }
 
   log.section('保留的文件');
-  console.log(`  ${ICONS.pipe}    项目源代码 (backend/, frontend/)`);
-  console.log(`  ${ICONS.pipe}    上传的文件 (backend/uploads/)`);
+  const backendExists = fs.existsSync(path.join(__dirname, 'backend'));
+  const frontendExists = fs.existsSync(path.join(__dirname, 'frontend'));
+  const uploadsExist = fs.existsSync(path.join(__dirname, 'backend', 'uploads'));
+
+  if (backendExists || frontendExists) {
+    console.log(`  ${ICONS.pipe}    项目源代码 (backend/, frontend/)`);
+  }
+  if (uploadsExist) {
+    console.log(`  ${ICONS.pipe}    上传的文件 (backend/uploads/)`);
+  }
+  if (!backendExists && !frontendExists && !uploadsExist) {
+    console.log(`  ${ICONS.pipe}    无`);
+  }
 
   log.section('重新部署');
   console.log(`  ${ICONS.pipe}    ${colors.cyan}node install.js${colors.reset}`);
