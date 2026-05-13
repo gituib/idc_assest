@@ -8,6 +8,9 @@ const AES_KEY_LENGTH = 256;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+const PLAIN_PREFIX = 'plain:';
+const isSecureContext = () => typeof crypto !== 'undefined' && typeof crypto.subtle !== 'undefined';
+
 const memoryCache = new Map();
 
 let _cachedCryptoKey = null;
@@ -32,6 +35,10 @@ async function deriveKey(material) {
 }
 
 async function getOrCreateKeyMaterial() {
+  if (!isSecureContext()) {
+    return null;
+  }
+
   let stored = sessionStorage.getItem(KEY_STORAGE_ID);
   if (stored) {
     const raw = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
@@ -57,6 +64,11 @@ async function getOrCreateKeyMaterial() {
 
 async function encrypt(plaintext) {
   const material = await getOrCreateKeyMaterial();
+
+  if (!material) {
+    return PLAIN_PREFIX + btoa(plaintext);
+  }
+
   const key = await deriveKey(material);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = encoder.encode(plaintext);
@@ -72,7 +84,13 @@ async function encrypt(plaintext) {
 
 async function decrypt(encrypted) {
   try {
+    if (encrypted.startsWith(PLAIN_PREFIX)) {
+      return atob(encrypted.slice(PLAIN_PREFIX.length));
+    }
+
     const material = await getOrCreateKeyMaterial();
+    if (!material) return null;
+
     const key = await deriveKey(material);
 
     const raw = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
