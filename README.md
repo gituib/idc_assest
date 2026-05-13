@@ -512,15 +512,6 @@ pm2 startup
 ```
 </details>
 
-<details>
-<summary>9. 忘记管理员密码</summary>
-
-重置密码或创建新管理员：
-
-```bash
-cd backend
-node scripts/init-database.js --reset-admin
-```
 </details>
 
 ---
