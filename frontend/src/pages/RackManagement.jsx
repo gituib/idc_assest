@@ -220,6 +220,13 @@ const RackCard = ({ rack, onEdit, onDelete, onView, selected, onSelect }) => {
           >
             {rack.height}U / {usedU}
           </div>
+          <Progress
+            percent={rack.height > 0 ? Math.min((usedU / rack.height) * 100, 100) : 0}
+            showInfo={false}
+            size="small"
+            strokeColor={usedU / rack.height >= 0.8 ? '#ff4d4f' : usedU / rack.height >= 0.6 ? '#faad14' : '#52c41a'}
+            style={{ marginTop: '4px' }}
+          />
         </div>
         <div style={{ padding: '12px', background: '#fafafa', borderRadius: '8px' }}>
           <Text type="secondary" style={{ fontSize: '11px' }}>
@@ -670,10 +677,26 @@ function RackManagement() {
       key: 'heightUsage',
       render: (_, record) => {
         const used = record.Devices?.reduce((sum, d) => sum + (d.height || 1), 0) || 0;
+        const percentage = record.height > 0 ? Math.min((used / record.height) * 100, 100) : 0;
+        const status = percentage >= 80 ? 'exception' : percentage >= 60 ? 'active' : 'normal';
         return (
-          <Text style={{ fontSize: '13px' }}>
-            {record.height}U / 已用 {used} U位
-          </Text>
+          <div style={{ minWidth: '120px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+              <Text style={{ fontSize: '13px' }}>
+                {record.height}U / 已用 {used}U
+              </Text>
+              <Text style={{ fontSize: '12px', color: percentage >= 80 ? '#ff4d4f' : percentage >= 60 ? '#faad14' : '#52c41a' }}>
+                {percentage.toFixed(0)}%
+              </Text>
+            </div>
+            <Progress
+              percent={percentage}
+              status={status}
+              showInfo={false}
+              size="small"
+              strokeColor={percentage >= 80 ? '#ff4d4f' : percentage >= 60 ? '#faad14' : '#52c41a'}
+            />
+          </div>
         );
       },
       sorter: (a, b) =>
