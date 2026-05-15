@@ -32,6 +32,7 @@ function saveConfig() {
     frontendDeploy: config.frontendDeploy,
     frontendPort: config.frontendPort,
     domain: config.domain,
+    nginxRoot: config.nginxRoot || null,
     savedAt: new Date().toISOString(),
   };
 
@@ -63,6 +64,7 @@ function applySavedConfig(saved) {
   if (saved.frontendDeploy) config.frontendDeploy = saved.frontendDeploy;
   if (saved.frontendPort) config.frontendPort = saved.frontendPort;
   if (saved.domain) config.domain = saved.domain;
+  if (saved.nginxRoot) config.nginxRoot = saved.nginxRoot;
 }
 
 function parseArgs() {

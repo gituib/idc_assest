@@ -12,12 +12,31 @@ const path = require('path');
 const { colors, ICONS, log, padCenter, initLogFile, closeLogFile } = require('./install/logger');
 const { SCRIPT_VERSION: INSTALL_SCRIPT_VERSION, LOG_DIR: INSTALL_LOG_DIR } = require('./install/constants');
 
-const SCRIPT_VERSION = '2.0.0';
+const SCRIPT_VERSION = '2.1.0';
 const MIN_NODE_VERSION = 16;
 const LOCK_FILE = path.join(__dirname, '.update.lock');
 const LOG_DIR = path.join(__dirname, 'logs');
 const BACKUP_DIR = path.join(__dirname, 'backup');
 const MAX_BACKUP_FILES = 10;
+const SAVED_CONFIG_PATH = path.join(__dirname, 'deploy', 'install-config.json');
+
+let deployConfig = null;
+
+function loadDeployConfig() {
+  try {
+    if (!fs.existsSync(SAVED_CONFIG_PATH)) {
+      log.warning('未找到部署配置 (deploy/install-config.json)，将使用默认逻辑');
+      return null;
+    }
+    const content = fs.readFileSync(SAVED_CONFIG_PATH, 'utf8');
+    const config = JSON.parse(content);
+    log.info(`部署配置: 前端=${config.frontendDeploy || '未知'}, 前端端口=${config.frontendPort || '未知'}, NGINX目录=${config.nginxRoot || '未配置'}`);
+    return config;
+  } catch (error) {
+    log.warning(`读取部署配置失败: ${error.message}`);
+    return null;
+  }
+}
 
 const UPDATE_STEPS = [
   '备份数据',
@@ -538,6 +557,59 @@ function buildFrontend(options) {
   return { success: true, skipped: true };
 }
 
+function syncFrontendToNginx(options) {
+  if (options.dryRun) {
+    log.subStep('[模拟] 同步前端文件到 NGINX 目录');
+    return { success: true, dryRun: true };
+  }
+
+  const frontendDeploy = deployConfig?.frontendDeploy;
+  if (frontendDeploy !== 'nginx') {
+    return { success: true, skipped: true };
+  }
+
+  const nginxRoot = deployConfig?.nginxRoot || '/var/www/idc';
+  const distDir = path.join(__dirname, 'frontend', 'dist');
+
+  if (!fs.existsSync(distDir)) {
+    log.warning(`前端构建产物不存在: ${distDir}，跳过 NGINX 同步`);
+    return { success: true, skipped: true };
+  }
+
+  if (!fs.existsSync(nginxRoot)) {
+    log.info(`NGINX 目录不存在，自动创建: ${nginxRoot}`);
+    runCommand(`mkdir -p ${nginxRoot}`, { silent: true });
+  }
+
+  log.subStep(`同步前端文件到 NGINX 目录 (${nginxRoot})...`);
+  const sudoPrefix = (process.getuid && process.getuid() === 0) ? '' : 'sudo ';
+  const copyResult = runCommand(`${sudoPrefix}cp -r ${distDir}/* ${nginxRoot}/`, { silent: true });
+
+  if (copyResult.success) {
+    runCommand(`${sudoPrefix}chmod -R 755 ${nginxRoot}`, { silent: true });
+    log.success('前端文件已同步到 NGINX 目录');
+  } else {
+    log.warning('前端文件同步失败，NGINX 可能仍显示旧页面');
+    return { success: false };
+  }
+
+  log.subStep('重载 NGINX 配置...');
+  const reloadResult = runCommand(`${sudoPrefix}nginx -s reload`, { silent: true });
+  if (reloadResult.success) {
+    log.success('NGINX 已重载');
+  } else {
+    log.info('尝试 systemctl 重载 NGINX...');
+    const systemctlResult = runCommand(`${sudoPrefix}systemctl reload nginx`, { silent: true });
+    if (systemctlResult.success) {
+      log.success('NGINX 已重载 (systemctl)');
+    } else {
+      log.warning('NGINX 重载失败，请手动执行: sudo nginx -s reload');
+    }
+  }
+
+  return { success: true };
+}
+
 function restartServices(options) {
   if (options.skipRestart) {
     log.info('已跳过服务重启');
@@ -546,7 +618,12 @@ function restartServices(options) {
 
   if (options.dryRun) {
     log.subStep('[模拟] 重启后端服务');
-    log.subStep('[模拟] 重启前端服务');
+    const frontendDeploy = deployConfig?.frontendDeploy;
+    if (frontendDeploy === 'nginx') {
+      log.subStep('[模拟] 同步前端文件到 NGINX 目录并重载');
+    } else {
+      log.subStep('[模拟] 重启前端服务 (PM2)');
+    }
     return { success: true, dryRun: true };
   }
 
@@ -578,12 +655,32 @@ function restartServices(options) {
     return { success: false };
   }
 
-  const frontendServiceName = findFrontendServiceName();
-  if (frontendServiceName) {
-    log.subStep(`重启前端服务 (${frontendServiceName})...`);
-    const frontendRestart = runCommand(`pm2 restart ${frontendServiceName}`);
-    if (frontendRestart.success) {
-      log.success('前端服务已重启');
+  const frontendDeploy = deployConfig?.frontendDeploy;
+
+  if (frontendDeploy === 'nginx') {
+    log.info('前端部署模式: NGINX（跳过 PM2 前端服务重启）');
+    const syncResult = syncFrontendToNginx(options);
+    if (!syncResult.success && !syncResult.skipped) {
+      log.warning('NGINX 前端同步失败，请手动处理');
+    }
+  } else {
+    const frontendServiceName = findFrontendServiceName();
+    if (frontendServiceName) {
+      log.info('前端部署模式: PM2 serve');
+      log.subStep(`重启前端服务 (${frontendServiceName})...`);
+      const frontendRestart = runCommand(`pm2 restart ${frontendServiceName}`);
+      if (frontendRestart.success) {
+        log.success('前端服务已重启');
+      }
+    } else {
+      log.info('未找到 PM2 前端服务（可能使用 NGINX 部署）');
+      if (process.platform === 'linux') {
+        log.info('尝试同步前端文件到 NGINX...');
+        const syncResult = syncFrontendToNginx(options);
+        if (!syncResult.success && !syncResult.skipped) {
+          log.warning('NGINX 前端同步失败，请手动处理');
+        }
+      }
     }
   }
 
@@ -782,6 +879,8 @@ async function main() {
   if (options.dryRun) {
     log.info('运行模式: 模拟运行（不会执行实际操作）');
   }
+
+  deployConfig = loadDeployConfig();
 
   const results = {};
 

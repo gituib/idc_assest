@@ -148,6 +148,8 @@ function generateNginxConfig() {
     frontendPath = '/var/www/idc';
   }
 
+  config.nginxRoot = frontendPath;
+
   const nginxConfig = `# IDC设备管理系统 - Nginx配置
 # 生成时间: ${new Date().toISOString()}
 
