@@ -214,7 +214,17 @@ async function autoConfigureNginx() {
   const root = isRootUser();
   const sudoPrefix = root ? '' : 'sudo ';
 
-  const wwwDir = '/var/www/idc';
+  const isBtPanel = fs.existsSync('/www/server/nginx/sbin/nginx') ||
+                    fs.existsSync('/www/server/nginx/conf/nginx.conf');
+
+  let wwwDir;
+  if (isBtPanel) {
+    wwwDir = '/www/wwwroot/idc';
+    log.info('检测到宝塔面板 Nginx 环境');
+  } else {
+    wwwDir = '/var/www/idc';
+  }
+
   const distDir = path.join(__dirname, '..', 'frontend', 'dist');
 
   if (fs.existsSync(distDir)) {
@@ -232,6 +242,8 @@ async function autoConfigureNginx() {
     log.info('请先完成前端构建后再配置 Nginx');
   }
 
+  config.nginxRoot = wwwDir;
+
   const configSource = path.join(__dirname, '..', 'deploy', 'nginx-idc.conf');
 
   if (!fs.existsSync(configSource)) {
@@ -242,8 +254,13 @@ async function autoConfigureNginx() {
   try {
     let configDir = '';
     let useSitesAvailable = false;
+    let isBtNginx = false;
 
-    if (fs.existsSync('/etc/nginx/sites-available')) {
+    if (isBtPanel && fs.existsSync('/www/server/nginx/conf/vhost')) {
+      configDir = '/www/server/nginx/conf/vhost';
+      isBtNginx = true;
+      log.info('使用宝塔面板 Nginx 虚拟主机目录');
+    } else if (fs.existsSync('/etc/nginx/sites-available')) {
       configDir = '/etc/nginx/sites-available';
       useSitesAvailable = true;
     } else if (fs.existsSync('/etc/nginx/conf.d')) {
@@ -254,7 +271,7 @@ async function autoConfigureNginx() {
       return;
     }
 
-    const configDest = path.join(configDir, 'idc');
+    const configDest = path.join(configDir, 'idc.conf');
     log.info(`复制配置到 ${configDest}...`);
 
     const copyResult = runCommand(`${sudoPrefix}cp "${configSource}" "${configDest}"`);
@@ -265,12 +282,23 @@ async function autoConfigureNginx() {
 
     if (useSitesAvailable) {
       log.info('创建站点软链接...');
-      runCommand(`${sudoPrefix}ln -sf "${configDest}" /etc/nginx/sites-enabled/idc`);
+      runCommand(`${sudoPrefix}ln -sf "${configDest}" /etc/nginx/sites-enabled/idc.conf`);
 
       if (fs.existsSync('/etc/nginx/sites-enabled/default')) {
         log.info('删除默认站点配置...');
         runCommand(`${sudoPrefix}rm -f /etc/nginx/sites-enabled/default`, { silent: true });
       }
+    }
+
+    if (isBtNginx) {
+      const btNginxConf = '/www/server/nginx/conf/nginx.conf';
+      try {
+        const mainConf = fs.readFileSync(btNginxConf, 'utf8');
+        if (!mainConf.includes('vhost')) {
+          log.warning('宝塔 Nginx 主配置未包含 vhost 目录，请手动确认');
+          log.info(`确保 ${btNginxConf} 的 http 段包含: include vhost/*.conf;`);
+        }
+      } catch {}
     }
 
     log.info('测试 Nginx 配置...');

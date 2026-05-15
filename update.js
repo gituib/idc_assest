@@ -568,7 +568,19 @@ function syncFrontendToNginx(options) {
     return { success: true, skipped: true };
   }
 
-  const nginxRoot = deployConfig?.nginxRoot || '/var/www/idc';
+  const isBtPanel = fs.existsSync('/www/server/nginx/sbin/nginx') ||
+                    fs.existsSync('/www/server/nginx/conf/nginx.conf');
+
+  let nginxRoot = deployConfig?.nginxRoot;
+  if (!nginxRoot) {
+    if (isBtPanel) {
+      nginxRoot = '/www/wwwroot/idc';
+    } else {
+      nginxRoot = '/var/www/idc';
+    }
+    log.info(`未配置 nginxRoot，自动检测: ${nginxRoot} (${isBtPanel ? '宝塔' : '标准'})`);
+  }
+
   const distDir = path.join(__dirname, 'frontend', 'dist');
 
   if (!fs.existsSync(distDir)) {
@@ -594,10 +606,24 @@ function syncFrontendToNginx(options) {
   }
 
   log.subStep('重载 NGINX 配置...');
-  const reloadResult = runCommand(`${sudoPrefix}nginx -s reload`, { silent: true });
-  if (reloadResult.success) {
-    log.success('NGINX 已重载');
-  } else {
+  let reloadResult = { success: false };
+
+  if (isBtPanel) {
+    const btNginxBin = '/www/server/nginx/sbin/nginx';
+    reloadResult = runCommand(`${sudoPrefix}${btNginxBin} -s reload`, { silent: true });
+    if (reloadResult.success) {
+      log.success('NGINX 已重载 (宝塔)');
+    }
+  }
+
+  if (!reloadResult.success) {
+    reloadResult = runCommand(`${sudoPrefix}nginx -s reload`, { silent: true });
+    if (reloadResult.success) {
+      log.success('NGINX 已重载');
+    }
+  }
+
+  if (!reloadResult.success) {
     log.info('尝试 systemctl 重载 NGINX...');
     const systemctlResult = runCommand(`${sudoPrefix}systemctl reload nginx`, { silent: true });
     if (systemctlResult.success) {
