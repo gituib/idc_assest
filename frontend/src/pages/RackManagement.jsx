@@ -678,7 +678,6 @@ function RackManagement() {
       render: (_, record) => {
         const used = record.Devices?.reduce((sum, d) => sum + (d.height || 1), 0) || 0;
         const percentage = record.height > 0 ? Math.min((used / record.height) * 100, 100) : 0;
-        const status = percentage >= 80 ? 'exception' : percentage >= 60 ? 'active' : 'normal';
         return (
           <div style={{ minWidth: '120px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
@@ -691,7 +690,6 @@ function RackManagement() {
             </div>
             <Progress
               percent={percentage}
-              status={status}
               showInfo={false}
               size="small"
               strokeColor={percentage >= 80 ? '#ff4d4f' : percentage >= 60 ? '#faad14' : '#52c41a'}
