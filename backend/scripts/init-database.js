@@ -7,6 +7,8 @@
  * 如需单独运行：node backend/scripts/init-database.js
  */
 
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+
 const { sequelize } = require('../db');
 const SystemSetting = require('../models/SystemSetting');
 const Consumable = require('../models/Consumable');
@@ -22,6 +24,22 @@ const FaultCategory = require('../models/FaultCategory');
 const InventoryPlan = require('../models/InventoryPlan');
 const InventoryTask = require('../models/InventoryTask');
 const InventoryRecord = require('../models/InventoryRecord');
+const Warehouse = require('../models/Warehouse');
+const Cable = require('../models/Cable');
+const DeviceField = require('../models/DeviceField');
+const DevicePort = require('../models/DevicePort');
+const NetworkCard = require('../models/NetworkCard');
+const PendingDevice = require('../models/PendingDevice');
+const Business = require('../models/Business');
+const DeviceBusiness = require('../models/DeviceBusiness');
+const Role = require('../models/Role');
+const Permission = require('../models/Permission');
+const UserRole = require('../models/UserRole');
+const Ticket = require('../models/Ticket');
+const TicketField = require('../models/TicketField');
+const TicketOperationRecord = require('../models/TicketOperationRecord');
+const BackupLog = require('../models/BackupLog');
+const OperationLog = require('../models/OperationLog');
 
 // 默认系统设置（包含中文描述）
 const defaultSettings = [
@@ -224,30 +242,47 @@ async function initDatabase() {
     await sequelize.authenticate();
     console.log('数据库连接成功');
 
-    // 同步所有模型（按依赖顺序）
+    // 同步所有模型（按依赖层级顺序）
+    // 第0层：无外键依赖的独立模型
     console.log('开始同步模型...');
-
-    // 基础模型
     await User.sync({ alter: true });
     await Room.sync({ alter: true });
-    await Rack.sync({ alter: true });
-    await Device.sync({ alter: true });
-    await FaultCategory.sync({ alter: true });
-
-    // 耗材相关模型
+    await Warehouse.sync({ alter: true });
+    await Role.sync({ alter: true });
+    await Permission.sync({ alter: true });
+    await Business.sync({ alter: true });
     await ConsumableCategory.sync({ alter: true });
     await Consumable.sync({ alter: true });
-    await ConsumableLog.sync({ alter: true });
-    await ConsumableRecord.sync({ alter: true });
-    await ConsumableLogArchive.sync({ alter: true });
-
-    // 盘点相关模型
-    await InventoryPlan.sync({ alter: true });
-    await InventoryTask.sync({ alter: true });
-    await InventoryRecord.sync({ alter: true });
-
-    // 系统设置
+    await FaultCategory.sync({ alter: true });
+    await DeviceField.sync({ alter: true });
+    await TicketField.sync({ alter: true });
     await SystemSetting.sync({ alter: true });
+    await BackupLog.sync({ alter: true });
+    await ConsumableLogArchive.sync({ alter: true });
+    await OperationLog.sync({ alter: true });
+
+    // 第1层：仅依赖第0层
+    await Rack.sync({ alter: true });
+    await UserRole.sync({ alter: true });
+    await InventoryPlan.sync({ alter: true });
+    await ConsumableRecord.sync({ alter: true });
+
+    // 第2层：依赖第0-1层
+    await Device.sync({ alter: true });
+    await InventoryTask.sync({ alter: true });
+
+    // 第3层：依赖第0-2层
+    await Cable.sync({ alter: true });
+    await NetworkCard.sync({ alter: true });
+    await DevicePort.sync({ alter: true });
+    await DeviceBusiness.sync({ alter: true });
+    await Ticket.sync({ alter: true });
+    await PendingDevice.sync({ alter: true });
+
+    // 第4层：依赖第0-3层
+    await TicketOperationRecord.sync({ alter: true });
+    await InventoryRecord.sync({ alter: true });
+    await ConsumableLog.sync({ alter: true });
 
     console.log('数据库表结构同步完成');
 

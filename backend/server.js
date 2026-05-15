@@ -95,18 +95,44 @@ async function syncBusinessModels() {
   const Business = require('./models/Business');
   const DeviceBusiness = require('./models/DeviceBusiness');
   const Warehouse = require('./models/Warehouse');
+  const Cable = require('./models/Cable');
+  const DevicePort = require('./models/DevicePort');
+  const NetworkCard = require('./models/NetworkCard');
+  const PendingDevice = require('./models/PendingDevice');
+  const Role = require('./models/Role');
+  const Permission = require('./models/Permission');
+  const UserRole = require('./models/UserRole');
+  const Ticket = require('./models/Ticket');
+  const TicketOperationRecord = require('./models/TicketOperationRecord');
 
-  // 仅在开发环境使用 sync({ alter: true })，生产环境应使用 migrations
   if (process.env.NODE_ENV !== 'production') {
-    await Business.sync({ alter: true });
-    await DeviceBusiness.sync({ alter: true });
     await Warehouse.sync({ alter: true });
-    logger.info('业务/设备关联/库房模型同步完成（alter mode）');
+    await Business.sync({ alter: true });
+    await Role.sync({ alter: true });
+    await Permission.sync({ alter: true });
+    await UserRole.sync({ alter: true });
+    await Cable.sync({ alter: true });
+    await DevicePort.sync({ alter: true });
+    await NetworkCard.sync({ alter: true });
+    await DeviceBusiness.sync({ alter: true });
+    await PendingDevice.sync({ alter: true });
+    await Ticket.sync({ alter: true });
+    await TicketOperationRecord.sync({ alter: true });
+    logger.info('业务/库房/工单等扩展模型同步完成（alter mode）');
   } else {
-    await Business.sync();
-    await DeviceBusiness.sync();
     await Warehouse.sync();
-    logger.info('业务/设备关联/库房模型同步完成（safe mode）');
+    await Business.sync();
+    await Role.sync();
+    await Permission.sync();
+    await UserRole.sync();
+    await Cable.sync();
+    await DevicePort.sync();
+    await NetworkCard.sync();
+    await DeviceBusiness.sync();
+    await PendingDevice.sync();
+    await Ticket.sync();
+    await TicketOperationRecord.sync();
+    logger.info('业务/库房/工单等扩展模型同步完成（safe mode）');
   }
 }
 
@@ -213,6 +239,7 @@ async function initAutoBackupScheduler() {
 async function initializeApp() {
   try {
     await syncDatabase();
+    await syncBusinessModels();
     await initDeviceFields();
     await initTicketFields();
     await initTicketModels();
@@ -221,7 +248,6 @@ async function initializeApp() {
     await syncInventoryModels();
     await syncBackupLogModel();
     await syncOperationLogModel();
-    await syncBusinessModels();
     await initDefaultSystemSettings();
     await initFaultCategories();
     await initAutoBackupScheduler();
