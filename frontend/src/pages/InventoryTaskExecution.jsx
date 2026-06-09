@@ -75,8 +75,8 @@ const InventoryTaskExecution = () => {
     setLoading(true);
     try {
       const res = await api.get(`/inventory/plans/${planId}`);
-      setPlan(res.data.plan);
-      setTasks(res.data.tasks || []);
+      setPlan(res.plan);
+      setTasks(res.tasks || []);
     } catch (error) {
       message.error('获取盘点计划失败');
     } finally {
@@ -87,9 +87,9 @@ const InventoryTaskExecution = () => {
   const fetchTaskRecords = async taskId => {
     try {
       const res = await api.get(`/inventory/tasks/${taskId}`);
-      setCurrentTask(res.data.task);
-      setRecords(res.data.records || []);
-      setRecordPagination(prev => ({ ...prev, total: res.data.records?.length || 0, current: 1 }));
+      setCurrentTask(res.task);
+      setRecords(res.records || []);
+      setRecordPagination(prev => ({ ...prev, total: res.records?.length || 0, current: 1 }));
       setSelectedRowKeys([]);
       setActiveTab('2');
     } catch (error) {
@@ -378,7 +378,7 @@ const InventoryTaskExecution = () => {
   const fetchDeviceFields = async () => {
     try {
       const res = await api.get('/deviceFields');
-      const sortedFields = res.data.sort((a, b) => a.order - b.order);
+      const sortedFields = res.sort((a, b) => a.order - b.order);
       setDeviceFields(sortedFields);
     } catch (error) {
       console.error('获取字段配置失败:', error);
@@ -389,7 +389,7 @@ const InventoryTaskExecution = () => {
   const fetchRooms = async () => {
     try {
       const res = await api.get('/rooms');
-      setRooms(res.data.rooms || res.data || []);
+      setRooms(res.rooms || res || []);
     } catch (error) {
       console.error('获取机房列表失败', error);
     }
@@ -398,7 +398,7 @@ const InventoryTaskExecution = () => {
   const fetchRacks = async () => {
     try {
       const res = await api.get('/racks', { params: { pageSize: 1000 } });
-      setRacks(res.data.racks || res.data || []);
+      setRacks(res.racks || res || []);
     } catch (error) {
       console.error('获取机柜列表失败', error);
     }
@@ -644,9 +644,9 @@ const InventoryTaskExecution = () => {
       quickAddForm.resetFields();
       setScanResult({
         success: true,
-        message: `设备 "${res.data.pendingDevice.deviceName}" 已暂存，请前往「暂存设备」页面完善信息后同步到设备管理`,
-        pendingDevice: res.data.pendingDevice,
-        sn: res.data.pendingDevice.serialNumber,
+        message: `设备 "${res.pendingDevice.deviceName}" 已暂存，请前往「暂存设备」页面完善信息后同步到设备管理`,
+        pendingDevice: res.pendingDevice,
+        sn: res.pendingDevice.serialNumber,
       });
     } catch (error) {
       message.error(error.response?.data?.error || '暂存设备失败');

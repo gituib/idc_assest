@@ -310,6 +310,7 @@ function RackManagement() {
   const debouncedSearchKeyword = useDebounce(searchKeyword, 300);
   const [statusFilter, setStatusFilter] = useState('all');
   const [roomFilter, setRoomFilter] = useState('all');
+  const [stats, setStats] = useState({ total: 0, active: 0, totalPower: 0, totalDevices: 0 });
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
@@ -324,18 +325,28 @@ function RackManagement() {
     async (page = 1, pageSize = 10) => {
       try {
         setLoading(true);
-        const response = await api.get('/racks', {
-          params: {
-            page,
-            pageSize,
-            roomId: roomFilter,
-            status: statusFilter,
-            keyword: debouncedSearchKeyword || undefined,
-          },
-        });
-        const { racks: data, total } = response;
+        const [racksRes, statsRes] = await Promise.all([
+          api.get('/racks', {
+            params: {
+              page,
+              pageSize,
+              roomId: roomFilter,
+              status: statusFilter,
+              keyword: debouncedSearchKeyword || undefined,
+            },
+          }),
+          api.get('/racks/stats', {
+            params: {
+              roomId: roomFilter,
+              status: statusFilter,
+              keyword: debouncedSearchKeyword || undefined,
+            },
+          }),
+        ]);
+        const { racks: data, total } = racksRes;
         setRacks(data);
         setPagination(prev => ({ ...prev, current: page, pageSize, total }));
+        setStats(statsRes);
       } catch (error) {
         message.error('获取机柜列表失败');
         console.error('获取机柜列表失败:', error);
@@ -616,19 +627,6 @@ function RackManagement() {
   );
 
   // 后端已过滤，直接使用 racks 数据
-  const filteredRacks = racks;
-
-  const stats = useMemo(
-    () => ({
-      total: racks.length,
-      active: racks.filter(r => r.status === 'active').length,
-      maintenance: racks.filter(r => r.status === 'maintenance').length,
-      totalPower: racks.reduce((sum, r) => sum + (r.currentPower || 0), 0),
-      totalDevices: racks.reduce((sum, r) => sum + (r.Devices?.length || 0), 0),
-    }),
-    [racks]
-  );
-
   const tableColumns = [
     {
       title: '机柜信息',
@@ -967,7 +965,7 @@ function RackManagement() {
         {viewMode === 'table' ? (
           <Table
             columns={tableColumns}
-            dataSource={filteredRacks}
+            dataSource={racks}
             rowKey="rackId"
             loading={loading}
             rowSelection={rowSelection}
@@ -978,8 +976,8 @@ function RackManagement() {
           />
         ) : (
           <Row gutter={[16, 16]}>
-            {filteredRacks.length > 0 ? (
-              filteredRacks.map(rack => (
+            {racks.length > 0 ? (
+              racks.map(rack => (
                 <Col xs={24} sm={12} lg={8} xl={6} key={rack.rackId}>
                   <RackCard
                     rack={rack}

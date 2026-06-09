@@ -78,6 +78,50 @@ router.get('/', async (req, res) => {
   }
 });
 
+// 获取机柜统计信息（全量，不受分页影响）
+router.get('/stats', async (req, res) => {
+  try {
+    const { roomId, status, keyword } = req.query;
+
+    const where = {};
+    if (roomId && roomId !== 'all') {
+      where.roomId = roomId;
+    }
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+    if (keyword) {
+      where[require('sequelize').Op.or] = [
+        { rackId: { [require('sequelize').Op.like]: `%${keyword}%` } },
+        { name: { [require('sequelize').Op.like]: `%${keyword}%` } },
+      ];
+    }
+
+    const total = await Rack.count({ where });
+    const active = await Rack.count({ where: { ...where, status: 'active' } });
+    const totalPowerResult = await Rack.findAll({
+      where,
+      attributes: [[sequelize.fn('COALESCE', sequelize.fn('SUM', sequelize.col('currentPower')), 0), 'totalPower']],
+      raw: true,
+    });
+    const totalPower = parseFloat(totalPowerResult[0]?.totalPower) || 0;
+
+    const rackIds = await Rack.findAll({
+      where,
+      attributes: ['rackId'],
+      raw: true,
+    });
+    const rackIdList = rackIds.map(r => r.rackId);
+    const totalDevices = rackIdList.length > 0
+      ? await Device.count({ where: { rackId: { [require('sequelize').Op.in]: rackIdList } } })
+      : 0;
+
+    res.json({ total, active, totalPower, totalDevices });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const MAX_EXPORT_SIZE = 50000;
 
 router.get('/all', async (req, res) => {
