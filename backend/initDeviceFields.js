@@ -184,7 +184,17 @@ async function initDeviceFields() {
           }
         }
 
-        if (field.options && !existingOptions) {
+        // 加固：系统字段（isSystem: true）的 options 永远不应为空
+        // 如果用户在"字段管理"页面误清空了系统字段的 options（如设备类型/状态），
+        // 启动时强制重置为默认值，避免前端拿到空 options 导致下拉框无选项
+        if (
+          existingField.isSystem &&
+          field.options &&
+          (!existingOptions || existingOptions.length === 0)
+        ) {
+          await existingField.update({ options: field.options });
+          console.log(`系统字段 options 为空，已重置为默认值: ${field.displayName}`);
+        } else if (field.options && !existingOptions) {
           await existingField.update({ options: field.options });
           console.log(`更新字段 options: ${field.displayName}`);
         } else if (field.options && Array.isArray(existingOptions)) {

@@ -164,12 +164,14 @@ function DeviceManagement() {
       let fields = response.data.sort((a, b) => a.order - b.order);
 
       // 补充缺失的 options（状态和设备类型）
+      // 修复：原条件 !field.options 对空数组 [] 判定为 false，导致 options 被清空时下拉框无选项
+      // 改为同时检查 null/undefined 和空数组，确保本地默认值能正确兜底
       fields = fields.map(field => {
-        if (field.fieldName === 'type' && !field.options) {
+        if (field.fieldName === 'type' && (!field.options || field.options.length === 0)) {
           const defaultTypeField = DEFAULT_DEVICE_FIELDS_LOCAL.find(f => f.fieldName === 'type');
           return { ...field, options: defaultTypeField?.options || [] };
         }
-        if (field.fieldName === 'status' && !field.options) {
+        if (field.fieldName === 'status' && (!field.options || field.options.length === 0)) {
           const defaultStatusField = DEFAULT_DEVICE_FIELDS_LOCAL.find(
             f => f.fieldName === 'status'
           );
