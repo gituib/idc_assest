@@ -113,3 +113,8 @@ backend/config/remote-backup-configs.json
 .vercelignore
 docs/install-improvement-plan.md
 docs/install-split-plan.md
+
+# ==============================================
+# Local-only references (本地参考文档)
+# ==============================================
+deploy/nginx-troubleshooting.md
