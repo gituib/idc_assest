@@ -269,13 +269,21 @@ const DeviceFormModal = ({
     }
   };
 
+  // 强制锁定必填的字段（不受字段管理配置影响）
+  const FORCE_REQUIRED_FIELDS = ['name', 'serialNumber', 'position', 'height'];
+
   const filteredFields = deviceFields.filter(
-    field =>
-      field.fieldName !== 'deviceId' &&
-      field.fieldName !== 'rackId' &&
-      field.fieldName !== 'position' &&
-      field.fieldName !== 'height'
+    field => field.fieldName !== 'deviceId'
   );
+
+  // 获取关键字段的配置（用于设备位置区块）
+  const rackFieldConfig = deviceFields.find(f => f.fieldName === 'rackId');
+  const positionFieldConfig = deviceFields.find(f => f.fieldName === 'position');
+  const heightFieldConfig = deviceFields.find(f => f.fieldName === 'height');
+
+  // 动态判断是否必填（强制锁定字段 > 字段配置）
+  const isPositionRequired = FORCE_REQUIRED_FIELDS.includes('position') || positionFieldConfig?.required;
+  const isHeightRequired = FORCE_REQUIRED_FIELDS.includes('height') || heightFieldConfig?.required;
 
   const formItems = [];
   filteredFields.forEach(field => {
@@ -356,10 +364,10 @@ const DeviceFormModal = ({
                     label={
                       <span>
                         机柜
-                        <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
+                        {rackFieldConfig?.required && <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>}
                       </span>
                     }
-                    rules={[{ required: true, message: '请选择机柜' }]}
+                    rules={rackFieldConfig?.required ? [{ required: true, message: '请选择机柜' }] : []}
                     style={{ marginBottom: '0' }}
                   >
                     <Select
@@ -389,10 +397,10 @@ const DeviceFormModal = ({
                     label={
                       <span>
                         安装位置 (U位)
-                        <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
+                        {isPositionRequired && <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>}
                       </span>
                     }
-                    rules={[{ required: true, message: '请输入U位' }]}
+                    rules={isPositionRequired ? [{ required: true, message: '请输入U位' }] : []}
                     style={{ marginBottom: '0' }}
                   >
                     <InputNumber
@@ -410,10 +418,10 @@ const DeviceFormModal = ({
                     label={
                       <span>
                         设备高度 (U)
-                        <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
+                        {isHeightRequired && <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>}
                       </span>
                     }
-                    rules={[{ required: true, message: '请输入设备高度' }]}
+                    rules={isHeightRequired ? [{ required: true, message: '请输入设备高度' }] : []}
                     initialValue={1}
                     style={{ marginBottom: '0' }}
                   >

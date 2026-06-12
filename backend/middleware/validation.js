@@ -1,10 +1,16 @@
 const logger = require('../utils/logger').module('ValidationMiddleware');
 
-const validate = (schema, source = 'body') => {
+const validate = (schemaOrFn, source = 'body') => {
   return async (req, res, next) => {
     const data = source === 'query' ? req.query : req.body;
 
     try {
+      // 支持函数形式的schema（动态schema：异步函数或同步函数返回Joi schema）
+      let schema = schemaOrFn;
+      if (typeof schemaOrFn === 'function') {
+        schema = await schemaOrFn();
+      }
+
       let value;
 
       if (schema.validate && typeof schema.validate === 'function') {

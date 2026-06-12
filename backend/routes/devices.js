@@ -16,13 +16,12 @@ const {
 } = require('../utils/operationLogger');
 const { validateBody, validateQuery } = require('../middleware/validation');
 const {
-  createDeviceSchema,
-  updateDeviceSchema,
   batchDeviceIdsSchema,
   batchStatusSchema,
   batchMoveSchema,
   queryDeviceSchema,
 } = require('../validation/deviceSchema');
+const { createDeviceSchema } = require('../validation/dynamicDeviceSchema');
 
 const PREVIEW_COUNT = 20;
 
@@ -736,7 +735,7 @@ async function generateDeviceId() {
 }
 
 // 创建设备
-router.post('/', validateBody(createDeviceSchema), async (req, res) => {
+router.post('/', validateBody(() => createDeviceSchema(false)), async (req, res) => {
   try {
     const deviceData = { ...req.body };
 
@@ -2285,7 +2284,7 @@ router.get('/:deviceId/tickets', async (req, res) => {
 });
 
 // 更新设备
-router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
+router.put('/:deviceId', validateBody(() => createDeviceSchema(true)), async (req, res) => {
   try {
     const oldDevice = await Device.findByPk(req.params.deviceId);
     if (!oldDevice) {

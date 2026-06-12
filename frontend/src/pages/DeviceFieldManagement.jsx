@@ -338,6 +338,11 @@ const FIELD_TYPE_OPTIONS = [
   { value: 'textarea', label: '多行文本' },
 ];
 
+// 强制锁定必填的系统核心字段（不受字段管理配置影响）
+const FORCE_LOCKED_REQUIRED_FIELDS = ['name', 'serialNumber', 'position', 'height'];
+// 强制锁定可见的系统核心字段（在其他模块强引用，不可关闭可见）
+const FORCE_LOCKED_VISIBLE_FIELDS = ['name', 'serialNumber'];
+
 function DeviceFieldManagement() {
   const [fields, setFields] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -668,8 +673,17 @@ function DeviceFieldManagement() {
               label={<span style={formLabelStyle}>必填</span>}
               valuePropName="checked"
               style={formItemFlexStyle}
+              tooltip={
+                editingField && FORCE_LOCKED_REQUIRED_FIELDS.includes(editingField.fieldName)
+                  ? '系统核心字段，不可关闭必填'
+                  : undefined
+              }
             >
-              <Switch />
+              <Switch
+                disabled={
+                  editingField && FORCE_LOCKED_REQUIRED_FIELDS.includes(editingField.fieldName)
+                }
+              />
             </Form.Item>
 
             <Form.Item
@@ -677,8 +691,18 @@ function DeviceFieldManagement() {
               label={<span style={formLabelStyle}>可见</span>}
               valuePropName="checked"
               style={formItemFlexStyle}
+              tooltip={
+                editingField && FORCE_LOCKED_VISIBLE_FIELDS.includes(editingField.fieldName)
+                  ? '系统核心字段，在其他模块中被引用，不可关闭可见'
+                  : undefined
+              }
             >
-              <Switch defaultChecked />
+              <Switch
+                defaultChecked
+                disabled={
+                  editingField && FORCE_LOCKED_VISIBLE_FIELDS.includes(editingField.fieldName)
+                }
+              />
             </Form.Item>
           </div>
 

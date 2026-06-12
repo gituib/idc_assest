@@ -114,8 +114,6 @@ const queryDeviceSchema = Joi.object({
 });
 
 module.exports = {
-  createDeviceSchema,
-  updateDeviceSchema,
   batchDeviceIdsSchema,
   batchStatusSchema,
   batchMoveSchema,
