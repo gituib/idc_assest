@@ -7,12 +7,11 @@ const UserRole = require('../models/UserRole');
 const { generateToken, authMiddleware } = require('../middleware/auth');
 const {
   SALT_ROUNDS,
-  MAX_LOGIN_ATTEMPTS,
-  LOCK_TIME,
   PASSWORD_MIN_LENGTH,
   USERNAME_MIN_LENGTH,
   USERNAME_MAX_LENGTH,
 } = require('../config');
+const SystemSetting = require('../models/SystemSetting');
 const { generateId } = require('../utils/idGenerator');
 
 const router = express.Router();
@@ -146,6 +145,38 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // 检查维护模式：非管理员无法登录
+    const maintenanceSetting = await SystemSetting.findByPk('maintenance_mode');
+    const isMaintenanceMode = maintenanceSetting
+      ? JSON.parse(maintenanceSetting.settingValue)
+      : false;
+
+    if (isMaintenanceMode) {
+      // 先查找用户，判断是否为管理员
+      const checkUser = await User.findOne({ where: { username } });
+      if (checkUser) {
+        const userRole = await UserRole.findOne({
+          where: { UserId: checkUser.userId },
+          include: [{ model: Role }],
+        });
+        const isAdmin = userRole && userRole.Role && userRole.Role.roleCode === 'admin';
+        if (!isAdmin) {
+          return res.status(503).json({
+            success: false,
+            code: 'MAINTENANCE_MODE',
+            message: '系统维护中，暂时无法登录，请联系管理员',
+          });
+        }
+      }
+    }
+
+    // 从系统设置读取最大登录尝试次数
+    const maxAttemptsSetting = await SystemSetting.findByPk('max_login_attempts');
+    const maxLoginAttempts = maxAttemptsSetting
+      ? JSON.parse(maxAttemptsSetting.settingValue)
+      : 5;
+    const lockTimeMs = 30 * 60 * 1000; // 锁定30分钟
+
     const user = await User.findOne({ where: { username } });
     if (!user) {
       return res.status(401).json({
@@ -163,6 +194,7 @@ router.post('/login', async (req, res) => {
           message: `账户已被锁定，请在 ${remainingMinutes} 分钟后重试`,
         });
       }
+      // 锁定时间已过，自动解锁
       user.status = 'active';
       user.loginCount = 0;
       user.lockedUntil = null;
@@ -187,18 +219,18 @@ router.post('/login', async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       user.loginCount = (user.loginCount || 0) + 1;
-      if (user.loginCount >= MAX_LOGIN_ATTEMPTS) {
+      if (user.loginCount >= maxLoginAttempts) {
         user.status = 'locked';
-        user.lockedUntil = new Date(Date.now() + LOCK_TIME);
+        user.lockedUntil = new Date(Date.now() + lockTimeMs);
       }
       await user.save();
 
-      const remainingAttempts = MAX_LOGIN_ATTEMPTS - user.loginCount;
+      const remainingAttempts = maxLoginAttempts - user.loginCount;
       let message = '用户名或密码错误';
       if (remainingAttempts > 0) {
         message += `，剩余 ${remainingAttempts} 次尝试机会`;
       } else {
-        message = `账户已被锁定，请在 3 分钟后重试`;
+        message = `账户已被锁定，请在 30 分钟后重试`;
       }
 
       return res.status(401).json({

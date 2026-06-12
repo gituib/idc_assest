@@ -14,9 +14,11 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
+    "@ant-design/icons-svg": "^4.4.2",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
     "@types/dagre": "^0.7.54",
+    "all": "^0.0.0",
     "antd": "^5.8.6",
     "axios": "^1.13.6",
     "dagre": "^0.8.5",

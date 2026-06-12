@@ -1,6 +1,13 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const UserRole = require('../models/UserRole');
+const Role = require('../models/Role');
+const SystemSetting = require('../models/SystemSetting');
 const logger = require('../utils/logger').module('AuthMiddleware');
+
+// 维护模式缓存，避免每次请求都查数据库
+let maintenanceModeCache = { value: false, updatedAt: 0 };
+const MAINTENANCE_CACHE_TTL = 30000; // 30秒缓存
 
 function getJwtSecret() {
   const envSecret = process.env.JWT_SECRET;
@@ -169,6 +176,41 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
+    // 维护模式检查：普通用户无法访问，管理员不受影响
+    const now = Date.now();
+    if (now - maintenanceModeCache.updatedAt > MAINTENANCE_CACHE_TTL) {
+      try {
+        const maintenanceSetting = await SystemSetting.findByPk('maintenance_mode');
+        maintenanceModeCache = {
+          value: maintenanceSetting ? JSON.parse(maintenanceSetting.settingValue) : false,
+          updatedAt: now,
+        };
+      } catch (err) {
+        logger.warn('读取维护模式设置失败', { error: err.message });
+      }
+    }
+
+    if (maintenanceModeCache.value) {
+      // 查询用户角色，判断是否为管理员
+      const userRole = await UserRole.findOne({
+        where: { UserId: user.userId },
+        include: [{ model: Role }],
+      });
+      const isAdmin = userRole && userRole.Role && userRole.Role.roleCode === 'admin';
+
+      if (!isAdmin) {
+        logger.info('维护模式：拒绝普通用户访问', {
+          userId: user.userId,
+          username: user.username,
+        });
+        return res.status(503).json({
+          success: false,
+          code: 'MAINTENANCE_MODE',
+          message: '系统维护中，请稍后再试',
+        });
+      }
+    }
+
     req.user = decoded;
     req.userModel = user;
     next();
@@ -229,6 +271,11 @@ const optionalAuth = async (req, res, next) => {
   }
 };
 
+/** 清除维护模式缓存，在设置更新时调用 */
+const clearMaintenanceCache = () => {
+  maintenanceModeCache = { value: false, updatedAt: 0 };
+};
+
 module.exports = {
   generateToken,
   verifyToken,
@@ -236,4 +283,5 @@ module.exports = {
   optionalAuth,
   JWT_SECRET,
   TOKEN_EXPIRY,
+  clearMaintenanceCache,
 };

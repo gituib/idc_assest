@@ -8,15 +8,10 @@ import axios from 'axios';
 
 const defaultConfig = {
   site_name: '机柜管理系统',
+  site_logo: '',
   primary_color: '#667eea',
   secondary_color: '#764ba2',
-  sidebar_collapsed: false,
-  compact_mode: false,
-  animation_enabled: true,
-  language: 'zh-CN',
-  timezone: 'Asia/Shanghai',
-  date_format: 'YYYY-MM-DD',
-  session_timeout: 30,
+  idle_timeout: 30,
   max_login_attempts: 5,
   maintenance_mode: false,
 };
@@ -84,5 +79,6 @@ export const useConfigStore = create((set, get) => ({
 export const useConfig = () => useConfigStore((state) => state.config);
 export const useConfigLoading = () => useConfigStore((state) => state.loading);
 export const useSiteName = () => useConfigStore((state) => state.config.site_name);
+export const useSiteLogo = () => useConfigStore((state) => state.config.site_logo);
 export const usePrimaryColor = () => useConfigStore((state) => state.config.primary_color);
 export const useSecondaryColor = () => useConfigStore((state) => state.config.secondary_color);

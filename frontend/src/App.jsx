@@ -48,6 +48,7 @@ import {
 } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useConfig } from './hooks/useConfig';
+import { useSiteLogo } from './stores/configStore';
 import { useDesignTokens } from './hooks/useDesignTokens';
 import useIdleTimeout from './hooks/useIdleTimeout';
 import { SWRConfig, swrConfig } from './hooks/useSWR';
@@ -153,6 +154,7 @@ const AppLayout = ({ children }) => {
   const [idleConfig, setIdleConfig] = useState(DEFAULT_IDLE_CONFIG);
   const { user, logout } = useAuth();
   const { config } = useConfig();
+  const siteLogo = useSiteLogo();
   const navigate = useNavigate();
   const location = useLocation();
   const designTokens = useDesignTokens();
@@ -409,14 +411,24 @@ const AppLayout = ({ children }) => {
               width: '36px',
               height: '36px',
               borderRadius: designTokens.borderRadius.small,
-              background: designTokens.colors.primary.gradient,
+              background: siteLogo ? 'transparent' : designTokens.colors.primary.gradient,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
+              overflow: 'hidden',
             }}
           >
-            <CloudServerOutlined style={{ fontSize: '18px', color: '#ffffff' }} />
+            {siteLogo ? (
+              <img
+                src={siteLogo}
+                alt="Logo"
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                onError={e => { e.target.style.display = 'none'; }}
+              />
+            ) : (
+              <CloudServerOutlined style={{ fontSize: '18px', color: '#ffffff' }} />
+            )}
           </div>
           {!collapsed && (
             <div>

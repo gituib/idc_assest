@@ -53,6 +53,7 @@ const User = sequelize.define(
     loginCount: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
+      comment: '连续登录失败次数，登录成功后重置',
     },
     lockedUntil: {
       type: DataTypes.DATE,

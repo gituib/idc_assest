@@ -36,6 +36,12 @@ axios.interceptors.response.use(
         }
       }
     }
+    // 维护模式拦截：503 + MAINTENANCE_MODE code
+    if (error.response?.status === 503 && error.response?.data?.code === 'MAINTENANCE_MODE') {
+      if (maintenanceCallback) {
+        maintenanceCallback(true);
+      }
+    }
     return Promise.reject(error);
   }
 );

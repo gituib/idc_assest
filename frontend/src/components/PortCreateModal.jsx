@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   Modal,
   Form,
@@ -14,6 +14,7 @@ import {
   Divider,
   Row,
   Col,
+  Segmented,
 } from 'antd';
 import {
   PlusOutlined,
@@ -23,6 +24,7 @@ import {
   TagOutlined,
   FileTextOutlined,
   CheckCircleOutlined,
+  SwapOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { designTokens } from '../config/theme';
@@ -31,6 +33,24 @@ import CloseButton from './CloseButton';
 const { Option } = Select;
 const { TextArea } = Input;
 
+/**
+ * 从端口名中提取前缀和末尾数字
+ * @param {string} portName - 端口名称，如 "1/0/48" 或 "eth0/1"
+ * @returns {{ prefix: string, num: number } | null} 前缀和数字，无数字则返回 null
+ */
+function extractPrefixAndNum(portName) {
+  if (!portName || typeof portName !== 'string') return null;
+  const match = portName.match(/^(.*?)(\d+)$/);
+  if (!match) return null;
+  return { prefix: match[1], num: parseInt(match[2], 10) };
+}
+
+/**
+ * 快捷模式解析端口范围（单输入框格式）
+ * 支持完整格式 "1/0/1-1/0/48" 和简写格式 "1/0/1-48"
+ * @param {string} portName - 端口范围字符串
+ * @returns {{ isRange: boolean, prefix: string, startNum: number, endNum: number, portCount: number, ports: string[], error?: string } | null}
+ */
 function parsePortRange(portName) {
   if (!portName || typeof portName !== 'string') {
     return null;
@@ -42,54 +62,135 @@ function parsePortRange(portName) {
     return null;
   }
 
-  const [startPart, endPart] = trimmed.split('-').map(s => s.trim());
+  // 用最后一个 - 分割，解决多 - 问题（如 eth-0-1-eth-0-48）
+  const lastDashIdx = trimmed.lastIndexOf('-');
+  const startPart = trimmed.substring(0, lastDashIdx).trim();
+  const endPart = trimmed.substring(lastDashIdx + 1).trim();
 
   if (!startPart || !endPart) {
-    return null;
+    return { isRange: false, prefix: '', startNum: 0, endNum: 0, portCount: 0, ports: [], error: '格式不完整，- 前后都需要有内容' };
   }
 
-  const startNumMatch = startPart.match(/(\d+)$/);
-  const endNumMatch = endPart.match(/(\d+)$/);
+  const startParsed = extractPrefixAndNum(startPart);
+  const endParsed = extractPrefixAndNum(endPart);
 
-  if (!startNumMatch || !endNumMatch) {
-    return null;
+  if (!startParsed) {
+    return { isRange: false, prefix: '', startNum: 0, endNum: 0, portCount: 0, ports: [], error: `起始端口名 "${startPart}" 末尾无数字，无法解析范围` };
   }
 
-  const startNum = parseInt(startNumMatch[1], 10);
-  const endNum = parseInt(endNumMatch[1], 10);
-
-  if (startNum >= endNum || endNum - startNum > 1000) {
-    return null;
+  // 简写格式：endPart 只有数字（如 "1/0/1-48"），endParsed.prefix 为空
+  if (!endParsed) {
+    return { isRange: false, prefix: '', startNum: 0, endNum: 0, portCount: 0, ports: [], error: `结束端口名 "${endPart}" 末尾无数字，无法解析范围` };
   }
 
-  const startIdx = startPart.length - startNumMatch[0].length;
-  const prefix = startPart.substring(0, startIdx);
+  let prefix;
+  let startNum = startParsed.num;
+  let endNum = endParsed.num;
+
+  if (endParsed.prefix === '') {
+    // 简写格式：1/0/1-48，结束部分只有数字，前缀沿用起始部分
+    prefix = startParsed.prefix;
+  } else {
+    // 完整格式：1/0/1-1/0/48，校验前缀一致
+    if (startParsed.prefix !== endParsed.prefix) {
+      return { isRange: false, prefix: '', startNum: 0, endNum: 0, portCount: 0, ports: [], error: `前后端口名前缀不一致："${startParsed.prefix}" vs "${endParsed.prefix}"` };
+    }
+    prefix = startParsed.prefix;
+  }
+
+  if (startNum >= endNum) {
+    return { isRange: false, prefix: '', startNum: 0, endNum: 0, portCount: 0, ports: [], error: `起始数字 ${startNum} 必须小于结束数字 ${endNum}` };
+  }
+
+  if (endNum - startNum > 1000) {
+    return { isRange: false, prefix: '', startNum: 0, endNum: 0, portCount: 0, ports: [], error: '单次最多创建1000个端口' };
+  }
+
   const portCount = endNum - startNum + 1;
-
   const ports = [];
   for (let i = 0; i < portCount; i++) {
-    const num = startNum + i;
-    ports.push(`${prefix}${num}`);
+    ports.push(`${prefix}${startNum + i}`);
   }
 
-  return {
-    isRange: true,
-    prefix,
-    startNum,
-    endNum,
-    portCount,
-    ports,
-  };
+  return { isRange: true, prefix, startNum, endNum, portCount, ports };
 }
 
-function generatePortNames(portName) {
-  const result = parsePortRange(portName);
-
-  if (result && result.isRange) {
-    return result.ports;
+/**
+ * 范围模式解析（双输入框：起始端口名 + 结束端口名）
+ * @param {string} startPortName - 起始端口名
+ * @param {string} endPortName - 结束端口名
+ * @returns {{ isRange: boolean, prefix: string, startNum: number, endNum: number, portCount: number, ports: string[], error?: string }}
+ */
+function parseRangeMode(startPortName, endPortName) {
+  if (!startPortName || !endPortName) {
+    return { isRange: false, prefix: '', startNum: 0, endNum: 0, portCount: 0, ports: [], error: '请填写起始和结束端口名' };
   }
 
-  return [portName];
+  const startParsed = extractPrefixAndNum(startPortName.trim());
+  const endParsed = extractPrefixAndNum(endPortName.trim());
+
+  if (!startParsed) {
+    return { isRange: false, prefix: '', startNum: 0, endNum: 0, portCount: 0, ports: [], error: `起始端口名 "${startPortName}" 末尾无数字` };
+  }
+  if (!endParsed) {
+    return { isRange: false, prefix: '', startNum: 0, endNum: 0, portCount: 0, ports: [], error: `结束端口名 "${endPortName}" 末尾无数字` };
+  }
+
+  if (startParsed.prefix !== endParsed.prefix) {
+    return { isRange: false, prefix: '', startNum: 0, endNum: 0, portCount: 0, ports: [], error: `前后端口名前缀不一致："${startParsed.prefix || '(空)'}" vs "${endParsed.prefix || '(空)'}"` };
+  }
+
+  if (startParsed.num >= endParsed.num) {
+    return { isRange: false, prefix: '', startNum: 0, endNum: 0, portCount: 0, ports: [], error: `起始数字 ${startParsed.num} 必须小于结束数字 ${endParsed.num}` };
+  }
+
+  if (endParsed.num - startParsed.num > 1000) {
+    return { isRange: false, prefix: '', startNum: 0, endNum: 0, portCount: 0, ports: [], error: '单次最多创建1000个端口' };
+  }
+
+  const prefix = startParsed.prefix;
+  const startNum = startParsed.num;
+  const endNum = endParsed.num;
+  const portCount = endNum - startNum + 1;
+  const ports = [];
+  for (let i = 0; i < portCount; i++) {
+    ports.push(`${prefix}${startNum + i}`);
+  }
+
+  return { isRange: true, prefix, startNum, endNum, portCount, ports };
+}
+
+/**
+ * 根据模式和输入生成端口名列表
+ * @param {string} mode - 'range' 或 'quick'
+ * @param {object} params - { portName } 或 { startPortName, endPortName }
+ * @returns {{ ports: string[], error: string | null, parseResult: object | null }}
+ */
+function generatePortNames(mode, params) {
+  if (mode === 'range') {
+    const { startPortName, endPortName } = params;
+    if (!startPortName && !endPortName) {
+      return { ports: [], error: null, parseResult: null };
+    }
+    if (!startPortName || !endPortName) {
+      // 只填了一个，暂不报错，返回空
+      return { ports: [], error: null, parseResult: null };
+    }
+    const result = parseRangeMode(startPortName, endPortName);
+    if (result.isRange) {
+      return { ports: result.ports, error: null, parseResult: result };
+    }
+    return { ports: [], error: result.error, parseResult: result };
+  }
+
+  // 快捷模式（仅单端口，不支持范围）
+  const { portName } = params;
+  if (!portName) {
+    return { ports: [], error: null, parseResult: null };
+  }
+
+  // 快捷模式直接作为单端口处理
+  return { ports: [portName.trim()], error: null, parseResult: null };
 }
 
 function PortCreateModal({
@@ -107,12 +208,18 @@ function PortCreateModal({
   const [previewPorts, setPreviewPorts] = useState([]);
   const [showPreview, setShowPreview] = useState(false);
   const [nicList, setNicList] = useState([]);
+  const [portMode, setPortMode] = useState('quick'); // 'range' | 'quick'
+  const [parseError, setParseError] = useState(null);
+  const [parseResult, setParseResult] = useState(null);
   const prevVisibleRef = useRef(false);
 
   useEffect(() => {
     if (visible && !prevVisibleRef.current) {
       setPreviewPorts([]);
       setShowPreview(false);
+      setPortMode('quick');
+      setParseError(null);
+      setParseResult(null);
       form.resetFields();
 
       if (networkCard) {
@@ -144,25 +251,84 @@ function PortCreateModal({
     }
   };
 
-  const handlePortNameChange = useCallback(e => {
-    const value = e.target.value;
-    const ports = generatePortNames(value);
+  /**
+   * 更新端口预览和解析状态
+   * @param {string} mode - 当前模式
+   * @param {object} params - 解析参数
+   */
+  const updatePortPreview = useCallback((mode, params) => {
+    const result = generatePortNames(mode, params);
 
-    if (ports.length > 1) {
-      setPreviewPorts(ports.slice(0, 20));
+    setParseError(result.error);
+    setParseResult(result.parseResult);
+
+    if (result.ports.length > 1) {
+      setPreviewPorts(result.ports.slice(0, 20));
       setShowPreview(true);
+    } else if (result.ports.length === 1) {
+      setPreviewPorts([]);
+      setShowPreview(false);
     } else {
       setPreviewPorts([]);
       setShowPreview(false);
     }
   }, []);
 
+  /** 快捷模式：端口名输入变化 */
+  const handleQuickPortNameChange = useCallback(e => {
+    const value = e.target.value;
+    updatePortPreview('quick', { portName: value });
+  }, [updatePortPreview]);
+
+  /** 范围模式：起始/结束端口名输入变化 */
+  const handleRangePortNameChange = useCallback(() => {
+    const startPortName = form.getFieldValue('startPortName');
+    const endPortName = form.getFieldValue('endPortName');
+    updatePortPreview('range', { startPortName, endPortName });
+  }, [form, updatePortPreview]);
+
+  /** 模式切换处理 */
+  const handleModeChange = useCallback((newMode) => {
+    setPortMode(newMode);
+    setParseError(null);
+    setParseResult(null);
+    setPreviewPorts([]);
+    setShowPreview(false);
+    // 清空端口名相关字段
+    form.setFieldsValue({ portName: undefined, startPortName: undefined, endPortName: undefined });
+  }, [form]);
+
+  /** 获取当前生成的端口名列表 */
+  const getCurrentPortNames = useCallback(() => {
+    if (portMode === 'range') {
+      const startPortName = form.getFieldValue('startPortName');
+      const endPortName = form.getFieldValue('endPortName');
+      return generatePortNames('range', { startPortName, endPortName });
+    }
+    const portName = form.getFieldValue('portName');
+    return generatePortNames('quick', { portName });
+  }, [portMode, form]);
+
   const handleSubmit = useCallback(async () => {
     try {
       const values = await form.validateFields();
       setLoading(true);
 
-      const portNames = generatePortNames(values.portName);
+      // 获取端口名列表
+      const { ports: portNames, error: genError } = getCurrentPortNames();
+
+      if (genError) {
+        message.error(genError);
+        setLoading(false);
+        return;
+      }
+
+      if (!portNames || portNames.length === 0) {
+        message.error('请输入端口名称');
+        setLoading(false);
+        return;
+      }
+
       const finalNicId = disableNicChange && defaultNicId ? defaultNicId : values.nicId || null;
 
       if (portNames.length === 1) {
@@ -203,6 +369,8 @@ function PortCreateModal({
       form.resetFields();
       setPreviewPorts([]);
       setShowPreview(false);
+      setParseError(null);
+      setParseResult(null);
       onSuccess?.();
       onClose();
     } catch (error) {
@@ -214,22 +382,36 @@ function PortCreateModal({
     } finally {
       setLoading(false);
     }
-  }, [device, form, onClose, onSuccess]);
+  }, [device, form, onClose, onSuccess, getCurrentPortNames, disableNicChange, defaultNicId]);
 
   const handleCancel = useCallback(() => {
     form.resetFields();
     setPreviewPorts([]);
     setShowPreview(false);
+    setParseError(null);
+    setParseResult(null);
     onClose();
   }, [form, onClose]);
 
   const handleValuesChange = changedValues => {
-    if (changedValues.portName) {
-      handlePortNameChange({ target: { value: changedValues.portName } });
+    if (portMode === 'quick' && changedValues.portName) {
+      handleQuickPortNameChange({ target: { value: changedValues.portName } });
+    }
+    if (portMode === 'range' && (changedValues.startPortName !== undefined || changedValues.endPortName !== undefined)) {
+      handleRangePortNameChange();
     }
   };
 
-  const portCount = previewPorts.length || (form.getFieldValue('portName') && !showPreview ? 1 : 0);
+  const portCount = useMemo(() => {
+    if (parseResult?.portCount) return parseResult.portCount;
+    if (previewPorts.length > 0) return previewPorts.length;
+    // 单端口情况
+    if (portMode === 'quick') {
+      const portName = form.getFieldValue('portName');
+      if (portName && !parseError) return 1;
+    }
+    return 0;
+  }, [parseResult, previewPorts, portMode, form, parseError]);
   const selectedNic = nicList.find(nic => nic.nicId === form.getFieldValue('nicId'));
 
   const styles = {
@@ -429,12 +611,28 @@ function PortCreateModal({
             message="格式说明"
             description={
               <div style={{ fontSize: '11px', lineHeight: '1.6' }}>
-                <div>
-                  • <strong>单个端口：</strong>eth0/1、gigabitethernet1/0/1
-                </div>
-                <div>
-                  • <strong>端口范围：</strong>1/0/1-1/0/48（创建 1/0/1 到 1/0/48 共48个端口）
-                </div>
+                {portMode === 'range' ? (
+                  <>
+                    <div>
+                      • <strong>范围模式：</strong>分别输入起始和结束端口名，系统自动生成端口序列
+                    </div>
+                    <div>
+                      • <strong>规则：</strong>起始和结束端口名的前缀必须一致，且起始数字需小于结束数字
+                    </div>
+                    <div>
+                      • <strong>示例：</strong>起始 1/0/1，结束 1/0/48 → 创建 1/0/1 至 1/0/48 共 48 个端口
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      • <strong>单端口模式：</strong>每次创建一个端口，如需批量创建请切换至范围模式
+                    </div>
+                    <div>
+                      • <strong>示例：</strong>eth0/1、GigabitEthernet0/0/1、1/0/24
+                    </div>
+                  </>
+                )}
               </div>
             }
             type="info"
@@ -448,52 +646,114 @@ function PortCreateModal({
                 <div style={styles.sectionTitle}>
                   <TagOutlined style={{ color: designTokens.colors.primary.main }} />
                   端口标识
+                  <div style={{ marginLeft: 'auto' }}>
+                    <Segmented
+                      size="small"
+                      value={portMode}
+                      onChange={handleModeChange}
+                      options={[
+                        { label: '单端口', value: 'quick' },
+                        { label: '范围模式', value: 'range' },
+                      ]}
+                    />
+                  </div>
                 </div>
 
-                <Form.Item
-                  name="portName"
-                  rules={[
-                    { required: true, message: '请输入端口名称' },
-                    {
-                      pattern: /^[\w\/:\-]+$/,
-                      message: '端口名称格式不正确',
-                    },
-                    {
-                      validator: (_, value) => {
-                        if (!value) return Promise.resolve();
-                        const ports = generatePortNames(value);
-                        if (ports.length > 1000) {
-                          return Promise.reject(new Error('单次最多创建1000个端口'));
+                {portMode === 'range' ? (
+                  <>
+                    <Form.Item
+                      name="startPortName"
+                      label={<span style={styles.fieldLabel}>起始端口名</span>}
+                      rules={[
+                        { required: true, message: '请输入起始端口名' },
+                        {
+                          pattern: /^[\w\/:]+$/,
+                          message: '端口名称格式不正确',
+                        },
+                      ]}
+                    >
+                      <Input
+                        size="small"
+                        placeholder="例如: 1/0/1"
+                        prefix={
+                          <TagOutlined
+                            style={{ color: designTokens.colors.neutral[400], fontSize: '12px' }}
+                          />
                         }
-                        return Promise.resolve();
-                      },
-                    },
-                  ]}
-                >
-                  <Input
-                    size="small"
-                    placeholder="例如: eth0/1 或 1/0/1-1/0/48"
-                    prefix={
-                      <TagOutlined
-                        style={{ color: designTokens.colors.neutral[400], fontSize: '12px' }}
+                        style={{ borderRadius: '6px' }}
+                        onChange={handleRangePortNameChange}
                       />
-                    }
-                    style={{ borderRadius: '6px' }}
-                    suffix={
-                      <Tooltip title="支持单个端口或端口范围（如 1/0/1-1/0/48）">
-                        <InfoCircleOutlined
-                          style={{ color: designTokens.colors.neutral[400], fontSize: '11px' }}
+                    </Form.Item>
+                    <Form.Item
+                      name="endPortName"
+                      label={<span style={styles.fieldLabel}>结束端口名</span>}
+                      rules={[
+                        { required: true, message: '请输入结束端口名' },
+                        {
+                          pattern: /^[\w\/:]+$/,
+                          message: '端口名称格式不正确',
+                        },
+                      ]}
+                    >
+                      <Input
+                        size="small"
+                        placeholder="例如: 1/0/48"
+                        prefix={
+                          <TagOutlined
+                            style={{ color: designTokens.colors.neutral[400], fontSize: '12px' }}
+                          />
+                        }
+                        style={{ borderRadius: '6px' }}
+                        onChange={handleRangePortNameChange}
+                      />
+                    </Form.Item>
+                  </>
+                ) : (
+                  <Form.Item
+                    name="portName"
+                    rules={[
+                      { required: true, message: '请输入端口名称' },
+                      {
+                        pattern: /^[\w\/:]+$/,
+                        message: '端口名称格式不正确',
+                      },
+                    ]}
+                  >
+                    <Input
+                      size="small"
+                      placeholder="例如: eth0/1 或 1/0/24"
+                      prefix={
+                        <TagOutlined
+                          style={{ color: designTokens.colors.neutral[400], fontSize: '12px' }}
                         />
-                      </Tooltip>
-                    }
-                  />
-                </Form.Item>
+                      }
+                      style={{ borderRadius: '6px' }}
+                      suffix={
+                        <Tooltip title="输入单个端口名称，批量创建请切换至范围模式">
+                          <InfoCircleOutlined
+                            style={{ color: designTokens.colors.neutral[400], fontSize: '11px' }}
+                          />
+                        </Tooltip>
+                      }
+                    />
+                  </Form.Item>
+                )}
 
-                {showPreview && (
+                {/* 解析失败提示 */}
+                {parseError && (
+                  <Alert
+                    message={parseError}
+                    type="error"
+                    showIcon
+                    style={{ marginBottom: '8px', borderRadius: '6px', fontSize: '12px' }}
+                  />
+                )}
+
+                {showPreview && parseResult && (
                   <div style={styles.previewCard}>
                     <div style={styles.previewTitle}>
                       <ThunderboltOutlined />
-                      将创建 {previewPorts.length} 个端口
+                      将创建 {parseResult.portCount} 个端口
                     </div>
                     <div style={styles.previewTags}>
                       {previewPorts.map((port, index) => (
@@ -501,15 +761,14 @@ function PortCreateModal({
                           {port}
                         </Tag>
                       ))}
-                      {parsePortRange(form.getFieldValue('portName'))?.portCount >
-                        previewPorts.length && (
+                      {parseResult.portCount > previewPorts.length && (
                         <Tag
                           style={{
                             ...styles.previewTag,
                             background: designTokens.colors.neutral[100],
                           }}
                         >
-                          ...等 {parsePortRange(form.getFieldValue('portName'))?.portCount} 个
+                          ...等 {parseResult.portCount} 个
                         </Tag>
                       )}
                     </div>

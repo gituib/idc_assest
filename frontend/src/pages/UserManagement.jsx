@@ -48,11 +48,6 @@ const UserManagement = () => {
   const [passwordForm] = Form.useForm();
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    fetchUsers();
-    fetchRoles();
-  }, [pagination.current]);
-
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -87,6 +82,16 @@ const UserManagement = () => {
       console.error('获取角色列表失败:', error);
       message.error('获取角色列表失败，请检查网络连接');
     }
+  }, []);
+
+  // 分页或 Tab 切换时刷新用户列表（依赖 fetchUsers，由其内部 useCallback 依赖自动驱动）
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // 角色列表仅在挂载时拉取一次，避免重复请求
+  useEffect(() => {
+    fetchRoles();
   }, []);
 
   const handleAdd = useCallback(() => {

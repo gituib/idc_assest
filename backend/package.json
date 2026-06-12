@@ -18,6 +18,7 @@
     "test:operation-logs": "jest tests/operationLog.model.test.js tests/operationLogger.test.js tests/operationLogs.api.test.js --runInBand"
   },
   "dependencies": {
+    "all": "^0.0.0",
     "axios": "^1.13.6",
     "basic-ftp": "^5.0.3",
     "bcryptjs": "^3.0.3",
@@ -54,7 +55,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.0",
     "jest": "^29.7.0",
-    "nodemon": "^3.0.1",
+    "nodemon": "^3.1.14",
     "prettier": "^3.8.1",
     "supertest": "^7.1.4"
   }

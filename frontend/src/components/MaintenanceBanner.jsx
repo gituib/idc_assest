@@ -24,8 +24,14 @@ function MaintenanceBanner() {
       return;
     }
 
-    setReason(maintenanceData.reason || '系统维护中');
-    setStartTime(maintenanceData.startTime);
+    // 支持布尔值（从503拦截器）或对象（从其他来源）
+    if (typeof maintenanceData === 'boolean' && maintenanceData) {
+      setReason('系统维护中，仅管理员可访问');
+      setStartTime(new Date().toISOString());
+    } else if (typeof maintenanceData === 'object') {
+      setReason(maintenanceData.reason || '系统维护中');
+      setStartTime(maintenanceData.startTime);
+    }
     setVisible(true);
   };
 

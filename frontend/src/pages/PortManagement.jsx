@@ -27,6 +27,7 @@ import {
   Typography,
   Divider,
   Pagination,
+  Segmented,
 } from 'antd';
 import {
   PlusOutlined,
@@ -142,6 +143,11 @@ function PortManagement() {
   const [selectDeviceModalVisible, setSelectDeviceModalVisible] = useState(false);
   const [selectedDeviceForPort, setSelectedDeviceForPort] = useState(null);
   const [nicList, setNicList] = useState([]);
+  const [portMode, setPortMode] = useState('quick'); // 'range' | 'quick'
+  const [parseError, setParseError] = useState(null);
+  const [parseResult, setParseResult] = useState(null);
+  const [previewPorts, setPreviewPorts] = useState([]);
+  const [showPreview, setShowPreview] = useState(false);
 
   // 批量选择相关状态
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
@@ -623,18 +629,153 @@ function PortManagement() {
     });
   };
 
-  const parsePortRange = portName => {
-    const rangeMatch = portName.match(/^(.*?)\/(\d+)-\1\/(\d+)$/);
-    if (rangeMatch) {
-      const prefix = rangeMatch[1];
-      const start = parseInt(rangeMatch[2]);
-      const end = parseInt(rangeMatch[3]);
+  /**
+   * 从端口名中提取前缀和末尾数字
+   * @param {string} portName - 端口名称
+   * @returns {{ prefix: string, num: number } | null}
+   */
+  const extractPrefixAndNum = portName => {
+    if (!portName || typeof portName !== 'string') return null;
+    const match = portName.match(/^(.*?)(\d+)$/);
+    if (!match) return null;
+    return { prefix: match[1], num: parseInt(match[2], 10) };
+  };
 
-      if (start <= end && end - start < 100) {
-        return Array.from({ length: end - start + 1 }, (_, i) => `${prefix}/${start + i}`);
-      }
+  /**
+   * 快捷模式解析端口范围
+   * @param {string} portName - 端口范围字符串
+   * @returns {{ isRange: boolean, ports: string[], portCount: number, error?: string } | null}
+   */
+  const parsePortRangeQuick = portName => {
+    if (!portName || typeof portName !== 'string') return null;
+    const trimmed = portName.trim();
+    if (!trimmed.includes('-')) return null;
+
+    const lastDashIdx = trimmed.lastIndexOf('-');
+    const startPart = trimmed.substring(0, lastDashIdx).trim();
+    const endPart = trimmed.substring(lastDashIdx + 1).trim();
+
+    if (!startPart || !endPart) {
+      return { isRange: false, ports: [], portCount: 0, error: '格式不完整，- 前后都需要有内容' };
     }
-    return [portName];
+
+    const startParsed = extractPrefixAndNum(startPart);
+    const endParsed = extractPrefixAndNum(endPart);
+
+    if (!startParsed) {
+      return { isRange: false, ports: [], portCount: 0, error: `起始端口名 "${startPart}" 末尾无数字` };
+    }
+    if (!endParsed) {
+      return { isRange: false, ports: [], portCount: 0, error: `结束端口名 "${endPart}" 末尾无数字` };
+    }
+
+    let prefix;
+    if (endParsed.prefix === '') {
+      prefix = startParsed.prefix;
+    } else {
+      if (startParsed.prefix !== endParsed.prefix) {
+        return { isRange: false, ports: [], portCount: 0, error: `前后端口名前缀不一致："${startParsed.prefix}" vs "${endParsed.prefix}"` };
+      }
+      prefix = startParsed.prefix;
+    }
+
+    if (startParsed.num >= endParsed.num) {
+      return { isRange: false, ports: [], portCount: 0, error: `起始数字 ${startParsed.num} 必须小于结束数字 ${endParsed.num}` };
+    }
+    if (endParsed.num - startParsed.num > 1000) {
+      return { isRange: false, ports: [], portCount: 0, error: '单次最多创建1000个端口' };
+    }
+
+    const portCount = endParsed.num - startParsed.num + 1;
+    const ports = [];
+    for (let i = 0; i < portCount; i++) {
+      ports.push(`${prefix}${startParsed.num + i}`);
+    }
+    return { isRange: true, ports, portCount };
+  };
+
+  /**
+   * 范围模式解析（双输入框）
+   * @param {string} startPortName - 起始端口名
+   * @param {string} endPortName - 结束端口名
+   * @returns {{ isRange: boolean, ports: string[], portCount: number, error?: string }}
+   */
+  const parsePortRangeMode = (startPortName, endPortName) => {
+    if (!startPortName || !endPortName) {
+      return { isRange: false, ports: [], portCount: 0, error: '请填写起始和结束端口名' };
+    }
+
+    const startParsed = extractPrefixAndNum(startPortName.trim());
+    const endParsed = extractPrefixAndNum(endPortName.trim());
+
+    if (!startParsed) {
+      return { isRange: false, ports: [], portCount: 0, error: `起始端口名 "${startPortName}" 末尾无数字` };
+    }
+    if (!endParsed) {
+      return { isRange: false, ports: [], portCount: 0, error: `结束端口名 "${endPortName}" 末尾无数字` };
+    }
+    if (startParsed.prefix !== endParsed.prefix) {
+      return { isRange: false, ports: [], portCount: 0, error: `前后端口名前缀不一致："${startParsed.prefix || '(空)'}" vs "${endParsed.prefix || '(空)'}"` };
+    }
+    if (startParsed.num >= endParsed.num) {
+      return { isRange: false, ports: [], portCount: 0, error: `起始数字 ${startParsed.num} 必须小于结束数字 ${endParsed.num}` };
+    }
+    if (endParsed.num - startParsed.num > 1000) {
+      return { isRange: false, ports: [], portCount: 0, error: '单次最多创建1000个端口' };
+    }
+
+    const portCount = endParsed.num - startParsed.num + 1;
+    const ports = [];
+    for (let i = 0; i < portCount; i++) {
+      ports.push(`${startParsed.prefix}${startParsed.num + i}`);
+    }
+    return { isRange: true, ports, portCount };
+  };
+
+  /**
+   * 根据模式生成端口名列表
+   * @param {string} mode - 'range' 或 'quick'
+   * @param {object} params - { portName } 或 { startPortName, endPortName }
+   * @returns {{ ports: string[], error: string | null, parseResult: object | null }}
+   */
+  const generatePortNames = (mode, params) => {
+    if (mode === 'range') {
+      const { startPortName, endPortName } = params;
+      if (!startPortName && !endPortName) return { ports: [], error: null, parseResult: null };
+      if (!startPortName || !endPortName) return { ports: [], error: null, parseResult: null };
+      const result = parsePortRangeMode(startPortName, endPortName);
+      if (result.isRange) return { ports: result.ports, error: null, parseResult: result };
+      return { ports: [], error: result.error, parseResult: result };
+    }
+
+    const { portName } = params;
+    if (!portName) return { ports: [], error: null, parseResult: null };
+    // 快捷模式（仅单端口，不支持范围）
+    return { ports: [portName.trim()], error: null, parseResult: null };
+  };
+
+  /** 更新端口预览 */
+  const updatePortPreview = (mode, params) => {
+    const result = generatePortNames(mode, params);
+    setParseError(result.error);
+    setParseResult(result.parseResult);
+    if (result.ports.length > 1) {
+      setPreviewPorts(result.ports.slice(0, 20));
+      setShowPreview(true);
+    } else {
+      setPreviewPorts([]);
+      setShowPreview(false);
+    }
+  };
+
+  /** 模式切换 */
+  const handleModeChange = newMode => {
+    setPortMode(newMode);
+    setParseError(null);
+    setParseResult(null);
+    setPreviewPorts([]);
+    setShowPreview(false);
+    form.setFieldsValue({ portName: undefined, startPortName: undefined, endPortName: undefined });
   };
 
   const generateUniquePortId = () => {
@@ -652,7 +793,22 @@ function PortManagement() {
           icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
         });
       } else {
-        const portNames = parsePortRange(values.portName);
+        // 根据模式获取端口名列表
+        const genResult = portMode === 'range'
+          ? generatePortNames('range', { startPortName: values.startPortName, endPortName: values.endPortName })
+          : generatePortNames('quick', { portName: values.portName });
+
+        if (genResult.error) {
+          message.error(genResult.error);
+          return;
+        }
+
+        const portNames = genResult.ports;
+        if (!portNames || portNames.length === 0) {
+          message.error('请输入端口名称');
+          return;
+        }
+
         const targetDeviceId = selectedDeviceForPort
           ? selectedDeviceForPort.deviceId
           : values.deviceId;
@@ -701,6 +857,10 @@ function PortManagement() {
       setModalVisible(false);
       form.resetFields();
       setSelectedDeviceForPort(null);
+      setParseError(null);
+      setParseResult(null);
+      setPreviewPorts([]);
+      setShowPreview(false);
       fetchPorts(1, false);
     } catch (error) {
       message.error(error.response?.data?.error || editingPort ? '更新失败' : '创建失败');
@@ -2037,9 +2197,13 @@ function PortManagement() {
           setModalVisible(false);
           form.resetFields();
           setSelectedDeviceForPort(null);
+          setParseError(null);
+          setParseResult(null);
+          setPreviewPorts([]);
+          setShowPreview(false);
         }}
         footer={null}
-        width={600}
+        width={860}
         zIndex={1050}
         style={{ borderRadius: '16px' }}
         styles={{ body: { padding: 0 } }}
@@ -2167,16 +2331,33 @@ function PortManagement() {
           </div>
 
           <Form form={form} layout="vertical">
+            {/* 格式说明 - 顶部 */}
             <Alert
               message="格式说明"
               description={
                 <div style={{ fontSize: '12px', lineHeight: '1.8' }}>
-                  <div>
-                    • <strong>单个端口：</strong>eth0/1、gigabitethernet1/0/1
-                  </div>
-                  <div>
-                    • <strong>端口范围：</strong>1/0/1-1/0/48（创建 1/0/1 到 1/0/48 共48个端口）
-                  </div>
+                  {portMode === 'range' ? (
+                    <>
+                      <div>
+                        • <strong>范围模式：</strong>分别输入起始和结束端口名，系统自动生成端口序列
+                      </div>
+                      <div>
+                        • <strong>规则：</strong>起始和结束端口名的前缀必须一致，且起始数字需小于结束数字
+                      </div>
+                      <div>
+                        • <strong>示例：</strong>起始 1/0/1，结束 1/0/48 → 创建 1/0/1 至 1/0/48 共 48 个端口
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        • <strong>单端口模式：</strong>每次创建一个端口，如需批量创建请切换至范围模式
+                      </div>
+                      <div>
+                        • <strong>示例：</strong>eth0/1、GigabitEthernet0/0/1、1/0/24
+                      </div>
+                    </>
+                  )}
                 </div>
               }
               type="info"
@@ -2189,347 +2370,505 @@ function PortManagement() {
               }}
             />
 
-            <div
-              style={{
-                background: designTokens.colors.neutral[50],
-                borderRadius: '12px',
-                padding: '20px',
-                marginBottom: '16px',
-                border: `1px solid ${designTokens.colors.neutral[200]}`,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  color: designTokens.colors.neutral[800],
-                  marginBottom: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <TagOutlined style={{ color: designTokens.colors.primary.main }} />
-                端口标识
-              </div>
-
-              {selectedDeviceForPort ? (
-                <>
-                  <Form.Item
-                    label={<span style={{ fontSize: '13px', fontWeight: 500 }}>设备</span>}
-                  >
-                    <Input
-                      value={selectedDeviceForPort.name}
-                      disabled
-                      addonAfter={
-                        <span
-                          style={{
-                            color: isServerDevice(selectedDeviceForPort)
-                              ? designTokens.colors.warning.main
-                              : designTokens.colors.success.main,
-                          }}
-                        >
-                          {isServerDevice(selectedDeviceForPort)
-                            ? '服务器'
-                            : isSwitchDevice(selectedDeviceForPort)
-                              ? '交换机'
-                              : '设备'}
-                        </span>
-                      }
-                      style={{ borderRadius: '8px' }}
-                    />
-                  </Form.Item>
-
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: isServerDevice(selectedDeviceForPort)
-                        ? '1fr 1fr'
-                        : '1fr',
-                      gap: '16px',
-                    }}
-                  >
-                    {isServerDevice(selectedDeviceForPort) && (
-                      <Form.Item
-                        name="nicId"
-                        label={<span style={{ fontSize: '13px', fontWeight: 500 }}>所属网卡</span>}
-                        rules={[{ required: true, message: '请选择网卡' }]}
-                      >
-                        <Select
-                          placeholder="请选择网卡"
-                          size="large"
-                          style={{ borderRadius: '8px' }}
-                        >
-                          {nicList.map(nic => (
-                            <Option key={nic.nicId} value={nic.nicId}>
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  padding: '4px 0',
-                                }}
-                              >
-                                <div>
-                                  <div style={{ fontWeight: 500 }}>{nic.name}</div>
-                                  {nic.speed && (
-                                    <div
-                                      style={{
-                                        fontSize: '12px',
-                                        color: designTokens.colors.neutral[500],
-                                      }}
-                                    >
-                                      {nic.speed}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </Option>
-                          ))}
-                        </Select>
-                      </Form.Item>
-                    )}
-
-                    <Form.Item
-                      name="portName"
-                      label={<span style={{ fontSize: '13px', fontWeight: 500 }}>端口名称</span>}
-                      rules={[{ required: true, message: '请输入端口名称' }]}
-                    >
-                      <Input
-                        placeholder="例如: eth0/1 或 1/0/1-1/0/48"
-                        size="large"
-                        prefix={<TagOutlined style={{ color: designTokens.colors.neutral[400] }} />}
-                        suffix={
-                          <Tooltip title="支持批量添加，例如: 1/0/1-1/0/48 将创建 48 个端口">
-                            <InfoCircleOutlined
-                              style={{ color: designTokens.colors.neutral[400] }}
-                            />
-                          </Tooltip>
-                        }
-                        style={{ borderRadius: '8px' }}
-                      />
-                    </Form.Item>
-                  </div>
-                </>
-              ) : (
-                <Form.Item
-                  name="deviceId"
-                  label={<span style={{ fontSize: '13px', fontWeight: 500 }}>设备</span>}
-                  rules={[{ required: true, message: '请选择设备' }]}
-                >
-                  <Select
-                    placeholder="输入关键词搜索设备"
-                    showSearch
-                    loading={deviceSearching}
-                    filterOption={false}
-                    onSearch={handleDeviceSearch}
-                    onDropdownVisibleChange={open => {
-                      if (open && devices.length === 0) {
-                        fetchDevices();
-                      }
-                    }}
-                    disabled={!!editingPort}
-                    size="large"
-                    style={{ borderRadius: '8px' }}
-                  >
-                    {devices.map(device => (
-                      <Option key={device.deviceId} value={device.deviceId}>
-                        {device.name} ({device.deviceId})
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              )}
-            </div>
-
-            <div
-              style={{
-                background: designTokens.colors.neutral[50],
-                borderRadius: '12px',
-                padding: '20px',
-                marginBottom: '16px',
-                border: `1px solid ${designTokens.colors.neutral[200]}`,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  color: designTokens.colors.neutral[800],
-                  marginBottom: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <ThunderboltOutlined style={{ color: designTokens.colors.primary.main }} />
-                端口属性
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <Form.Item
-                  name="portType"
-                  label={<span style={{ fontSize: '13px', fontWeight: 500 }}>端口类型</span>}
-                  rules={[{ required: true, message: '请选择端口类型' }]}
-                  initialValue="RJ45"
-                >
-                  <Select size="large" style={{ borderRadius: '8px' }}>
-                    <Option value="RJ45">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div
-                          style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '2px',
-                            background: designTokens.colors.device.server,
-                          }}
-                        />
-                        RJ45
-                      </div>
-                    </Option>
-                    <Option value="SFP">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div
-                          style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '2px',
-                            background: designTokens.colors.device.switch,
-                          }}
-                        />
-                        SFP
-                      </div>
-                    </Option>
-                    <Option value="SFP+">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div
-                          style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '2px',
-                            background: designTokens.colors.purple.main,
-                          }}
-                        />
-                        SFP+
-                      </div>
-                    </Option>
-                    <Option value="SFP28">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div
-                          style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '2px',
-                            background: designTokens.colors.info.main,
-                          }}
-                        />
-                        SFP28
-                      </div>
-                    </Option>
-                    <Option value="QSFP">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div
-                          style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '2px',
-                            background: designTokens.colors.warning.main,
-                          }}
-                        />
-                        QSFP
-                      </div>
-                    </Option>
-                    <Option value="QSFP28">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div
-                          style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '2px',
-                            background: designTokens.colors.secondary.main,
-                          }}
-                        />
-                        QSFP28
-                      </div>
-                    </Option>
-                  </Select>
-                </Form.Item>
-
-                <Form.Item
-                  name="vlanId"
-                  label={<span style={{ fontSize: '13px', fontWeight: 500 }}>VLAN ID</span>}
-                >
-                  <InputNumber
-                    placeholder="1-4094"
-                    min={1}
-                    max={4094}
-                    size="large"
-                    style={{ width: '100%', borderRadius: '8px' }}
-                  />
-                </Form.Item>
-              </div>
-
-              {!editingPort && (
+            {/* 端口标识 + 端口属性 左右排列 */}
+            <Row gutter={16} style={{ marginBottom: '16px' }}>
+              {/* 左侧：端口标识 */}
+              <Col span={12}>
                 <div
                   style={{
-                    background: designTokens.colors.success.bg,
-                    border: `1px solid ${designTokens.colors.success.light}`,
-                    borderRadius: '8px',
-                    padding: '12px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
+                    background: designTokens.colors.neutral[50],
+                    borderRadius: '12px',
+                    padding: '16px',
+                    height: '100%',
+                    border: `1px solid ${designTokens.colors.neutral[200]}`,
                   }}
                 >
-                  <CheckCircleOutlined
-                    style={{ color: designTokens.colors.success.main, fontSize: '18px' }}
-                  />
-                  <div>
-                    <div
-                      style={{
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        color: designTokens.colors.success.dark,
-                      }}
-                    >
-                      新建端口默认状态为空闲
-                    </div>
-                    <div style={{ fontSize: '12px', color: designTokens.colors.success.main }}>
-                      接线后状态将自动更新为占用
-                    </div>
+                  <div
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: designTokens.colors.neutral[800],
+                      marginBottom: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <TagOutlined style={{ color: designTokens.colors.primary.main }} />
+                    端口标识
+                    {!editingPort && (
+                      <div style={{ marginLeft: 'auto' }}>
+                        <Segmented
+                          size="small"
+                          value={portMode}
+                          onChange={handleModeChange}
+                          options={[
+                            { label: '单端口', value: 'quick' },
+                            { label: '范围模式', value: 'range' },
+                          ]}
+                        />
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
 
-              {editingPort && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  {selectedDeviceForPort ? (
+                    <>
+                      <Form.Item
+                        label={<span style={{ fontSize: '13px', fontWeight: 500 }}>设备</span>}
+                        style={{ marginBottom: '12px' }}
+                      >
+                        <Input
+                          value={selectedDeviceForPort.name}
+                          disabled
+                          addonAfter={
+                            <span
+                              style={{
+                                color: isServerDevice(selectedDeviceForPort)
+                                  ? designTokens.colors.warning.main
+                                  : designTokens.colors.success.main,
+                              }}
+                            >
+                              {isServerDevice(selectedDeviceForPort)
+                                ? '服务器'
+                                : isSwitchDevice(selectedDeviceForPort)
+                                  ? '交换机'
+                                  : '设备'}
+                            </span>
+                          }
+                          style={{ borderRadius: '8px' }}
+                        />
+                      </Form.Item>
+
+                      {isServerDevice(selectedDeviceForPort) && (
+                        <Form.Item
+                          name="nicId"
+                          label={<span style={{ fontSize: '13px', fontWeight: 500 }}>所属网卡</span>}
+                          rules={[{ required: true, message: '请选择网卡' }]}
+                          style={{ marginBottom: '12px' }}
+                        >
+                          <Select
+                            placeholder="请选择网卡"
+                            size="large"
+                            style={{ borderRadius: '8px' }}
+                          >
+                            {nicList.map(nic => (
+                              <Option key={nic.nicId} value={nic.nicId}>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '4px 0',
+                                  }}
+                                >
+                                  <div>
+                                    <div style={{ fontWeight: 500 }}>{nic.name}</div>
+                                    {nic.speed && (
+                                      <div
+                                        style={{
+                                          fontSize: '12px',
+                                          color: designTokens.colors.neutral[500],
+                                        }}
+                                      >
+                                        {nic.speed}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </Option>
+                            ))}
+                          </Select>
+                        </Form.Item>
+                      )}
+
+                      {editingPort ? (
+                        <Form.Item
+                          name="portName"
+                          label={<span style={{ fontSize: '13px', fontWeight: 500 }}>端口名称</span>}
+                          rules={[{ required: true, message: '请输入端口名称' }]}
+                          style={{ marginBottom: '0' }}
+                        >
+                          <Input
+                            placeholder="例如: eth0/1"
+                            size="large"
+                            prefix={<TagOutlined style={{ color: designTokens.colors.neutral[400] }} />}
+                            style={{ borderRadius: '8px' }}
+                          />
+                        </Form.Item>
+                      ) : portMode === 'range' ? (
+                        <>
+                          <Form.Item
+                            name="startPortName"
+                            label={<span style={{ fontSize: '13px', fontWeight: 500 }}>起始端口名</span>}
+                            rules={[{ required: true, message: '请输入起始端口名' }]}
+                            style={{ marginBottom: '12px' }}
+                          >
+                            <Input
+                              placeholder="例如: 1/0/1"
+                              size="large"
+                              prefix={<TagOutlined style={{ color: designTokens.colors.neutral[400] }} />}
+                              style={{ borderRadius: '8px' }}
+                              onChange={() => {
+                                const startPortName = form.getFieldValue('startPortName');
+                                const endPortName = form.getFieldValue('endPortName');
+                                updatePortPreview('range', { startPortName, endPortName });
+                              }}
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            name="endPortName"
+                            label={<span style={{ fontSize: '13px', fontWeight: 500 }}>结束端口名</span>}
+                            rules={[{ required: true, message: '请输入结束端口名' }]}
+                            style={{ marginBottom: '0' }}
+                          >
+                            <Input
+                              placeholder="例如: 1/0/48"
+                              size="large"
+                              prefix={<TagOutlined style={{ color: designTokens.colors.neutral[400] }} />}
+                              style={{ borderRadius: '8px' }}
+                              onChange={() => {
+                                const startPortName = form.getFieldValue('startPortName');
+                                const endPortName = form.getFieldValue('endPortName');
+                                updatePortPreview('range', { startPortName, endPortName });
+                              }}
+                            />
+                          </Form.Item>
+                        </>
+                      ) : (
+                        <Form.Item
+                          name="portName"
+                          label={<span style={{ fontSize: '13px', fontWeight: 500 }}>端口名称</span>}
+                          rules={[{ required: true, message: '请输入端口名称' }]}
+                          style={{ marginBottom: '0' }}
+                        >
+                          <Input
+                            placeholder="例如: eth0/1 或 1/0/24"
+                            size="large"
+                            prefix={<TagOutlined style={{ color: designTokens.colors.neutral[400] }} />}
+                            suffix={
+                              <Tooltip title="输入单个端口名称，批量创建请切换至范围模式">
+                                <InfoCircleOutlined
+                                  style={{ color: designTokens.colors.neutral[400] }}
+                                />
+                              </Tooltip>
+                            }
+                            style={{ borderRadius: '8px' }}
+                            onChange={e => updatePortPreview('quick', { portName: e.target.value })}
+                          />
+                        </Form.Item>
+                      )}
+
+                      {/* 解析失败提示 */}
+                      {parseError && !editingPort && (
+                        <Alert
+                          message={parseError}
+                          type="error"
+                          showIcon
+                          style={{ marginTop: '8px', borderRadius: '6px', fontSize: '12px' }}
+                        />
+                      )}
+
+                      {/* 端口预览 */}
+                      {showPreview && parseResult && !editingPort && (
+                        <div
+                          style={{
+                            background: `linear-gradient(135deg, ${designTokens.colors.info.bg} 0%, ${designTokens.colors.primary.bg} 100%)`,
+                            borderRadius: '10px',
+                            padding: '12px',
+                            marginTop: '8px',
+                            border: `1px solid ${designTokens.colors.primary.light}20`,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: designTokens.colors.primary.dark,
+                              marginBottom: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            <ThunderboltOutlined />
+                            将创建 {parseResult.portCount} 个端口
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {previewPorts.map((port, index) => (
+                              <Tag
+                                key={index}
+                                style={{
+                                  background: '#fff',
+                                  border: `1px solid ${designTokens.colors.primary.light}`,
+                                  color: designTokens.colors.primary.main,
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 500,
+                                  padding: '2px 6px',
+                                }}
+                              >
+                                {port}
+                              </Tag>
+                            ))}
+                            {parseResult.portCount > previewPorts.length && (
+                              <Tag
+                                style={{
+                                  background: designTokens.colors.neutral[100],
+                                  border: `1px solid ${designTokens.colors.neutral[300]}`,
+                                  color: designTokens.colors.neutral[600],
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  padding: '2px 6px',
+                                }}
+                              >
+                                ...等 {parseResult.portCount} 个
+                              </Tag>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <Form.Item
+                      name="deviceId"
+                      label={<span style={{ fontSize: '13px', fontWeight: 500 }}>设备</span>}
+                      rules={[{ required: true, message: '请选择设备' }]}
+                      style={{ marginBottom: '0' }}
+                    >
+                      <Select
+                        placeholder="输入关键词搜索设备"
+                        showSearch
+                        loading={deviceSearching}
+                        filterOption={false}
+                        onSearch={handleDeviceSearch}
+                        onDropdownVisibleChange={open => {
+                          if (open && devices.length === 0) {
+                            fetchDevices();
+                          }
+                        }}
+                        disabled={!!editingPort}
+                        size="large"
+                        style={{ borderRadius: '8px' }}
+                      >
+                        {devices.map(device => (
+                          <Option key={device.deviceId} value={device.deviceId}>
+                            {device.name} ({device.deviceId})
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  )}
+                </div>
+              </Col>
+
+              {/* 右侧：端口属性 */}
+              <Col span={12}>
+                <div
+                  style={{
+                    background: designTokens.colors.neutral[50],
+                    borderRadius: '12px',
+                    padding: '16px',
+                    height: '100%',
+                    border: `1px solid ${designTokens.colors.neutral[200]}`,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: designTokens.colors.neutral[800],
+                      marginBottom: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <ThunderboltOutlined style={{ color: designTokens.colors.primary.main }} />
+                    端口属性
+                  </div>
+
                   <Form.Item
-                    name="status"
-                    label={<span style={{ fontSize: '13px', fontWeight: 500 }}>状态</span>}
-                    rules={[{ required: true, message: '请选择状态' }]}
+                    name="portType"
+                    label={<span style={{ fontSize: '13px', fontWeight: 500 }}>端口类型</span>}
+                    rules={[{ required: true, message: '请选择端口类型' }]}
+                    initialValue="RJ45"
+                    style={{ marginBottom: '12px' }}
                   >
                     <Select size="large" style={{ borderRadius: '8px' }}>
-                      <Option value="free">
-                        <Tag color="success">空闲</Tag>
+                      <Option value="RJ45">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '2px',
+                              background: designTokens.colors.device.server,
+                            }}
+                          />
+                          RJ45
+                        </div>
                       </Option>
-                      <Option value="occupied">
-                        <Tag color="warning">占用</Tag>
+                      <Option value="SFP">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '2px',
+                              background: designTokens.colors.device.switch,
+                            }}
+                          />
+                          SFP
+                        </div>
                       </Option>
-                      <Option value="fault">
-                        <Tag color="error">故障</Tag>
+                      <Option value="SFP+">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '2px',
+                              background: designTokens.colors.purple.main,
+                            }}
+                          />
+                          SFP+
+                        </div>
+                      </Option>
+                      <Option value="SFP28">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '2px',
+                              background: designTokens.colors.info.main,
+                            }}
+                          />
+                          SFP28
+                        </div>
+                      </Option>
+                      <Option value="QSFP">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '2px',
+                              background: designTokens.colors.warning.main,
+                            }}
+                          />
+                          QSFP
+                        </div>
+                      </Option>
+                      <Option value="QSFP28">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '2px',
+                              background: designTokens.colors.secondary.main,
+                            }}
+                          />
+                          QSFP28
+                        </div>
                       </Option>
                     </Select>
                   </Form.Item>
-                </div>
-              )}
-            </div>
 
+                  <Form.Item
+                    name="portSpeed"
+                    label={<span style={{ fontSize: '13px', fontWeight: 500 }}>端口速率</span>}
+                    initialValue="1G"
+                    style={{ marginBottom: '12px' }}
+                  >
+                    <Select size="large" style={{ borderRadius: '8px' }}>
+                      <Option value="100M">100M</Option>
+                      <Option value="1G">1G</Option>
+                      <Option value="10G">10G</Option>
+                      <Option value="25G">25G</Option>
+                      <Option value="40G">40G</Option>
+                      <Option value="100G">100G</Option>
+                    </Select>
+                  </Form.Item>
+
+                  <Form.Item
+                    name="vlanId"
+                    label={<span style={{ fontSize: '13px', fontWeight: 500 }}>VLAN ID</span>}
+                    style={{ marginBottom: '0' }}
+                  >
+                    <InputNumber
+                      placeholder="1-4094"
+                      min={1}
+                      max={4094}
+                      size="large"
+                      style={{ width: '100%', borderRadius: '8px' }}
+                    />
+                  </Form.Item>
+
+                  {editingPort && (
+                    <Form.Item
+                      name="status"
+                      label={<span style={{ fontSize: '13px', fontWeight: 500 }}>状态</span>}
+                      rules={[{ required: true, message: '请选择状态' }]}
+                      style={{ marginTop: '12px', marginBottom: '0' }}
+                    >
+                      <Select size="large" style={{ borderRadius: '8px' }}>
+                        <Option value="free">
+                          <Tag color="success">空闲</Tag>
+                        </Option>
+                        <Option value="occupied">
+                          <Tag color="warning">占用</Tag>
+                        </Option>
+                        <Option value="fault">
+                          <Tag color="error">故障</Tag>
+                        </Option>
+                      </Select>
+                    </Form.Item>
+                  )}
+
+                  {!editingPort && (
+                    <div
+                      style={{
+                        background: designTokens.colors.success.bg,
+                        border: `1px solid ${designTokens.colors.success.light}`,
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        marginTop: '12px',
+                      }}
+                    >
+                      <CheckCircleOutlined
+                        style={{ color: designTokens.colors.success.main, fontSize: '16px' }}
+                      />
+                      <div>
+                        <div
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: 500,
+                            color: designTokens.colors.success.dark,
+                          }}
+                        >
+                          新建端口默认状态为空闲
+                        </div>
+                        <div style={{ fontSize: '11px', color: designTokens.colors.success.main }}>
+                          接线后状态将自动更新为占用
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Col>
+            </Row>
+
+            {/* 描述信息 - 底部 */}
             <div
               style={{
                 background: designTokens.colors.neutral[50],
                 borderRadius: '12px',
-                padding: '20px',
-                marginBottom: '16px',
+                padding: '16px',
                 border: `1px solid ${designTokens.colors.neutral[200]}`,
               }}
             >
@@ -2538,7 +2877,7 @@ function PortManagement() {
                   fontSize: '14px',
                   fontWeight: 600,
                   color: designTokens.colors.neutral[800],
-                  marginBottom: '16px',
+                  marginBottom: '12px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
@@ -2549,7 +2888,7 @@ function PortManagement() {
               </div>
               <Form.Item name="description" style={{ marginBottom: 0 }}>
                 <TextArea
-                  rows={3}
+                  rows={2}
                   placeholder="请输入描述信息（可选）"
                   style={{ borderRadius: '8px', resize: 'none' }}
                 />
@@ -2579,6 +2918,10 @@ function PortManagement() {
                 setModalVisible(false);
                 form.resetFields();
                 setSelectedDeviceForPort(null);
+                setParseError(null);
+                setParseResult(null);
+                setPreviewPorts([]);
+                setShowPreview(false);
               }}
               style={{ borderRadius: '8px', minWidth: '80px' }}
             >

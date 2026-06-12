@@ -4,7 +4,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const { Op } = require('sequelize');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, clearMaintenanceCache } = require('../middleware/auth');
 
 // 读取 package.json 获取版本号
 const packageJsonPath = path.join(__dirname, '../../package.json');
@@ -28,7 +28,7 @@ const { FRONTEND } = require('../config');
 // 初始化默认系统设置
 const initDefaultSettings = async () => {
   const defaultSettings = [
-    // 全局配置
+    // 基本设置 - 站点信息
     {
       settingKey: 'site_name',
       settingValue: JSON.stringify('机柜管理系统'),
@@ -45,30 +45,8 @@ const initDefaultSettings = async () => {
       description: '网站Logo URL',
       isEditable: true,
     },
-    {
-      settingKey: 'timezone',
-      settingValue: JSON.stringify('Asia/Shanghai'),
-      settingType: 'string',
-      category: 'general',
-      description: '时区设置',
-      isEditable: true,
-    },
-    {
-      settingKey: 'date_format',
-      settingValue: JSON.stringify('YYYY-MM-DD'),
-      settingType: 'string',
-      category: 'general',
-      description: '日期格式',
-      isEditable: true,
-    },
-    {
-      settingKey: 'session_timeout',
-      settingValue: JSON.stringify(30),
-      settingType: 'number',
-      category: 'general',
-      description: '登录有效期(分钟)',
-      isEditable: true,
-    },
+
+    // 基本设置 - 安全设置
     {
       settingKey: 'idle_timeout',
       settingValue: JSON.stringify(30),
@@ -76,14 +54,6 @@ const initDefaultSettings = async () => {
       category: 'general',
       description: '用户空闲超时时间(分钟)',
       isEditable: true,
-    },
-    {
-      settingKey: 'idle_warning_time',
-      settingValue: JSON.stringify(60),
-      settingType: 'number',
-      category: 'general',
-      description: '空闲超时前警告时间(秒)',
-      isEditable: false,
     },
     {
       settingKey: 'max_login_attempts',
@@ -117,38 +87,6 @@ const initDefaultSettings = async () => {
       settingType: 'string',
       category: 'appearance',
       description: '主题辅助色调',
-      isEditable: true,
-    },
-    {
-      settingKey: 'compact_mode',
-      settingValue: JSON.stringify(false),
-      settingType: 'boolean',
-      category: 'appearance',
-      description: '紧凑模式',
-      isEditable: true,
-    },
-    {
-      settingKey: 'sidebar_collapsed',
-      settingValue: JSON.stringify(false),
-      settingType: 'boolean',
-      category: 'appearance',
-      description: '侧边栏默认折叠',
-      isEditable: true,
-    },
-    {
-      settingKey: 'table_row_height',
-      settingValue: JSON.stringify('default'),
-      settingType: 'string',
-      category: 'appearance',
-      description: '表格行高: small/default/middle/large',
-      isEditable: true,
-    },
-    {
-      settingKey: 'animation_enabled',
-      settingValue: JSON.stringify(true),
-      settingType: 'boolean',
-      category: 'appearance',
-      description: '启用动画效果',
       isEditable: true,
     },
 
@@ -199,22 +137,6 @@ const initDefaultSettings = async () => {
       settingType: 'string',
       category: 'about',
       description: '系统描述',
-      isEditable: true,
-    },
-    {
-      settingKey: 'privacy_policy',
-      settingValue: JSON.stringify(''),
-      settingType: 'string',
-      category: 'about',
-      description: '隐私政策URL',
-      isEditable: true,
-    },
-    {
-      settingKey: 'terms_of_service',
-      settingValue: JSON.stringify(''),
-      settingType: 'string',
-      category: 'about',
-      description: '服务条款URL',
       isEditable: true,
     },
   ];
@@ -361,6 +283,11 @@ router.put('/:key', async (req, res) => {
       settingValue: JSON.stringify(parsedValue),
     });
 
+    // 如果更新了维护模式设置，清除缓存
+    if (key === 'maintenance_mode') {
+      clearMaintenanceCache();
+    }
+
     res.json({
       message: '设置更新成功',
       setting: {
@@ -426,6 +353,11 @@ router.put('/', async (req, res) => {
       updatedSettings,
       errors: errors.length > 0 ? errors : undefined,
     });
+
+    // 如果更新了维护模式设置，清除缓存
+    if ('maintenance_mode' in settings) {
+      clearMaintenanceCache();
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -444,27 +376,16 @@ router.post('/reset/:key', async (req, res) => {
     const defaultValues = {
       site_name: '机柜管理系统',
       site_logo: '',
-      timezone: 'Asia/Shanghai',
-      date_format: 'YYYY-MM-DD',
-      session_timeout: 30,
       idle_timeout: 30,
-      idle_warning_time: 60,
       max_login_attempts: 5,
       maintenance_mode: false,
-      frontend_port: FRONTEND.DEFAULT_PORT,
       primary_color: '#667eea',
       secondary_color: '#764ba2',
-      compact_mode: false,
-      sidebar_collapsed: false,
-      table_row_height: 'default',
-      animation_enabled: true,
       company_name: '',
       contact_email: '',
       contact_phone: '',
       company_address: '',
       system_description: '机柜管理系统 - 专业的数据中心设备管理解决方案',
-      privacy_policy: '',
-      terms_of_service: '',
     };
 
     const defaultValue = defaultValues[key];
@@ -475,6 +396,11 @@ router.post('/reset/:key', async (req, res) => {
     await setting.update({
       settingValue: JSON.stringify(defaultValue),
     });
+
+    // 如果重置了维护模式设置，清除缓存
+    if (key === 'maintenance_mode') {
+      clearMaintenanceCache();
+    }
 
     res.json({
       message: '设置已重置为默认值',
