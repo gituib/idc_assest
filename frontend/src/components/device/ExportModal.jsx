@@ -13,16 +13,27 @@ const modalHeaderStyle = {
   fontWeight: 600,
 };
 
+/**
+ * 设备导出模态框
+ * @param {boolean} visible - 是否显示
+ * @param {number} selectedCount - 已选择的设备数量
+ * @param {number} currentPageCount - 当前页设备数量
+ * @param {number} totalCount - 符合筛选条件的设备总数
+ * @param {Function} onExport - 导出回调
+ * @param {Function} onCancel - 取消回调
+ */
 const ExportModal = ({
   visible,
-  selectedDevices,
-  currentPageDevices,
-  allDevices,
+  selectedCount,
+  currentPageCount,
+  totalCount,
   onExport,
   onCancel,
 }) => {
+  const hasSelection = selectedCount > 0;
   const [exportFormat, setExportFormat] = useState('csv');
-  const [exportScope, setExportScope] = useState('selected');
+  // 有选中设备时默认导出选中行，否则默认导出全部
+  const [exportScope, setExportScope] = useState(hasSelection ? 'selected' : 'all');
   const [exportLoading, setExportLoading] = useState(false);
 
   const handleExport = async () => {
@@ -41,11 +52,11 @@ const ExportModal = ({
   const getScopeLabel = () => {
     switch (exportScope) {
       case 'selected':
-        return `选择的行 (${selectedDevices.length} 个)`;
+        return `选择的行 (${selectedCount} 个)`;
       case 'currentPage':
-        return `当前页 (${currentPageDevices.length} 个)`;
+        return `当前页 (${currentPageCount} 个)`;
       case 'all':
-        return `全部设备 (${allDevices.length} 个)`;
+        return `全部设备 (${totalCount} 个)`;
       default:
         return '';
     }
@@ -114,9 +125,11 @@ const ExportModal = ({
         </Form.Item>
         <Form.Item label="导出范围">
           <Select value={exportScope} onChange={setExportScope} style={{ width: '100%' }}>
-            <Option value="selected">{getScopeLabel()}</Option>
-            <Option value="currentPage">当前页 ({currentPageDevices.length} 个)</Option>
-            <Option value="all">全部设备 ({allDevices.length} 个)</Option>
+            {hasSelection && (
+              <Option value="selected">{getScopeLabel()}</Option>
+            )}
+            <Option value="currentPage">当前页 ({currentPageCount} 个)</Option>
+            <Option value="all">全部设备 ({totalCount} 个)</Option>
           </Select>
         </Form.Item>
         <div style={{ color: '#666', fontSize: '13px' }}>

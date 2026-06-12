@@ -786,30 +786,39 @@ paths:
           description: 导入成功
 
   /api/devices/enhanced-export:
-    get:
-      summary: 增强导出设备数据
+    post:
+      summary: 增强导出设备数据（支持按筛选条件导出全部设备）
       tags: [devices]
-      parameters:
-        - name: deviceIds
-          in: query
-          schema:
-            type: string
-        - name: format
-          in: query
-          schema:
-            type: string
-            enum: [csv, json]
-            default: csv
-        - name: fields
-          in: query
-          schema:
-            type: string
-          description: JSON格式的字段列表
-        - name: fieldLabels
-          in: query
-          schema:
-            type: string
-          description: JSON格式的字段标签映射
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceIds:
+                  type: array
+                  items:
+                    type: string
+                  description: 指定导出的设备ID列表（与filters二选一）
+                format:
+                  type: string
+                  enum: [csv, json]
+                  default: csv
+                filters:
+                  type: object
+                  description: 筛选条件（导出全部设备时使用）
+                  properties:
+                    keyword:
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      type: string
+                    roomId:
+                      type: string
+                    rackId:
+                      type: string
       responses:
         '200':
           description: 导出成功

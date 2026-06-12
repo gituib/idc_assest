@@ -145,6 +145,14 @@ function DeviceManagement() {
         const { devices: deviceList, total } = response.data;
 
         const processedDevices = deviceList.map(processDeviceData);
+
+        // 当前页无数据且不是第 1 页时，回退到前一页
+        if (processedDevices.length === 0 && page > 1 && total > 0) {
+          const prevPage = Math.ceil(total / pageSize) || 1;
+          fetchDevices(prevPage, pageSize);
+          return;
+        }
+
         setAllDevices(processedDevices);
         setPagination(prev => ({ ...prev, current: page, pageSize, total }));
       } catch (error) {
@@ -266,7 +274,7 @@ function DeviceManagement() {
       }
 
       setModalVisible(false);
-      fetchDevices(1, pagination.pageSize);
+      fetchDevices(pagination.current, pagination.pageSize);
       setEditingDevice(null);
     } catch (error) {
       const errorMsg = error.response?.data?.error || error.message || '未知错误';
@@ -349,7 +357,7 @@ function DeviceManagement() {
           message.success(response.data.message || '成功删除所有设备');
           setSelectedDevices([]);
           setSelectAll(false);
-          fetchDevices(1, 50);
+          fetchDevices(1, pagination.pageSize);
         } catch (error) {
           message.error('删除所有设备失败');
           console.error('删除所有设备失败:', error);
@@ -397,7 +405,7 @@ function DeviceManagement() {
         try {
           await axios.delete(`/api/devices/${deviceId}`);
           message.success('设备删除成功');
-          fetchDevices(1, pagination.pageSize);
+          fetchDevices(pagination.current, pagination.pageSize);
         } catch (error) {
           message.error('设备删除失败');
           console.error('设备删除失败:', error);
@@ -453,33 +461,45 @@ function DeviceManagement() {
   };
 
   const showExportModal = () => {
-    if (selectedDevices.length === 0) {
-      message.warning('请先选择要导出的设备');
-      return;
-    }
     setExportModalVisible(true);
   };
 
+  /**
+   * 处理设备数据导出
+   * @param {Object} options - 导出选项
+   * @param {string} options.format - 导出格式（csv/json）
+   * @param {string} options.scope - 导出范围（selected/currentPage/all）
+   */
   const handleEnhancedExport = async ({ format, scope }) => {
-    let deviceIds = [];
+    let requestBody = { format };
+
     if (scope === 'selected') {
-      deviceIds = selectedDevices;
+      // 导出选中的设备
+      if (selectedDevices.length === 0) {
+        message.warning('没有可导出的设备');
+        return;
+      }
+      requestBody.deviceIds = selectedDevices;
     } else if (scope === 'currentPage') {
-      deviceIds = allDevices.map(device => device.deviceId);
+      // 导出当前页设备
+      const currentPageIds = allDevices.map(device => device.deviceId);
+      if (currentPageIds.length === 0) {
+        message.warning('没有可导出的设备');
+        return;
+      }
+      requestBody.deviceIds = currentPageIds;
     } else if (scope === 'all') {
-      deviceIds = allDevices.map(device => device.deviceId);
+      // 按筛选条件导出全部设备（由后端查询，不受分页限制）
+      requestBody.filters = {
+        keyword: debouncedKeyword || undefined,
+        status: status !== 'all' ? status : undefined,
+        type: type !== 'all' ? type : undefined,
+        roomId: roomId !== 'all' ? roomId : undefined,
+        rackId: rackId !== 'all' ? rackId : undefined,
+      };
     }
 
-    if (deviceIds.length === 0) {
-      message.warning('没有可导出的设备');
-      return;
-    }
-
-    const params = new URLSearchParams();
-    deviceIds.forEach(id => params.append('deviceIds', id));
-    params.append('format', format);
-
-    const response = await axios.get(`/api/devices/enhanced-export?${params.toString()}`, {
+    const response = await axios.post('/api/devices/enhanced-export', requestBody, {
       responseType: 'blob',
     });
 
@@ -494,7 +514,7 @@ function DeviceManagement() {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
 
-    message.success(`成功导出 ${deviceIds.length} 个设备`);
+    message.success('设备数据导出成功');
   };
 
   const handleImport = async (file, callbacks) => {
@@ -1294,9 +1314,9 @@ function DeviceManagement() {
 
       <ExportModal
         visible={exportModalVisible}
-        selectedDevices={selectedDevices}
-        currentPageDevices={allDevices}
-        allDevices={allDevices}
+        selectedCount={selectedDevices.length}
+        currentPageCount={allDevices.length}
+        totalCount={pagination.total}
         onExport={handleEnhancedExport}
         onCancel={() => setExportModalVisible(false)}
       />

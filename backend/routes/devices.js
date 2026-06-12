@@ -1877,9 +1877,10 @@ router.put('/batch-move', async (req, res) => {
 });
 
 // 增强导出设备数据（支持所有字段和自定义字段）
-router.get('/enhanced-export', async (req, res) => {
+// 改为 POST 请求，支持按筛选条件导出全部设备，避免 URL 长度限制
+router.post('/enhanced-export', async (req, res) => {
   try {
-    const { deviceIds, format = 'csv' } = req.query;
+    const { deviceIds, format = 'csv', filters } = req.body;
 
     // 从数据库读取所有字段配置（不过滤 visible，以导出所有信息）
     const allFields = await DeviceField.findAll({
@@ -1896,32 +1897,103 @@ router.get('/enhanced-export', async (req, res) => {
 
     // 构建查询条件
     const where = {};
-    if (deviceIds) {
-      const ids = Array.isArray(deviceIds) ? deviceIds : [deviceIds];
-      where.deviceId = { [Op.in]: ids };
+
+    // 按指定 deviceIds 导出（选择的行 / 当前页）
+    if (deviceIds && Array.isArray(deviceIds) && deviceIds.length > 0) {
+      where.deviceId = { [Op.in]: deviceIds };
+    } else if (filters) {
+      // 按筛选条件导出全部设备（复用列表查询的筛选逻辑）
+      const { keyword, status, type, rackId, roomId } = filters;
+
+      if (keyword) {
+        const escapedKeyword = keyword
+          .replace(/\\/g, '\\\\')
+          .replace(/'/g, "''")
+          .replace(/%/g, '\\%')
+          .replace(/_/g, '\\_');
+
+        const searchConditions = [
+          { deviceId: { [Op.like]: `%${escapedKeyword}%` } },
+          { name: { [Op.like]: `%${escapedKeyword}%` } },
+          { type: { [Op.like]: `%${escapedKeyword}%` } },
+          { model: { [Op.like]: `%${escapedKeyword}%` } },
+          { serialNumber: { [Op.like]: `%${escapedKeyword}%` } },
+          { ipAddress: { [Op.like]: `%${escapedKeyword}%` } },
+          { description: { [Op.like]: `%${escapedKeyword}%` } },
+        ];
+
+        // 动态获取文本类型的自定义字段
+        const customFields = await DeviceField.findAll({
+          where: {
+            isSystem: false,
+            fieldType: { [Op.in]: ['string', 'textarea'] },
+          },
+        });
+
+        if (customFields.length > 0) {
+          const jsonConditions = customFields.map(field => {
+            const safeFieldName = field.fieldName
+              .replace(/\\/g, '\\\\')
+              .replace(/"/g, '\\"')
+              .replace(/'/g, "''");
+
+            if (dbDialect === 'mysql') {
+              return sequelize.literal(
+                `JSON_UNQUOTE(JSON_EXTRACT(customFields, '$."${safeFieldName}"')) LIKE '%${escapedKeyword}%' ESCAPE '\\\\'`
+              );
+            } else {
+              return sequelize.literal(
+                `CAST(json_extract(customFields, '$.${safeFieldName}') AS TEXT) LIKE '%${escapedKeyword}%' ESCAPE '\\'`
+              );
+            }
+          });
+          searchConditions.push(...jsonConditions);
+        }
+
+        where[Op.or] = searchConditions;
+      }
+
+      if (status && status !== 'all') {
+        where.status = status;
+      }
+      if (type && type !== 'all') {
+        where.type = type;
+      }
+      if (rackId && rackId !== 'all') {
+        where.rackId = rackId;
+      }
     }
 
-    // 查询设备数据
+    // 查询设备数据（不分页，导出全部匹配结果）
+    const includeConfig = [
+      {
+        model: Rack,
+        include: [{ model: Room }],
+      },
+    ];
+
+    // 如果按筛选条件导出且有机房筛选，添加 Rack 的 where 条件
+    if (filters && filters.roomId && filters.roomId !== 'all') {
+      includeConfig[0].where = { roomId: filters.roomId };
+    }
+
     const devices = await Device.findAll({
       where,
-      include: [
-        {
-          model: Rack,
-          include: [{ model: Room }],
-        },
-      ],
+      include: includeConfig,
+      distinct: true,
     });
 
     if (devices.length === 0) {
       return res.status(404).json({ error: '未找到指定的设备' });
     }
 
-    // 状态和类型映射
+    // 状态和类型映射（补充 idle 状态）
     const statusMap = {
       running: '运行中',
       maintenance: '维护中',
       offline: '离线',
       fault: '故障',
+      idle: '空闲',
     };
     const typeMap = {
       server: '服务器',
@@ -2019,8 +2091,12 @@ router.get('/enhanced-export', async (req, res) => {
         return res.status(400).json({ error: '没有可导出的字段' });
       }
 
+      // 使用唯一文件名避免并发导出冲突
+      const exportFileName = `enhanced_export_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.csv`;
+      const exportFilePath = path.join(__dirname, '../temp', exportFileName);
+
       const csvWriter = createObjectCsvWriter({
-        path: path.join(__dirname, '../temp/enhanced_export.csv'),
+        path: exportFilePath,
         header: headers,
         encoding: 'utf8',
       });
@@ -2031,17 +2107,19 @@ router.get('/enhanced-export', async (req, res) => {
 
       await csvWriter.writeRecords(exportData);
 
-      const csvContent = fs.readFileSync(
-        path.join(__dirname, '../temp/enhanced_export.csv'),
-        'utf8'
-      );
+      const csvContent = fs.readFileSync(exportFilePath, 'utf8');
       const gbkContent = iconv.encode(csvContent, 'gbk');
 
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename=devices.csv');
       res.send(gbkContent);
 
-      fs.unlinkSync(path.join(__dirname, '../temp/enhanced_export.csv'));
+      // 清理临时文件
+      try {
+        fs.unlinkSync(exportFilePath);
+      } catch (cleanupErr) {
+        logger.warn('清理导出临时文件失败', { error: cleanupErr.message });
+      }
     } else {
       // JSON 导出
       res.setHeader('Content-Type', 'application/json');

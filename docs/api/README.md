@@ -646,17 +646,21 @@ POST /api/devices/import
 ### 增强导出设备数据
 
 ```http
-GET /api/devices/enhanced-export
+POST /api/devices/enhanced-export
 ```
 
-**查询参数：**
+**请求体参数：**
 
 | 参数名 | 类型 | 描述 |
 |--------|------|------|
-| deviceIds | string/array | 指定导出的设备ID |
-| format | string | 导出格式（csv/json） |
-| fields | string | JSON格式的字段列表 |
-| fieldLabels | string | JSON格式的字段标签映射 |
+| deviceIds | array | 指定导出的设备ID列表（与filters二选一） |
+| format | string | 导出格式（csv/json），默认csv |
+| filters | object | 筛选条件（导出全部设备时使用） |
+| filters.keyword | string | 搜索关键词 |
+| filters.status | string | 设备状态筛选 |
+| filters.type | string | 设备类型筛选 |
+| filters.roomId | string | 机房ID筛选 |
+| filters.rackId | string | 机柜ID筛选 |
 
 ### 获取设备的工单列表
 
@@ -2239,7 +2243,7 @@ GET /health
 | /api/devices/import-template | GET | 获取设备导入模板 |
 | /api/devices/export | GET | 导出设备数据 |
 | /api/devices/import | POST | 导入设备数据 |
-| /api/devices/enhanced-export | GET | 增强导出设备数据 |
+| /api/devices/enhanced-export | POST | 增强导出设备数据 |
 | /api/devices/:deviceId/tickets | GET | 获取设备的工单列表 |
 | /api/deviceFields | GET/POST | 设备字段列表/创建 |
 | /api/deviceFields/:id | PUT/DELETE | 设备字段更新/删除 |
