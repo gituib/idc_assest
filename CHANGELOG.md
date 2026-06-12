@@ -4,6 +4,23 @@
 
 ---
 
+## [2.1.0] - 2026-06-12
+
+### 新增功能
+
+#### 设备字段必填规则与可见性同步
+- 新增动态 Joi Schema 生成器（`dynamicDeviceSchema.js`），设备创建/编辑时从 `DeviceField` 表动态读取字段配置
+- 前端设备表单（`DeviceFormModal`）完全适配字段管理配置，取消 `rackId/position/height` 的硬编码排除
+- 新增字段管理页面防护，强制锁定系统核心字段（`name`/`serialNumber`/`position`/`height`）的必填和可见性开关
+- 同步前端默认常量与后端 `initDeviceFields.js` 一致（`deviceId` required 改为 `false`，`powerConsumption` required 改为 `true`）
+
+### 修复
+
+- 修复字段管理页面修改配置后，设备添加/编辑页面配置不生效的问题
+- 修复 `powerConsumption` 前后端默认值不一致的问题
+
+---
+
 ## [2.0.0] - 2026-05-06
 
 ### 新增功能
