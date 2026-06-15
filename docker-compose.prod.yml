@@ -8,8 +8,9 @@ version: '3.8'
 services:
   # ---------- 后端服务 ----------
   backend:
-    # 从镜像仓库拉取，需替换为实际的镜像名
-    image: ${BACKEND_IMAGE:-your-registry/idc-backend:latest}
+    # 从阿里云容器镜像服务（个人版）拉取
+    # 实际镜像地址: crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-backend:latest
+    image: ${BACKEND_IMAGE:-crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-backend:latest}
     container_name: idc-backend
     volumes:
       # 配置映射（核心）
@@ -37,7 +38,7 @@ services:
 
   # ---------- 前端（Nginx）服务 ----------
   frontend:
-    image: ${FRONTEND_IMAGE:-your-registry/idc-frontend:latest}
+    image: ${FRONTEND_IMAGE:-crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-frontend:latest}
     pull_policy: always
     container_name: idc-frontend
     ports:

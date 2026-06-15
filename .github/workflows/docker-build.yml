@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: registry.cn-hangzhou.aliyuncs.com
+  REGISTRY: crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com
   NAMESPACE: ${{ secrets.ALIYUN_NAMESPACE }}
   BACKEND_IMAGE: idc-backend
   FRONTEND_IMAGE: idc-frontend
