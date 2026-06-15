@@ -9,8 +9,8 @@ services:
   # ---------- 后端服务 ----------
   backend:
     # 从阿里云容器镜像服务（个人版）拉取
-    # 实际镜像地址: crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-backend:latest
-    image: ${BACKEND_IMAGE:-crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-backend:latest}
+    # 实际镜像地址: crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-backend:v2.1.0
+    image: ${BACKEND_IMAGE:-crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-backend:v2.1.0}
     container_name: idc-backend
     volumes:
       # 配置映射（核心）
