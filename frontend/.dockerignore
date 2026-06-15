@@ -1,0 +1,30 @@
+# ============================================
+# 前端 Docker 构建忽略文件
+# ============================================
+
+# 依赖
+node_modules
+
+# 构建产物（由构建阶段生成）
+dist
+
+# 本地环境
+.env
+.frontend-port
+
+# 版本控制
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# npm
+npm-debug.log*

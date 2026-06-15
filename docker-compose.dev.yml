@@ -1,0 +1,81 @@
+# ============================================
+# IDC 设备管理系统 - 开发环境配置
+# 使用 build 指令本地构建镜像
+# ============================================
+
+version: '3.8'
+
+services:
+  # ---------- 后端服务 ----------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: idc-backend-dev
+    volumes:
+      # 配置映射（核心）
+      - ./backend/.env:/app/.env
+      # 数据持久化
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+      - ./backend/backups:/app/backups
+      - ./backend/temp:/app/temp
+    env_file:
+      - ./backend/.env
+    environment:
+      - NODE_ENV=development
+      # 连接 docker-compose 内的 MySQL 时，注释掉下方 MYSQL_HOST 的注释
+      # 连接远程 MySQL 时，保持 .env 中的配置即可
+    networks:
+      - idc-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ---------- 前端（Nginx）服务 ----------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: idc-frontend-dev
+    ports:
+      - "80:80"
+    networks:
+      - idc-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ---------- MySQL 数据库 ----------
+  # 如需使用本地 MySQL 容器，取消下方注释
+  # mysql:
+  #   image: mysql:8.0
+  #   container_name: idc-mysql-dev
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+  #     MYSQL_DATABASE: idc_management
+  #     MYSQL_USER: idc_user
+  #     MYSQL_PASSWORD: ${MYSQL_PASSWORD:-idc_pass}
+  #   ports:
+  #     - "3306:3306"
+  #   networks:
+  #     - idc-network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+networks:
+  idc-network:
+    driver: bridge
+
+# volumes:
+#   mysql_data:
