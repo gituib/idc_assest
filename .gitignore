@@ -56,7 +56,8 @@ lerna-debug.log*
 # ==============================================
 # Backup files (备份文件)
 # ==============================================
-backend/backups/
+backend/backups/*
+!backend/backups/.gitkeep
 *.backup.json
 *.bak
 
