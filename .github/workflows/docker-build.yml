@@ -1,3 +1,6 @@
+# ============================================
+# 构建并推送 Docker 镜像到 GitHub Container Registry
+# ============================================
 name: Build and Push Docker Images
 
 on:
@@ -12,8 +15,8 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com
-  NAMESPACE: ${{ secrets.ALIYUN_NAMESPACE }}
+  REGISTRY: ghcr.io
+  NAMESPACE: ${{ github.repository_owner }}
   BACKEND_IMAGE: idc-backend
   FRONTEND_IMAGE: idc-frontend
 
@@ -27,12 +30,12 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 登录阿里云 Docker Registry
+      - name: 登录 GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.ALIYUN_USERNAME }}
-          password: ${{ secrets.ALIYUN_PASSWORD }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 提取版本号
         id: meta
@@ -69,12 +72,12 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 登录阿里云 Docker Registry
+      - name: 登录 GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.ALIYUN_USERNAME }}
-          password: ${{ secrets.ALIYUN_PASSWORD }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 提取版本号
         id: meta
@@ -114,8 +117,12 @@ jobs:
           echo "=== 构建结果 ==="
           echo "后端镜像: ${{ needs.build-backend.result }}"
           echo "前端镜像: ${{ needs.build-frontend.result }}"
+          echo ""
+          echo "ghcr.io 镜像地址："
+          echo "  后端: ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.BACKEND_IMAGE }}:latest"
+          echo "  前端: ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.FRONTEND_IMAGE }}:latest"
           if [[ "${{ needs.build-backend.result }}" == "success" && "${{ needs.build-frontend.result }}" == "success" ]]; then
-            echo "所有镜像构建成功"
+            echo "所有镜像构建成功，已推送到 ghcr.io"
           else
             echo "部分镜像构建失败"
             exit 1

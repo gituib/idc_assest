@@ -4,7 +4,7 @@
 >
 > 架构：3 个容器（Nginx + 前端静态文件 | Backend | MySQL）
 
----
+***
 
 ## 目录
 
@@ -18,20 +18,26 @@
 - [八、版本升级](#八版本升级)
 - [九、常见问题](#九常见问题)
 
----
+***
 
 ## 一、前置要求
 
 ### 1.1 所需条件
 
-| 条件 | 说明 |
-|------|------|
-| **服务器** | Linux 系统（推荐 Ubuntu 20.04+ / Debian 11+ / CentOS 7+） |
-| **Docker** | 20.10 及以上版本 |
-| **Docker Compose** | v2 及以上 |
-| **网络** | 服务器能访问阿里云容器镜像服务 |
+| 条件                 | 说明                                                  |
+| ------------------ | --------------------------------------------------- |
+| **服务器**            | Linux 系统（推荐 Ubuntu 20.04+ / Debian 11+ / CentOS 7+） |
+| **Docker**         | 20.10 及以上版本                                         |
+| **Docker Compose** | v2 及以上                                              |
+| **网络**             | 服务器能访问镜像仓库                                          |
 
-### 1.2 架构说明
+### 1.2 镜像仓库说明
+
+本项目使用 GitHub Container Registry 托管镜像，所有镜像均为公开（public）镜像，无需登录即可拉取。
+
+镜像地址格式：`ghcr.io/gituib/镜像名:tag`
+
+### 1.3 架构说明
 
 用户访问 `http://服务器IP` 时，请求流程如下：
 
@@ -41,7 +47,7 @@
                 └── /api 路径 → 反向代理 → Backend 容器 :8000 → MySQL 容器 :3306（或远程 MySQL）
 ```
 
----
+***
 
 ## 二、服务器准备
 
@@ -65,13 +71,14 @@ docker --version
 docker compose version
 ```
 
----
+***
 
 ## 三、创建部署目录与配置
 
 > 本部署方式**不需要 git clone** 整个项目仓库。只需在服务器上手动创建需要的配置文件和持久化目录即可。
 >
 > 需要创建的内容只有 3 个部分：
+>
 > 1. **配置文件**：`docker-compose.yml` + 项目根目录 `.env` + `backend/.env`
 > 2. **持久化目录**：`backend/uploads/`、`backend/logs/`、`backend/backups/`、`backend/temp/`
 
@@ -104,12 +111,13 @@ cat > /opt/idc_assest/docker-compose.yml << 'YAMLEOF'
 # ============================================
 # IDC 设备管理系统 - 生产环境配置
 # 从镜像仓库拉取预构建镜像，无 build 指令
+# 默认从 ghcr.io 拉取，可通过 BACKEND/FRONTEND_IMAGE 环境变量切换
 # ============================================
 
 services:
   # ---------- 后端服务 ----------
   backend:
-    image: ${BACKEND_IMAGE:-crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-backend:latest}
+    image: ${BACKEND_IMAGE:-ghcr.io/gituib/idc-backend:latest}
     container_name: idc-backend
     volumes:
       - ./backend/.env:/app/.env
@@ -133,7 +141,7 @@ services:
 
   # ---------- 前端（Nginx）服务 ----------
   frontend:
-    image: ${FRONTEND_IMAGE:-crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-frontend:latest}
+    image: ${FRONTEND_IMAGE:-ghcr.io/gituib/idc-frontend:latest}
     pull_policy: always
     container_name: idc-frontend
     ports:
@@ -173,7 +181,7 @@ volumes:
 YAMLEOF
 ```
 
-> **注意**：如果使用远程 MySQL（已有数据库），请在创建后编辑此文件，注释掉 `mysql` 服务部分。
+> **注意**：请将 `你的GitHub用户名` 替换为实际的 GitHub 用户名（此处已替换为 gituib）。如果使用远程 MySQL（已有数据库），请在创建后编辑此文件，注释掉 `mysql` 服务部分。
 
 ### 3.3 创建项目根目录 .env 文件
 
@@ -272,11 +280,11 @@ EOF
     └── temp/                  # 临时文件目录
 ```
 
----
+***
 
 ## 四、生产环境配置
 
-### 4.1 生成并配置 JWT_SECRET
+### 4.1 生成并配置 JWT\_SECRET
 
 直接在创建 `backend/.env` 时用变量注入，避免手动复制粘贴：
 
@@ -294,11 +302,11 @@ JWT_SECRET=$(openssl rand -base64 64)
 
 > MySQL 容器的账号密码**必须**在两个 `.env` 文件中保持一致：
 
-| 配置项 | 文件位置 | 说明 |
-|--------|----------|------|
-| `MYSQL_USER=idc_user` | `/opt/idc_assest/.env` | 指定 MySQL 容器创建的用户名 |
-| `MYSQL_USERNAME=idc_user` | `/opt/idc_assest/backend/.env` | 后端连接数据库用的用户名 |
-| `MYSQL_PASSWORD=xxx` | 两个文件各有一处 | 密码必须相同 |
+| 配置项                       | 文件位置                           | 说明                |
+| ------------------------- | ------------------------------ | ----------------- |
+| `MYSQL_USER=idc_user`     | `/opt/idc_assest/.env`         | 指定 MySQL 容器创建的用户名 |
+| `MYSQL_USERNAME=idc_user` | `/opt/idc_assest/backend/.env` | 后端连接数据库用的用户名      |
+| `MYSQL_PASSWORD=xxx`      | 两个文件各有一处                       | 密码必须相同            |
 
 可以用以下命令快速对比两个文件中的用户和密码是否一致：
 
@@ -343,7 +351,7 @@ MYSQL_PASSWORD=数据库密码
 MYSQL_DATABASE=数据库名
 ```
 
----
+***
 
 ## 五、启动容器
 
@@ -396,7 +404,7 @@ docker logs -f idc-backend
 服务器运行在 http://localhost:8000
 ```
 
----
+***
 
 ## 六、验证部署
 
@@ -410,8 +418,8 @@ docker compose -f docker-compose.yml ps
 
 ```
 NAME            IMAGE                                          STATUS          PORTS
-idc-frontend    .../idc-frontend:latest                        Up              :80->80/tcp
-idc-backend     .../idc-backend:latest                         Up (healthy)    8000/tcp
+idc-frontend    ghcr.io/.../idc-frontend:latest                Up              :80->80/tcp
+idc-backend     ghcr.io/.../idc-backend:latest                 Up (healthy)    8000/tcp
 idc-mysql       mysql:8.0                                      Up              3306/tcp
 ```
 
@@ -439,7 +447,7 @@ curl http://服务器IP/api
 curl http://服务器IP/health
 ```
 
----
+***
 
 ## 七、日常运维
 
@@ -485,7 +493,7 @@ docker stats idc-backend idc-frontend idc-mysql
 docker compose -f docker-compose.yml restart backend
 ```
 
----
+***
 
 ## 八、版本升级
 
@@ -502,16 +510,17 @@ docker compose -f docker-compose.yml up -d
 docker image prune -a
 ```
 
-### 回滚到指定版本
+### 回滚到指定版本（ghcr.io）
 
 ```bash
-# 用 v2.1.0 版本的镜像启动
-BACKEND_IMAGE=crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-backend:v2.1.0 \
-FRONTEND_IMAGE=crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-frontend:v2.1.0 \
+BACKEND_IMAGE=ghcr.io/gituib/idc-backend:v2.1.0 \
+FRONTEND_IMAGE=ghcr.io/gituib/idc-frontend:v2.1.0 \
 docker compose -f docker-compose.yml up -d
 ```
 
----
+***
+
+
 
 ## 九、常见问题
 
@@ -542,16 +551,12 @@ ports:
 
 ### 9.3 拉取镜像失败
 
-**原因：** 阿里云登录凭证问题或网络不通。
+**原因：** 网络问题或镜像仓库无法访问。
 
 **排查：**
 
 ```bash
-# 手动登录阿里云 Registry 测试
-docker login crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com
-
-# 检查网络
-ping crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com
+ping ghcr.io
 ```
 
 ### 9.4 初始化后没有默认管理员账号
@@ -602,3 +607,4 @@ vim /opt/idc_assest/backend/.env
 # 2. 重启后端容器
 docker compose -f docker-compose.yml restart backend
 ```
+

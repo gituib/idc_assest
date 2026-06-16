@@ -1,6 +1,7 @@
 # ============================================
 # IDC 设备管理系统 - 生产环境配置
 # 从镜像仓库拉取预构建镜像，无 build 指令
+# 默认从 ghcr.io 拉取，可通过 BACKEND/FRONTEND_IMAGE 环境变量切换
 # ============================================
 
 version: '3.8'
@@ -8,9 +9,8 @@ version: '3.8'
 services:
   # ---------- 后端服务 ----------
   backend:
-    # 从阿里云容器镜像服务（个人版）拉取
-    # 实际镜像地址: crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-backend:latest
-    image: ${BACKEND_IMAGE:-crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-backend:latest}
+    # 从 ghcr.io 拉取公开镜像，可通过 BACKEND_IMAGE 环境变量覆盖
+    image: ${BACKEND_IMAGE:-ghcr.io/gituib/idc-backend:latest}
     container_name: idc-backend
     volumes:
       # 配置映射（核心）
@@ -38,7 +38,8 @@ services:
 
   # ---------- 前端（Nginx）服务 ----------
   frontend:
-    image: ${FRONTEND_IMAGE:-crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-frontend:latest}
+    # 从 ghcr.io 拉取公开镜像，可通过 FRONTEND_IMAGE 环境变量覆盖
+    image: ${FRONTEND_IMAGE:-ghcr.io/gituib/idc-frontend:latest}
     pull_policy: always
     container_name: idc-frontend
     ports:
