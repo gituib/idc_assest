@@ -59,13 +59,14 @@ docker --version
 docker compose version
 ```
 
-### 2.2 创建目录结构
+### 2.2 验证 Docker 安装
 
 ```bash
-# 在服务器上创建项目根目录
-mkdir -p /opt/idc_assest
-cd /opt/idc_assest
+docker --version
+docker compose version
 ```
+
+部署目录会在第三节"克隆项目代码"步骤中直接创建到 `/opt/idc_assest`，无需提前创建。
 
 ---
 
@@ -73,21 +74,19 @@ cd /opt/idc_assest
 
 ### 3.1 克隆项目代码
 
-> 注意：克隆代码是为了获取 `docker-compose.prod.yml` 和 `.env` 配置模板，**不是用来构建镜像的**（镜像已由CI/CD自动构建好）。
+> 注意：克隆代码是为了获取 `docker-compose.prod.yml` 和 `.env` 配置模板，**不是用来构建镜像的**（镜像已由 CI/CD 自动构建好，部署服务器无需 Node.js 源码）。
 
 ```bash
-git clone https://github.com/gituib/idc_assest.git .
+# 直接克隆到部署目录
+git clone https://github.com/gituib/idc_assest.git /opt/idc_assest
+cd /opt/idc_assest
 ```
+
+克隆完成后，整个项目目录就是部署目录。多余的源代码（`backend/`、`frontend/` 源码）不影响运行，运行时只会用到 `docker-compose.prod.yml`、`.env` 和持久化目录。
 
 ### 3.2 持久化目录
 
-通过 `git clone` 完整克隆项目时，`backend/uploads/` 和 `backend/temp/` 目录已包含占位文件（`.gitkeep`）。`backend/logs/` 和 `backend/backups/` 也已在仓库中预留。
-
-如果是 sparse-checkout 或下载 release 包的方式，需要手动创建：
-
-```bash
-mkdir -p backend/uploads backend/logs backend/backups backend/temp
-```
+通过 `git clone` 完整克隆项目后，`backend/uploads/`、`backend/temp/`、`backend/logs/`、`backend/backups/` 四个持久化目录已经在仓库中预留（包含 `.gitkeep` 占位文件），**无需手动创建**。
 
 ### 3.3 配置 .env 文件
 
