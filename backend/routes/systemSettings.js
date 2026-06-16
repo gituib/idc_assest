@@ -7,7 +7,7 @@ const { Op } = require('sequelize');
 const { authMiddleware, clearMaintenanceCache } = require('../middleware/auth');
 
 // 读取 package.json 获取版本号
-const packageJsonPath = path.join(__dirname, '../../package.json');
+const packageJsonPath = path.join(__dirname, '../package.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 const APP_VERSION = packageJson.version || '1.0.0';
 
