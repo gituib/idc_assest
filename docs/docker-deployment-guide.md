@@ -35,8 +35,6 @@
 
 本项目使用 GitHub Container Registry 托管镜像，所有镜像均为公开（public）镜像，无需登录即可拉取。
 
-镜像地址格式：`ghcr.io/gituib/镜像名:tag`
-
 ### 1.3 架构说明
 
 用户访问 `http://服务器IP` 时，请求流程如下：
@@ -181,7 +179,7 @@ volumes:
 YAMLEOF
 ```
 
-> **注意**：请将 `你的GitHub用户名` 替换为实际的 GitHub 用户名（此处已替换为 gituib）。如果使用远程 MySQL（已有数据库），请在创建后编辑此文件，注释掉 `mysql` 服务部分。
+> **注意**：如果使用远程 MySQL（已有数据库），请在创建后编辑此文件，注释掉 `mysql` 服务部分。
 
 ### 3.3 创建项目根目录 .env 文件
 
@@ -510,17 +508,9 @@ docker compose -f docker-compose.yml up -d
 docker image prune -a
 ```
 
-### 回滚到指定版本（ghcr.io）
-
-```bash
-BACKEND_IMAGE=ghcr.io/gituib/idc-backend:v2.1.0 \
-FRONTEND_IMAGE=ghcr.io/gituib/idc-frontend:v2.1.0 \
-docker compose -f docker-compose.yml up -d
-```
+<br />
 
 ***
-
-
 
 ## 九、常见问题
 
@@ -564,8 +554,6 @@ ping ghcr.io
 系统**不内置默认管理员账号**，采用"首个注册用户自动成为管理员"机制。
 
 首次访问系统时，转到注册页面创建第一个账号，该账号会自动被授予管理员权限。
-
-> **注意**：项目根目录 `docker-compose.yml` 中的 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 等环境变量仅用于特定部署脚本，实际后端代码不依赖这些变量创建用户。
 
 ### 9.5 上传文件后访问 404
 
