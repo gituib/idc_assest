@@ -6,10 +6,10 @@
 
 现代化数据中心（IDC）设备管理系统，提供机房、机柜、设备的全生命周期管理，具备 3D 可视化展示功能。
 
-**GitHub**: https://github.com/gituib/idc_assest
-**Gitee**: https://gitee.com/zhang96110/idc_assest
+**GitHub**: <https://github.com/gituib/idc_assest>
+**Gitee**: <https://gitee.com/zhang96110/idc_assest>
 
----
+***
 
 ## 目录
 
@@ -39,30 +39,30 @@
   - [贡献指南](#贡献指南)
   - [许可证](#许可证)
 
----
+***
 
 ## 功能特性
 
-| 模块 | 描述 |
-|------|------|
-| 机房管理 | 多机房管理，平面图可视化 |
-| 机柜管理 | 机柜增删改查，3D 可视化，批量导入导出 |
-| 设备管理 | 全生命周期管理，自定义字段，批量导入导出 |
-| 端口管理 | 设备端口配置，网卡绑定，批量管理 |
-| 线缆管理 | 线缆连接管理，可视化追踪 |
-| 网络拓扑 | 拓扑可视化展示（ReactFlow） |
-| 工单管理 | 故障报修，维护工单全流程 |
-| 耗材管理 | 库存管理，SN 序列号追踪，日志归档 |
-| 盘点管理 | 盘点计划与执行，待审核设备 |
-| 空闲设备 | 空闲设备转入/激活 |
-| 数据看板 | 实时监控，功率监控，趋势图表 |
-| 3D 可视化 | 三维机柜展示，LOD 优化 |
-| 机房平面图 | Canvas 渲染，拖拽编辑 |
-| 操作日志 | 审计追踪，统计分析 |
-| 备份管理 | 本地/远程备份，自动定时 |
-| 系统配置 | 自定义字段，背景配置 |
-| 用户权限 | RBAC 角色控制 |
-| API 文档 | Swagger 交互式文档 |
+| 模块     | 描述                   |
+| ------ | -------------------- |
+| 机房管理   | 多机房管理，平面图可视化         |
+| 机柜管理   | 机柜增删改查，3D 可视化，批量导入导出 |
+| 设备管理   | 全生命周期管理，自定义字段，批量导入导出 |
+| 端口管理   | 设备端口配置，网卡绑定，批量管理     |
+| 线缆管理   | 线缆连接管理，可视化追踪         |
+| 网络拓扑   | 拓扑可视化展示（ReactFlow）   |
+| 工单管理   | 故障报修，维护工单全流程         |
+| 耗材管理   | 库存管理，SN 序列号追踪，日志归档   |
+| 盘点管理   | 盘点计划与执行，待审核设备        |
+| 空闲设备   | 空闲设备转入/激活            |
+| 数据看板   | 实时监控，功率监控，趋势图表       |
+| 3D 可视化 | 三维机柜展示，LOD 优化        |
+| 机房平面图  | Canvas 渲染，拖拽编辑       |
+| 操作日志   | 审计追踪，统计分析            |
+| 备份管理   | 本地/远程备份，自动定时         |
+| 系统配置   | 自定义字段，背景配置           |
+| 用户权限   | RBAC 角色控制            |
+| API 文档 | Swagger 交互式文档        |
 
 ### 项目截图
 
@@ -89,9 +89,24 @@
 
 </details>
 
----
+***
 
 ## 快速开始
+
+### Docker 部署（推荐）
+
+> 适用于新服务器上快速部署，无需安装 Node.js 等运行时环境，只需 Docker 即可。
+
+**详细教程**：[Docker 部署指南](docs/docker-deployment-guide.md)
+
+**架构**：3 个容器（Nginx + 前端静态文件 | Backend | MySQL），通过 Docker Compose 编排。
+
+- **Nginx 容器**：提供前端静态页面 + 反向代理 `/api` 到后端
+- **Backend 容器**：Node.js Express 应用，端口 8000
+- **MySQL 容器**：数据库，数据持久化到 Docker 卷
+
+**访问地址**：`http://服务器IP`
+**首次使用**：注册页面注册的第一个账号自动成为管理员
 
 ### Linux 一键部署
 
@@ -108,6 +123,7 @@ curl -fsSL https://gitee.com/zhang96110/idc_assest/raw/main/install.sh | bash
 ```
 
 **install.sh 自动完成**：
+
 - 自动检测 Linux 发行版（Ubuntu/Debian/CentOS/Arch）
 - 自动安装 Node.js 20.x
 - 自动安装系统依赖（git、curl）
@@ -152,30 +168,30 @@ cd backend && node scripts/init-database.js
 cd .. && npm start
 ```
 
-**访问地址**：http://localhost:3000
+**访问地址**：<http://localhost:3000>
 **默认账号**：首次注册自动成为管理员
 
----
+***
 
 ## 环境要求
 
-| 项目 | 最低要求 | 推荐配置 |
-|------|----------|----------|
-| **操作系统** | Windows 10+、macOS 12+、Linux | 同最低 |
-| **Node.js** | ≥14.0.0 | 20.x LTS |
-| **npm** | ≥6.0.0 | 10.x |
-| **内存** | 4GB | 8GB+ |
-| **磁盘** | 2GB | 10GB+ |
+| 项目          | 最低要求                        | 推荐配置     |
+| ----------- | --------------------------- | -------- |
+| **操作系统**    | Windows 10+、macOS 12+、Linux | 同最低      |
+| **Node.js** | ≥14.0.0                     | 20.x LTS |
+| **npm**     | ≥6.0.0                      | 10.x     |
+| **内存**      | 4GB                         | 8GB+     |
+| **磁盘**      | 2GB                         | 10GB+    |
 
 **生产环境额外要求**：
 
-| 项目 | 要求 |
-|------|------|
-| 数据库 | MySQL 8.0+（推荐）或 SQLite |
-| Web 服务器 | Nginx 1.18+ |
-| 进程管理 | PM2 5.x+ |
+| 项目      | 要求                     |
+| ------- | ---------------------- |
+| 数据库     | MySQL 8.0+（推荐）或 SQLite |
+| Web 服务器 | Nginx 1.18+            |
+| 进程管理    | PM2 5.x+               |
 
----
+***
 
 ## 脚本命令参考
 
@@ -230,6 +246,7 @@ node update.js --help
 ```
 
 **智能检测功能**：
+
 - 依赖安装智能跳过（检测 package.json 变化）
 - 前端构建智能跳过（检测源码变化）
 - 数据库自动备份（支持回滚）
@@ -261,7 +278,7 @@ node uninstall.js --dry-run
 node uninstall.js --help
 ```
 
----
+***
 
 ## 部署指南
 
@@ -283,13 +300,11 @@ FLUSH PRIVILEGES;
 
 **服务器要求参考**：
 
-| 规模 | CPU | 内存 | 磁盘 |
-|------|-----|------|------|
-| 小型（<100 设备） | 2 核心 | 4GB | 40GB |
-| 中型（100-500 设备） | 4 核心 | 8GB | 80GB |
-| 大型（>500 设备） | 8 核心+ | 16GB+ | 100GB+ |
-
-
+| 规模             | CPU   | 内存    | 磁盘     |
+| -------------- | ----- | ----- | ------ |
+| 小型（<100 设备）    | 2 核心  | 4GB   | 40GB   |
+| 中型（100-500 设备） | 4 核心  | 8GB   | 80GB   |
+| 大型（>500 设备）    | 8 核心+ | 16GB+ | 100GB+ |
 
 ### Nginx 配置
 
@@ -362,7 +377,7 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo nginx -s reload
 ```
 
----
+***
 
 ## 系统维护
 
@@ -411,7 +426,7 @@ cd backend && node scripts/backup.js
 cd backend && node scripts/restore.js <backup-file>
 ```
 
----
+***
 
 ## 常见问题
 
@@ -431,6 +446,7 @@ PORT=8001
 # 方案2：停止占用进程
 sudo kill $(lsof -t -i:8000)
 ```
+
 </details>
 
 <details>
@@ -440,6 +456,7 @@ sudo kill $(lsof -t -i:8000)
 2. 检查端口监听：`netstat -tulpn | grep 8000`
 3. 检查 Nginx 配置：`nginx -t`
 4. 查看错误日志：`tail /var/log/nginx/error.log`
+
 </details>
 
 <details>
@@ -455,16 +472,19 @@ rm -rf node_modules dist
 npm install
 npm run build
 ```
+
 </details>
 
 <details>
 <summary>4. 数据库连接失败</summary>
 
 **MySQL**：
+
 - 检查服务状态：`sudo systemctl status mysql`
 - 验证连接参数（主机、端口、用户名、密码）
 - 确认数据库已创建：`SHOW DATABASES;`
 - 检查用户权限：`SHOW GRANTS FOR 'idc_user'@'localhost';`
+
 </details>
 
 <details>
@@ -477,6 +497,7 @@ sudo chown -R $(whoami):$(whoami) /path/to/idc_assest
 # 上传目录权限
 sudo chmod -R 777 backend/uploads
 ```
+
 </details>
 
 <details>
@@ -489,6 +510,7 @@ node_args: "--max-old-space-size=4096"
 # 或命令行
 pm2 restart idc-backend --update-env
 ```
+
 </details>
 
 <details>
@@ -502,6 +524,7 @@ npm cache clean --force
 rm -rf node_modules package-lock.json
 npm install
 ```
+
 </details>
 
 <details>
@@ -513,11 +536,12 @@ pm2 start ecosystem.config.js
 pm2 save
 pm2 startup
 ```
-</details>
 
 </details>
 
----
+</details>
+
+***
 
 ## 项目结构
 
@@ -553,15 +577,15 @@ idc_assest/
 └── README.md            # 本文件
 ```
 
----
+***
 
 ## API 文档
 
-完整交互式 API 文档访问：**http://localhost:8000/api-docs**
+完整交互式 API 文档访问：**<http://localhost:8000/api-docs>**
 
 基于 Swagger/OpenAPI 3.0 标准，支持在线认证测试和 API 调试。
 
----
+***
 
 ## 贡献指南
 
@@ -588,33 +612,35 @@ git push origin feature/your-feature
 
 **提交信息规范**：
 
-| 类型 | 说明 |
-|------|------|
-| feat | 新功能 |
-| fix | Bug 修复 |
-| docs | 文档更新 |
-| style | 代码格式 |
-| refactor | 重构 |
-| perf | 性能优化 |
-| test | 测试 |
-| chore | 构建/工具 |
+| 类型       | 说明     |
+| -------- | ------ |
+| feat     | 新功能    |
+| fix      | Bug 修复 |
+| docs     | 文档更新   |
+| style    | 代码格式   |
+| refactor | 重构     |
+| perf     | 性能优化   |
+| test     | 测试     |
+| chore    | 构建/工具  |
 
 **开发规范**：
+
 - 使用 ES6+ 语法
 - 遵循 React Hooks 规范
 - 使用 async/await 处理异步
 - 遵循 ESLint + Prettier 代码规范
 
----
+***
 
 ## 许可证
 
 本项目基于 **MIT 许可证**开源。
 
----
+***
 
 **⭐ 如果这个项目对您有帮助，请给我们一个 Star！**
 
-- Gitee Issues: https://gitee.com/zhang96110/idc_assest/issues
-- GitHub Issues: https://github.com/gituib/idc_assest/issues
+- Gitee Issues: <https://gitee.com/zhang96110/idc_assest/issues>
+- GitHub Issues: <https://github.com/gituib/idc_assest/issues>
 - QQ 群：1081123775
+

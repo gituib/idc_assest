@@ -10,7 +10,7 @@
 
 - [一、前置要求](#一前置要求)
 - [二、服务器准备](#二服务器准备)
-- [三、拉取项目与配置](#三拉取项目与配置)
+- [三、创建部署目录与配置](#三创建部署目录与配置)
 - [四、生产环境配置](#四生产环境配置)
 - [五、启动容器](#五启动容器)
 - [六、验证部署](#六验证部署)
@@ -29,7 +29,6 @@
 | **服务器** | Linux 系统（推荐 Ubuntu 20.04+ / Debian 11+ / CentOS 7+） |
 | **Docker** | 20.10 及以上版本 |
 | **Docker Compose** | v2 及以上 |
-| **Git** | 用于拉取项目代码 |
 | **网络** | 服务器能访问阿里云容器镜像服务 |
 
 ### 1.2 架构说明
@@ -66,123 +65,42 @@ docker --version
 docker compose version
 ```
 
-部署目录会在第三节"克隆项目代码"步骤中直接创建到 `/opt/idc_assest`，无需提前创建。
-
 ---
 
-## 三、拉取项目与配置
+## 三、创建部署目录与配置
 
-### 3.1 克隆项目代码
+> 本部署方式**不需要 git clone** 整个项目仓库。只需在服务器上手动创建需要的配置文件和持久化目录即可。
+>
+> 需要创建的内容只有 3 个部分：
+> 1. **配置文件**：`docker-compose.yml` + 项目根目录 `.env` + `backend/.env`
+> 2. **持久化目录**：`backend/uploads/`、`backend/logs/`、`backend/backups/`、`backend/temp/`
 
-> 注意：克隆代码是为了获取 `docker-compose.prod.yml` 和 `.env` 配置模板，**不是用来构建镜像的**（镜像已由 CI/CD 自动构建好，部署服务器无需 Node.js 源码）。
+### 3.1 创建部署目录结构
 
 ```bash
-# 直接克隆到部署目录
-git clone https://github.com/gituib/idc_assest.git /opt/idc_assest
+# 创建部署根目录和所有持久化目录
+mkdir -p /opt/idc_assest/backend/{uploads,logs,backups,temp}
 cd /opt/idc_assest
+
+# 查看目录结构
+tree /opt/idc_assest -L 2
 ```
 
-克隆完成后，整个项目目录就是部署目录。多余的源代码（`backend/`、`frontend/` 源码）不影响运行，运行时只会用到 `docker-compose.prod.yml`、`.env` 和持久化目录。
+预期输出：
 
-### 3.2 持久化目录
-
-通过 `git clone` 完整克隆项目后，`backend/uploads/`、`backend/temp/`、`backend/logs/`、`backend/backups/` 四个持久化目录已经在仓库中预留（包含 `.gitkeep` 占位文件），**无需手动创建**。
-
-### 3.3 配置 .env 文件
-
-> **重要：项目中有两个 `.env` 文件，作用完全不同，不要混淆。**
-
-| 文件位置 | 谁读取 | 作用 |
-|----------|--------|------|
-| `/opt/idc_assest/.env` | Docker Compose | 配置 MySQL 容器自身（密码、用户名等） |
-| `/opt/idc_assest/backend/.env` | 后端 Node.js 应用 | 配置后端业务参数（数据库连接、JWT 等） |
-
-**`backend/.env`** 完整配置内容：
-
-```ini
-# ==============================================
-# 服务器配置
-# ==============================================
-PORT=8000
-NODE_ENV=production
-
-# ==============================================
-# 数据库配置
-# ==============================================
-# 方式一：使用 Docker 本地 MySQL 容器（推荐新部署）
-DB_TYPE=mysql
-MYSQL_HOST=mysql                      # Docker 服务名，不是 localhost
-MYSQL_PORT=3306
-MYSQL_USERNAME=idc_user
-MYSQL_PASSWORD=这里改成MySQL容器密码
-MYSQL_DATABASE=idc_management
-
-# 方式二：使用远程 MySQL（已有数据库的情况）
-# DB_TYPE=mysql
-# MYSQL_HOST=远程MySQL地址
-# MYSQL_PORT=3306
-# MYSQL_USERNAME=数据库用户名
-# MYSQL_PASSWORD=数据库密码
-# MYSQL_DATABASE=数据库名
-
-# ==============================================
-# JWT 密钥（重要！必须手动设置）
-# 生产环境不能留空，生成命令：
-#   node -e "console.log(require('crypto').randomBytes(64).toString('base64'))"
-# ==============================================
-JWT_SECRET=这里填入生成的密钥，至少32位
-
-# ==============================================
-# 其他配置（保持默认即可）
-# ==============================================
-TOKEN_EXPIRY=24h
-SALT_ROUNDS=12
-MAX_LOGIN_ATTEMPTS=3
-LOCK_TIME_MINUTES=15
-PASSWORD_MIN_LENGTH=8
-USERNAME_MIN_LENGTH=4
-USERNAME_MAX_LENGTH=30
-API_TIMEOUT=20000
-DB_QUERY_TIMEOUT=15000
-DEFAULT_PAGE_SIZE=20
-MAX_PAGE_SIZE=500
-MAX_FILE_SIZE_MB=30
-MAX_AVATAR_SIZE_MB=2
-MAX_RETRIES=5
-RETRY_DELAY=2000
-LOG_LEVEL=info
-LOG_DIR=./logs
-LOG_MAX_FILE_SIZE=20m
-LOG_MAX_FILES=30d
+```
+/opt/idc_assest
+└── backend
+    ├── uploads/
+    ├── logs/
+    ├── backups/
+    └── temp/
 ```
 
----
-
-## 四、生产环境配置
-
-部署方式分两种，选择其中一种：
-
-### 方式A：使用 Docker 本地 MySQL（推荐新部署）
-
-> MySQL 作为容器运行在 Docker 内部，数据卷持久化到主机。
-
-**步骤 1：编辑 `backend/.env`，确认 MySQL 配置如下：**
-
-```ini
-DB_TYPE=mysql
-MYSQL_HOST=mysql              # Docker 服务名
-MYSQL_PORT=3306
-MYSQL_USERNAME=idc_user       # 必须跟 MYSQL_USER 一致
-MYSQL_PASSWORD=你的密码
-MYSQL_DATABASE=idc_management
-```
-
-**步骤 2：用完整配置覆盖 `docker-compose.prod.yml`**
-
-直接执行以下命令**覆盖**文件，避免手动编辑时缩进/拼写出错：
+### 3.2 创建 docker-compose.yml
 
 ```bash
-cat > /opt/idc_assest/docker-compose.prod.yml << 'EOF'
+cat > /opt/idc_assest/docker-compose.yml << 'YAMLEOF'
 # ============================================
 # IDC 设备管理系统 - 生产环境配置
 # 从镜像仓库拉取预构建镜像，无 build 指令
@@ -252,33 +170,169 @@ networks:
 
 volumes:
   mysql_data:
-EOF
+YAMLEOF
 ```
 
-完成后可以用 `cat` 验证一下文件最后部分（确认 `mysql_data:` 后面有冒号且文件正常结束）：
+> **注意**：如果使用远程 MySQL（已有数据库），请在创建后编辑此文件，注释掉 `mysql` 服务部分。
+
+### 3.3 创建项目根目录 .env 文件
+
+> 这个文件是给 Docker Compose 读取的，用于配置 MySQL 容器本身的账号密码。
 
 ```bash
-tail -10 /opt/idc_assest/docker-compose.prod.yml
-```
-
-**步骤 3：创建项目根目录的 `.env`**（供 Docker Compose 读取，配置 MySQL 容器自身）：
-
-```bash
-cat > /opt/idc_assest/.env << 'EOF'
-MYSQL_ROOT_PASSWORD=root密码
+cd /opt/idc_assest
+cat > .env << 'EOF'
+MYSQL_ROOT_PASSWORD=这里填MySQL root密码
 MYSQL_USER=idc_user
-MYSQL_PASSWORD=用户密码（与 backend/.env 中 MYSQL_PASSWORD 一致）
+MYSQL_PASSWORD=这里填MySQL用户密码（与 backend/.env 中 MYSQL_PASSWORD 一致）
 MYSQL_DATABASE=idc_management
 EOF
 ```
 
-> 注意：这个文件**不是**给后端读的，是给 Docker Compose 解析 `${MYSQL_ROOT_PASSWORD}` 等占位符用的。
+### 3.4 创建 backend/.env 文件
 
-### 方式B：使用远程 MySQL（已有数据库）
+> **重要**：这个文件是后端 Node.js 应用读取的，配置数据库连接、JWT 等业务参数。不要与项目根目录的 `.env` 混淆。
 
-> 保持现有的远程 MySQL 实例，不需要本地 MySQL 容器。
+```bash
+cd /opt/idc_assest
 
-`docker-compose.prod.yml` 保持原样（MySQL 部分保持注释），`.env` 中配置远程数据库地址即可：
+# 先生成 JWT 密钥（确保已执行 4.1 节的命令）
+# JWT_SECRET=$(openssl rand -base64 64)
+
+# 创建 backend/.env（注意：使用 << EOF 而非 << 'EOF'，使变量可以被展开）
+cat > backend/.env << EOF
+# ==============================================
+# 服务器配置
+# ==============================================
+PORT=8000
+NODE_ENV=production
+
+# ==============================================
+# 数据库配置
+# ==============================================
+# 方式一：使用 Docker 本地 MySQL 容器（推荐新部署）
+DB_TYPE=mysql
+MYSQL_HOST=mysql                      # Docker 服务名，不是 localhost
+MYSQL_PORT=3306
+MYSQL_USERNAME=idc_user
+MYSQL_PASSWORD=这里改成MySQL用户密码
+MYSQL_DATABASE=idc_management
+
+# 方式二：使用远程 MySQL（已有数据库的情况）
+# DB_TYPE=mysql
+# MYSQL_HOST=远程MySQL地址
+# MYSQL_PORT=3306
+# MYSQL_USERNAME=数据库用户名
+# MYSQL_PASSWORD=数据库密码
+# MYSQL_DATABASE=数据库名
+
+# ==============================================
+# JWT 密钥（重要！通过变量自动注入，无需手动填写）
+# ==============================================
+JWT_SECRET=${JWT_SECRET}
+
+# ==============================================
+# 其他配置（保持默认即可）
+# ==============================================
+TOKEN_EXPIRY=24h
+SALT_ROUNDS=12
+MAX_LOGIN_ATTEMPTS=3
+LOCK_TIME_MINUTES=15
+PASSWORD_MIN_LENGTH=8
+USERNAME_MIN_LENGTH=4
+USERNAME_MAX_LENGTH=30
+API_TIMEOUT=20000
+DB_QUERY_TIMEOUT=15000
+DEFAULT_PAGE_SIZE=20
+MAX_PAGE_SIZE=500
+MAX_FILE_SIZE_MB=30
+MAX_AVATAR_SIZE_MB=2
+MAX_RETRIES=5
+RETRY_DELAY=2000
+LOG_LEVEL=info
+LOG_DIR=./logs
+LOG_MAX_FILE_SIZE=20m
+LOG_MAX_FILES=30d
+EOF
+```
+
+### 3.5 验证文件结构
+
+创建完成后，部署目录的文件结构应为：
+
+```
+/opt/idc_assest/
+├── docker-compose.yml    # Docker Compose 配置
+├── .env                       # Docker Compose 环境变量（MySQL 账号密码）
+└── backend/
+    ├── .env                   # 后端应用配置（数据库连接、JWT 等）
+    ├── uploads/               # 上传文件持久化目录
+    ├── logs/                  # 运行日志持久化目录
+    ├── backups/               # 数据库备份持久化目录
+    └── temp/                  # 临时文件目录
+```
+
+---
+
+## 四、生产环境配置
+
+### 4.1 生成并配置 JWT_SECRET
+
+直接在创建 `backend/.env` 时用变量注入，避免手动复制粘贴：
+
+```bash
+# 生成 JWT 密钥并保存到变量
+JWT_SECRET=$(openssl rand -base64 64)
+
+# 后续创建 backend/.env 时引用该变量即可
+# 见下方 3.4 节示例中的 JWT_SECRET=${JWT_SECRET}
+```
+
+> 如果服务器没有 `openssl`，也可以用 `node -e "console.log(require('crypto').randomBytes(64).toString('base64'))"` 生成。
+
+### 4.2 确认账号密码一致性
+
+> MySQL 容器的账号密码**必须**在两个 `.env` 文件中保持一致：
+
+| 配置项 | 文件位置 | 说明 |
+|--------|----------|------|
+| `MYSQL_USER=idc_user` | `/opt/idc_assest/.env` | 指定 MySQL 容器创建的用户名 |
+| `MYSQL_USERNAME=idc_user` | `/opt/idc_assest/backend/.env` | 后端连接数据库用的用户名 |
+| `MYSQL_PASSWORD=xxx` | 两个文件各有一处 | 密码必须相同 |
+
+可以用以下命令快速对比两个文件中的用户和密码是否一致：
+
+```bash
+cd /opt/idc_assest
+echo "=== 根目录 .env ===" && grep -E "MYSQL_USER|MYSQL_PASSWORD" .env
+echo ""
+echo "=== backend/.env ===" && grep -E "MYSQL_USERNAME|MYSQL_PASSWORD" backend/.env
+```
+
+预期输出（用户名为 `idc_user`，密码两处相同即表示一致）：
+
+```
+=== 根目录 .env ===
+MYSQL_USER=idc_user
+MYSQL_PASSWORD=MyPassw0rd!
+
+=== backend/.env ===
+MYSQL_USERNAME=idc_user
+MYSQL_PASSWORD=MyPassw0rd!
+```
+
+### 4.3 方式B：使用远程 MySQL（可选）
+
+> 如果已有远程 MySQL 实例，不想在 Docker 中运行 MySQL 容器，请执行以下操作：
+
+**步骤 1**：编辑 `/opt/idc_assest/docker-compose.yml`，注释掉 `mysql` 服务部分：
+
+```bash
+# 用 sed 注释 mysql 服务（从 services: 末尾到文件末尾）
+# 或者手动编辑，将 mysql: 到文件末尾的内容用 # 注释掉
+```
+
+**步骤 2**：修改 `/opt/idc_assest/backend/.env`，配置远程数据库地址：
 
 ```ini
 DB_TYPE=mysql
@@ -297,37 +351,28 @@ MYSQL_DATABASE=数据库名
 
 ```bash
 cd /opt/idc_assest
-
-# 方式A（本地 MySQL）
-docker compose -f docker-compose.prod.yml pull
-
-# 方式B（远程 MySQL）
-docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml pull
 ```
 
 ### 5.2 启动服务
 
 ```bash
-# 方式A（本地 MySQL）
-docker compose -f docker-compose.prod.yml up -d
-
-# 方式B（远程 MySQL）
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.yml up -d
 ```
 
 ### 5.3 查看启动状态
 
 ```bash
 # 查看所有容器状态
-docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.yml ps
 
 # 实时查看日志
-docker compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.yml logs -f
 
 # 单独查看某个容器的日志
 docker logs idc-backend
 docker logs idc-frontend
-docker logs idc-mysql   # 仅方式A
+docker logs idc-mysql
 ```
 
 ### 5.4 等待初始化完成
@@ -358,7 +403,7 @@ docker logs -f idc-backend
 ### 6.1 检查容器状态
 
 ```bash
-docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.yml ps
 ```
 
 所有容器都应该是 `Up` 状态：
@@ -402,19 +447,19 @@ curl http://服务器IP/health
 
 ```bash
 # 查看状态
-docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.yml ps
 
 # 查看日志
-docker compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.yml logs -f
 
 # 重启服务
-docker compose -f docker-compose.prod.yml restart
+docker compose -f docker-compose.yml restart
 
 # 停止服务
-docker compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.yml down
 
 # 停止并删除数据卷（数据会丢失！慎用）
-docker compose -f docker-compose.prod.yml down -v
+docker compose -f docker-compose.yml down -v
 ```
 
 ### 7.2 备份数据库
@@ -434,10 +479,10 @@ docker stats idc-backend idc-frontend idc-mysql
 
 ### 7.4 更新服务配置
 
-修改 `.env` 后，需要重启后端容器才能生效：
+修改 `backend/.env` 后，需要重启后端容器才能生效：
 
 ```bash
-docker compose -f docker-compose.prod.yml restart backend
+docker compose -f docker-compose.yml restart backend
 ```
 
 ---
@@ -448,10 +493,10 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ```bash
 # 1. 拉取最新镜像
-docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml pull
 
 # 2. 重新创建容器
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.yml up -d
 
 # 3. 清理旧镜像（可选）
 docker image prune -a
@@ -463,7 +508,7 @@ docker image prune -a
 # 用 v2.1.0 版本的镜像启动
 BACKEND_IMAGE=crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-backend:v2.1.0 \
 FRONTEND_IMAGE=crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com/idc-assest/idc-frontend:v2.1.0 \
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.yml up -d
 ```
 
 ---
@@ -481,14 +526,14 @@ docker compose -f docker-compose.prod.yml up -d
 docker logs idc-backend
 
 # 常见错误：
-# - JWT_SECRET 未配置 → 在 .env 中设置 JWT_SECRET
+# - JWT_SECRET 未配置 → 在 backend/.env 中设置 JWT_SECRET
 # - MySQL 连接被拒 → 检查 MYSQL_HOST / MYSQL_PASSWORD
 # - 端口被占用 → 检查 80 端口是否已被其他程序占用
 ```
 
 ### 9.2 端口被占用
 
-如果 80 端口被其他服务占用，可以修改 `docker-compose.prod.yml` 中的端口映射：
+如果 80 端口被其他服务占用，可以修改 `docker-compose.yml` 中的端口映射：
 
 ```yaml
 ports:
@@ -511,14 +556,11 @@ ping crpi-c807itn6exy37e7d.cn-hangzhou.personal.cr.aliyuncs.com
 
 ### 9.4 初始化后没有默认管理员账号
 
-后端首次启动会自动创建默认管理员账号：
+系统**不内置默认管理员账号**，采用"首个注册用户自动成为管理员"机制。
 
-| 账号 | 说明 |
-|------|------|
-| `admin` | 管理员 |
-| `admin` | 管理员密码 |
+首次访问系统时，转到注册页面创建第一个账号，该账号会自动被授予管理员权限。
 
-如果登录失败，检查后端日志是否有初始化相关的错误信息。
+> **注意**：项目根目录 `docker-compose.yml` 中的 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 等环境变量仅用于特定部署脚本，实际后端代码不依赖这些变量创建用户。
 
 ### 9.5 上传文件后访问 404
 
@@ -529,56 +571,7 @@ ls -la /opt/idc_assest/backend/uploads/
 chmod 755 /opt/idc_assest/backend/uploads/
 ```
 
-### 9.6 yaml 解析错误：`did not find expected key`
-
-**常见原因：**
-
-1. **缩进错误**：YAML 严格依赖缩进，每个 service 下的属性必须比 service 名多 2 个空格。例如：
-
-   ```yaml
-   services:
-     backend:           # ← 2 个空格
-       image: ...       # ← 4 个空格（比 backend 多 2 个）
-     mysql:             # ← 2 个空格
-       image: mysql:8.0 # ← 4 个空格
-   ```
-
-2. **拼写错误**：例如把 `networks` 写成 `netorks`。
-
-**解决方法：**
-
-```bash
-# 用 yamllint 检查
-pip install yamllint
-yamllint /opt/idc_assest/docker-compose.prod.yml
-```
-
-或者直接对照文档第四章的完整 `docker-compose.prod.yml` 内容复制。
-
-### 9.7 错误：`env file /opt/idc_assest/backend/.env not found`
-
-**原因：** `docker-compose.prod.yml` 里 backend 服务配置了 `env_file: ./backend/.env`，但这个文件不存在。
-
-**解决方法：**
-
-```bash
-# 创建 backend/.env 文件（参考 3.3 节）
-cat > /opt/idc_assest/backend/.env << 'EOF'
-PORT=8000
-NODE_ENV=production
-DB_TYPE=mysql
-MYSQL_HOST=mysql
-MYSQL_PORT=3306
-MYSQL_USERNAME=idc_user
-MYSQL_PASSWORD=你的密码
-MYSQL_DATABASE=idc_management
-JWT_SECRET=64位随机密钥
-TOKEN_EXPIRY=24h
-...（其他配置）
-EOF
-```
-
-### 9.8 后端连不上 MySQL 容器
+### 9.6 后端连不上 MySQL 容器
 
 **排查步骤：**
 
@@ -596,4 +589,16 @@ grep MYSQL_HOST /opt/idc_assest/backend/.env
 
 # 4. 进入 MySQL 容器验证
 docker exec -it idc-mysql mysql -u idc_user -p
+```
+
+### 9.7 如何在已有部署基础上添加新配置
+
+如果已经在运行中，需要补充某个配置项：
+
+```bash
+# 1. 编辑 backend/.env 补充配置
+vim /opt/idc_assest/backend/.env
+
+# 2. 重启后端容器
+docker compose -f docker-compose.yml restart backend
 ```
