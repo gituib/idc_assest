@@ -177,12 +177,16 @@ MYSQL_PASSWORD=你的密码
 MYSQL_DATABASE=idc_management
 ```
 
-**步骤 2：取消 `docker-compose.prod.yml` 中 MySQL 部分的注释：**
+**步骤 2：用完整配置覆盖 `docker-compose.prod.yml`**
 
-完整的 `docker-compose.prod.yml`（MySQL 部分已启用）：
+直接执行以下命令**覆盖**文件，避免手动编辑时缩进/拼写出错：
 
-```yaml
-version: '3.8'
+```bash
+cat > /opt/idc_assest/docker-compose.prod.yml << 'EOF'
+# ============================================
+# IDC 设备管理系统 - 生产环境配置
+# 从镜像仓库拉取预构建镜像，无 build 指令
+# ============================================
 
 services:
   # ---------- 后端服务 ----------
@@ -248,6 +252,13 @@ networks:
 
 volumes:
   mysql_data:
+EOF
+```
+
+完成后可以用 `cat` 验证一下文件最后部分（确认 `mysql_data:` 后面有冒号且文件正常结束）：
+
+```bash
+tail -10 /opt/idc_assest/docker-compose.prod.yml
 ```
 
 **步骤 3：创建项目根目录的 `.env`**（供 Docker Compose 读取，配置 MySQL 容器自身）：
