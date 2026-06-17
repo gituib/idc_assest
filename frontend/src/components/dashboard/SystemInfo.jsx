@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import { designTokens } from '../../config/theme';
 import { useFetch } from '../../hooks/useSWR';
+import { version as appVersion } from '../../../package.json';
 
 // 格式化运行时间
 const formatUptime = (seconds) => {
@@ -38,7 +39,7 @@ const formatUptime = (seconds) => {
 const SystemInfo = ({ onRefresh, isRefreshing }) => {
   const { data: systemData, isLoading: isVersionLoading } = useFetch('/system-settings/system/info');
 
-  const version = systemData?.system?.version || '1.2.0';
+  const version = systemData?.system?.version || appVersion;
   const formattedVersion = `v${version}`;
   const currentTime = new Date().toLocaleString('zh-CN');
 

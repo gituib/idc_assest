@@ -1,7 +1,7 @@
 const logger = require('../utils/logger').module('DevicePortsRoute');
 const express = require('express');
 const router = express.Router();
-const { Op } = require('sequelize');
+const { Op, Sequelize } = require('sequelize');
 const DevicePort = require('../models/DevicePort');
 const Device = require('../models/Device');
 const NetworkCard = require('../models/NetworkCard');
@@ -489,6 +489,107 @@ router.get('/export/all', async (req, res) => {
 });
 
 // 获取单个端口
+// 按设备分组返回端口，支持设备维度分页
+// 解决端口数超过 pageSize 时部分设备不显示的问题
+router.get('/grouped', async (req, res) => {
+  try {
+    const { deviceId, page = 1, pageSize = 10 } = req.query;
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const pageSizeNum = Math.max(1, parseInt(pageSize) || 10);
+    const offset = (pageNum - 1) * pageSizeNum;
+
+    // 设备筛选条件
+    const deviceWhere = {};
+    if (deviceId) {
+      deviceWhere.deviceId = deviceId;
+    }
+
+    // 端口总数（不受设备分页影响，用于前端统计与导出）
+    const portWhere = {};
+    if (deviceId) {
+      portWhere.deviceId = deviceId;
+    }
+    const totalPorts = await DevicePort.count({ where: portWhere });
+
+    // 查询有端口的设备（用 EXISTS 子查询，避免 hasMany JOIN 导致 limit 作用于端口行）
+    // 若用 include+JOIN，limit 会作用于 JOIN 后的行数，端口多的设备会占满 limit
+    const { count, rows } = await Device.findAndCountAll({
+      attributes: ['deviceId', 'name', 'type', 'rackId'],
+      where: {
+        ...deviceWhere,
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.literal(
+              `EXISTS (SELECT 1 FROM device_ports WHERE device_ports.deviceId = Device.deviceId)`
+            ),
+            '=',
+            1
+          ),
+        ],
+      },
+      order: [['name', 'ASC']],
+      offset,
+      limit: pageSizeNum,
+    });
+
+    // 当前页设备ID列表
+    const pagedDeviceIds = rows.map(d => d.deviceId);
+
+    if (pagedDeviceIds.length === 0) {
+      return res.json({
+        total: count,
+        totalPorts,
+        page: pageNum,
+        pageSize: pageSizeNum,
+        groups: [],
+      });
+    }
+
+    // 查询当前页设备的所有端口（含网卡关联）
+    const ports = await DevicePort.findAll({
+      where: { deviceId: { [Op.in]: pagedDeviceIds } },
+      include: [
+        {
+          model: Device,
+          as: 'device',
+          attributes: ['deviceId', 'name', 'type', 'rackId'],
+        },
+        {
+          model: NetworkCard,
+          as: 'networkCard',
+          attributes: ['nicId', 'name'],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+
+    // 按设备分组，保持设备排序（与分页查询一致）
+    const deviceMap = new Map();
+    rows.forEach(d => {
+      deviceMap.set(d.deviceId, { device: d, ports: [] });
+    });
+    ports.forEach(port => {
+      const group = deviceMap.get(port.deviceId);
+      if (group) {
+        group.ports.push(port);
+      }
+    });
+
+    const groups = pagedDeviceIds.map(id => deviceMap.get(id));
+
+    res.json({
+      total: count,
+      totalPorts,
+      page: pageNum,
+      pageSize: pageSizeNum,
+      groups,
+    });
+  } catch (error) {
+    logger.error('按设备分组获取端口失败', { error: error.message, stack: error.stack });
+    res.status(500).json({ error: error.message, errorType: error.name });
+  }
+});
+
 router.get('/:portId', async (req, res) => {
   try {
     const port = await DevicePort.findByPk(req.params.portId, {

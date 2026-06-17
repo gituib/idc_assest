@@ -100,11 +100,34 @@ const animations = {
   },
 };
 
+/**
+ * 按端口名称中的数字段进行自然排序
+ * @param {Array} ports - 端口数组
+ * @returns {Array} 排序后的新数组
+ */
+function sortPortsByName(ports) {
+  const extractNumbers = str => {
+    const matches = str ? String(str).match(/\d+/g) : null;
+    return matches ? matches.map(Number) : [];
+  };
+  return [...ports].sort((a, b) => {
+    const numsA = extractNumbers(a.portName);
+    const numsB = extractNumbers(b.portName);
+    for (let i = 0; i < Math.min(numsA.length, numsB.length); i++) {
+      if (numsA[i] !== numsB[i]) {
+        return numsA[i] - numsB[i];
+      }
+    }
+    return String(a.portName).localeCompare(String(b.portName));
+  });
+}
+
 function PortManagement() {
   const [ports, setPorts] = useState([]);
   const [devices, setDevices] = useState([]);
   const [deviceSearching, setDeviceSearching] = useState(false);
-  const [groupedPorts, setGroupedPorts] = useState({});
+  // 按设备分组的端口列表（数组，每项 { device, ports }）
+  const [groupedPorts, setGroupedPorts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
     deviceId: '',
@@ -167,17 +190,13 @@ function PortManagement() {
   const hasMoreRef = useRef(true);
   const isLoadingRef = useRef(false);
 
-  // 设备卡片分页状态
+  // 设备卡片分页状态（按设备维度分页）
   const [deviceCardPage, setDeviceCardPage] = useState(1);
   const deviceCardPageSize = 10;
   const [deviceCardTotal, setDeviceCardTotal] = useState(0);
 
-  // 分页和懒加载状态
-  const [portPage, setPortPage] = useState(1);
-  const [portPageSize, setPortPageSize] = useState(50);
+  // 端口总数（所有设备端口总和，用于统计与导出弹窗）
   const [portTotal, setPortTotal] = useState(0);
-  const [portLoading, setPortLoading] = useState(false);
-  const [portLoadingMore, setPortLoadingMore] = useState(false);
 
   // 服务器网卡卡片列表状态
   const [serverNicSearchText, setServerNicSearchText] = useState('');
@@ -186,46 +205,42 @@ function PortManagement() {
   const [serverNicCardPage, setServerNicCardPage] = useState(1);
   const serverNicCardPageSize = 12;
 
+  // 按设备分组获取端口（设备维度分页，避免端口数过多时部分设备不显示）
   const fetchPorts = useCallback(
-    async (page = 1, append = false) => {
+    async (page = 1) => {
       const validPage = Number.isInteger(page) && page > 0 ? page : 1;
-      const validPageSize = Number.isInteger(portPageSize) && portPageSize > 0 ? portPageSize : 50;
       try {
-        if (append) {
-          setPortLoadingMore(true);
-        } else {
-          setLoading(true);
-        }
-
+        setLoading(true);
         const params = {
           page: validPage,
-          pageSize: validPageSize,
+          pageSize: deviceCardPageSize,
         };
-
         if (filters.deviceId) params.deviceId = filters.deviceId;
 
-        const response = await api.get('/device-ports', { params });
-        const portsData = response.ports || [];
-        const total = response.total || 0;
-        const filteredPorts = portsData;
+        const response = await api.get('/device-ports/grouped', { params });
+        const groups = response.groups || [];
 
-        if (append) {
-          setPorts(prev => [...prev, ...filteredPorts]);
-        } else {
-          setPorts(filteredPorts);
-        }
-        setPortTotal(total);
-        setPortPage(page);
-        hasMoreRef.current = page * portPageSize < total;
+        // 对每个设备的端口按名称自然排序，并展开为扁平数组（供统计、导出当前页使用）
+        const flatPorts = [];
+        const sortedGroups = groups.map(g => {
+          const sortedPorts = sortPortsByName(g.ports || []);
+          sortedPorts.forEach(p => flatPorts.push(p));
+          return { device: g.device, ports: sortedPorts };
+        });
+
+        setPorts(flatPorts);
+        setGroupedPorts(sortedGroups);
+        setDeviceCardTotal(response.total || 0);
+        setPortTotal(response.totalPorts || 0);
+        setDeviceCardPage(validPage);
       } catch (error) {
         message.error('获取端口列表失败');
         console.error('获取端口列表失败:', error);
       } finally {
         setLoading(false);
-        setPortLoadingMore(false);
       }
     },
-    [filters, portPageSize]
+    [filters, deviceCardPageSize]
   );
 
   const fetchDevices = useCallback(async (keyword = '') => {
@@ -255,104 +270,21 @@ function PortManagement() {
   );
 
   useEffect(() => {
-    fetchPorts(1, false);
+    fetchPorts(1);
     fetchDevices();
   }, [fetchPorts, fetchDevices]);
 
-  const handleLoadMore = useCallback(() => {
-    if (!hasMoreRef.current || isLoadingRef.current || portLoadingMore) return;
-    isLoadingRef.current = true;
-    const nextPage = portPage + 1;
-    fetchPorts(nextPage, true).then(() => {
-      isLoadingRef.current = false;
-    });
-  }, [portPage, portLoadingMore, fetchPorts]);
-
-  useEffect(() => {
-    if (!loadMoreRef.current) return;
-
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0].isIntersecting && hasMoreRef.current && !portLoadingMore) {
-          handleLoadMore();
-        }
-      },
-      { threshold: 0.1, rootMargin: '100px' }
-    );
-
-    observer.observe(loadMoreRef.current);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [handleLoadMore, portLoadingMore]);
-
-  const handlePageSizeChange = useCallback(
-    (newPage, newPageSize) => {
-      setPortPageSize(newPageSize);
-      setPortPage(1);
-      fetchPorts(1, false);
-    },
-    [fetchPorts]
-  );
-
-  useEffect(() => {
-    const grouped = {};
-    ports.forEach(port => {
-      const deviceId = port.deviceId;
-      if (!grouped[deviceId]) {
-        grouped[deviceId] = {
-          device: port.device || devices.find(d => d.deviceId === deviceId),
-          ports: [],
-        };
-      }
-      grouped[deviceId].ports.push(port);
-    });
-
-    // 对每个设备的端口按名称升序排序
-    Object.keys(grouped).forEach(deviceId => {
-      grouped[deviceId].ports.sort((a, b) => {
-        const extractNumbers = str => {
-          const matches = str.match(/\d+/g);
-          return matches ? matches.map(Number) : [];
-        };
-        const numsA = extractNumbers(a.portName);
-        const numsB = extractNumbers(b.portName);
-        for (let i = 0; i < Math.min(numsA.length, numsB.length); i++) {
-          if (numsA[i] !== numsB[i]) {
-            return numsA[i] - numsB[i];
-          }
-        }
-        return a.portName.localeCompare(b.portName);
-      });
-    });
-
-    setGroupedPorts(grouped);
-
-    const deviceIds = Object.keys(grouped);
-    const newTotal = deviceIds.length;
-    setDeviceCardTotal(newTotal);
-    if (deviceCardPage > Math.ceil(newTotal / deviceCardPageSize)) {
-      setDeviceCardPage(1);
-    }
-    setExpandedKeys([]);
-  }, [ports, devices, deviceCardPage, deviceCardPageSize]);
-
   const handleSearch = useCallback(() => {
-    setPortPage(1);
     setDeviceCardPage(1);
-    hasMoreRef.current = true;
-    fetchPorts(1, false);
+    fetchPorts(1);
   }, [fetchPorts]);
 
   const handleReset = useCallback(() => {
     setFilters({
       deviceId: '',
     });
-    setPortPage(1);
     setDeviceCardPage(1);
-    hasMoreRef.current = true;
-    fetchPorts(1, false);
+    fetchPorts(1);
   }, [fetchPorts]);
 
   const handleAdd = () => {
@@ -547,7 +479,7 @@ function PortManagement() {
       icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
     });
     setRefreshTrigger(prev => prev + 1);
-    fetchPorts(1, false);
+    fetchPorts(1);
   };
 
   const handleEdit = port => {
@@ -579,7 +511,7 @@ function PortManagement() {
             content: '删除成功',
             icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
           });
-          fetchPorts(1, false);
+          fetchPorts(1);
         } catch (error) {
           const errorMsg = error.response?.data?.error || '';
           if (errorMsg.includes('关联的接线记录')) {
@@ -615,7 +547,7 @@ function PortManagement() {
             icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
           });
           setSelectedRowKeys([]);
-          fetchPorts(1, false);
+          fetchPorts(1);
         } catch (error) {
           const errorMsg = error.response?.data?.error || '';
           if (errorMsg.includes('关联的接线记录')) {
@@ -861,7 +793,7 @@ function PortManagement() {
       setParseResult(null);
       setPreviewPorts([]);
       setShowPreview(false);
-      fetchPorts(1, false);
+      fetchPorts(1);
     } catch (error) {
       message.error(error.response?.data?.error || editingPort ? '更新失败' : '创建失败');
       console.error('提交失败:', error);
@@ -1289,7 +1221,7 @@ function PortManagement() {
         });
       }
 
-      fetchPorts(1, false);
+      fetchPorts(1);
       setImportModalVisible(false);
       setImportPreview([]);
     } catch (error) {
@@ -1871,7 +1803,7 @@ function PortManagement() {
             <div style={{ padding: '40px' }}>
               <Skeleton active paragraph={{ rows: 6 }} />
             </div>
-          ) : Object.keys(groupedPorts).length === 0 ? (
+          ) : groupedPorts.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1912,22 +1844,18 @@ function PortManagement() {
             </motion.div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {Object.entries(groupedPorts)
-                .slice(
-                  (deviceCardPage - 1) * deviceCardPageSize,
-                  deviceCardPage * deviceCardPageSize
-                )
-                .map(([deviceId, data], index) => {
+              {groupedPorts.map((data, index) => {
                   const device = data.device;
+                  const deviceId = device?.deviceId;
                   const devicePorts = data.ports || [];
                   const freeCount = devicePorts.filter(p => p.status === 'free').length;
                   const occupiedCount = devicePorts.filter(p => p.status === 'occupied').length;
                   const faultCount = devicePorts.filter(p => p.status === 'fault').length;
-                  const isExpanded = expandedKeys.includes(deviceId);
+                  const isExpanded = deviceId ? expandedKeys.includes(deviceId) : false;
 
                   return (
                     <Card
-                      key={deviceId}
+                      key={deviceId || index}
                       style={{
                         borderRadius: designTokens.borderRadius.lg,
                         border: `1px solid ${designTokens.colors.neutral[200]}`,
@@ -2140,7 +2068,7 @@ function PortManagement() {
                                   onChange: setSelectedRowKeys,
                                 }}
                                 pagination={{
-                                  pageSize: 10,
+                                  defaultPageSize: 10,
                                   showSizeChanger: true,
                                   showTotal: total => `共 ${total} 个端口`,
                                   pageSizeOptions: ['10', '20', '50', '100'],
@@ -2164,8 +2092,8 @@ function PortManagement() {
                     pageSize={deviceCardPageSize}
                     total={deviceCardTotal}
                     onChange={page => {
-                      setDeviceCardPage(page);
                       setExpandedKeys([]);
+                      fetchPorts(page);
                     }}
                     showSizeChanger={false}
                     showTotal={(total, range) =>
@@ -2174,14 +2102,9 @@ function PortManagement() {
                   />
                 </div>
               )}
-              {hasMoreRef.current && (
-                <div ref={loadMoreRef} style={{ textAlign: 'center', padding: '20px' }}>
-                  {portLoadingMore && <Spin tip="加载更多端口..." />}
-                </div>
-              )}
-              {!hasMoreRef.current && ports.length > 0 && (
+              {ports.length > 0 && (
                 <div style={{ textAlign: 'center', padding: '16px', color: '#999' }}>
-                  已加载全部 {portTotal} 个端口
+                  共 {deviceCardTotal} 个设备，{portTotal} 个端口
                 </div>
               )}
             </div>

@@ -200,7 +200,7 @@ EOF
 > **重要**：这个文件是后端 Node.js 应用读取的，配置数据库连接、JWT 等业务参数。不要与项目根目录的 `.env` 混淆。
 
 ```bash
-cd /opt/idc_assest
+cd /opt/idc_assest/backend
 
 # 先生成 JWT 密钥（确保已执行 4.1 节的命令）
 # JWT_SECRET=$(openssl rand -base64 64)

@@ -93,7 +93,7 @@ const initDefaultSettings = async () => {
     // 关于页面
     {
       settingKey: 'app_version',
-      settingValue: JSON.stringify('1.2.0'),
+      settingValue: JSON.stringify(APP_VERSION),
       settingType: 'string',
       category: 'about',
       description: '应用版本',
