@@ -277,12 +277,11 @@ const Login = () => {
                     name="email"
                     label="邮箱"
                     rules={[
-                      { required: true, message: '请输入邮箱' },
                       { type: 'email', message: '请输入有效的邮箱地址' },
                     ]}
                   >
                     <Input
-                      placeholder="请输入邮箱"
+                      placeholder="请输入邮箱（选填）"
                       className="login-input"
                       prefix={<MailOutlined className="input-icon" />}
                     />
@@ -290,10 +289,9 @@ const Login = () => {
                   <Form.Item
                     name="phone"
                     label="手机号"
-                    rules={[{ required: true, message: '请输入手机号' }]}
                   >
                     <Input
-                      placeholder="请输入手机号"
+                      placeholder="请输入手机号（选填）"
                       className="login-input"
                       prefix={<PhoneOutlined className="input-icon" />}
                     />
@@ -301,17 +299,19 @@ const Login = () => {
                 </>
               )}
 
-              <Form.Item
-                name="username"
-                label={isFirstUser ? '管理员账号' : '用户名'}
-                rules={[{ required: true, message: isFirstUser ? '请设置管理员账号' : '请输入用户名' }]}
-              >
-                <Input
-                  prefix={<UserOutlined className="input-icon" />}
-                  placeholder={isFirstUser ? '请设置管理员账号' : '请输入用户名'}
-                  className="login-input"
-                />
-              </Form.Item>
+              {!registerMode && (
+                <Form.Item
+                  name="username"
+                  label={isFirstUser ? '管理员账号' : '用户名'}
+                  rules={[{ required: true, message: isFirstUser ? '请设置管理员账号' : '请输入用户名' }]}
+                >
+                  <Input
+                    prefix={<UserOutlined className="input-icon" />}
+                    placeholder={isFirstUser ? '请设置管理员账号' : '请输入用户名'}
+                    className="login-input"
+                  />
+                </Form.Item>
+              )}
 
               <Form.Item
                 name="password"
