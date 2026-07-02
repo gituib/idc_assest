@@ -56,16 +56,7 @@
 
 > 适用于新服务器上快速部署，无需安装 Node.js 等运行时环境，只需 Docker 即可。
 
-**详细教程**：[Docker 部署指南](docs/docker-deployment-guide.md)
-
-**架构**：3 个容器（Nginx + 前端静态文件 | Backend | MySQL），通过 Docker Compose 编排。
-
-- **Nginx 容器**：提供前端静态页面 + 反向代理 `/api` 到后端
-- **Backend 容器**：Node.js Express 应用，端口 8000
-- **MySQL 容器**：数据库，数据持久化到 Docker 卷
-
-**访问地址**：`http://服务器IP`
-**首次使用**：注册页面注册的第一个账号自动成为管理员
+📖 **详细教程请查看文档站**：[Docker 部署指南](https://gituib.github.io/idc_assest-docs/deploy/docker-deploy.html)
 
 ### Linux 一键部署
 
