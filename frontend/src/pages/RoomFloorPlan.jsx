@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
-import { Spin, Empty, message } from 'antd';
+import { Spin, Empty, message, Modal } from 'antd';
 import useFloorPlanContext from '../hooks/floorplan/useFloorPlanContext';
 import useFloorPlanData from '../hooks/floorplan/useFloorPlanData';
 import { FloorPlanCanvas, FloorPlanToolbar, RackDetailPanel } from '../components/floorplan';
@@ -75,13 +75,30 @@ const RoomFloorPlanContent = () => {
     hideDetail,
   } = useFloorPlanContext();
 
-  const { layoutData, loading, error, refetch } = useFloorPlanData(selectedRoomId);
+  const {
+    layoutData,
+    loading,
+    saving,
+    error,
+    refetch,
+    savePositions,
+    initLayout,
+  } = useFloorPlanData(selectedRoomId);
   const canvasRef = useRef(null);
   const [currentZoom, setCurrentZoom] = useState(1);
   const [hoveredDevice, setHoveredDevice] = useState(null);
   const [hoveredDeviceRack, setHoveredDeviceRack] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // 编辑模式相关状态
+  const [editMode, setEditMode] = useState(false);
+  // 编辑模式下用户自定义网格行列数
+  const [editGridRows, setEditGridRows] = useState(10);
+  const [editGridCols, setEditGridCols] = useState(10);
+  // 编辑过程中未保存的位置覆盖 Map<rackId, {rowPos, colPos, facing}>
+  const [positionOverrides, setPositionOverrides] = useState(() => new Map());
+  const hasPendingChanges = positionOverrides.size > 0;
 
   const handleViewChange = useCallback(({ zoom }) => {
     setCurrentZoom(zoom);
@@ -92,6 +109,20 @@ const RoomFloorPlanContent = () => {
       message.error(error);
     }
   }, [error]);
+
+  // 切换机房时退出编辑模式并清空未保存改动
+  useEffect(() => {
+    setEditMode(false);
+    setPositionOverrides(new Map());
+  }, [selectedRoomId]);
+
+  // 机房数据加载后，同步 gridRows/gridCols 到编辑状态
+  useEffect(() => {
+    if (layoutData?.room) {
+      setEditGridRows(layoutData.room.gridRows || 10);
+      setEditGridCols(layoutData.room.gridCols || 10);
+    }
+  }, [layoutData?.room]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -147,10 +178,92 @@ const RoomFloorPlanContent = () => {
   }, []);
 
   const handleRackClick = useCallback((rack) => {
+    // 编辑模式下不打开详情面板，避免干扰拖拽
+    if (editMode) return;
     if (rack) {
       showDetail(rack);
     }
-  }, [showDetail]);
+  }, [showDetail, editMode]);
+
+  /**
+   * 切换编辑模式（退出时若有未保存改动需二次确认）
+   */
+  const handleToggleEditMode = useCallback(() => {
+    if (editMode && hasPendingChanges) {
+      Modal.confirm({
+        title: '退出编辑',
+        content: '当前有未保存的布局改动，确定要放弃并退出吗？',
+        okText: '放弃改动',
+        cancelText: '继续编辑',
+        okButtonProps: { danger: true },
+        onOk: () => {
+          setPositionOverrides(new Map());
+          setEditMode(false);
+        },
+      });
+      return;
+    }
+    setPositionOverrides(new Map());
+    setEditMode((prev) => !prev);
+    // 进入编辑模式时，将当前机房 gridRows/gridCols 写入编辑网格状态
+    if (!editMode && layoutData?.room) {
+      setEditGridRows(layoutData.room.gridRows || 10);
+      setEditGridCols(layoutData.room.gridCols || 10);
+    }
+  }, [editMode, hasPendingChanges, layoutData?.room]);
+
+  /**
+   * 机柜拖拽结束回调，将新位置写入本地覆盖表（不立即保存）
+   * @param {object} rack - 被拖拽的机柜
+   * @param {number} rowPos - 新行号
+   * @param {number} colPos - 新列号
+   */
+  const handleRackDragEnd = useCallback((rack, rowPos, colPos) => {
+    setPositionOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(rack.rackId, {
+        rowPos,
+        colPos,
+        facing: rack.facing || 'front',
+      });
+      return next;
+    });
+  }, []);
+
+  /**
+   * 保存当前编辑的布局到后端
+   */
+  const handleSaveLayout = useCallback(async () => {
+    if (!hasPendingChanges) return;
+    const positions = Array.from(positionOverrides.entries()).map(([rackId, pos]) => ({
+      rackId,
+      rowPos: pos.rowPos,
+      colPos: pos.colPos,
+      facing: pos.facing,
+    }));
+    const ok = await savePositions(positions);
+    if (ok) {
+      message.success('布局保存成功');
+      setPositionOverrides(new Map());
+      setEditMode(false);
+    } else {
+      message.error('布局保存失败，请重试');
+    }
+  }, [hasPendingChanges, positionOverrides, savePositions]);
+
+  /**
+   * 重置布局（让后端按名称顺序自动重新排列）
+   */
+  const handleResetLayout = useCallback(async () => {
+    const ok = await initLayout();
+    if (ok) {
+      message.success('布局已重置为自动排列');
+      setPositionOverrides(new Map());
+      setEditMode(false);
+    } else {
+      message.error('布局重置失败，请重试');
+    }
+  }, [initLayout]);
 
   const roomName = layoutData?.room?.name || '';
 
@@ -192,6 +305,16 @@ const RoomFloorPlanContent = () => {
         isFullscreen={isFullscreen}
         onRefresh={refetch}
         onExport={handleExport}
+        editMode={editMode}
+        onToggleEditMode={handleToggleEditMode}
+        onSaveLayout={handleSaveLayout}
+        onResetLayout={handleResetLayout}
+        saving={saving}
+        hasPendingChanges={hasPendingChanges}
+        editGridRows={editGridRows}
+        editGridCols={editGridCols}
+        onEditGridRowsChange={setEditGridRows}
+        onEditGridColsChange={setEditGridCols}
       />
 
       {loading ? (
@@ -219,6 +342,11 @@ const RoomFloorPlanContent = () => {
               onRackClick={handleRackClick}
               onDeviceHover={handleDeviceHover}
               onViewChange={handleViewChange}
+              editMode={editMode}
+              editGridRows={editGridRows}
+              editGridCols={editGridCols}
+              positionOverrides={positionOverrides}
+              onRackDragEnd={handleRackDragEnd}
             />
 
             {hoveredDevice && (

@@ -119,6 +119,12 @@ const Device = sequelize.define(
 );
 
 Device.belongsTo(Rack, { foreignKey: 'rackId', onDelete: 'SET NULL' });
-Device.belongsTo(Warehouse, { foreignKey: 'warehouseId', onDelete: 'SET NULL' });
+// warehouseId 业务上为自由输入文本（无库房管理功能），关闭数据库外键约束
+// 保留模型关联以便未来通过 include 查询，但不创建实际 FK 约束
+Device.belongsTo(Warehouse, {
+  foreignKey: 'warehouseId',
+  onDelete: 'SET NULL',
+  constraints: false,
+});
 
 module.exports = Device;

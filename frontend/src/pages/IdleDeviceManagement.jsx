@@ -56,6 +56,20 @@ const IdleDeviceManagement = () => {
   const [selectedShelveRoomId, setSelectedShelveRoomId] = useState(null);
   const [shelvePositionConflict, setShelvePositionConflict] = useState(null);
   const [shelveSelectedRackId, setShelveSelectedRackId] = useState(null);
+  // 设备类型选项，从字段管理配置动态加载，缺失时回退到默认 5 项
+  const [deviceTypeOptions, setDeviceTypeOptions] = useState([
+    { value: 'server', label: '服务器' },
+    { value: 'switch', label: '交换机' },
+    { value: 'router', label: '路由器' },
+    { value: 'storage', label: '存储设备' },
+    { value: 'other', label: '其他设备' },
+  ]);
+
+  // 设备类型 value -> label 映射，用于列表标签显示
+  const deviceTypeLabelMap = deviceTypeOptions.reduce((acc, opt) => {
+    acc[opt.value] = opt.label;
+    return acc;
+  }, {});
 
   const fetchIdleDevices = useCallback(async () => {
     setLoading(true);
@@ -97,6 +111,19 @@ const IdleDeviceManagement = () => {
     }
   };
 
+  // 从字段管理配置加载设备类型选项，options 为空时保持默认 5 项
+  const fetchDeviceFields = async () => {
+    try {
+      const response = await axios.get('/api/deviceFields');
+      const typeField = response.data.find(f => f.fieldName === 'type');
+      if (typeField && Array.isArray(typeField.options) && typeField.options.length > 0) {
+        setDeviceTypeOptions(typeField.options);
+      }
+    } catch (error) {
+      console.error('获取字段配置失败', error);
+    }
+  };
+
   useEffect(() => {
     fetchIdleDevices();
   }, [fetchIdleDevices]);
@@ -104,6 +131,7 @@ const IdleDeviceManagement = () => {
   useEffect(() => {
     fetchRacks();
     fetchRooms();
+    fetchDeviceFields();
   }, []);
 
   const handleAdd = () => {
@@ -332,7 +360,7 @@ const IdleDeviceManagement = () => {
                 }
                 style={{ marginRight: 0 }}
               >
-                {record.type === 'server' ? '服务器' : record.type === 'switch' ? '交换机' : '其他'}
+                {deviceTypeLabelMap[record.type] || record.type || '其他'}
               </Tag>
               <Text type="secondary" style={{ fontSize: '12px' }}>
                 {record.model || '-'}
@@ -732,11 +760,11 @@ const IdleDeviceManagement = () => {
               <Col span={12}>
                 <Form.Item name="type" label="设备类型">
                   <Select placeholder="请选择设备类型" allowClear style={{ borderRadius: '8px' }}>
-                    <Option value="server">服务器</Option>
-                    <Option value="switch">交换机</Option>
-                    <Option value="router">路由器</Option>
-                    <Option value="storage">存储设备</Option>
-                    <Option value="other">其他</Option>
+                    {deviceTypeOptions.map(opt => (
+                      <Option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </Option>
+                    ))}
                   </Select>
                 </Form.Item>
               </Col>
@@ -987,11 +1015,11 @@ const IdleDeviceManagement = () => {
                   rules={[{ required: true, message: '请选择设备类型' }]}
                 >
                   <Select placeholder="请选择设备类型" style={{ borderRadius: '8px' }}>
-                    <Option value="server">服务器</Option>
-                    <Option value="switch">交换机</Option>
-                    <Option value="router">路由器</Option>
-                    <Option value="storage">存储设备</Option>
-                    <Option value="other">其他设备</Option>
+                    {deviceTypeOptions.map(opt => (
+                      <Option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </Option>
+                    ))}
                   </Select>
                 </Form.Item>
               </Col>

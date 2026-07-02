@@ -37,13 +37,18 @@ function buildFieldValidator(field, isUpdate) {
       else validator = validator.allow('', null);
       break;
 
-    case 'type':
-      validator = Joi.string().valid(...DEVICE_TYPES).messages({
-        'any.only': `设备类型必须是以下之一: ${DEVICE_TYPES.join(', ')}`,
+    case 'type': {
+      // 从字段配置动态提取允许的设备类型值，options 为空时回退到默认值
+      const allowedTypes = Array.isArray(field.options) && field.options.length > 0
+        ? field.options.map(opt => (opt && opt.value !== undefined ? opt.value : opt))
+        : DEVICE_TYPES;
+      validator = Joi.string().valid(...allowedTypes).messages({
+        'any.only': `设备类型必须是以下之一: ${allowedTypes.join(', ')}`,
         'any.required': '设备类型是必填字段',
       });
       if (isRequired && !isUpdate) validator = validator.required();
       break;
+    }
 
     case 'serialNumber':
       validator = Joi.string().max(100).messages({

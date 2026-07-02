@@ -648,6 +648,14 @@ function DeviceManagement() {
           onHeaderCell: handleHeaderCellResize(field.fieldName),
         });
       } else if (field.fieldName === 'type') {
+        // 动态构建类型标签映射：优先用字段配置的 options，缺失时回退到 TYPE_MAP，再缺失则显示原值
+        const typeOptions = Array.isArray(field.options) ? field.options : [];
+        const typeLabelMap = {};
+        typeOptions.forEach(opt => {
+          if (opt && opt.value !== undefined) {
+            typeLabelMap[opt.value] = opt.label;
+          }
+        });
         generatedColumns.push({
           title: field.displayName,
           dataIndex: field.fieldName,
@@ -657,7 +665,7 @@ function DeviceManagement() {
           render: type => (
             <Space>
               {getDeviceTypeIcon(type)}
-              <span>{TYPE_MAP[type]}</span>
+              <span>{typeLabelMap[type] || TYPE_MAP[type] || type}</span>
             </Space>
           ),
         });

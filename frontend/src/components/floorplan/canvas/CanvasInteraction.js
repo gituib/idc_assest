@@ -1,4 +1,10 @@
-import { ZOOM } from './CanvasConstants';
+import {
+  ZOOM,
+  GRID_CELL_WIDTH,
+  GRID_CELL_HEIGHT,
+  GRID_ORIGIN_X,
+  GRID_ORIGIN_Y,
+} from './CanvasConstants';
 
 class CanvasInteraction {
   constructor(canvas, renderer, callbacks) {
@@ -14,6 +20,17 @@ class CanvasInteraction {
     this.lastMouseX = 0;
     this.lastMouseY = 0;
 
+    // 编辑模式相关状态
+    this.isEditMode = false;
+    this.editGridRows = 10;
+    this.editGridCols = 10;
+    // 当前正在拖拽的机柜对象
+    this.draggingRack = null;
+    // 拖拽起始网格位置（用于判断是否真的发生了移动）
+    this.dragStartGrid = null;
+    // 当前拖拽预览的网格位置
+    this.dragCurrentGrid = null;
+
     this.onMouseDown = this.onMouseDown.bind(this);
     this.onMouseMove = this.onMouseMove.bind(this);
     this.onMouseUp = this.onMouseUp.bind(this);
@@ -24,6 +41,69 @@ class CanvasInteraction {
     this.onTouchEnd = this.onTouchEnd.bind(this);
 
     this.bindEvents();
+  }
+
+  /**
+   * 切换编辑模式
+   * @param {boolean} enabled - 是否进入编辑模式
+   * @returns {void}
+   */
+  setEditMode(enabled) {
+    this.isEditMode = !!enabled;
+    if (!enabled) {
+      // 退出编辑模式时清理拖拽状态
+      this.draggingRack = null;
+      this.dragStartGrid = null;
+      this.dragCurrentGrid = null;
+      this.renderer.setDragPreview(null);
+    }
+    this.canvas.style.cursor = 'default';
+  }
+
+  /**
+   * 设置编辑模式下的网格行列数
+   * @param {number} rows - 行数
+   * @param {number} cols - 列数
+   * @returns {void}
+   */
+  setGridSize(rows, cols) {
+    this.editGridRows = rows;
+    this.editGridCols = cols;
+  }
+
+  /**
+   * 更新回调集合（避免 React 闭包失效问题）
+   * @param {object} callbacks - 新的回调集合
+   * @returns {void}
+   */
+  setCallbacks(callbacks) {
+    this.callbacks = { ...this.callbacks, ...callbacks };
+  }
+
+  /**
+   * 将画布像素坐标转换为网格行列号
+   * @param {number} canvasX - 画布X坐标
+   * @param {number} canvasY - 画布Y坐标
+   * @returns {{rowPos:number, colPos:number}} 网格行列号（可能为负或超出范围）
+   */
+  canvasToGrid(canvasX, canvasY) {
+    const viewX = (canvasX - this.renderer.offsetX) / this.renderer.zoom;
+    const viewY = (canvasY - this.renderer.offsetY) / this.renderer.zoom;
+    const colPos = Math.floor((viewX - GRID_ORIGIN_X) / GRID_CELL_WIDTH);
+    const rowPos = Math.floor((viewY - GRID_ORIGIN_Y) / GRID_CELL_HEIGHT);
+    return { rowPos, colPos };
+  }
+
+  /**
+   * 将网格行列号限制在用户自定义范围内
+   * @param {number} rowPos - 行号
+   * @param {number} colPos - 列号
+   * @returns {{rowPos:number, colPos:number}|null} 限制后的网格位置，超出返回 null
+   */
+  clampGrid(rowPos, colPos) {
+    if (rowPos < 0 || colPos < 0) return null;
+    if (rowPos >= this.editGridRows || colPos >= this.editGridCols) return null;
+    return { rowPos, colPos };
   }
 
   bindEvents() {
@@ -68,14 +148,63 @@ class CanvasInteraction {
     this.panStartY = coords.y;
     this.panStartOffsetX = this.renderer.offsetX;
     this.panStartOffsetY = this.renderer.offsetY;
+
+    // 编辑模式下：点中机柜 → 启动拖拽；点中空白 → 平移视图
+    if (this.isEditMode) {
+      const hitResult = this.renderer.hitTest(coords.x, coords.y);
+      if (hitResult && hitResult.rack && !hitResult.device) {
+        this.draggingRack = hitResult.rack;
+        const startGrid = this.renderer._resolveGridPos(hitResult.rack);
+        this.dragStartGrid = startGrid;
+        this.dragCurrentGrid = startGrid;
+        this.renderer.setDragPreview({
+          rack: hitResult.rack,
+          rowPos: startGrid.rowPos,
+          colPos: startGrid.colPos,
+          valid: true,
+        });
+        this.canvas.style.cursor = 'grabbing';
+        return;
+      }
+    }
+
     this.isPanning = true;
-    this.canvas.style.cursor = 'grabbing';
+    this.canvas.style.cursor = this.isEditMode ? 'move' : 'grabbing';
   }
 
   onMouseMove(e) {
     const coords = this.getCanvasCoords(e);
     this.lastMouseX = coords.x;
     this.lastMouseY = coords.y;
+
+    // 编辑模式拖拽中：计算网格位置，更新预览
+    if (this.isEditMode && this.draggingRack) {
+      const grid = this.canvasToGrid(coords.x, coords.y);
+      const clamped = this.clampGrid(grid.rowPos, grid.colPos);
+      if (clamped) {
+        const valid = !this.renderer.isGridOccupied(
+          clamped.rowPos,
+          clamped.colPos,
+          this.draggingRack.rackId
+        );
+        this.dragCurrentGrid = clamped;
+        this.renderer.setDragPreview({
+          rack: this.draggingRack,
+          rowPos: clamped.rowPos,
+          colPos: clamped.colPos,
+          valid,
+        });
+      } else {
+        this.dragCurrentGrid = null;
+        this.renderer.setDragPreview({
+          rack: this.draggingRack,
+          rowPos: grid.rowPos,
+          colPos: grid.colPos,
+          valid: false,
+        });
+      }
+      return;
+    }
 
     if (this.isPanning) {
       const dx = coords.x - this.panStartX;
@@ -94,12 +223,13 @@ class CanvasInteraction {
     }
 
     const hitResult = this.renderer.hitTest(coords.x, coords.y);
-    
+
     if (hitResult) {
       this.renderer.setHoveredRack(hitResult.rack);
       this.renderer.setHoveredDevice(hitResult.device);
-      this.canvas.style.cursor = 'pointer';
-      
+      // 编辑模式下机柜可拖拽 → 显示 move 光标
+      this.canvas.style.cursor = this.isEditMode ? 'move' : 'pointer';
+
       if (hitResult.device) {
         this.callbacks.onDeviceHover?.(hitResult.device, hitResult.rack, coords.x, coords.y);
       } else {
@@ -109,13 +239,33 @@ class CanvasInteraction {
     } else {
       this.renderer.setHoveredRack(null);
       this.renderer.setHoveredDevice(null);
-      this.canvas.style.cursor = 'default';
+      this.canvas.style.cursor = this.isEditMode ? 'default' : 'default';
       this.callbacks.onRackHover?.(null);
       this.callbacks.onDeviceHover?.(null);
     }
   }
 
   onMouseUp(e) {
+    // 编辑模式拖拽结束：提交位置（仅当目标有效且与起点不同）
+    if (this.isEditMode && this.draggingRack) {
+      const rack = this.draggingRack;
+      const startGrid = this.dragStartGrid;
+      const currentGrid = this.dragCurrentGrid;
+      const valid = currentGrid &&
+        !this.renderer.isGridOccupied(currentGrid.rowPos, currentGrid.colPos, rack.rackId);
+
+      if (valid && currentGrid &&
+          (currentGrid.rowPos !== startGrid.rowPos || currentGrid.colPos !== startGrid.colPos)) {
+        this.callbacks.onRackDragEnd?.(rack, currentGrid.rowPos, currentGrid.colPos);
+      }
+      this.draggingRack = null;
+      this.dragStartGrid = null;
+      this.dragCurrentGrid = null;
+      this.renderer.setDragPreview(null);
+      this.canvas.style.cursor = 'default';
+      return;
+    }
+
     if (this.isPanning) {
       const dx = Math.abs((e ? this.getCanvasCoords(e).x : this.lastMouseX) - this.panStartX);
       const dy = Math.abs((e ? this.getCanvasCoords(e).y : this.lastMouseY) - this.panStartY);

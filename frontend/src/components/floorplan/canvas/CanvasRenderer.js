@@ -2,6 +2,12 @@ import {
   CELL_WIDTH,
   CELL_HEIGHT,
   CELL_GAP,
+  GRID_CELL_WIDTH,
+  GRID_CELL_HEIGHT,
+  GRID_ORIGIN_X,
+  GRID_ORIGIN_Y,
+  GRID_DEFAULT_ROWS,
+  GRID_DEFAULT_COLS,
   RACK_PADDING,
   RACK_HEADER_HEIGHT,
   RACK_STATUS_BAR_HEIGHT,
@@ -29,6 +35,18 @@ class CanvasRenderer {
     this.hoveredRack = null;
     this.hoveredDevice = null;
     this.selectedRack = null;
+
+    // 编辑模式相关状态
+    this.isEditMode = false;
+    // 用户自定义的编辑网格行列数
+    this.editGridRows = 10;
+    this.editGridCols = 10;
+    // 位置覆盖：编辑过程中未保存的位置 Map<rackId, { rowPos, colPos, facing }>
+    this.positionOverrides = new Map();
+    // 网格占用情况 Map<`${rowPos},${colPos}`, rackId>
+    this.occupiedGrids = new Map();
+    // 当前拖拽预览状态 { rack, rowPos, colPos, valid } | null
+    this.dragPreview = null;
 
     this.pendingRender = false;
     this.bgCanvas = null;
@@ -111,6 +129,7 @@ class CanvasRenderer {
     this.racks.forEach(r => {
       if (r.rackId) this.rackMap.set(r.rackId, r);
     });
+    this._rebuildOccupiedGrids();
     this.requestRender();
   }
 
@@ -142,24 +161,97 @@ class CanvasRenderer {
     }
   }
 
-  requestRender() {
-    if (this.pendingRender) return;
-    this.pendingRender = true;
-    requestAnimationFrame(() => {
-      this.pendingRender = false;
-      this.render();
-    });
+  /**
+   * 切换编辑模式
+   * @param {boolean} enabled - 是否进入编辑模式
+   */
+  setEditMode(enabled) {
+    if (this.isEditMode !== enabled) {
+      this.isEditMode = !!enabled;
+      if (!enabled) {
+        // 退出编辑模式时清理拖拽预览
+        this.dragPreview = null;
+      }
+      this.requestRender();
+    }
   }
 
-  getRackBounds(rack) {
+  /**
+   * 设置编辑模式下的网格行列数
+   * @param {number} rows - 行数
+   * @param {number} cols - 列数
+   */
+  setGridSize(rows, cols) {
+    if (this.editGridRows !== rows || this.editGridCols !== cols) {
+      this.editGridRows = rows;
+      this.editGridCols = cols;
+      this.requestRender();
+    }
+  }
+
+  /**
+   * 设置位置覆盖（编辑过程中未保存的位置）
+   * @param {Map<string, {rowPos:number, colPos:number, facing:string}>} overrides
+   */
+  setPositionOverrides(overrides) {
+    this.positionOverrides = overrides instanceof Map ? overrides : new Map();
+    this._rebuildOccupiedGrids();
+    this.requestRender();
+  }
+
+  /**
+   * 设置拖拽预览状态
+   * @param {{rack:object, rowPos:number, colPos:number, valid:boolean}|null} state
+   */
+  setDragPreview(state) {
+    this.dragPreview = state || null;
+    this.requestRender();
+  }
+
+  /**
+   * 重建网格占用映射，用于编辑模式下判断目标格子是否被其他机柜占用
+   * @returns {void}
+   */
+  _rebuildOccupiedGrids() {
+    this.occupiedGrids.clear();
+    for (const rack of this.racks) {
+      const pos = this._resolveGridPos(rack);
+      if (pos) {
+        this.occupiedGrids.set(`${pos.rowPos},${pos.colPos}`, rack.rackId);
+      }
+    }
+  }
+
+  /**
+   * 解析机柜的网格位置（优先用 override，其次数据库字段，最后回退到名称推算）
+   * @param {object} rack - 机柜对象
+   * @returns {{rowPos:number, colPos:number}} 网格位置
+   */
+  _resolveGridPos(rack) {
+    if (!rack) return null;
+    const override = this.positionOverrides.get(rack.rackId);
+    if (override && Number.isInteger(override.rowPos) && Number.isInteger(override.colPos)) {
+      return { rowPos: override.rowPos, colPos: override.colPos };
+    }
+    if (Number.isInteger(rack.rowPos) && Number.isInteger(rack.colPos)) {
+      return { rowPos: rack.rowPos, colPos: rack.colPos };
+    }
+    // 回退：按名称首字母推算
+    return this._fallbackGridPosByName(rack);
+  }
+
+  /**
+   * 按机柜名称首字母推算网格位置（兼容历史数据）
+   * @param {object} rack - 机柜对象
+   * @returns {{rowPos:number, colPos:number}} 网格位置
+   */
+  _fallbackGridPosByName(rack) {
     const name = rack.name || '';
     const firstChar = name.charAt(0).toUpperCase();
-    
     let row = 0;
     if (/[A-Z]/.test(firstChar)) {
       row = firstChar.charCodeAt(0) - 65;
     }
-    
     const sameRowRacks = this.racks.filter(r => {
       const rName = r.name || '';
       const rFirst = rName.charAt(0).toUpperCase();
@@ -169,14 +261,48 @@ class CanvasRenderer {
       }
       return rRow === row;
     }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    
     const col = sameRowRacks.indexOf(rack);
-    
-    const startX = 24;
-    const startY = 24;
-    const x = startX + col * (CELL_WIDTH + CELL_GAP);
-    const y = startY + row * (CELL_HEIGHT + CELL_GAP);
+    return { rowPos: row, colPos: col < 0 ? 0 : col };
+  }
+
+  /**
+   * 判断指定网格是否已被其他机柜占用
+   * @param {number} rowPos - 行号
+   * @param {number} colPos - 列号
+   * @param {string} [excludeRackId] - 需排除的机柜ID（通常为正在拖拽的机柜自身）
+   * @returns {boolean} 是否被占用
+   */
+  isGridOccupied(rowPos, colPos, excludeRackId) {
+    const occupant = this.occupiedGrids.get(`${rowPos},${colPos}`);
+    if (!occupant) return false;
+    if (excludeRackId && occupant === excludeRackId) return false;
+    return true;
+  }
+
+  requestRender() {
+    if (this.pendingRender) return;
+    this.pendingRender = true;
+    requestAnimationFrame(() => {
+      this.pendingRender = false;
+      this.render();
+    });
+  }
+
+  /**
+   * 根据网格坐标计算像素边界（机柜左上角坐标 + 宽高）
+   * @param {number} rowPos - 行号
+   * @param {number} colPos - 列号
+   * @returns {{x:number, y:number, width:number, height:number}}
+   */
+  getGridBounds(rowPos, colPos) {
+    const x = GRID_ORIGIN_X + colPos * GRID_CELL_WIDTH;
+    const y = GRID_ORIGIN_Y + rowPos * GRID_CELL_HEIGHT;
     return { x, y, width: CELL_WIDTH, height: CELL_HEIGHT };
+  }
+
+  getRackBounds(rack) {
+    const pos = this._resolveGridPos(rack);
+    return this.getGridBounds(pos.rowPos, pos.colPos);
   }
 
   getDeviceBounds(rack, device) {
@@ -259,7 +385,7 @@ class CanvasRenderer {
     ctx.scale(this.dpr, this.dpr);
 
     ctx.clearRect(0, 0, displayWidth, displayHeight);
-    
+
     if (this.bgCanvas.width > 0 && this.bgCanvas.height > 0) {
       ctx.drawImage(this.bgCanvas, 0, 0, displayWidth, displayHeight);
     }
@@ -268,22 +394,98 @@ class CanvasRenderer {
     ctx.translate(this.offsetX, this.offsetY);
     ctx.scale(this.zoom, this.zoom);
 
+    // 编辑模式下绘制网格背景
+    if (this.isEditMode) {
+      this._drawEditGrid(ctx, displayWidth, displayHeight);
+    }
+
     const visibleRacks = this._getVisibleRacks(displayWidth, displayHeight);
     for (const { rack, bounds } of visibleRacks) {
-      this.drawRack(ctx, rack, bounds);
+      const isDragging = this.dragPreview?.rack?.rackId === rack.rackId;
+      this.drawRack(ctx, rack, bounds, isDragging);
+    }
+
+    // 编辑模式下绘制拖拽预览
+    if (this.isEditMode && this.dragPreview) {
+      this._drawDragPreview(ctx);
     }
 
     ctx.restore();
     ctx.restore();
   }
 
-  drawRack(ctx, rack, bounds) {
+  /**
+   * 绘制编辑模式下的网格背景
+   * 网格行列数据根据机柜实际占据的最大行列自动计算（含 margin），
+   * 不受 room.gridRows/gridCols 限制，确保所有已有位置都有对应网格
+   * @param {CanvasRenderingContext2D} ctx - 画布上下文
+   * @param {number} displayWidth - 显示宽度（CSS像素）
+   * @param {number} displayHeight - 显示高度（CSS像素）
+   */
+  _drawEditGrid(ctx, displayWidth, displayHeight) {
+    const rows = this.editGridRows;
+    const cols = this.editGridCols;
+
+    // 计算视口可见范围（视图坐标）
+    const viewLeft = -this.offsetX / this.zoom;
+    const viewTop = -this.offsetY / this.zoom;
+    const viewRight = viewLeft + displayWidth / this.zoom;
+    const viewBottom = viewTop + displayHeight / this.zoom;
+
+    // 计算可见网格列范围
+    const startCol = Math.max(0, Math.floor((viewLeft - GRID_ORIGIN_X) / GRID_CELL_WIDTH));
+    const endCol = Math.min(cols - 1, Math.ceil((viewRight - GRID_ORIGIN_X) / GRID_CELL_WIDTH));
+    const startRow = Math.max(0, Math.floor((viewTop - GRID_ORIGIN_Y) / GRID_CELL_HEIGHT));
+    const endRow = Math.min(rows - 1, Math.ceil((viewBottom - GRID_ORIGIN_Y) / GRID_CELL_HEIGHT));
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(22,119,255,0.18)';
+    ctx.lineWidth = 1 / this.zoom;
+    ctx.setLineDash([6 / this.zoom, 4 / this.zoom]);
+
+    for (let row = startRow; row <= endRow; row++) {
+      for (let col = startCol; col <= endCol; col++) {
+        const x = GRID_ORIGIN_X + col * GRID_CELL_WIDTH;
+        const y = GRID_ORIGIN_Y + row * GRID_CELL_HEIGHT;
+        ctx.strokeRect(x, y, CELL_WIDTH, CELL_HEIGHT);
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
+   * 绘制拖拽预览（虚线框 + 状态色）
+   */
+  _drawDragPreview(ctx) {
+    const { rowPos, colPos, valid } = this.dragPreview;
+    const bounds = this.getGridBounds(rowPos, colPos);
+    ctx.save();
+    ctx.setLineDash([8 / this.zoom, 5 / this.zoom]);
+    ctx.lineWidth = 2 / this.zoom;
+    ctx.strokeStyle = valid ? '#1677ff' : '#ff4d4f';
+    ctx.fillStyle = valid ? 'rgba(22,119,255,0.08)' : 'rgba(255,77,79,0.08)';
+    this.roundRect(ctx, bounds.x, bounds.y, bounds.width, bounds.height, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawRack(ctx, rack, bounds, isDragging) {
     const { x, y, width, height } = bounds;
     const isSelected = this.selectedRack?.rackId === rack.rackId;
     const isHovered = this.hoveredRack?.rackId === rack.rackId;
     const statusColor = RACK_STATUS_COLORS[rack.status] || RACK_STATUS_COLORS.active;
 
     ctx.save();
+
+    // 拖拽中的机柜半透明显示，让用户看清预览位置
+    if (isDragging) {
+      ctx.globalAlpha = 0.35;
+    }
+
+    // 编辑模式下给机柜加蓝色高亮边框，提示可拖拽
+    const editHighlight = this.isEditMode && !isDragging;
+
     ctx.beginPath();
     this.roundRect(ctx, x, y, width, height, 10);
 
@@ -311,9 +513,16 @@ class CanvasRenderer {
     ctx.fill();
 
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = isSelected ? '#1677ff' : isHovered ? '#bae7ff' : '#e5e7eb';
-    ctx.lineWidth = isSelected ? 2 : 1;
+    if (editHighlight) {
+      ctx.strokeStyle = '#1677ff';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+    } else {
+      ctx.strokeStyle = isSelected ? '#1677ff' : isHovered ? '#bae7ff' : '#e5e7eb';
+      ctx.lineWidth = isSelected ? 2 : 1;
+    }
     ctx.stroke();
+    ctx.setLineDash([]);
 
     ctx.beginPath();
     ctx.moveTo(x + 10, y);

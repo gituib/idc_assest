@@ -266,7 +266,11 @@ function RackImportModal({ visible, onClose, onImport, onDownloadTemplate }) {
           <ul style={{ margin: '8px 0 0', paddingLeft: '20px', lineHeight: '1.8' }}>
             <li>
               <Text strong>必填字段：</Text>
-              机柜ID、机柜名称、所属机房名称、高度(U)、最大功率(W)、状态
+              机柜名称、所属机房名称、高度(U)、最大功率(W)、状态
+            </li>
+            <li>
+              <Text strong>可选字段：</Text>
+              机柜ID（留空时系统自动按 RACK001、RACK002 规则生成）
             </li>
             <li>
               <Text strong>状态值：</Text>

@@ -25,6 +25,16 @@ const { createDeviceSchema } = require('../validation/dynamicDeviceSchema');
 
 const PREVIEW_COUNT = 20;
 
+// 从字段配置动态提取允许的设备类型，options 为空时回退到默认值
+// 解决字段管理新增设备类型后，导入/创建接口仍按硬编码白名单校验导致报错的问题
+function extractValidTypes(deviceFields) {
+  const typeField = deviceFields.find(f => f.fieldName === 'type');
+  if (typeField && Array.isArray(typeField.options) && typeField.options.length > 0) {
+    return typeField.options.map(opt => (opt && opt.value !== undefined ? opt.value : opt));
+  }
+  return ['server', 'switch', 'router', 'storage', 'other'];
+}
+
 async function checkPositionAvailable(
   rackId,
   position,
@@ -199,7 +209,7 @@ router.post('/import-preview', async (req, res) => {
       return match ? match[1].trim() : fieldNameWithFormat;
     };
 
-    const validTypes = ['server', 'switch', 'router', 'storage', 'other'];
+    const validTypes = extractValidTypes(deviceFields);
     const validStatuses = ['running', 'maintenance', 'offline', 'fault'];
     const baseFieldNames = [
       'deviceId',
@@ -301,6 +311,9 @@ router.post('/import-preview', async (req, res) => {
 
         if (!rackName?.trim()) {
           rowErrors.push('所在机柜名称不能为空');
+        } else if (roomName?.trim() && roomNameToIdMap.get(roomName.trim()) && !rackLocationMap.get(`${roomName.trim()}_${rackName.trim()}`)) {
+          // 机房存在但机柜不存在时给出明确错误，不再依赖导入时自动创建
+          rowErrors.push(`机柜不存在：机房「${roomName.trim()}」下不存在名为「${rackName.trim()}」的机柜，请先在机柜管理中创建该机柜`);
         }
 
         const status = getFieldValue('status');
@@ -1147,7 +1160,7 @@ router.post('/import', async (req, res) => {
     // 【优化2】收集所有需要验证的唯一键
     const allDeviceIds = new Set();
     const allSerialNumbers = new Set();
-    const validTypes = ['server', 'switch', 'router', 'storage', 'other'];
+    const validTypes = extractValidTypes(deviceFields);
     const validStatuses = ['running', 'maintenance', 'offline', 'fault'];
     const baseFieldNames = [
       'deviceId',
@@ -1254,43 +1267,11 @@ router.post('/import', async (req, res) => {
         }
 
         const locationKey = `${roomName.trim()}_${rackName.trim()}`;
-        let rackId = rackLocationMap.get(locationKey);
+        const rackId = rackLocationMap.get(locationKey);
 
-        // 机柜不存在则自动创建
+        // 机柜不存在时给出错误详情，不再自动创建
         if (!rackId) {
-          const maxRackResult = await Rack.findOne({
-            attributes: [
-              [
-                sequelize.fn(
-                  'MAX',
-                  dbDialect === 'mysql'
-                    ? sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('rackId'), 5), 'SIGNED')
-                    : sequelize.cast(sequelize.fn('SUBSTR', sequelize.col('rackId'), 5), 'INTEGER')
-                ),
-                'maxNum',
-              ],
-            ],
-            where: { rackId: { [Op.like]: 'RACK%' } },
-            transaction: t,
-          });
-          let maxRackNum = maxRackResult?.get('maxNum') || 0;
-          maxRackNum++;
-
-          const newRack = await Rack.create(
-            {
-              rackId: `RACK${String(maxRackNum).padStart(3, '0')}`,
-              name: rackName.trim(),
-              height: 42,
-              maxPower: 10000,
-              currentPower: 0,
-              status: 'active',
-              roomId: roomId,
-            },
-            { transaction: t }
-          );
-
-          rackId = newRack.rackId;
-          rackLocationMap.set(locationKey, rackId);
+          throw new Error(`机柜不存在：机房「${roomName.trim()}」下不存在名为「${rackName.trim()}」的机柜，请先在机柜管理中创建该机柜`);
         }
 
         // 验证状态

@@ -2,6 +2,16 @@ export const CELL_WIDTH = 220;
 export const CELL_HEIGHT = 480;
 export const CELL_GAP = 20;
 
+// 网格单元尺寸（一个机柜占一格）
+export const GRID_CELL_WIDTH = CELL_WIDTH + CELL_GAP;
+export const GRID_CELL_HEIGHT = CELL_HEIGHT + CELL_GAP;
+// 网格原点（左上角第一个格子的起始坐标）
+export const GRID_ORIGIN_X = 24;
+export const GRID_ORIGIN_Y = 24;
+// 默认网格行列数（与 Room.gridRows/gridCols 对齐）
+export const GRID_DEFAULT_ROWS = 10;
+export const GRID_DEFAULT_COLS = 10;
+
 export const RACK_PADDING = 10;
 export const RACK_HEADER_HEIGHT = 36;
 export const RACK_STATUS_BAR_HEIGHT = 4;

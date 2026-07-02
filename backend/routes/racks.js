@@ -575,9 +575,8 @@ function validateRackData(jsonData, roomNameToIdMap, validRoomNames) {
   processedData.forEach(item => {
     const errors = [];
 
-    if (!item.rackId || item.rackId === '') {
-      errors.push('机柜ID不能为空（如需自动生成请使用导入功能）');
-    } else if (!/^[a-zA-Z0-9_-]+$/.test(item.rackId)) {
+    // 机柜ID为空时由 /import 路由自动生成，此处仅校验非空时的格式
+    if (item.rackId && !/^[a-zA-Z0-9_-]+$/.test(item.rackId)) {
       errors.push('机柜ID只能包含字母、数字、下划线和横线');
     }
     if (!item.name || String(item.name).trim() === '') {
