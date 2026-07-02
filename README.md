@@ -9,17 +9,24 @@
 **GitHub**: <https://github.com/gituib/idc_assest>
 **Gitee**: <https://gitee.com/zhang96110/idc_assest>
 
-***
+---
+
+<div align="center">
+  <a href="https://gituib.github.io/idc_assest-docs" style="display: inline-block; padding: 12px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; font-size: 20px; font-weight: bold; text-decoration: none; border-radius: 8px; margin: 16px 0;">
+    📖 查看完整文档教程 →
+  </a>
+  <br>
+  <span style="color: #666; font-size: 14px;">包含安装部署、配置说明、使用指南等全部教程</span>
+</div>
+
+---
 
 ## 目录
 
 - [IDC设备资产管理系统](#idc设备资产管理系统)
-  - [功能特性](#功能特性)
-    - [项目截图](#项目截图)
   - [快速开始](#快速开始)
     - [Linux 一键部署](#linux-一键部署)
     - [Windows 部署](#windows-部署)
-    - [手动安装](#手动安装)
   - [环境要求](#环境要求)
     - [生产环境额外要求](#生产环境额外要求)
   - [脚本命令参考](#脚本命令参考)
@@ -40,54 +47,6 @@
   - [许可证](#许可证)
 
 ***
-
-## 功能特性
-
-| 模块     | 描述                   |
-| ------ | -------------------- |
-| 机房管理   | 多机房管理，平面图可视化         |
-| 机柜管理   | 机柜增删改查，3D 可视化，批量导入导出 |
-| 设备管理   | 全生命周期管理，自定义字段，批量导入导出 |
-| 端口管理   | 设备端口配置，网卡绑定，批量管理     |
-| 线缆管理   | 线缆连接管理，可视化追踪         |
-| 网络拓扑   | 拓扑可视化展示（ReactFlow）   |
-| 工单管理   | 故障报修，维护工单全流程         |
-| 耗材管理   | 库存管理，SN 序列号追踪，日志归档   |
-| 盘点管理   | 盘点计划与执行，待审核设备        |
-| 空闲设备   | 空闲设备转入/激活            |
-| 数据看板   | 实时监控，功率监控，趋势图表       |
-| 3D 可视化 | 三维机柜展示，LOD 优化        |
-| 机房平面图  | Canvas 渲染，拖拽编辑       |
-| 操作日志   | 审计追踪，统计分析            |
-| 备份管理   | 本地/远程备份，自动定时         |
-| 系统配置   | 自定义字段，背景配置           |
-| 用户权限   | RBAC 角色控制            |
-| API 文档 | Swagger 交互式文档        |
-
-### 项目截图
-
-<details>
-<summary>点击展开查看截图</summary>
-
-![数据看板](docs/images/dashboard-full.png)
-*数据看板 - 实时监控数据中心运行状态*
-
-![3D 机柜可视化](docs/images/3d-visualization-full.png)
-*3D 机柜可视化 - 三维展示机柜设备布局*
-
-![机房管理](docs/images/room-management-full.png)
-*机房管理 - 多机房分类管理*
-
-![设备管理](docs/images/device-management-full.png)
-*设备管理 - 设备全生命周期管理*
-
-![工单管理](docs/images/ticket-management.png)
-*工单管理 - 故障报修与维护工单处理*
-
-![数据备份](docs/images/backup-management.png)
-*数据备份 - 数据库备份与恢复管理*
-
-</details>
 
 ***
 
@@ -142,34 +101,6 @@ node install.js
 # 或使用 npm
 npm run deploy
 ```
-
-### 手动安装
-
-```bash
-# 1. 克隆项目
-git clone https://gitee.com/zhang96110/idc_assest.git
-cd idc_assest
-
-# 2. 安装依赖
-npm run install:all
-
-# 3. 配置环境变量
-cp backend/.env.example backend/.env
-
-# 4. 配置 JWT 密钥（必填）
-# 编辑 backend/.env，设置 JWT_SECRET 为强随机字符串
-# 生成命令：openssl rand -hex 64（Linux/macOS）
-# 或：node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-
-# 5. 初始化数据库
-cd backend && node scripts/init-database.js
-
-# 6. 启动服务
-cd .. && npm start
-```
-
-**访问地址**：<http://localhost:3000>
-**默认账号**：首次注册自动成为管理员
 
 ***
 
