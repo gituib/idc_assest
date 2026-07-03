@@ -406,7 +406,11 @@ const CableWizardModal = ({ visible, onClose, onSuccess, initialSourceDevice, ed
         message.success('接线创建成功');
       }
       
-      onSuccess?.();
+      // 通知父组件刷新，传递受影响的设备ID以便刷新端口状态
+      onSuccess?.({
+        sourceDeviceId: sourceDevice.deviceId,
+        targetDeviceId: targetDevice.deviceId,
+      });
       onClose();
     } catch (error) {
       console.error('操作接线失败:', error);

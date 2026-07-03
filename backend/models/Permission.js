@@ -16,7 +16,7 @@ const Permission = sequelize.define(
     permissionCode: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
+      unique: 'permissionCode',
     },
     parentId: {
       type: DataTypes.STRING,

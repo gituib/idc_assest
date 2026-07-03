@@ -6,6 +6,22 @@ const DevicePort = require('../models/DevicePort');
 const Device = require('../models/Device');
 const NetworkCard = require('../models/NetworkCard');
 const Cable = require('../models/Cable');
+const Rack = require('../models/Rack');
+const Room = require('../models/Room');
+
+// 设备卡片需要展示的扩展字段（含位置、网络、状态信息）
+const DEVICE_DETAIL_ATTRIBUTES = [
+  'deviceId',
+  'name',
+  'type',
+  'model',
+  'serialNumber',
+  'rackId',
+  'position',
+  'height',
+  'ipAddress',
+  'status',
+];
 
 DevicePort.belongsTo(Device, { foreignKey: 'deviceId', as: 'device' });
 Device.hasMany(DevicePort, { foreignKey: 'deviceId', as: 'ports' });
@@ -493,7 +509,7 @@ router.get('/export/all', async (req, res) => {
 // 解决端口数超过 pageSize 时部分设备不显示的问题
 router.get('/grouped', async (req, res) => {
   try {
-    const { deviceId, page = 1, pageSize = 10 } = req.query;
+    const { deviceId, roomId, rackId, page = 1, pageSize = 10 } = req.query;
     const pageNum = Math.max(1, parseInt(page) || 1);
     const pageSizeNum = Math.max(1, parseInt(pageSize) || 10);
     const offset = (pageNum - 1) * pageSizeNum;
@@ -504,32 +520,85 @@ router.get('/grouped', async (req, res) => {
       deviceWhere.deviceId = deviceId;
     }
 
-    // 端口总数（不受设备分页影响，用于前端统计与导出）
-    const portWhere = {};
-    if (deviceId) {
-      portWhere.deviceId = deviceId;
+    // 机柜筛选
+    if (rackId) {
+      deviceWhere.rackId = rackId;
+    } else if (roomId) {
+      // 先查找该机房下的所有机柜
+      const racksInRoom = await Rack.findAll({
+        where: { roomId },
+        attributes: ['rackId'],
+      });
+      const rackIds = racksInRoom.map(r => r.rackId);
+      if (rackIds.length === 0) {
+        // 机房下无机柜，直接返回空结果
+        return res.json({
+          total: 0,
+          totalPorts: 0,
+          page: pageNum,
+          pageSize: pageSizeNum,
+          groups: [],
+        });
+      }
+      deviceWhere.rackId = { [Op.in]: rackIds };
     }
-    const totalPorts = await DevicePort.count({ where: portWhere });
+
+    // 有端口的设备查询条件（复用 deviceWhere + EXISTS 子查询）
+    const deviceWithPortsWhere = {
+      ...deviceWhere,
+      [Op.and]: [
+        Sequelize.where(
+          Sequelize.literal(
+            `EXISTS (SELECT 1 FROM device_ports WHERE device_ports.deviceId = Device.deviceId)`
+          ),
+          '=',
+          1
+        ),
+      ],
+    };
+
+    // 查询符合条件的所有设备ID（用于统计端口总数）
+    const allMatchingDevices = await Device.findAll({
+      attributes: ['deviceId'],
+      where: deviceWithPortsWhere,
+    });
+    const allMatchingDeviceIds = allMatchingDevices.map(d => d.deviceId);
+
+    if (allMatchingDeviceIds.length === 0) {
+      return res.json({
+        total: 0,
+        totalPorts: 0,
+        page: pageNum,
+        pageSize: pageSizeNum,
+        groups: [],
+      });
+    }
+
+    // 端口总数（不受设备分页影响，用于前端统计与导出）
+    const totalPorts = await DevicePort.count({
+      where: { deviceId: { [Op.in]: allMatchingDeviceIds } },
+    });
 
     // 查询有端口的设备（用 EXISTS 子查询，避免 hasMany JOIN 导致 limit 作用于端口行）
     // 若用 include+JOIN，limit 会作用于 JOIN 后的行数，端口多的设备会占满 limit
     const { count, rows } = await Device.findAndCountAll({
-      attributes: ['deviceId', 'name', 'type', 'rackId'],
-      where: {
-        ...deviceWhere,
-        [Op.and]: [
-          Sequelize.where(
-            Sequelize.literal(
-              `EXISTS (SELECT 1 FROM device_ports WHERE device_ports.deviceId = Device.deviceId)`
-            ),
-            '=',
-            1
-          ),
-        ],
-      },
+      attributes: DEVICE_DETAIL_ATTRIBUTES,
+      where: deviceWithPortsWhere,
       order: [['name', 'ASC']],
       offset,
       limit: pageSizeNum,
+      include: [
+        {
+          model: Rack,
+          attributes: ['rackId', 'name'],
+          include: [
+            {
+              model: Room,
+              attributes: ['roomId', 'name'],
+            },
+          ],
+        },
+      ],
     });
 
     // 当前页设备ID列表
@@ -552,7 +621,19 @@ router.get('/grouped', async (req, res) => {
         {
           model: Device,
           as: 'device',
-          attributes: ['deviceId', 'name', 'type', 'rackId'],
+          attributes: DEVICE_DETAIL_ATTRIBUTES,
+          include: [
+            {
+              model: Rack,
+              attributes: ['rackId', 'name'],
+              include: [
+                {
+                  model: Room,
+                  attributes: ['roomId', 'name'],
+                },
+              ],
+            },
+          ],
         },
         {
           model: NetworkCard,

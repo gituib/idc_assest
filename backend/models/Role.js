@@ -17,7 +17,7 @@ const Role = sequelize.define(
     roleCode: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
+      unique: 'roleCode',
     },
     description: {
       type: DataTypes.STRING,

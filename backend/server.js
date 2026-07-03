@@ -105,35 +105,38 @@ async function syncBusinessModels() {
   const Ticket = require('./models/Ticket');
   const TicketOperationRecord = require('./models/TicketOperationRecord');
 
-  if (process.env.NODE_ENV !== 'production') {
-    await Warehouse.sync({ alter: true });
-    await Business.sync({ alter: true });
-    await Role.sync({ alter: true });
-    await Permission.sync({ alter: true });
-    await UserRole.sync({ alter: true });
-    await Cable.sync({ alter: true });
-    await DevicePort.sync({ alter: true });
-    await NetworkCard.sync({ alter: true });
-    await DeviceBusiness.sync({ alter: true });
-    await PendingDevice.sync({ alter: true });
-    await Ticket.sync({ alter: true });
-    await TicketOperationRecord.sync({ alter: true });
-    logger.info('业务/库房/工单等扩展模型同步完成（alter mode）');
-  } else {
-    await Warehouse.sync();
-    await Business.sync();
-    await Role.sync();
-    await Permission.sync();
-    await UserRole.sync();
-    await Cable.sync();
-    await DevicePort.sync();
-    await NetworkCard.sync();
-    await DeviceBusiness.sync();
-    await PendingDevice.sync();
-    await Ticket.sync();
-    await TicketOperationRecord.sync();
-    logger.info('业务/库房/工单等扩展模型同步完成（safe mode）');
-  }
+  /**
+   * 安全同步单个模型：alter:true 可能因历史遗留索引/数据问题失败，
+   * 单个模型失败不应导致整个服务崩溃，仅记录错误后继续。
+   */
+  const safeSync = async (model, label) => {
+    try {
+      if (process.env.NODE_ENV !== 'production') {
+        await model.sync({ alter: true });
+      } else {
+        await model.sync();
+      }
+    } catch (err) {
+      logger.error(`模型 ${label} 同步失败，服务将继续启动（请手动修复表结构）`, {
+        error: err.message,
+      });
+    }
+  };
+
+  await safeSync(Warehouse, 'Warehouse');
+  await safeSync(Business, 'Business');
+  await safeSync(Role, 'Role');
+  await safeSync(Permission, 'Permission');
+  await safeSync(UserRole, 'UserRole');
+  await safeSync(Cable, 'Cable');
+  await safeSync(DevicePort, 'DevicePort');
+  await safeSync(NetworkCard, 'NetworkCard');
+  await safeSync(DeviceBusiness, 'DeviceBusiness');
+  await safeSync(PendingDevice, 'PendingDevice');
+  await safeSync(Ticket, 'Ticket');
+  await safeSync(TicketOperationRecord, 'TicketOperationRecord');
+
+  logger.info('业务/库房/工单等扩展模型同步完成' + (process.env.NODE_ENV !== 'production' ? '（alter mode）' : '（safe mode）'));
 }
 
 async function initDefaultSystemSettings() {

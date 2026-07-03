@@ -61,7 +61,7 @@ const NetworkCard = sequelize.define(
     indexes: [
       { fields: ['deviceId'] },
       { fields: ['slotNumber'] },
-      { unique: true, fields: ['deviceId', 'name'] },
+      { unique: true, name: 'network_cards_device_id_name', fields: ['deviceId', 'name'] },
     ],
   }
 );

@@ -311,12 +311,20 @@ function CableManagement() {
       cancelText: '取消',
       onOk: async () => {
         try {
+          // 先找到被删除接线的设备ID，用于后续刷新端口状态
+          const deletedCable = cables.find(c => c.cableId === cableId);
+          const sourceDeviceId = deletedCable?.sourceDeviceId;
+          const targetDeviceId = deletedCable?.targetDeviceId;
+
           await axios.delete(`/api/cables/${cableId}`);
           message.success({
             content: '删除成功',
             icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
           });
           fetchCables();
+          // 刷新受影响的设备端口状态
+          if (sourceDeviceId) fetchDevicePorts(sourceDeviceId);
+          if (targetDeviceId) fetchDevicePorts(targetDeviceId);
         } catch (error) {
           message.error('删除失败');
           console.error('删除失败:', error);
@@ -339,6 +347,9 @@ function CableManagement() {
         setModalVisible(false);
         form.resetFields();
         fetchCables();
+        // 刷新受影响的设备端口状态（新旧端口都可能变化）
+        fetchDevicePorts(values.sourceDeviceId);
+        fetchDevicePorts(values.targetDeviceId);
         return;
       }
 
@@ -367,6 +378,9 @@ function CableManagement() {
         setModalVisible(false);
         form.resetFields();
         fetchCables();
+        // 刷新受影响的设备端口状态
+        fetchDevicePorts(values.sourceDeviceId);
+        fetchDevicePorts(values.targetDeviceId);
       } catch (error) {
         if (error.response?.status === 409) {
           // 冲突错误
@@ -407,6 +421,9 @@ function CableManagement() {
       setPendingSubmitValues(null);
       setConflictInfo(null);
       fetchCables();
+      // 刷新受影响的设备端口状态
+      fetchDevicePorts(pendingSubmitValues.sourceDeviceId);
+      fetchDevicePorts(pendingSubmitValues.targetDeviceId);
     } catch (error) {
       message.error('强制接管失败');
       console.error('强制接管失败:', error);
@@ -1523,9 +1540,16 @@ function CableManagement() {
           setWizardInitialSourceDevice(null);
           setEditingCable(null);
         }}
-        onSuccess={() => {
+        onSuccess={(result) => {
           setEditingCable(null);
           fetchCables();
+          // 刷新受影响的设备端口状态
+          if (result?.sourceDeviceId) {
+            fetchDevicePorts(result.sourceDeviceId);
+          }
+          if (result?.targetDeviceId) {
+            fetchDevicePorts(result.targetDeviceId);
+          }
         }}
         initialSourceDevice={wizardInitialSourceDevice}
         editingCable={editingCable}

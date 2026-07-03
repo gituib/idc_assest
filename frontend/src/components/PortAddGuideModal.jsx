@@ -143,7 +143,7 @@ const PortAddGuideModal = ({ visible, onClose, onSelectType }) => {
                   marginBottom: '4px',
                 }}
               >
-                交换机端口
+                网络设备端口
               </div>
               <div
                 style={{
@@ -151,7 +151,7 @@ const PortAddGuideModal = ({ visible, onClose, onSelectType }) => {
                   color: designTokens.colors.neutral[500],
                 }}
               >
-                直接添加端口
+                交换机/路由器/防火墙等
               </div>
             </div>
             <div
@@ -284,7 +284,7 @@ const PortAddGuideModal = ({ visible, onClose, onSelectType }) => {
                     marginBottom: '2px',
                   }}
                 >
-                  交换机端口
+                  网络设备端口
                 </div>
                 <div
                   style={{
@@ -293,8 +293,8 @@ const PortAddGuideModal = ({ visible, onClose, onSelectType }) => {
                     lineHeight: 1.6,
                   }}
                 >
-                  交换机端口用于网络设备间的连接，可以直接创建端口，无需关联网卡。适用于创建 Uplink
-                  端口、Trunk 端口等。
+                  适用于交换机、路由器、防火墙、存储设备等网络设备，可以直接创建端口，无需关联网卡。适用于创建
+                  Uplink 端口、Trunk 端口等。
                 </div>
               </div>
             </div>

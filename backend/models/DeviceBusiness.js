@@ -38,7 +38,7 @@ const DeviceBusiness = sequelize.define(
     indexes: [
       { fields: ['deviceId'] },
       { fields: ['businessId'] },
-      { unique: true, fields: ['deviceId', 'businessId'] },
+      { unique: true, name: 'device_business_device_id_business_id', fields: ['deviceId', 'businessId'] },
     ],
   }
 );

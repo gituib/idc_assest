@@ -386,9 +386,14 @@ function getLastBackupTime() {
     )
     .map(f => {
       const filePath = path.join(backupDir, f);
+      const stats = fs.statSync(filePath);
+      // Docker 环境下 birthtime 可能为 0 或无效，使用 mtime 作为 fallback
+      const fileTime = (stats.birthtimeMs && stats.birthtimeMs > 0)
+        ? stats.birthtimeMs
+        : stats.mtimeMs;
       return {
         filename: f,
-        createdAt: fs.statSync(filePath).birthtime,
+        createdAt: new Date(fileTime),
       };
     })
     .sort((a, b) => b.createdAt - a.createdAt);
@@ -1436,13 +1441,17 @@ function cleanOldBackups(options = {}) {
     .map(f => {
       const filePath = path.join(backupPath, f);
       const stats = fs.statSync(filePath);
+      // Docker 环境下 birthtime 可能为 0 或无效，使用 mtime 作为 fallback
+      const fileTime = (stats.birthtimeMs && stats.birthtimeMs > 0)
+        ? stats.birthtimeMs
+        : stats.mtimeMs;
       return {
         filename: f,
         path: filePath,
         size: stats.size,
-        createdAt: stats.birthtime,
-        createdMs: stats.birthtimeMs || stats.birthtime.getTime(),
-        age: now - (stats.birthtimeMs || stats.birthtime.getTime()),
+        createdAt: new Date(fileTime),
+        createdMs: fileTime,
+        age: now - fileTime,
       };
     })
     .sort((a, b) => b.createdMs - a.createdMs);

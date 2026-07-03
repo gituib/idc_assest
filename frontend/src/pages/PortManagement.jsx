@@ -53,6 +53,14 @@ import {
   ThunderboltOutlined,
   FileTextOutlined,
   InfoCircleOutlined,
+  SafetyOutlined,
+  HddOutlined,
+  SwapOutlined,
+  EnvironmentOutlined,
+  DatabaseOutlined,
+  ColumnHeightOutlined,
+  GlobalOutlined,
+  BarcodeOutlined,
 } from '@ant-design/icons';
 import api from '../api';
 import { roomAPI, rackAPI } from '../api/cache';
@@ -69,6 +77,7 @@ import PortExportModal from '../components/PortExportModal';
 import { designTokens } from '../config/theme';
 import CloseButton from '../components/CloseButton';
 import { debounce } from '../utils/common';
+import { STATUS_MAP } from '../constants/deviceManagementConstants';
 
 const { Option } = Select;
 const { Panel } = Collapse;
@@ -131,6 +140,8 @@ function PortManagement() {
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
     deviceId: '',
+    roomId: '',
+    rackId: '',
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingPort, setEditingPort] = useState(null);
@@ -205,6 +216,53 @@ function PortManagement() {
   const [serverNicCardPage, setServerNicCardPage] = useState(1);
   const serverNicCardPageSize = 12;
 
+  /**
+   * 加载筛选用的机房和机柜列表
+   */
+  const loadFilterRoomsAndRacks = useCallback(async () => {
+    try {
+      const [roomsData, racksData] = await Promise.all([
+        roomAPI.list(),
+        api.get('/racks', { params: { pageSize: 1000 } }),
+      ]);
+      setRoomList(roomsData.rooms || roomsData || []);
+      setRackList(racksData.racks || racksData || []);
+    } catch (error) {
+      console.error('获取机房机柜数据失败:', error);
+    }
+  }, []);
+
+  /**
+   * 根据选中的机房筛选机柜列表
+   */
+  const filteredRackList = useMemo(() => {
+    if (!filters.roomId) return rackList;
+    return rackList.filter(rack => rack.roomId === filters.roomId);
+  }, [rackList, filters.roomId]);
+
+  /**
+   * 机房选择变化处理
+   * @param {string} roomId - 机房ID
+   */
+  const handleRoomChange = useCallback((roomId) => {
+    setFilters(prev => ({
+      ...prev,
+      roomId: roomId || '',
+      rackId: '',
+    }));
+  }, []);
+
+  /**
+   * 机柜选择变化处理
+   * @param {string} rackId - 机柜ID
+   */
+  const handleRackChange = useCallback((rackId) => {
+    setFilters(prev => ({
+      ...prev,
+      rackId: rackId || '',
+    }));
+  }, []);
+
   // 按设备分组获取端口（设备维度分页，避免端口数过多时部分设备不显示）
   const fetchPorts = useCallback(
     async (page = 1) => {
@@ -216,6 +274,8 @@ function PortManagement() {
           pageSize: deviceCardPageSize,
         };
         if (filters.deviceId) params.deviceId = filters.deviceId;
+        if (filters.roomId) params.roomId = filters.roomId;
+        if (filters.rackId) params.rackId = filters.rackId;
 
         const response = await api.get('/device-ports/grouped', { params });
         const groups = response.groups || [];
@@ -272,7 +332,8 @@ function PortManagement() {
   useEffect(() => {
     fetchPorts(1);
     fetchDevices();
-  }, [fetchPorts, fetchDevices]);
+    loadFilterRoomsAndRacks();
+  }, [fetchPorts, fetchDevices, loadFilterRoomsAndRacks]);
 
   const handleSearch = useCallback(() => {
     setDeviceCardPage(1);
@@ -282,6 +343,8 @@ function PortManagement() {
   const handleReset = useCallback(() => {
     setFilters({
       deviceId: '',
+      roomId: '',
+      rackId: '',
     });
     setDeviceCardPage(1);
     fetchPorts(1);
@@ -298,11 +361,13 @@ function PortManagement() {
     setGuidedDeviceType(type);
     fetchDevices();
     fetchRoomsAndRacks();
+    // 根据引导类型默认选中第一个 Tab
     if (type === 'switch') {
       setDeviceFilterType('switch');
-    } else if (type === 'server') {
+    } else {
       setDeviceFilterType('server');
     }
+    setDevicePage(1);
     setSelectDeviceModalVisible(true);
   };
 
@@ -751,6 +816,7 @@ function PortManagement() {
             deviceId: targetDeviceId,
             portName: name,
             portType: values.portType,
+            portSpeed: values.portSpeed,
             status: 'free',
             vlanId: values.vlanId,
             description: values.description,
@@ -774,6 +840,7 @@ function PortManagement() {
             deviceId: targetDeviceId,
             portName: portNames[0],
             portType: values.portType,
+            portSpeed: values.portSpeed,
             status: 'free',
             vlanId: values.vlanId,
             description: values.description,
@@ -1577,19 +1644,59 @@ function PortManagement() {
     if (type.includes('server')) return <CloudServerOutlined />;
     if (type.includes('switch')) return <AppstoreOutlined />;
     if (type.includes('router')) return <ApiOutlined />;
+    if (type.includes('firewall')) return <SafetyOutlined />;
+    if (type.includes('storage')) return <HddOutlined />;
+    if (type.includes('loadbalancer')) return <SwapOutlined />;
     return <AppstoreOutlined />;
   };
 
+  /** 获取设备类型分类：server 为服务器，switch 涵盖所有网络设备（交换机/路由器/防火墙/存储等） */
   const getDeviceType = device => {
     if (!device?.type) return 'unknown';
     const type = device.type.toLowerCase();
-    if (type.includes('switch')) return 'switch';
     if (type.includes('server')) return 'server';
+    // 交换机、路由器、防火墙、存储等网络设备归为一类
+    if (
+      type.includes('switch') ||
+      type.includes('router') ||
+      type.includes('firewall') ||
+      type.includes('storage') ||
+      type.includes('loadbalancer')
+    ) {
+      return 'switch';
+    }
     return 'other';
   };
 
   const isSwitchDevice = device => getDeviceType(device) === 'switch';
   const isServerDevice = device => getDeviceType(device) === 'server';
+
+  /** 根据设备原始类型获取中文名标签 */
+  const getDeviceTypeLabel = device => {
+    if (!device?.type) return '设备';
+    const type = device.type.toLowerCase();
+    if (type.includes('server')) return '服务器';
+    if (type.includes('switch')) return '交换机';
+    if (type.includes('router')) return '路由器';
+    if (type.includes('firewall')) return '防火墙';
+    if (type.includes('storage')) return '存储设备';
+    if (type.includes('loadbalancer')) return '负载均衡';
+    return '设备';
+  };
+
+  /** 将设备状态值映射为带颜色的中文文本 */
+  const getDeviceStatusTag = status => {
+    const config = STATUS_MAP[status];
+    if (!config) return null;
+    return (
+      <Tag
+        color={config.color}
+        style={{ marginLeft: '4px', marginInlineEnd: 0, borderRadius: '4px', padding: '0 8px' }}
+      >
+        {config.text}
+      </Tag>
+    );
+  };
 
   // 过滤后的设备列表（带分页）
   const paginatedDevices = useMemo(() => {
@@ -1601,9 +1708,21 @@ function PortManagement() {
     const filtered = devices.filter(d => {
       const type = getDeviceType(d);
       if (type !== 'switch' && type !== 'server') return false;
-      if (deviceFilterType !== 'all' && type !== deviceFilterType) return false;
       if (selectedRackId && d.rackId !== selectedRackId) return false;
       if (selectedRoomId && d.rackId && rackRoomMap[d.rackId] !== selectedRoomId) return false;
+      // 子类型过滤：根据设备原始类型精确匹配
+      if (deviceFilterType !== 'all') {
+        if (deviceFilterType === 'server') {
+          if (type !== 'server') return false;
+        } else if (deviceFilterType === 'switch') {
+          // 'switch' Tab 在非引导模式下展示所有网络设备
+          if (type !== 'switch') return false;
+        } else {
+          // 子类型过滤：router/firewall/storage 等，检查原始 type 字段
+          const rawType = (d.type || '').toLowerCase();
+          if (!rawType.includes(deviceFilterType)) return false;
+        }
+      }
       return true;
     });
     const pageSize = 100;
@@ -1698,8 +1817,63 @@ function PortManagement() {
               }}
               bodyStyle={{ padding: '16px' }}
             >
-              <Row gutter={[16, 16]} align="middle">
-                <Col xs={24} sm={24} md={10} lg={8}>
+              <Row gutter={[16, 16]} align="bottom">
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <div
+                    style={{
+                      marginBottom: '6px',
+                      fontSize: '13px',
+                      color: designTokens.colors.neutral[600],
+                      fontWeight: 500,
+                    }}
+                  >
+                    机房筛选
+                  </div>
+                  <Select
+                    placeholder="选择机房"
+                    style={{ width: '100%' }}
+                    value={filters.roomId || undefined}
+                    onChange={handleRoomChange}
+                    allowClear
+                  >
+                    {roomList.map(room => (
+                      <Option key={room.roomId} value={room.roomId}>
+                        {room.name}
+                      </Option>
+                    ))}
+                  </Select>
+                </Col>
+
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <div
+                    style={{
+                      marginBottom: '6px',
+                      fontSize: '13px',
+                      color: designTokens.colors.neutral[600],
+                      fontWeight: 500,
+                    }}
+                  >
+                    机柜筛选
+                  </div>
+                  <Select
+                    placeholder="选择机柜"
+                    style={{ width: '100%' }}
+                    value={filters.rackId || undefined}
+                    onChange={handleRackChange}
+                    allowClear
+                  >
+                    {filteredRackList.map(rack => {
+                      const room = roomList.find(r => r.roomId === rack.roomId);
+                      return (
+                        <Option key={rack.rackId} value={rack.rackId}>
+                          {filters.roomId ? rack.name : `${room?.name ? room.name + ' - ' : ''}${rack.name}`}
+                        </Option>
+                      );
+                    })}
+                  </Select>
+                </Col>
+
+                <Col xs={24} sm={12} md={8} lg={6}>
                   <div
                     style={{
                       marginBottom: '6px',
@@ -1734,17 +1908,36 @@ function PortManagement() {
                   </Select>
                 </Col>
 
-                <Col xs={24} sm={24} md={14} lg={16}>
-                  <div
-                    style={{
-                      marginBottom: '6px',
-                      fontSize: '13px',
-                      color: designTokens.colors.neutral[600],
-                      fontWeight: 500,
-                    }}
-                  >
-                    操作
-                  </div>
+                <Col xs={24} sm={12} md={24} lg={6}>
+                  <Space size="small" wrap>
+                    <Button
+                      type="primary"
+                      icon={<SearchOutlined />}
+                      onClick={handleSearch}
+                      loading={loading}
+                      style={{
+                        background: designTokens.colors.primary.gradient,
+                        border: 'none',
+                        borderRadius: designTokens.borderRadius.sm,
+                      }}
+                    >
+                      搜索
+                    </Button>
+                    <Button
+                      icon={<ClearOutlined />}
+                      onClick={handleReset}
+                      style={{ borderRadius: designTokens.borderRadius.sm }}
+                    >
+                      重置
+                    </Button>
+                  </Space>
+                </Col>
+              </Row>
+
+              <Divider style={{ margin: '16px 0 12px' }} />
+
+              <Row gutter={[16, 8]}>
+                <Col span={24}>
                   <Space size="small" wrap>
                     <Button
                       type="primary"
@@ -1786,7 +1979,7 @@ function PortManagement() {
                     <Tooltip title="刷新数据">
                       <Button
                         icon={<ReloadOutlined />}
-                        onClick={fetchPorts}
+                        onClick={() => fetchPorts(deviceCardPage)}
                         loading={loading}
                         size="middle"
                         style={{ borderRadius: designTokens.borderRadius.sm }}
@@ -1924,11 +2117,7 @@ function PortManagement() {
                                 }
                                 style={{ marginLeft: '4px' }}
                               >
-                                {isServerDevice(device)
-                                  ? '服务器'
-                                  : isSwitchDevice(device)
-                                    ? '交换机'
-                                    : '设备'}
+                                {getDeviceTypeLabel(device)}
                               </Tag>
                             </div>
                             <div
@@ -1939,6 +2128,71 @@ function PortManagement() {
                               }}
                             >
                               {device?.deviceId || '-'} · {device?.model || device?.type || '设备'}
+                            </div>
+                            {/* 设备扩展信息：机房位置、机柜、U位、IP、SN、状态 */}
+                            <div
+                              style={{
+                                fontSize: '12px',
+                                color: designTokens.colors.neutral[500],
+                                marginTop: '6px',
+                                display: 'flex',
+                                gap: '12px',
+                                flexWrap: 'wrap',
+                                alignItems: 'center',
+                              }}
+                            >
+                              {device?.Rack?.Room?.name && (
+                                <Tooltip title="机房">
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <EnvironmentOutlined />
+                                    {device.Rack.Room.name}
+                                  </span>
+                                </Tooltip>
+                              )}
+                              {device?.Rack?.name && (
+                                <Tooltip title="机柜">
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <DatabaseOutlined />
+                                    {device.Rack.name}
+                                  </span>
+                                </Tooltip>
+                              )}
+                              {device?.position != null && (
+                                <Tooltip title="U位">
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <ColumnHeightOutlined />
+                                    U{device.position}
+                                    {device?.height ? `~${device.position + device.height - 1}` : ''}
+                                  </span>
+                                </Tooltip>
+                              )}
+                              {device?.ipAddress && (
+                                <Tooltip title="IP地址">
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <GlobalOutlined />
+                                    {device.ipAddress}
+                                  </span>
+                                </Tooltip>
+                              )}
+                              {device?.serialNumber && (
+                                <Tooltip title="序列号">
+                                  <span
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      maxWidth: '160px',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    <BarcodeOutlined />
+                                    {device.serialNumber}
+                                  </span>
+                                </Tooltip>
+                              )}
+                              {getDeviceStatusTag(device?.status)}
                             </div>
                           </div>
                         </div>
@@ -2060,7 +2314,11 @@ function PortManagement() {
                                 </div>
                               )}
                               <Table
-                                columns={portColumns}
+                                columns={
+                                  isServerDevice(device)
+                                    ? portColumns
+                                    : portColumns.filter(col => col.key !== 'networkCard')
+                                }
                                 dataSource={devicePorts}
                                 rowKey="portId"
                                 rowSelection={{
@@ -3340,11 +3598,11 @@ function PortManagement() {
                   color: guidedDeviceType === 'switch' ? '#047857' : '#4f46e5',
                 }}
               >
-                {guidedDeviceType === 'switch' ? '添加交换机端口' : '添加服务器端口'}
+                {guidedDeviceType === 'switch' ? '添加网络设备端口' : '添加服务器端口'}
               </span>
               <span style={{ fontSize: '12px', color: '#666' }}>
                 {guidedDeviceType === 'switch'
-                  ? '（交换机端口可直接创建，无需关联网卡）'
+                  ? '（适用于交换机/路由器/防火墙/存储等，可直接创建，无需关联网卡）'
                   : '（服务器端口需关联网卡）'}
               </span>
             </div>
@@ -3415,10 +3673,49 @@ function PortManagement() {
               return false;
             return true;
           });
-          const switchCount = allDevices.filter(d => getDeviceType(d) === 'switch').length;
-          const serverCount = allDevices.filter(d => getDeviceType(d) === 'server').length;
-          const showSwitchTab = guidedDeviceType === null || guidedDeviceType === 'switch';
-          const showServerTab = guidedDeviceType === null || guidedDeviceType === 'server';
+
+          // 根据引导类型动态配置 Tab
+          const tabConfigs = (() => {
+            if (guidedDeviceType === 'switch') {
+              // 网络设备端口 → 显示网络设备子类型
+              return [
+                { key: 'switch', label: '交换机' },
+                { key: 'router', label: '路由器' },
+                { key: 'firewall', label: '防火墙' },
+                { key: 'storage', label: '存储设备' },
+              ];
+            }
+            if (guidedDeviceType === 'server') {
+              // 服务器端口 → 只显示服务器
+              return [
+                { key: 'server', label: '服务器' },
+              ];
+            }
+            // 无引导 → 显示大类
+            return [
+              { key: 'switch', label: '网络设备' },
+              { key: 'server', label: '服务器' },
+            ];
+          })();
+
+          // 计算每个 Tab 的设备数量
+          const getTabCount = key => {
+            if (key === 'server') return allDevices.filter(d => getDeviceType(d) === 'server').length;
+            // 子类型按原始 type 匹配
+            return allDevices.filter(d => {
+              const rawType = (d.type || '').toLowerCase();
+              return rawType.includes(key);
+            }).length;
+          };
+
+          // Tab 渐变色配置
+          const tabColors = {
+            switch: { active: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', shadow: 'rgba(17, 153, 142, 0.3)' },
+            server: { active: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', shadow: 'rgba(102, 126, 234, 0.3)' },
+            router: { active: 'linear-gradient(135deg, #f59e0b 0%, #f97316 100%)', shadow: 'rgba(245, 158, 11, 0.3)' },
+            firewall: { active: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', shadow: 'rgba(239, 68, 68, 0.3)' },
+            storage: { active: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', shadow: 'rgba(139, 92, 246, 0.3)' },
+          };
 
           return (
             <div
@@ -3429,89 +3726,39 @@ function PortManagement() {
                 background: '#f5f7fa',
                 padding: '4px',
                 borderRadius: '12px',
+                flexWrap: 'wrap',
               }}
             >
-              {guidedDeviceType === null && (
-                <button
-                  onClick={() => {
-                    setDeviceFilterType('all');
-                    setDevicePage(1);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '10px 16px',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    background:
-                      deviceFilterType === 'all'
-                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                        : 'transparent',
-                    color: deviceFilterType === 'all' ? '#fff' : '#666',
-                    boxShadow:
-                      deviceFilterType === 'all' ? '0 2px 8px rgba(102, 126, 234, 0.3)' : 'none',
-                  }}
-                >
-                  全部 ({allDevices.length})
-                </button>
-              )}
-              {showSwitchTab && (
-                <button
-                  onClick={() => {
-                    setDeviceFilterType('switch');
-                    setDevicePage(1);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '10px 16px',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    background:
-                      deviceFilterType === 'switch'
-                        ? 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
-                        : 'transparent',
-                    color: deviceFilterType === 'switch' ? '#fff' : '#666',
-                    boxShadow:
-                      deviceFilterType === 'switch' ? '0 2px 8px rgba(17, 153, 142, 0.3)' : 'none',
-                  }}
-                >
-                  交换机 ({switchCount})
-                </button>
-              )}
-              {showServerTab && (
-                <button
-                  onClick={() => {
-                    setDeviceFilterType('server');
-                    setDevicePage(1);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '10px 16px',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    background:
-                      deviceFilterType === 'server'
-                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                        : 'transparent',
-                    color: deviceFilterType === 'server' ? '#fff' : '#666',
-                    boxShadow:
-                      deviceFilterType === 'server' ? '0 2px 8px rgba(102, 126, 234, 0.3)' : 'none',
-                  }}
-                >
-                  服务器 ({serverCount})
-                </button>
-              )}
+              {tabConfigs.map(tab => {
+                const colors = tabColors[tab.key] || tabColors.all;
+                const isActive = deviceFilterType === tab.key;
+                const count = getTabCount(tab.key);
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => {
+                      setDeviceFilterType(tab.key);
+                      setDevicePage(1);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      background: isActive ? colors.active : 'transparent',
+                      color: isActive ? '#fff' : '#666',
+                      boxShadow: isActive ? `0 2px 8px ${colors.shadow}` : 'none',
+                      minWidth: '80px',
+                    }}
+                  >
+                    {tab.label} ({count})
+                  </button>
+                );
+              })}
             </div>
           );
         })()}
@@ -3547,7 +3794,7 @@ function PortManagement() {
                 {deviceFilterType === 'all'
                   ? '暂无可添加端口的设备'
                   : deviceFilterType === 'switch'
-                    ? '暂无可添加端口的交换机'
+                    ? '暂无可添加端口的网络设备'
                     : '暂无可添加端口的服务器'}
               </div>
             </div>
@@ -3667,7 +3914,7 @@ function PortManagement() {
                         flexShrink: 0,
                       }}
                     >
-                      {isServerDevice(device) ? '服务器' : '交换机'}
+                      {getDeviceTypeLabel(device)}
                     </div>
                   </div>
                 </div>

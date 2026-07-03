@@ -64,7 +64,7 @@ const DevicePort = sequelize.define(
       { fields: ['status'] },
       { fields: ['portType'] },
       { fields: ['portSpeed'] },
-      { unique: true, fields: ['deviceId', 'portName'] },
+      { unique: true, name: 'device_ports_device_id_port_name', fields: ['deviceId', 'portName'] },
     ],
   }
 );
