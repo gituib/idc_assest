@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Tooltip, Badge, Divider, Pagination } from 'antd';
 import { LinkOutlined, SwapRightOutlined, AimOutlined, NodeIndexOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { usePortOptions } from '../hooks/usePortOptions';
 
 const PortPanel = ({
   ports,
@@ -12,6 +13,9 @@ const PortPanel = ({
   compact = false,
   selectedPort = null,
 }) => {
+  // 端口/线缆类型选项（来自 /api/port-options，集中维护）
+  const { portTypeMap, cableTypeMap } = usePortOptions();
+
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(48); // 默认每页48个端口
 
@@ -75,21 +79,10 @@ const PortPanel = ({
     }
   };
 
-  // 获取端口类型图标 - 使用更真实的端口符号
+  // 获取端口类型图标 - 从选项配置取 symbol 字段
   const getPortTypeIcon = portType => {
-    switch (portType) {
-      case 'RJ45':
-        return '⬡'; // 六边形表示网口
-      case 'SFP':
-      case 'SFP+':
-      case 'SFP28':
-        return '▭'; // 矩形表示SFP
-      case 'QSFP':
-      case 'QSFP28':
-        return '▯'; // 宽矩形表示QSFP
-      default:
-        return '⬡';
-    }
+    const option = portTypeMap.get(portType);
+    return option ? option.symbol : '⬡';
   };
 
   // 获取简化端口显示名称（只显示数字）
@@ -105,24 +98,14 @@ const PortPanel = ({
 
   // 获取线缆类型文本
   const getCableTypeText = cableType => {
-    const typeMap = {
-      ethernet: '网线',
-      fiber: '光纤',
-      copper: '铜缆',
-      power: '电源线',
-    };
-    return typeMap[cableType] || cableType || '未知';
+    const option = cableTypeMap.get(cableType);
+    return option ? option.label : cableType || '未知';
   };
 
   // 获取线缆类型颜色
   const getCableTypeColor = cableType => {
-    const colorMap = {
-      ethernet: '#52c41a',
-      fiber: '#1890ff',
-      copper: '#faad14',
-      power: '#ff4d4f',
-    };
-    return colorMap[cableType] || '#999';
+    const option = cableTypeMap.get(cableType);
+    return option ? option.dotColor : '#999';
   };
 
   // 查找端口关联的接线

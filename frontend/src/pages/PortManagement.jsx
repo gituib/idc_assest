@@ -78,6 +78,7 @@ import { designTokens } from '../config/theme';
 import CloseButton from '../components/CloseButton';
 import { debounce } from '../utils/common';
 import { STATUS_MAP } from '../constants/deviceManagementConstants';
+import { usePortOptions } from '../hooks/usePortOptions';
 
 const { Option } = Select;
 const { Panel } = Collapse;
@@ -132,6 +133,9 @@ function sortPortsByName(ports) {
 }
 
 function PortManagement() {
+  // 端口/速率/线缆类型选项（来自 /api/port-options，集中维护）
+  const { portTypes, portSpeeds, portTypeMap, portSpeedMap } = usePortOptions();
+
   const [ports, setPorts] = useState([]);
   const [devices, setDevices] = useState([]);
   const [deviceSearching, setDeviceSearching] = useState(false);
@@ -1067,25 +1071,25 @@ function PortManagement() {
       }
     }
 
-    const validPortTypes = ['RJ45', 'SFP', 'SFP+', 'SFP28', 'QSFP', 'QSFP28'];
-    if (row['端口类型'] && !validPortTypes.includes(row['端口类型'])) {
+    const validPortTypeValues = portTypes.map(o => o.value);
+    if (row['端口类型'] && !validPortTypeValues.includes(row['端口类型'])) {
       errors.push({
         row: rowNum,
         field: '端口类型',
         value: row['端口类型'],
         error: '无效的端口类型',
-        suggestion: `端口类型 "${row['端口类型']}" 不支持。可选值：${validPortTypes.join('、')}`,
+        suggestion: `端口类型 "${row['端口类型']}" 不支持。可选值：${validPortTypeValues.join('、')}`,
       });
     }
 
-    const validPortSpeeds = ['100M', '1G', '10G', '25G', '40G', '100G'];
-    if (row['端口速率'] && !validPortSpeeds.includes(row['端口速率'])) {
+    const validPortSpeedValues = portSpeeds.map(o => o.value);
+    if (row['端口速率'] && !validPortSpeedValues.includes(row['端口速率'])) {
       errors.push({
         row: rowNum,
         field: '端口速率',
         value: row['端口速率'],
         error: '无效的端口速率',
-        suggestion: `端口速率 "${row['端口速率']}" 不支持。可选值：${validPortSpeeds.join('、')}`,
+        suggestion: `端口速率 "${row['端口速率']}" 不支持。可选值：${validPortSpeedValues.join('、')}`,
       });
     }
 
@@ -1522,15 +1526,10 @@ function PortManagement() {
   };
 
   const getPortTypeTag = type => {
-    const typeMap = {
-      RJ45: { color: 'blue', text: 'RJ45' },
-      SFP: { color: 'green', text: 'SFP' },
-      'SFP+': { color: 'cyan', text: 'SFP+' },
-      SFP28: { color: 'purple', text: 'SFP28' },
-      QSFP: { color: 'orange', text: 'QSFP' },
-      QSFP28: { color: 'red', text: 'QSFP28' },
-    };
-    const config = typeMap[type] || { color: 'default', text: type };
+    const option = portTypeMap.get(type);
+    const config = option
+      ? { color: option.color, text: option.label }
+      : { color: 'default', text: type };
     return (
       <Tag
         color={config.color}
@@ -2875,85 +2874,31 @@ function PortManagement() {
                     initialValue="RJ45"
                     style={{ marginBottom: '12px' }}
                   >
-                    <Select size="large" style={{ borderRadius: '8px' }}>
-                      <Option value="RJ45">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div
-                            style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '2px',
-                              background: designTokens.colors.device.server,
-                            }}
-                          />
-                          RJ45
-                        </div>
-                      </Option>
-                      <Option value="SFP">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div
-                            style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '2px',
-                              background: designTokens.colors.device.switch,
-                            }}
-                          />
-                          SFP
-                        </div>
-                      </Option>
-                      <Option value="SFP+">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div
-                            style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '2px',
-                              background: designTokens.colors.purple.main,
-                            }}
-                          />
-                          SFP+
-                        </div>
-                      </Option>
-                      <Option value="SFP28">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div
-                            style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '2px',
-                              background: designTokens.colors.info.main,
-                            }}
-                          />
-                          SFP28
-                        </div>
-                      </Option>
-                      <Option value="QSFP">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div
-                            style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '2px',
-                              background: designTokens.colors.warning.main,
-                            }}
-                          />
-                          QSFP
-                        </div>
-                      </Option>
-                      <Option value="QSFP28">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div
-                            style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '2px',
-                              background: designTokens.colors.secondary.main,
-                            }}
-                          />
-                          QSFP28
-                        </div>
-                      </Option>
+                    <Select size="large" style={{ borderRadius: '8px' }} optionLabelProp="label">
+                      {portTypes.map(opt => (
+                        <Option
+                          key={opt.value}
+                          value={opt.value}
+                          label={opt.label}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div
+                              style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '2px',
+                                background: opt.dotColor,
+                              }}
+                            />
+                            <span>{opt.label}</span>
+                            {opt.cnName && (
+                              <span style={{ color: '#999', fontSize: '13px' }}>
+                                （{opt.cnName}）
+                              </span>
+                            )}
+                          </div>
+                        </Option>
+                      ))}
                     </Select>
                   </Form.Item>
 
@@ -2964,12 +2909,11 @@ function PortManagement() {
                     style={{ marginBottom: '12px' }}
                   >
                     <Select size="large" style={{ borderRadius: '8px' }}>
-                      <Option value="100M">100M</Option>
-                      <Option value="1G">1G</Option>
-                      <Option value="10G">10G</Option>
-                      <Option value="25G">25G</Option>
-                      <Option value="40G">40G</Option>
-                      <Option value="100G">100G</Option>
+                      {portSpeeds.map(opt => (
+                        <Option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </Option>
+                      ))}
                     </Select>
                   </Form.Item>
 

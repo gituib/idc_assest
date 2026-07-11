@@ -30,6 +30,7 @@ import {
   EnvironmentOutlined,
   FilterOutlined,
   UnorderedListOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -67,6 +68,7 @@ import {
   ExportModal,
   FieldConfigModal,
   BatchStatusModal,
+  BatchWarrantyModal,
 } from '../components/device';
 import { useDebounce } from '../hooks/useDebounce';
 import { getDeviceTypeIcon, getStatusConfig, processDeviceData } from '../utils/deviceUtils.jsx';
@@ -116,6 +118,9 @@ function DeviceManagement() {
 
   const [batchStatusModalVisible, setBatchStatusModalVisible] = useState(false);
   const [batchStatusLoading, setBatchStatusLoading] = useState(false);
+
+  const [batchWarrantyModalVisible, setBatchWarrantyModalVisible] = useState(false);
+  const [batchWarrantyLoading, setBatchWarrantyLoading] = useState(false);
 
   const [exportModalVisible, setExportModalVisible] = useState(false);
 
@@ -457,6 +462,45 @@ function DeviceManagement() {
       console.error('批量状态变更失败:', error);
     } finally {
       setBatchStatusLoading(false);
+    }
+  };
+
+  const showBatchWarrantyModal = () => {
+    if (selectedDevices.length === 0) {
+      message.warning('请先选择要操作的设备');
+      return;
+    }
+    setBatchWarrantyModalVisible(true);
+  };
+
+  /**
+   * 提交批量更新维保信息
+   * @param {Object} values - 表单值
+   * @param {Date} values.purchaseDate - 采购日期
+   * @param {Date} values.warrantyExpiry - 维保到期日期
+   */
+  const handleBatchWarrantyUpdate = async values => {
+    setBatchWarrantyLoading(true);
+    try {
+      const payload = {
+        deviceIds: selectedDevices,
+        warrantyExpiry: values.warrantyExpiry ? values.warrantyExpiry.format('YYYY-MM-DD') : null,
+        purchaseDate: values.purchaseDate ? values.purchaseDate.format('YYYY-MM-DD') : null,
+      };
+
+      const response = await axios.put('/api/devices/batch-warranty', payload);
+
+      message.success(response.data.message || '批量更新维保信息成功');
+      setBatchWarrantyModalVisible(false);
+      setSelectedDevices([]);
+      setSelectAll(false);
+      fetchDevices(1, pagination.pageSize);
+    } catch (error) {
+      const errorMsg = error.response?.data?.error || '批量更新维保信息失败';
+      message.error(errorMsg);
+      console.error('批量更新维保信息失败:', error);
+    } finally {
+      setBatchWarrantyLoading(false);
     }
   };
 
@@ -893,6 +937,18 @@ function DeviceManagement() {
               onClick={showBatchStatusModal}
             >
               状态变更 ({selectedDevices.length})
+            </Button>
+            <Button
+              style={{
+                ...secondaryActionStyle,
+                color: '#722ed1',
+                borderColor: '#722ed1',
+              }}
+              icon={<SafetyCertificateOutlined />}
+              disabled={selectedDevices.length === 0}
+              onClick={showBatchWarrantyModal}
+            >
+              维保更新 ({selectedDevices.length})
             </Button>
             <Button
               style={{
@@ -1344,6 +1400,14 @@ function DeviceManagement() {
         loading={batchStatusLoading}
         onSubmit={handleBatchStatusChange}
         onCancel={() => setBatchStatusModalVisible(false)}
+      />
+
+      <BatchWarrantyModal
+        visible={batchWarrantyModalVisible}
+        selectedCount={selectedDevices.length}
+        loading={batchWarrantyLoading}
+        onSubmit={handleBatchWarrantyUpdate}
+        onCancel={() => setBatchWarrantyModalVisible(false)}
       />
     </div>
   );

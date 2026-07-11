@@ -109,6 +109,10 @@ const routesConfig = [
     file: 'topology.js',
     path: '/api/topology',
   },
+  {
+    file: 'portOptions.js',
+    path: '/api/port-options',
+  },
 ];
 
 module.exports = routesConfig;

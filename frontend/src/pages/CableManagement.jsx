@@ -57,6 +57,7 @@ import { debounce } from '../utils/common';
 import CloseButton from '../components/CloseButton';
 import CableWizardModal from '../components/CableWizardModal';
 import { TopologyModal } from '../components/topology';
+import { usePortOptions } from '../hooks/usePortOptions';
 
 const { Option } = Select;
 const { Panel } = Collapse;
@@ -113,6 +114,9 @@ const animations = {
 };
 
 function CableManagement() {
+  // 端口/线缆类型选项（来自 /api/port-options，集中维护）
+  const { cableTypes, cableTypeMap } = usePortOptions();
+
   const [cables, setCables] = useState([]);
   const [devices, setDevices] = useState([]);
   const [deviceSearching, setDeviceSearching] = useState(false);
@@ -515,8 +519,8 @@ function CableManagement() {
       return { valid: false, error: `第 ${index + 1} 行：目标设备不存在` };
     }
 
-    const validCableTypes = ['网线', '光纤', '铜缆'];
-    if (!validCableTypes.includes(row['线缆类型'])) {
+    const validCableTypeLabels = cableTypes.map(o => o.label);
+    if (!validCableTypeLabels.includes(row['线缆类型'])) {
       return { valid: false, error: `第 ${index + 1} 行：无效的线缆类型` };
     }
 
@@ -542,11 +546,10 @@ function CableManagement() {
     setImportProgress({ current: 0, total: importPreview.length });
 
     try {
-      const cableTypeMap = {
-        网线: 'ethernet',
-        光纤: 'fiber',
-        铜缆: 'copper',
-      };
+      const cableTypeLabelToValue = cableTypes.reduce((acc, o) => {
+        acc[o.label] = o.value;
+        return acc;
+      }, {});
 
       const statusMap = {
         正常: 'normal',
@@ -560,7 +563,7 @@ function CableManagement() {
         sourcePort: row['源设备端口'],
         targetDeviceId: row['目标设备ID'],
         targetPort: row['目标设备端口'],
-        cableType: cableTypeMap[row['线缆类型']] || 'ethernet',
+        cableType: cableTypeLabelToValue[row['线缆类型']] || 'ethernet',
         cableLength: row['线缆长度(米)'],
         status: statusMap[row['状态']] || 'normal',
         description: row['描述'],
@@ -656,12 +659,10 @@ function CableManagement() {
   };
 
   const getCableTypeTag = type => {
-    const typeMap = {
-      ethernet: { color: 'blue', text: '网线', icon: '🔌' },
-      fiber: { color: 'cyan', text: '光纤', icon: '🔷' },
-      copper: { color: 'orange', text: '铜缆', icon: '⚡' },
-    };
-    const config = typeMap[type] || { color: 'default', text: type, icon: '' };
+    const option = cableTypeMap.get(type);
+    const config = option
+      ? { color: option.color, text: option.label }
+      : { color: 'default', text: type };
     return (
       <Tag
         color={config.color}
@@ -968,11 +969,19 @@ function CableManagement() {
                     style={{ width: '100%' }}
                     value={filters.cableType}
                     onChange={value => setFilters(prev => ({ ...prev, cableType: value }))}
+                    optionLabelProp="label"
                   >
-                    <Option value="all">全部类型</Option>
-                    <Option value="ethernet">网线</Option>
-                    <Option value="fiber">光纤</Option>
-                    <Option value="copper">铜缆</Option>
+                    <Option value="all" label="全部类型">全部类型</Option>
+                    {cableTypes.map(opt => (
+                      <Option key={opt.value} value={opt.value} label={opt.label}>
+                        <span>{opt.label}</span>
+                        {opt.cnName && (
+                          <span style={{ color: '#999', fontSize: '12px' }}>
+                            （{opt.cnName}）
+                          </span>
+                        )}
+                      </Option>
+                    ))}
                   </Select>
                 </Col>
 
@@ -1496,10 +1505,17 @@ function CableManagement() {
                 rules={[{ required: true, message: '请选择线缆类型' }]}
                 initialValue="ethernet"
               >
-                <Select placeholder="请选择线缆类型">
-                  <Option value="ethernet">网线</Option>
-                  <Option value="fiber">光纤</Option>
-                  <Option value="copper">铜缆</Option>
+                <Select placeholder="请选择线缆类型" optionLabelProp="label">
+                  {cableTypes.map(opt => (
+                    <Option key={opt.value} value={opt.value} label={opt.label}>
+                      <span>{opt.label}</span>
+                      {opt.cnName && (
+                        <span style={{ color: '#999', fontSize: '12px' }}>
+                          （{opt.cnName}）
+                        </span>
+                      )}
+                    </Option>
+                  ))}
                 </Select>
               </Form.Item>
             </Col>

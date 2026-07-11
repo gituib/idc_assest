@@ -286,6 +286,7 @@ const PUBLIC_PATHS = [
   '/api-docs',
   '/api-docs.json',
   '/system-settings/system/info',
+  '/port-options',
   '/maintenance',
 ];
 

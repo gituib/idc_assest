@@ -18,6 +18,7 @@ const { validateBody, validateQuery } = require('../middleware/validation');
 const {
   batchDeviceIdsSchema,
   batchStatusSchema,
+  batchWarrantySchema,
   batchMoveSchema,
   queryDeviceSchema,
 } = require('../validation/deviceSchema');
@@ -1852,6 +1853,87 @@ router.put('/batch-move', async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 批量更新维保信息
+router.put('/batch-warranty', validateBody(batchWarrantySchema), async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const { deviceIds, purchaseDate, warrantyExpiry } = req.body;
+
+    // 检查数据库中是否存在这些设备
+    const existingDevices = await Device.findAll({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      attributes: ['deviceId', 'name', 'purchaseDate', 'warrantyExpiry'],
+      transaction,
+    });
+
+    const existingIds = existingDevices.map(d => d.deviceId);
+    const missingIds = deviceIds.filter(id => !existingIds.includes(id));
+
+    if (missingIds.length > 0) {
+      await transaction.rollback();
+      return res.status(404).json({ error: `设备不存在: ${missingIds.join(', ')}` });
+    }
+
+    let affectedCount = 0;
+    const deviceDetails = existingDevices.map(d => d.toJSON());
+    const beforeState = deviceDetails.map(d => ({
+      deviceId: d.deviceId,
+      name: d.name,
+      purchaseDate: d.purchaseDate,
+      warrantyExpiry: d.warrantyExpiry,
+    }));
+
+    // 逐个更新
+    for (const device of existingDevices) {
+      const updateData = {};
+
+      updateData.warrantyExpiry = warrantyExpiry;
+      if (purchaseDate !== undefined) {
+        updateData.purchaseDate = purchaseDate || null;
+      }
+
+      const [updated] = await Device.update(updateData, {
+        where: { deviceId: device.deviceId },
+        transaction,
+      });
+      if (updated) {
+        affectedCount++;
+      }
+    }
+
+    const deviceSummary = deviceDetails
+      .map(d => `${d.name}(编号:${d.deviceId})`)
+      .join('、');
+
+    const operationDesc = `批量更新${affectedCount}台设备维保信息：${deviceSummary}`;
+
+    await logDeviceOperation('batch_warranty_update', operationDesc, {
+      targetId: deviceIds.join(','),
+      targetName: `${affectedCount}台设备`,
+      beforeState,
+      afterState: { purchaseDate, warrantyExpiry },
+      req,
+      metadata: {
+        affectedCount,
+        devices: deviceDetails,
+        purchaseDate,
+        warrantyExpiry,
+      },
+    });
+
+    await transaction.commit();
+
+    res.json({
+      message: `批量更新维保信息成功，已更新 ${affectedCount} 个设备`,
+      affectedCount,
+    });
+  } catch (error) {
+    await transaction.rollback();
+    logger.error('批量更新维保信息失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });

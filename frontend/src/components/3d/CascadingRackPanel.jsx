@@ -284,7 +284,13 @@ const CascadingRackPanel = ({
                     const globalIndex = flatRackList.findIndex(r => r.rackId === rack.rackId);
                     const deviceCount = rack.Devices?.length || rack.deviceCount || 0;
                     const height = rack.height || 45;
-                    const usedU = deviceCount * 2;
+                    // 按设备实际 height 字段累加，避免硬编码 2U 导致使用率失真
+                    const usedU = rack.Devices?.length
+                      ? rack.Devices.reduce(
+                          (sum, d) => sum + (Number(d.height) || 1),
+                          0
+                        )
+                      : deviceCount * 2; // 后端未返回 Devices 数组时回退到旧逻辑
                     const usagePercent = Math.min(100, Math.round((usedU / height) * 100));
 
                     const isSelected = rack.rackId === selectedRackId;

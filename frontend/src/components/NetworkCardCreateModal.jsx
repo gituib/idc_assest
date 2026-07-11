@@ -45,31 +45,55 @@ const MANUFACTURER_OPTIONS = [
   { value: 'Other', label: '其他' },
 ];
 
-function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
+function NetworkCardCreateModal({ device, visible, onClose, onSuccess, editingCard }) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+
+  // 是否为编辑模式
+  const isEditMode = !!editingCard;
 
   useEffect(() => {
     if (visible) {
       form.resetFields();
+      // 编辑模式：回填网卡信息
+      if (editingCard) {
+        form.setFieldsValue({
+          name: editingCard.name,
+          slotNumber: editingCard.slotNumber,
+          description: editingCard.description,
+          model: editingCard.model,
+          manufacturer: editingCard.manufacturer,
+        });
+      }
     }
-  }, [visible, form]);
+  }, [visible, form, editingCard]);
 
   const handleSubmit = useCallback(async () => {
     try {
       const values = await form.validateFields();
       setLoading(true);
 
-      await axios.post('/api/network-cards', {
-        deviceId: device.deviceId,
+      const payload = {
         name: values.name,
         slotNumber: values.slotNumber,
         description: values.description,
         model: values.model,
         manufacturer: values.manufacturer,
-      });
+      };
 
-      message.success('网卡创建成功');
+      if (isEditMode) {
+        // 编辑模式：调用 PUT 接口更新网卡
+        await axios.put(`/api/network-cards/${editingCard.nicId}`, payload);
+        message.success('网卡更新成功');
+      } else {
+        // 创建模式：调用 POST 接口新建网卡
+        await axios.post('/api/network-cards', {
+          deviceId: device.deviceId,
+          ...payload,
+        });
+        message.success('网卡创建成功');
+      }
+
       form.resetFields();
       onSuccess?.();
       onClose();
@@ -77,12 +101,14 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
       if (error.errorFields) {
         return;
       }
-      message.error(error.response?.data?.error || '网卡创建失败');
-      console.error('创建网卡失败:', error);
+      message.error(
+        error.response?.data?.error || (isEditMode ? '网卡更新失败' : '网卡创建失败')
+      );
+      console.error(isEditMode ? '更新网卡失败:' : '创建网卡失败:', error);
     } finally {
       setLoading(false);
     }
-  }, [device, form, onClose, onSuccess]);
+  }, [device, form, onClose, onSuccess, editingCard, isEditMode]);
 
   const handleCancel = useCallback(() => {
     form.resetFields();
@@ -94,7 +120,7 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
       title={
         <Space>
           <CloudServerOutlined style={{ color: designTokens.colors.primary.main }} />
-          <span>新增网卡 - {device?.name || '设备'}</span>
+          <span>{isEditMode ? '编辑网卡' : '新增网卡'} - {device?.name || '设备'}</span>
         </Space>
       }
       open={visible}
@@ -102,7 +128,7 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
       onOk={handleSubmit}
       onCancel={handleCancel}
       confirmLoading={loading}
-      okText="创建"
+      okText={isEditMode ? '保存' : '创建'}
       cancelText="取消"
       width={800}
       styles={{ body: { padding: '0 24px 24px' } }}
@@ -116,7 +142,9 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
         }}
       >
         <div style={{ fontSize: '13px', color: designTokens.colors.neutral[700], lineHeight: 1.6 }}>
-          为服务器添加新的网卡，网卡创建后可关联端口
+          {isEditMode
+            ? '修改网卡信息，保存后立即生效'
+            : '为服务器添加新的网卡，网卡创建后可关联端口'}
         </div>
       </div>
 

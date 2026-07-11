@@ -6,11 +6,15 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment } from '@react-three/drei';
 const envMapUrl = '/assets/3d/env.hdr';
 import RackModel from './RackModel';
-import { useScene3D } from '../../hooks/useScene3D';
+import {
+  useDevices,
+  useSelectedDevice,
+  useDeviceSlideEnabled,
+} from '../../stores/scene3DStore';
 import * as THREE from 'three';
 import ErrorBoundary from '../ErrorBoundary';
 
@@ -24,73 +28,96 @@ const deviceDpr = isMobile || isSmallScreen ? 1 : [1, 2];
 // 创建全局 ref 用于外部访问 controls
 const controlsRefGlobal = { current: null };
 
+/**
+ * 计算机柜相关的3D场景参数（统一一份计算，避免Controls和Scene不一致）
+ * RackModel 中：最外层 group y=0.5，机柜框架高度 = rackHeight*0.04445 + 0.2（含上下板）
+ * 因此机柜中心 y = 0.5 + (rackHeight*0.04445 + 0.2) / 2
+ */
+const getRackSceneParams = (rack) => {
+  const rackHeight = rack?.height || 45;
+  const uHeight = 0.04445;
+  const rackHeightMeters = rackHeight * uHeight;
+  const rackTotalHeight = rackHeightMeters + 0.2;
+  const targetY = 0.5 + rackTotalHeight / 2;
+  const distance = Math.max(3, rackTotalHeight * 1.3);
+  // 相机与target同高，避免俯视导致的透视偏移（放大时机柜上跑）
+  const cameraPosition = new THREE.Vector3(distance * 0.6, targetY, distance);
+  const target = new THREE.Vector3(0, targetY, 0);
+  const minDistance = Math.max(1.5, rackTotalHeight * 0.3);
+  const maxDistance = Math.max(8, rackTotalHeight * 2);
+
+  return { rackHeight, rackTotalHeight, targetY, distance, cameraPosition, target, minDistance, maxDistance };
+};
+
+/**
+ * 相机初始化组件：在 OrbitControls 接管前，确保相机朝向 target
+ * 避免 OrbitControls 以默认方向初始化导致内部状态不一致
+ */
+const CameraInitializer = ({ cameraPosition, target }) => {
+  const { camera } = useThree();
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    camera.position.copy(cameraPosition);
+    camera.lookAt(target);
+    camera.updateProjectionMatrix();
+  }, [camera, cameraPosition, target]);
+
+  return null;
+};
+
 // 内部组件用于处理 OrbitControls
-const Controls = ({ rack, onControlsReady }) => {
+const Controls = ({ rack, onControlsReady, modalsOpen = false }) => {
   const controlsRef = useRef();
   const { camera } = useThree();
-  // 机柜中心点（中轴线）
-  const rackHeight = rack?.height || 45;
-  const targetY = (rackHeight * 0.04445) / 2 + 0.5;
-  const fixedTarget = useMemo(() => new THREE.Vector3(0, targetY, 0), [targetY]);
+  const params = useMemo(() => getRackSceneParams(rack), [rack]);
+  const { cameraPosition, target, minDistance, maxDistance } = params;
 
-  // 根据机柜高度计算合适的相机距离限制
-  const minDistance = useMemo(() => Math.max(1.5, rackHeight * 0.04445 * 0.3), [rackHeight]);
-  const maxDistance = useMemo(() => Math.max(8, rackHeight * 0.04445 * 1.5), [rackHeight]);
+  // target 数组形式，用于 OrbitControls 的 target prop
+  const targetArray = useMemo(() => [target.x, target.y, target.z], [target]);
 
-  // 保存相机初始位置用于重置
-  const initialCameraPosition = useMemo(() => {
-    const rackHeightMeters = rackHeight * 0.04445;
-    const baseHeight = 2;
-    const heightFactor = rackHeightMeters * 0.6;
-    const distance = Math.max(3, rackHeightMeters * 1.2);
-    return new THREE.Vector3(distance * 0.7, baseHeight + heightFactor * 0.3, distance);
-  }, [rackHeight]);
+  // 初始化时确保相机位置和朝向正确
+  useEffect(() => {
+    camera.position.copy(cameraPosition);
+    camera.lookAt(target);
+  }, [camera, cameraPosition, target]);
 
+  // 注册 controls 就绪回调
   useEffect(() => {
     if (controlsRef.current) {
       controlsRefGlobal.current = controlsRef.current;
       if (onControlsReady) {
         onControlsReady({
           reset: () => {
-            // 重置相机位置
-            camera.position.copy(initialCameraPosition);
-            controlsRef.current.target.copy(fixedTarget);
+            camera.position.copy(cameraPosition);
+            controlsRef.current.target.copy(target);
             controlsRef.current.update();
           },
         });
       }
     }
-  }, [controlsRef.current, camera, initialCameraPosition, fixedTarget, onControlsReady]);
-
-  const prevTargetRef = React.useRef(null);
-
-  useFrame(() => {
-    if (controlsRef.current) {
-      // 仅在 target 变化时更新，避免每帧执行矩阵计算
-      if (prevTargetRef.current !== fixedTarget) {
-        controlsRef.current.target.copy(fixedTarget);
-        controlsRef.current.update();
-        prevTargetRef.current = fixedTarget;
-      }
-    }
-  });
+  }, [controlsRef.current, camera, cameraPosition, target, onControlsReady]);
 
   return (
     <OrbitControls
       ref={controlsRef}
       makeDefault
+      target={targetArray}
       minPolarAngle={0.1}
       maxPolarAngle={Math.PI / 1.5}
       minAzimuthAngle={-Infinity}
       maxAzimuthAngle={Infinity}
       minDistance={minDistance}
       maxDistance={maxDistance}
-      enablePan={true}
-      enableZoom={true}
-      enableRotate={true}
+      // 模态框打开时禁用所有交互，避免误拖动视角
+      enablePan={!modalsOpen}
+      enableZoom={!modalsOpen}
+      enableRotate={!modalsOpen}
       mouseButtons={{
         LEFT: 0, // 左键旋转
-        MIDDLE: 1, // 中键平移
+        MIDDLE: 1, // 中键缩放
         RIGHT: 2, // 右键平移
       }}
       touches={{
@@ -102,9 +129,11 @@ const Controls = ({ rack, onControlsReady }) => {
 };
 
 const Scene = forwardRef(
-  ({ rack, tooltipFields, onDeviceClick, onDeviceHover, onDeviceLeave }, ref) => {
-    // 从 Context 获取3D场景状态
-    const { devices, selectedDevice, deviceSlideEnabled } = useScene3D();
+  ({ rack, tooltipFields, onDeviceClick, onDeviceHover, onDeviceLeave, modalsOpen = false }, ref) => {
+    // 从 Context 获取3D场景状态（使用 selector 精准订阅，避免全量订阅导致过度渲染）
+    const devices = useDevices();
+    const selectedDevice = useSelectedDevice();
+    const deviceSlideEnabled = useDeviceSlideEnabled();
 
     // 用于存储 controls API
     const controlsApiRef = useRef(null);
@@ -142,21 +171,12 @@ const Scene = forwardRef(
       ]
     );
 
-    // 根据机柜高度动态计算相机初始位置
-    const rackHeight = rack?.height || 45;
-    const rackHeightMeters = rackHeight * 0.04445;
-    // 相机位置：确保能完整看到机柜，高度随机柜高度调整
-    const cameraPosition = useMemo(() => {
-      const baseHeight = 2;
-      const heightFactor = rackHeightMeters * 0.6;
-      const distance = Math.max(3, rackHeightMeters * 1.2);
-      return [distance * 0.7, baseHeight + heightFactor * 0.3, distance];
-    }, [rackHeightMeters]);
-
-    // 相机目标点（机柜中心）
-    const cameraTarget = useMemo(() => {
-      return [0, rackHeightMeters / 2 + 0.5, 0];
-    }, [rackHeightMeters]);
+    // 统一使用 getRackSceneParams 计算相机位置，与 Controls 保持一致
+    const params = useMemo(() => getRackSceneParams(rack), [rack]);
+    const cameraPosition = useMemo(
+      () => [params.cameraPosition.x, params.cameraPosition.y, params.cameraPosition.z],
+      [params]
+    );
 
     return (
       <ErrorBoundary
@@ -175,6 +195,9 @@ const Scene = forwardRef(
           style={{ background: 'transparent' }}
         >
           <PerspectiveCamera makeDefault position={cameraPosition} fov={45} />
+
+          {/* 相机初始化：确保 OrbitControls 接管前相机朝向正确 */}
+          <CameraInitializer cameraPosition={params.cameraPosition} target={params.target} />
 
           <ambientLight intensity={0.5} color="#ffffff" />
           <pointLight position={[5, 8, 5]} intensity={2} color="#ffffff" />
@@ -202,6 +225,7 @@ const Scene = forwardRef(
           {/* Controls - 使用独立组件保持旋转中心固定 */}
           <Controls
             rack={rack}
+            modalsOpen={modalsOpen}
             onControlsReady={api => {
               controlsApiRef.current = api;
             }}

@@ -19,15 +19,20 @@ import {
   ApiOutlined,
   CloudServerOutlined,
   FolderOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
 import api from '../api';
 import PortCreateModal from './PortCreateModal';
 import NetworkCardCreateModal from './NetworkCardCreateModal';
 import { designTokens } from '../config/theme';
+import { usePortOptions } from '../hooks/usePortOptions';
 
 const { Panel } = Collapse;
 
 function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
+  // 端口类型选项（来自 /api/port-options，集中维护）
+  const { portTypeMap } = usePortOptions();
+
   const [cards, setCards] = useState([]);
   const [networkCards, setNetworkCards] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -35,6 +40,9 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
   const [createCardModalVisible, setCreateCardModalVisible] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
   const [expandedCards, setExpandedCards] = useState([]);
+  // 编辑网卡相关状态
+  const [editingCard, setEditingCard] = useState(null);
+  const [editCardModalVisible, setEditCardModalVisible] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!deviceId) return;
@@ -107,6 +115,19 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
     onRefresh?.();
   }, [fetchData, onRefresh]);
 
+  // 打开编辑网卡弹窗
+  const handleEditCard = useCallback((card, e) => {
+    e?.stopPropagation();
+    setEditingCard(card);
+    setEditCardModalVisible(true);
+  }, []);
+
+  // 编辑网卡成功回调
+  const handleEditCardSuccess = useCallback(() => {
+    fetchData();
+    onRefresh?.();
+  }, [fetchData, onRefresh]);
+
   const handleExpand = nicId => {
     setExpandedCards(prev => {
       if (prev.includes(nicId)) {
@@ -130,15 +151,9 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
   };
 
   const getTypeTag = type => {
-    const config = {
-      RJ45: { color: 'blue', text: 'RJ45' },
-      SFP: { color: 'green', text: 'SFP' },
-      'SFP+': { color: 'cyan', text: 'SFP+' },
-      SFP28: { color: 'purple', text: 'SFP28' },
-      QSFP: { color: 'orange', text: 'QSFP' },
-      QSFP28: { color: 'red', text: 'QSFP28' },
-    };
-    const { color, text } = config[type] || { color: 'default', text: type };
+    const option = portTypeMap.get(type);
+    const color = option ? option.color : 'default';
+    const text = option ? option.label : type;
     return <Tag color={color}>{text}</Tag>;
   };
 
@@ -250,6 +265,13 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
             <div style={{ fontSize: '12px', color: '#64748b' }}>
               {card.description || (card.isUngrouped ? '未分配到网卡的端口' : '网卡')}
             </div>
+            {/* 展示网卡详细信息：制造商、型号 */}
+            {!card.isUngrouped && (card.manufacturer || card.model) && (
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                {card.manufacturer && <span style={{ marginRight: 8 }}>{card.manufacturer}</span>}
+                {card.model && <span>{card.model}</span>}
+              </div>
+            )}
           </div>
         </div>
         <Space size={12}>
@@ -259,6 +281,16 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
           <span style={{ fontSize: '12px', color: '#64748b' }}>占用</span>
           <Badge count={stats.fault} style={{ backgroundColor: designTokens.colors.error }} />
           <span style={{ fontSize: '12px', color: '#64748b' }}>故障</span>
+          {!card.isUngrouped && (
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={e => handleEditCard(card, e)}
+            >
+              编辑
+            </Button>
+          )}
           {!card.isUngrouped && (
             <Popconfirm
               title="确定要删除此网卡吗？"
@@ -415,6 +447,18 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
         visible={createCardModalVisible}
         onClose={() => setCreateCardModalVisible(false)}
         onSuccess={handleCreateCardSuccess}
+      />
+
+      {/* 编辑网卡弹窗（复用 NetworkCardCreateModal 的编辑模式） */}
+      <NetworkCardCreateModal
+        device={{ deviceId, name: deviceName }}
+        visible={editCardModalVisible}
+        editingCard={editingCard}
+        onClose={() => {
+          setEditCardModalVisible(false);
+          setEditingCard(null);
+        }}
+        onSuccess={handleEditCardSuccess}
       />
 
       <PortCreateModal

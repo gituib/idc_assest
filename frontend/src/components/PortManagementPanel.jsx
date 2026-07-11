@@ -10,8 +10,12 @@ import {
 import axios from 'axios';
 import PortCreateModal from './PortCreateModal';
 import { designTokens } from '../config/theme';
+import { usePortOptions } from '../hooks/usePortOptions';
 
 function PortManagementPanel({ deviceId, deviceName, onRefresh }) {
+  // 端口类型选项（来自 /api/port-options，集中维护）
+  const { portTypeMap } = usePortOptions();
+
   const [ports, setPorts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -64,15 +68,9 @@ function PortManagementPanel({ deviceId, deviceName, onRefresh }) {
   };
 
   const getTypeTag = type => {
-    const config = {
-      RJ45: { color: 'blue', text: 'RJ45' },
-      SFP: { color: 'green', text: 'SFP' },
-      'SFP+': { color: 'cyan', text: 'SFP+' },
-      SFP28: { color: 'purple', text: 'SFP28' },
-      QSFP: { color: 'orange', text: 'QSFP' },
-      QSFP28: { color: 'red', text: 'QSFP28' },
-    };
-    const { color, text } = config[type] || { color: 'default', text: type };
+    const option = portTypeMap.get(type);
+    const color = option ? option.color : 'default';
+    const text = option ? option.label : type;
     return <Tag color={color}>{text}</Tag>;
   };
 

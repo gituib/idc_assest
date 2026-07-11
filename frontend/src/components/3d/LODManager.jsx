@@ -1,18 +1,24 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
+// LOD 级别枚举
 export const LOD_LEVELS = {
   HIGH: 0,
   MEDIUM: 1,
   LOW: 2,
 };
 
+// LOD 距离阈值（单位：米）
 export const LOD_DISTANCES = {
   HIGH: 5,
   MEDIUM: 10,
 };
 
+/**
+ * 创建低细节设备 mesh（远距离用）
+ * 仅保留面板 + 机身 + 状态灯，最小化 drawcall
+ */
 const createSimplifiedDeviceMesh = (device, uHeight, rackDepth, deviceColor, statusColor) => {
   const depth = rackDepth || 1.0;
   const dHeight = device.height || device.u_height || 1;
@@ -42,6 +48,10 @@ const createSimplifiedDeviceMesh = (device, uHeight, rackDepth, deviceColor, sta
   );
 };
 
+/**
+ * 创建中等细节设备 mesh（中距离用）
+ * 含面板 + 机身 + 基础硬盘槽位 + 状态灯
+ */
 const createMediumDeviceMesh = (device, uHeight, rackDepth, deviceColor, statusColor) => {
   const depth = rackDepth || 1.0;
   const dHeight = device.height || device.u_height || 1;
@@ -94,6 +104,14 @@ const createMediumDeviceMesh = (device, uHeight, rackDepth, deviceColor, statusC
   );
 };
 
+/**
+ * LOD 级别管理器
+ * 根据相机距离动态切换设备模型的细节级别
+ * 优化策略：
+ *   - 条件渲染：只挂载当前级别的模型，远距离时 HIGH 级别的 DeviceModel 完全卸载
+ *   - useFrame 中仅在级别变化时 setCurrentLevel，避免每帧触发 React 重渲染
+ *   - MEDIUM/LOW 的 JSX 用 useMemo 缓存
+ */
 const LODManager = ({
   device,
   uHeight,
@@ -105,73 +123,61 @@ const LODManager = ({
   level = LOD_LEVELS.HIGH,
 }) => {
   const groupRef = useRef();
-  const highDetailRef = useRef();
-  const mediumDetailRef = useRef();
-  const lowDetailRef = useRef();
   const { camera } = useThree();
-  const lodLevelRef = useRef(LOD_LEVELS.HIGH);
-  const distanceRef = useRef(0);
   const prevDistanceRef = useRef(null);
-  const [, forceUpdate] = React.useReducer(x => x + 1, 0);
+  // 当前 LOD 级别（state）：仅在级别变化时更新，触发 React 重渲染切换挂载的模型
+  const [currentLevel, setCurrentLevel] = useState(LOD_LEVELS.HIGH);
+
+  // 缓存中/低细节 JSX，避免每次级别切换都重建
+  const mediumMesh = useMemo(
+    () => createMediumDeviceMesh(device, uHeight, rackDepth, deviceColor, statusColor),
+    [device, uHeight, rackDepth, deviceColor, statusColor]
+  );
+  const lowMesh = useMemo(
+    () => createSimplifiedDeviceMesh(device, uHeight, rackDepth, deviceColor, statusColor),
+    [device, uHeight, rackDepth, deviceColor, statusColor]
+  );
 
   useFrame(() => {
     if (!groupRef.current) return;
 
     const distance = camera.position.distanceTo(groupRef.current.position);
 
-    // 仅当距离变化超过阈值（10%）时才检查
+    // 仅当距离变化超过 10% 时才检查，避免每帧执行
     if (prevDistanceRef.current !== null) {
-      const changeRatio = Math.abs(distance - prevDistanceRef.current) / (prevDistanceRef.current || 1);
+      const changeRatio =
+        Math.abs(distance - prevDistanceRef.current) / (prevDistanceRef.current || 1);
       if (changeRatio < 0.1) return;
     }
     prevDistanceRef.current = distance;
-    distanceRef.current = distance;
 
-    const highThreshold = LOD_DISTANCES.HIGH;
-    const mediumThreshold = LOD_DISTANCES.MEDIUM;
-
+    // 计算新级别
     let newLevel = LOD_LEVELS.HIGH;
-    if (distance > mediumThreshold) {
+    if (distance > LOD_DISTANCES.MEDIUM) {
       newLevel = LOD_LEVELS.LOW;
-    } else if (distance > highThreshold) {
+    } else if (distance > LOD_DISTANCES.HIGH) {
       newLevel = LOD_LEVELS.MEDIUM;
     }
 
-    if (newLevel !== lodLevelRef.current) {
-      lodLevelRef.current = newLevel;
-      if (highDetailRef.current) {
-        highDetailRef.current.visible = newLevel === LOD_LEVELS.HIGH;
-      }
-      if (mediumDetailRef.current) {
-        mediumDetailRef.current.visible = newLevel === LOD_LEVELS.MEDIUM;
-      }
-      if (lowDetailRef.current) {
-        lowDetailRef.current.visible = newLevel === LOD_LEVELS.LOW;
-      }
-      forceUpdate();
+    // 仅在级别变化时触发 React 重渲染（条件挂载/卸载子树）
+    if (newLevel !== currentLevel) {
+      setCurrentLevel(newLevel);
     }
   });
 
-  if (level !== LOD_LEVELS.HIGH) {
-    return children;
-  }
+  // 外部强制指定级别时直接使用
+  const effectiveLevel = level !== LOD_LEVELS.HIGH ? level : currentLevel;
 
   return (
     <group ref={groupRef} position={position}>
-      {/* 高细节模型 - 默认显示 */}
-      <group ref={highDetailRef} visible={true}>
-        {children}
-      </group>
+      {/* 高细节模型：仅近距离时挂载，远距离完全卸载（节省 DeviceModel 的 useFrame） */}
+      {effectiveLevel === LOD_LEVELS.HIGH && children}
 
       {/* 中等细节模型 */}
-      <group ref={mediumDetailRef} visible={false}>
-        {createMediumDeviceMesh(device, uHeight, rackDepth, deviceColor, statusColor)}
-      </group>
+      {effectiveLevel === LOD_LEVELS.MEDIUM && mediumMesh}
 
       {/* 低细节模型 */}
-      <group ref={lowDetailRef} visible={false}>
-        {createSimplifiedDeviceMesh(device, uHeight, rackDepth, deviceColor, statusColor)}
-      </group>
+      {effectiveLevel === LOD_LEVELS.LOW && lowMesh}
     </group>
   );
 };

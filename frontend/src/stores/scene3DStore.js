@@ -15,28 +15,14 @@ export const useScene3DStore = create((set) => ({
   deviceCables: [],
   loadingDevices: false,
 
-  selectDevice: (device) => set({ selectedDevice: device }),
+  // 统一使用 set* 前缀命名，避免重复 API 造成使用混乱
   setSelectedDevice: (device) => set({ selectedDevice: device }),
-  hoverDevice: (device) => set({ hoveredDevice: device }),
   setHoveredDevice: (device) => set({ hoveredDevice: device }),
-
-  toggleDeviceSlide: () => set((state) => ({ deviceSlideEnabled: !state.deviceSlideEnabled })),
-  setDeviceSlide: (enabled) => set({ deviceSlideEnabled: enabled }),
   setDeviceSlideEnabled: (enabled) => set({ deviceSlideEnabled: enabled }),
-
   setDevices: (devices) => set({ devices }),
-  updateDevices: (devices) => set({ devices }),
-
-  updateRacks: (racks) => set({ racks }),
   setRacks: (racks) => set({ racks }),
-
-  selectRack: (rack) => set({ selectedRack: rack }),
   setSelectedRack: (rack) => set({ selectedRack: rack }),
-
-  updateDeviceCables: (cables) => set({ deviceCables: cables }),
   setDeviceCables: (cables) => set({ deviceCables: cables }),
-
-  setLoading: (loading) => set({ loadingDevices: loading }),
   setLoadingDevices: (loading) => set({ loadingDevices: loading }),
 
   clearDeviceSelection: () => set({ selectedDevice: null, hoveredDevice: null }),
@@ -58,3 +44,4 @@ export const useDevices = () => useScene3DStore((state) => state.devices);
 export const useSelectedDevice = () => useScene3DStore((state) => state.selectedDevice);
 export const useRacks = () => useScene3DStore((state) => state.racks);
 export const useSelectedRack = () => useScene3DStore((state) => state.selectedRack);
+export const useDeviceSlideEnabled = () => useScene3DStore((state) => state.deviceSlideEnabled);

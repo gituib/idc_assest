@@ -627,10 +627,16 @@ const DeviceModel = ({
   // 使用 ref 避免重复设置悬停状态
   const isHoveredRef = useRef(false);
 
-  // 背板渲染控制状态
-  const [backPanelLevel, setBackPanelLevel] = useState(0); // 0: 不渲染, 1: 简化, 2: 完整
+  // 背板渲染控制：用 ref 替代 state，避免切换时触发整个 DeviceModel 重渲染
+  // 始终挂载背板 JSX（useMemo 缓存），通过 backPanelGroupRef.visible 直接控制显示
+  const backPanelGroupRef = useRef();
+  const backPanelVisibleRef = useRef(false);
   const { camera } = useThree();
   const prevCameraZRef = useRef(null);
+
+  // 双击检测：记录上次点击时间，区分单击（选中）和双击（滑出）
+  const lastClickTimeRef = useRef(0);
+  const DOUBLE_CLICK_THRESHOLD = 300; // 双击间隔阈值（毫秒）
 
   // 使用传入的 uHeight (默认为 0.04445m)
   const uHeight = propUHeight || 0.04445;
@@ -652,10 +658,10 @@ const DeviceModel = ({
     }
   });
 
-  // 背板渲染控制 - 根据相机位置动态调整
-  // 仅在相机 Z 坐标变化超过阈值时触发，减少不必要的状态更新
+  // 背板可见性控制 - 根据相机 Z 坐标直接切换 visible 属性
+  // 零 React 重渲染：只改 Three.js Object3D.visible
   useFrame(() => {
-    if (!groupRef.current) return;
+    if (!backPanelGroupRef.current) return;
 
     const cameraZ = camera.position.z;
 
@@ -665,18 +671,13 @@ const DeviceModel = ({
     }
     prevCameraZRef.current = cameraZ;
 
-    // 获取相机相对设备的位置
-    const deviceWorldPos = new THREE.Vector3();
-    groupRef.current.getWorldPosition(deviceWorldPos);
+    // 相机在正面（z > threshold）时隐藏背板，背面时显示
+    const shouldShow = cameraZ <= BACK_PANEL_CONFIG.visibilityThreshold;
 
-    // 简单逻辑：相机在正面（z > threshold）时不渲染背板
-    // 相机在背面（z <= threshold）时渲染完整背板
-    const shouldShowBackPanel = cameraZ <= BACK_PANEL_CONFIG.visibilityThreshold;
-    const newLevel = shouldShowBackPanel ? 2 : 0;
-
-    // 只有当级别变化时才更新状态
-    if (newLevel !== backPanelLevel) {
-      setBackPanelLevel(newLevel);
+    // 只在状态变化时修改 visible，避免每帧写入
+    if (shouldShow !== backPanelVisibleRef.current) {
+      backPanelVisibleRef.current = shouldShow;
+      backPanelGroupRef.current.visible = shouldShow;
     }
   });
 
@@ -974,23 +975,9 @@ const DeviceModel = ({
     );
   };
 
-  // 渲染简化版背板（只显示基础背板）
-  const renderSimplifiedBackPanel = backZ => {
-    return (
-      <group position={[0, 0, backZ]} rotation={[0, Math.PI, 0]}>
-        {/* 基础背板 - 使用共享几何体 */}
-        <mesh
-          position={[0, 0, 0.001]}
-          geometry={SHARED_GEOMETRIES.box}
-          material={SHARED_MATERIALS.panel}
-          scale={[chassisWidth, height - gap, 0.002]}
-        />
-      </group>
-    );
-  };
-
   // 渲染完整版背板（包含 PSU、风扇、网卡等细节）
-  const renderFullBackPanel = backZ => {
+  // 用 useCallback 包装，确保依赖变化时才重建函数
+  const renderFullBackPanel = useCallback(backZ => {
     return (
       <group position={[0, 0, backZ]} rotation={[0, Math.PI, 0]}>
         {/* 基础背板 - 透明玻璃质感 */}
@@ -1082,28 +1069,14 @@ const DeviceModel = ({
         </group>
       </group>
     );
-  };
+  }, [chassisWidth, height, gap]);
 
-  // 根据级别渲染背板
-  const renderBackPanel = () => {
-    // Back face Z position
+  // 背板 JSX 用 useMemo 缓存，仅在 device/尺寸变化时重建
+  // 始终挂载到场景中，通过 backPanelGroupRef.visible 控制显示
+  const backPanel = useMemo(() => {
     const backZ = chassisZ - chassisDepth / 2;
-
-    // 根据背板级别决定渲染内容
-    switch (backPanelLevel) {
-      case 0:
-        // 不渲染背板
-        return null;
-      case 1:
-        // 简化背板
-        return renderSimplifiedBackPanel(backZ);
-      case 2:
-        // 完整背板
-        return renderFullBackPanel(backZ);
-      default:
-        return null;
-    }
-  };
+    return renderFullBackPanel(backZ);
+  }, [chassisZ, chassisDepth, renderFullBackPanel]);
   const renderDeviceFace = () => {
     const type = device.type?.toLowerCase() || '';
     if (type.includes('server') || type.includes('服务器')) return renderServerFace();
@@ -1148,7 +1121,17 @@ const DeviceModel = ({
         ref={groupRef}
         onClick={e => {
           e.stopPropagation();
-          isExtendedRef.current = !isExtendedRef.current;
+          // 双击检测：300ms 内的第二次点击视为双击，切换滑出状态
+          const now = Date.now();
+          const isDoubleClick =
+            now - lastClickTimeRef.current < DOUBLE_CLICK_THRESHOLD;
+          lastClickTimeRef.current = now;
+
+          if (isDoubleClick) {
+            // 双击：切换滑出状态
+            isExtendedRef.current = !isExtendedRef.current;
+          }
+          // 单击和双击都触发选中回调（让详情面板打开）
           onClick && onClick(device);
         }}
         onPointerOver={e => {
@@ -1207,8 +1190,10 @@ const DeviceModel = ({
         {/* 设备特定前面板细节 */}
         {renderDeviceFace()}
 
-        {/* 设备背板细节 */}
-        {renderBackPanel()}
+        {/* 设备背板细节 - 始终挂载，通过 ref 控制 visible 避免重渲染 */}
+        <group ref={backPanelGroupRef} visible={false}>
+          {backPanel}
+        </group>
       </group>
 
       {/* 设备名称 (悬浮显示，避免遮挡细节) - 暂时禁用 */}

@@ -37,7 +37,16 @@ const Cable = sequelize.define(
       allowNull: false,
     },
     cableType: {
-      type: DataTypes.ENUM('ethernet', 'fiber', 'copper'),
+      type: DataTypes.ENUM(
+        // 以太网线缆
+        'ethernet', 'cat5e', 'cat6', 'cat6a', 'cat7', 'cat8', 'dac', 'aoc',
+        // 光纤线缆
+        'fiber', 'os2', 'om1', 'om2', 'om3', 'om4', 'om5',
+        // 同轴/铜质
+        'copper', 'coax',
+        // 其他
+        'power', 'console', 'stack'
+      ),
       defaultValue: 'ethernet',
       allowNull: false,
     },

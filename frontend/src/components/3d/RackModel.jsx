@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import DeviceModel from './DeviceModel';
 import LODManager, { LOD_LEVELS } from './LODManager';
@@ -55,29 +55,85 @@ const RackModel = ({
   const deviceGroupOffset = 0.1;
 
   // 生成U位刻度标识 - 写在机柜左右两侧柱子上
+  // 优化策略：
+  //   - 刻度线（box）用 1 个 InstancedMesh 合并所有 U 位的左+右刻度，drawcall 从 2×rackHeight 降到 1
+  //   - U 位数字（plane）因 texture 各异无法用 InstancedMesh 合并，但共享 geometry 按 major/minor 分组
+  const leftPostX = -width / 2 + postWidth / 2;
+  const rightPostX = width / 2 - postWidth / 2;
+  const frontPostZ = depth / 2 - postWidth / 2;
+
+  // 共享几何体（major 和 minor 各一套，避免每 U 创建新 PlaneGeometry）
+  const majorPlaneGeo = useMemo(() => new THREE.PlaneGeometry(0.035, 0.035), []);
+  const minorPlaneGeo = useMemo(() => new THREE.PlaneGeometry(0.025, 0.025), []);
+  const majorTickGeo = useMemo(() => new THREE.BoxGeometry(postWidth, 0.002, 0.001), [postWidth]);
+  const minorTickGeo = useMemo(() => new THREE.BoxGeometry(postWidth, 0.001, 0.001), [postWidth]);
+  const majorTickMat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#fbbf24' }), []);
+  const minorTickMat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#6b7280' }), []);
+
+  // 收集所有刻度线的位置信息，用于 InstancedMesh
+  const tickInstances = useMemo(() => {
+    const instances = [];
+    for (let u = 1; u <= rackHeight; u += 1) {
+      const yPos = (u - 1) * uHeight + uHeight / 2 + deviceGroupOffset;
+      const isMajorU = u % 5 === 0;
+      const tickZ = frontPostZ + postWidth / 2 + 0.002;
+      // 左侧刻度
+      instances.push({ x: leftPostX, y: yPos, z: tickZ, isMajor: isMajorU });
+      // 右侧刻度
+      instances.push({ x: rightPostX, y: yPos, z: tickZ, isMajor: isMajorU });
+    }
+    return instances;
+  }, [rackHeight, uHeight, leftPostX, rightPostX, frontPostZ, postWidth, deviceGroupOffset]);
+
+  // 刻度线 InstancedMesh 组件
+  const TickInstances = ({ instances, geometry, material }) => {
+    const meshRef = useRef();
+    const dummy = useMemo(() => new THREE.Object3D(), []);
+
+    useEffect(() => {
+      if (!meshRef.current) return;
+      for (let i = 0; i < instances.length; i += 1) {
+        const inst = instances[i];
+        dummy.position.set(inst.x, inst.y, inst.z);
+        dummy.updateMatrix();
+        meshRef.current.setMatrixAt(i, dummy.matrix);
+      }
+      meshRef.current.instanceMatrix.needsUpdate = true;
+    }, [instances, dummy]);
+
+    return (
+      <instancedMesh
+        ref={meshRef}
+        args={[geometry, material, instances.length]}
+      />
+    );
+  };
+
+  // 拆分 major/minor 刻度实例
+  const majorTickInstances = useMemo(
+    () => tickInstances.filter(i => i.isMajor),
+    [tickInstances]
+  );
+  const minorTickInstances = useMemo(
+    () => tickInstances.filter(i => !i.isMajor),
+    [tickInstances]
+  );
+
+  // U 位数字标签：保留 plane，但共享 geometry（按 major/minor 分组）
   const uLabels = useMemo(() => {
     const labels = [];
     for (let u = 1; u <= rackHeight; u += 1) {
       const yPos = (u - 1) * uHeight + uHeight / 2 + deviceGroupOffset;
-
       const texture = getULabelTexture(u);
-
       const isMajorU = u % 5 === 0;
-      const planeSize = isMajorU ? 0.035 : 0.025;
-      const planeGeometry = new THREE.PlaneGeometry(planeSize, planeSize);
-
-      const leftPostX = -width / 2 + postWidth / 2;
-      const rightPostX = width / 2 - postWidth / 2;
-      const frontPostZ = depth / 2 - postWidth / 2;
-
-      const tickColor = isMajorU ? '#fbbf24' : '#6b7280';
-      const tickHeight = isMajorU ? 0.002 : 0.001;
+      const planeGeo = isMajorU ? majorPlaneGeo : minorPlaneGeo;
+      const labelZ = frontPostZ + postWidth / 2 + 0.001;
 
       labels.push(
         <group key={`u-label-${u}`}>
           <mesh
-            position={[leftPostX, yPos, frontPostZ + postWidth / 2 + 0.001]}
-            geometry={planeGeometry}
+            position={[leftPostX, yPos, labelZ]}
+            geometry={planeGeo}
           >
             <meshBasicMaterial
               map={texture}
@@ -87,8 +143,8 @@ const RackModel = ({
             />
           </mesh>
           <mesh
-            position={[rightPostX, yPos, frontPostZ + postWidth / 2 + 0.001]}
-            geometry={planeGeometry}
+            position={[rightPostX, yPos, labelZ]}
+            geometry={planeGeo}
           >
             <meshBasicMaterial
               map={texture}
@@ -96,20 +152,12 @@ const RackModel = ({
               opacity={1}
               side={THREE.DoubleSide}
             />
-          </mesh>
-          <mesh position={[leftPostX, yPos, frontPostZ + postWidth / 2 + 0.002]}>
-            <boxGeometry args={[postWidth, tickHeight, 0.001]} />
-            <meshBasicMaterial color={tickColor} />
-          </mesh>
-          <mesh position={[rightPostX, yPos, frontPostZ + postWidth / 2 + 0.002]}>
-            <boxGeometry args={[postWidth, tickHeight, 0.001]} />
-            <meshBasicMaterial color={tickColor} />
           </mesh>
         </group>
       );
     }
     return labels;
-  }, [rackHeight]);
+  }, [rackHeight, uHeight, leftPostX, rightPostX, frontPostZ, postWidth, majorPlaneGeo, minorPlaneGeo, deviceGroupOffset]);
 
   // 生成机柜框架
   const frame = useMemo(() => {
@@ -152,11 +200,27 @@ const RackModel = ({
           </mesh>
         ))}
 
-        {/* U位刻度标识 */}
+        {/* U位刻度线 - 用 InstancedMesh 合并所有刻度，drawcall 从 2×rackHeight 降到 2 */}
+        {majorTickInstances.length > 0 && (
+          <TickInstances
+            instances={majorTickInstances}
+            geometry={majorTickGeo}
+            material={majorTickMat}
+          />
+        )}
+        {minorTickInstances.length > 0 && (
+          <TickInstances
+            instances={minorTickInstances}
+            geometry={minorTickGeo}
+            material={minorTickMat}
+          />
+        )}
+
+        {/* U位数字标签 - 共享 geometry，按 texture 区分 */}
         {uLabels}
       </group>
     );
-  }, [width, height, depth, postWidth, uLabels]);
+  }, [width, height, depth, postWidth, uLabels, majorTickInstances, minorTickInstances, majorTickGeo, majorTickMat, minorTickGeo, minorTickMat]);
 
   return (
     <group position={[0, 0.5, 0]}>

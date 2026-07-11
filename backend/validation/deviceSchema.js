@@ -98,6 +98,18 @@ const batchMoveSchema = Joi.object({
   startPosition: Joi.number().integer().min(1).allow(null),
 });
 
+const batchWarrantySchema = Joi.object({
+  deviceIds: Joi.array().items(Joi.string().required()).min(1).required().messages({
+    'array.base': '设备ID列表必须是数组',
+    'array.min': '至少需要提供一个设备ID',
+    'any.required': '设备ID列表是必填字段',
+  }),
+  warrantyExpiry: Joi.date().required().messages({
+    'any.required': '维保到期日期是必填字段',
+  }),
+  purchaseDate: Joi.date().allow(null),
+});
+
 const queryDeviceSchema = Joi.object({
   keyword: Joi.string().max(100).allow(''),
   status: Joi.string()
@@ -116,6 +128,7 @@ const queryDeviceSchema = Joi.object({
 module.exports = {
   batchDeviceIdsSchema,
   batchStatusSchema,
+  batchWarrantySchema,
   batchMoveSchema,
   queryDeviceSchema,
   DEVICE_TYPES,

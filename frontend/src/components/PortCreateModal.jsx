@@ -29,6 +29,7 @@ import {
 import axios from 'axios';
 import { designTokens } from '../config/theme';
 import CloseButton from './CloseButton';
+import { usePortOptions } from '../hooks/usePortOptions';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -203,6 +204,9 @@ function PortCreateModal({
   networkCard,
   disableNicChange = false,
 }) {
+  // 端口类型/速率选项（来自 /api/port-options，集中维护）
+  const { portTypes, portSpeeds } = usePortOptions();
+
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [previewPorts, setPreviewPorts] = useState([]);
@@ -891,85 +895,35 @@ function PortCreateModal({
                   label={<span style={styles.fieldLabel}>端口类型</span>}
                   rules={[{ required: true, message: '请选择' }]}
                 >
-                  <Select size="small" style={{ width: '100%', borderRadius: '6px' }}>
-                    <Option value="RJ45">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '2px',
-                            background: designTokens.colors.device.server,
-                          }}
-                        />
-                        RJ45
-                      </div>
-                    </Option>
-                    <Option value="SFP">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '2px',
-                            background: designTokens.colors.device.switch,
-                          }}
-                        />
-                        SFP
-                      </div>
-                    </Option>
-                    <Option value="SFP+">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '2px',
-                            background: designTokens.colors.purple.main,
-                          }}
-                        />
-                        SFP+
-                      </div>
-                    </Option>
-                    <Option value="SFP28">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '2px',
-                            background: designTokens.colors.info.main,
-                          }}
-                        />
-                        SFP28
-                      </div>
-                    </Option>
-                    <Option value="QSFP">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '2px',
-                            background: designTokens.colors.warning.main,
-                          }}
-                        />
-                        QSFP
-                      </div>
-                    </Option>
-                    <Option value="QSFP28">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '2px',
-                            background: designTokens.colors.secondary.main,
-                          }}
-                        />
-                        QSFP28
-                      </div>
-                    </Option>
+                  <Select
+                    size="small"
+                    style={{ width: '100%', borderRadius: '6px' }}
+                    optionLabelProp="label"
+                  >
+                    {portTypes.map(opt => (
+                      <Option
+                        key={opt.value}
+                        value={opt.value}
+                        label={opt.label}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div
+                            style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '2px',
+                              background: opt.dotColor,
+                            }}
+                          />
+                          <span>{opt.label}</span>
+                          {opt.cnName && (
+                            <span style={{ color: '#999', fontSize: '12px' }}>
+                              （{opt.cnName}）
+                            </span>
+                          )}
+                        </div>
+                      </Option>
+                    ))}
                   </Select>
                 </Form.Item>
               </Col>
@@ -981,12 +935,11 @@ function PortCreateModal({
                   rules={[{ required: true, message: '请选择' }]}
                 >
                   <Select size="small" style={{ width: '100%', borderRadius: '6px' }}>
-                    <Option value="100M">100M</Option>
-                    <Option value="1G">1G</Option>
-                    <Option value="10G">10G</Option>
-                    <Option value="25G">25G</Option>
-                    <Option value="40G">40G</Option>
-                    <Option value="100G">100G</Option>
+                    {portSpeeds.map(opt => (
+                      <Option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </Option>
+                    ))}
                   </Select>
                 </Form.Item>
               </Col>

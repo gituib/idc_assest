@@ -33,6 +33,7 @@ import { deviceAPI } from '../api';
 import { designTokens } from '../config/theme';
 import dayjs from 'dayjs';
 import api from '../api';
+import { usePortOptions } from '../hooks/usePortOptions';
 
 const { Text, Title } = Typography;
 const { Panel } = Collapse;
@@ -48,6 +49,9 @@ function DeviceDetailDrawer({
   tooltipFields,
   refreshTrigger,
 }) {
+  // 端口类型选项（来自 /api/port-options，集中维护）
+  const { portTypeMap } = usePortOptions();
+
   const [activeTab, setActiveTab] = useState('ports');
 
   const [tickets, setTickets] = useState([]);
@@ -217,18 +221,15 @@ function DeviceDetailDrawer({
     return <Tag color={color}>{text}</Tag>;
   }, []);
 
-  const getPortTypeTag = useCallback(type => {
-    const config = {
-      RJ45: { color: 'blue', text: 'RJ45' },
-      SFP: { color: 'green', text: 'SFP' },
-      'SFP+': { color: 'cyan', text: 'SFP+' },
-      SFP28: { color: 'purple', text: 'SFP28' },
-      QSFP: { color: 'orange', text: 'QSFP' },
-      QSFP28: { color: 'red', text: 'QSFP28' },
-    };
-    const { color, text } = config[type] || { color: 'default', text: type };
-    return <Tag color={color}>{text}</Tag>;
-  }, []);
+  const getPortTypeTag = useCallback(
+    type => {
+      const option = portTypeMap.get(type);
+      const color = option ? option.color : 'default';
+      const text = option ? option.label : type;
+      return <Tag color={color}>{text}</Tag>;
+    },
+    [portTypeMap]
+  );
 
   const getDeviceTypeName = useCallback(type => {
     const typeMap = {

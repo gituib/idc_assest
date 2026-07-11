@@ -112,6 +112,7 @@ backend/config/remote-backup-configs.json
 .vercel/
 .gitignore
 .vercelignore
+3d-datacenter-dashboard/
 docs/install-improvement-plan.md
 docs/install-split-plan.md
 

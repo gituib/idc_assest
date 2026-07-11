@@ -559,6 +559,7 @@ const Rack3DVisualization = () => {
                 onDeviceHover={handleDeviceHover}
                 tooltipFields={tooltipFields}
                 deviceSlideEnabled={deviceSlideEnabled}
+                modalsOpen={modalVisible || nicModalVisible || portModalVisible || cableModalVisible}
               />
 
               {/* Rack Info Overlay (New) */}

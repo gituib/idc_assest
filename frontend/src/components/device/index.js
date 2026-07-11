@@ -5,3 +5,4 @@ export { default as ImportModal } from './ImportModal';
 export { default as ExportModal } from './ExportModal';
 export { default as FieldConfigModal } from './FieldConfigModal';
 export { default as BatchStatusModal } from './BatchStatusModal';
+export { default as BatchWarrantyModal } from './BatchWarrantyModal';
