@@ -1653,6 +1653,24 @@ function PortManagement() {
     return <DeploymentUnitOutlined />;
   };
 
+  /**
+   * 按设备原始类型返回图标背景渐变与阴影色
+   * @param {Object} device - 设备对象
+   * @returns {{ gradient: string, shadow: string }} 背景渐变与阴影色
+   */
+  const getDeviceIconStyle = device => {
+    if (!device?.type) return { gradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)', shadow: 'rgba(100, 116, 139, 0.3)' };
+    const type = device.type.toLowerCase();
+    if (type.includes('server')) return { gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', shadow: 'rgba(102, 126, 234, 0.3)' };
+    if (type.includes('switch')) return { gradient: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', shadow: 'rgba(17, 153, 142, 0.3)' };
+    if (type.includes('router')) return { gradient: 'linear-gradient(135deg, #f59e0b 0%, #f97316 100%)', shadow: 'rgba(245, 158, 11, 0.3)' };
+    if (type.includes('firewall')) return { gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', shadow: 'rgba(239, 68, 68, 0.3)' };
+    if (type.includes('storage')) return { gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', shadow: 'rgba(139, 92, 246, 0.3)' };
+    if (type.includes('loadbalancer')) return { gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', shadow: 'rgba(59, 130, 246, 0.3)' };
+    // 自定义类型用粉红渐变（色彩饱满，避免灰色辨识度不足）
+    return { gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)', shadow: 'rgba(236, 72, 153, 0.3)' };
+  };
+
   /** 获取设备类型分类：server 为服务器，switch 涵盖所有网络设备（交换机/路由器/防火墙/存储等） */
   const getDeviceType = device => {
     if (!device?.type) return 'unknown';
@@ -2098,17 +2116,13 @@ function PortManagement() {
                               width: '48px',
                               height: '48px',
                               borderRadius: designTokens.borderRadius.md,
-                              background: isServerDevice(device)
-                                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                                : isSwitchDevice(device)
-                                  ? 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
-                                  : designTokens.colors.primary.gradient,
+                              background: getDeviceIconStyle(device).gradient,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               color: '#fff',
                               fontSize: '24px',
-                              boxShadow: designTokens.shadows.md,
+                              boxShadow: `0 4px 12px ${getDeviceIconStyle(device).shadow}`,
                             }}
                           >
                             {getDeviceIcon(device)}
@@ -2621,16 +2635,10 @@ function PortManagement() {
                           addonAfter={
                             <span
                               style={{
-                                color: isServerDevice(selectedDeviceForPort)
-                                  ? designTokens.colors.warning.main
-                                  : designTokens.colors.success.main,
+                                color: getDeviceIconStyle(selectedDeviceForPort).shadow.replace(/0\.3\)/, '1)'),
                               }}
                             >
-                              {isServerDevice(selectedDeviceForPort)
-                                ? '服务器'
-                                : isSwitchDevice(selectedDeviceForPort)
-                                  ? '交换机'
-                                  : '设备'}
+                              {getDeviceTypeLabel(selectedDeviceForPort)}
                             </span>
                           }
                           style={{ borderRadius: '8px' }}
@@ -3808,17 +3816,13 @@ function PortManagement() {
                         width: '48px',
                         height: '48px',
                         borderRadius: '12px',
-                        background: isServerDevice(device)
-                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                          : 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                        background: getDeviceIconStyle(device).gradient,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#fff',
                         fontSize: '22px',
-                        boxShadow: isServerDevice(device)
-                          ? '0 4px 12px rgba(102, 126, 234, 0.3)'
-                          : '0 4px 12px rgba(17, 153, 142, 0.3)',
+                        boxShadow: `0 4px 12px ${getDeviceIconStyle(device).shadow}`,
                         flexShrink: 0,
                       }}
                     >
