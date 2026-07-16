@@ -1706,7 +1706,8 @@ function PortManagement() {
 
     const filtered = devices.filter(d => {
       const type = getDeviceType(d);
-      if (type !== 'switch' && type !== 'server') return false;
+      // 仅排除无类型设备，允许自定义类型（other）进入端口管理
+      if (type === 'unknown') return false;
       if (selectedRackId && d.rackId !== selectedRackId) return false;
       if (selectedRoomId && d.rackId && rackRoomMap[d.rackId] !== selectedRoomId) return false;
       // 子类型过滤：根据设备原始类型精确匹配
@@ -3611,7 +3612,8 @@ function PortManagement() {
 
           const allDevices = devices.filter(d => {
             const type = getDeviceType(d);
-            if (type !== 'switch' && type !== 'server') return false;
+            // 仅排除无类型设备，允许自定义类型（other）进入端口管理
+            if (type === 'unknown') return false;
             if (selectedRackId && d.rackId !== selectedRackId) return false;
             if (selectedRoomId && d.rackId && rackRoomMap[d.rackId] !== selectedRoomId)
               return false;
