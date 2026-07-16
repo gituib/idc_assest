@@ -1719,9 +1719,17 @@ function PortManagement() {
       if (deviceFilterType !== 'all') {
         if (deviceFilterType === 'server') {
           if (type !== 'server') return false;
+        } else if (deviceFilterType === 'other') {
+          // 「其他」Tab：展示自定义类型设备
+          if (type !== 'other') return false;
         } else if (deviceFilterType === 'switch') {
-          // 'switch' Tab 在非引导模式下展示所有网络设备
-          if (type !== 'switch') return false;
+          if (guidedDeviceType === null) {
+            // 无引导模式下「网络设备」大类 Tab：包含所有网络设备及自定义类型
+            if (type !== 'switch' && type !== 'other') return false;
+          } else {
+            // 引导模式下「交换机」子 Tab：仅展示交换机
+            if (type !== 'switch') return false;
+          }
         } else {
           // 子类型过滤：router/firewall/storage 等，检查原始 type 字段
           const rawType = (d.type || '').toLowerCase();
@@ -1739,7 +1747,7 @@ function PortManagement() {
       total: filtered.length,
       hasMore,
     };
-  }, [devices, deviceFilterType, devicePage, rackList, selectedRoomId, selectedRackId]);
+  }, [devices, deviceFilterType, devicePage, guidedDeviceType, rackList, selectedRoomId, selectedRackId]);
 
   useEffect(() => {
     if (!loadMoreRef.current) return;
