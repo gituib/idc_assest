@@ -61,6 +61,7 @@ import {
   ColumnHeightOutlined,
   GlobalOutlined,
   BarcodeOutlined,
+  DeploymentUnitOutlined,
 } from '@ant-design/icons';
 import api from '../api';
 import { roomAPI, rackAPI } from '../api/cache';
@@ -1646,7 +1647,8 @@ function PortManagement() {
     if (type.includes('firewall')) return <SafetyOutlined />;
     if (type.includes('storage')) return <HddOutlined />;
     if (type.includes('loadbalancer')) return <SwapOutlined />;
-    return <AppstoreOutlined />;
+    // 自定义类型（无线控制器、上网行为管理等）统一用节点设备图标，与交换机区分
+    return <DeploymentUnitOutlined />;
   };
 
   /** 获取设备类型分类：server 为服务器，switch 涵盖所有网络设备（交换机/路由器/防火墙/存储等） */
