@@ -184,11 +184,17 @@ function DeviceManagement() {
           const defaultTypeField = DEFAULT_DEVICE_FIELDS_LOCAL.find(f => f.fieldName === 'type');
           return { ...field, options: defaultTypeField?.options || [] };
         }
-        if (field.fieldName === 'status' && (!field.options || field.options.length === 0)) {
+        if (field.fieldName === 'status') {
+          // 状态字段：options 为空时用本地默认值兜底；无论是否为空都强制过滤掉 'idle'
+          // 原因：空闲状态只能通过「标记为空闲」按钮转入，避免在新增/编辑表单中误选导致 isIdle 与 status 不一致
           const defaultStatusField = DEFAULT_DEVICE_FIELDS_LOCAL.find(
             f => f.fieldName === 'status'
           );
-          return { ...field, options: defaultStatusField?.options || [] };
+          const baseOptions =
+            !field.options || field.options.length === 0
+              ? defaultStatusField?.options || []
+              : field.options;
+          return { ...field, options: baseOptions.filter(opt => opt.value !== 'idle') };
         }
         return field;
       });

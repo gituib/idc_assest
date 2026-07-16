@@ -125,7 +125,7 @@ export const DEFAULT_DEVICE_FIELDS = [
       { value: 'maintenance', label: '维护中' },
       { value: 'offline', label: '离线' },
       { value: 'fault', label: '故障' },
-      { value: 'idle', label: '空闲' },
+      // 'idle'(空闲) 不在此处提供：空闲状态只能通过「标记为空闲」按钮转入，避免与 isIdle 字段不一致
     ],
   },
   {

@@ -60,6 +60,7 @@ export default [
       'react-hooks/static-components': 'off',
       'react-hooks/refs': 'off',
       'react-hooks/immutability': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
     },
   },
 ];
