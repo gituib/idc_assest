@@ -151,7 +151,7 @@ const PortAddGuideModal = ({ visible, onClose, onSelectType }) => {
                   color: designTokens.colors.neutral[500],
                 }}
               >
-                交换机/路由器/防火墙等
+                交换机/路由器/防火墙及自定义类型
               </div>
             </div>
             <div
@@ -293,7 +293,7 @@ const PortAddGuideModal = ({ visible, onClose, onSelectType }) => {
                     lineHeight: 1.6,
                   }}
                 >
-                  适用于交换机、路由器、防火墙、存储设备等网络设备，可以直接创建端口，无需关联网卡。适用于创建
+                  适用于交换机、路由器、防火墙、存储设备等网络设备，以及其他自定义网络设备类型（如无线控制器、上网行为管理等），可以直接创建端口，无需关联网卡。适用于创建
                   Uplink 端口、Trunk 端口等。
                 </div>
               </div>
