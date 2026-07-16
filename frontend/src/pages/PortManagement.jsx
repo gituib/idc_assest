@@ -3628,12 +3628,13 @@ function PortManagement() {
           // 根据引导类型动态配置 Tab
           const tabConfigs = (() => {
             if (guidedDeviceType === 'switch') {
-              // 网络设备端口 → 显示网络设备子类型
+              // 网络设备端口 → 显示网络设备子类型 + 其他（自定义类型）
               return [
                 { key: 'switch', label: '交换机' },
                 { key: 'router', label: '路由器' },
                 { key: 'firewall', label: '防火墙' },
                 { key: 'storage', label: '存储设备' },
+                { key: 'other', label: '其他' },
               ];
             }
             if (guidedDeviceType === 'server') {
@@ -3652,6 +3653,7 @@ function PortManagement() {
           // 计算每个 Tab 的设备数量
           const getTabCount = key => {
             if (key === 'server') return allDevices.filter(d => getDeviceType(d) === 'server').length;
+            if (key === 'other') return allDevices.filter(d => getDeviceType(d) === 'other').length;
             // 子类型按原始 type 匹配
             return allDevices.filter(d => {
               const rawType = (d.type || '').toLowerCase();
@@ -3666,6 +3668,7 @@ function PortManagement() {
             router: { active: 'linear-gradient(135deg, #f59e0b 0%, #f97316 100%)', shadow: 'rgba(245, 158, 11, 0.3)' },
             firewall: { active: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', shadow: 'rgba(239, 68, 68, 0.3)' },
             storage: { active: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', shadow: 'rgba(139, 92, 246, 0.3)' },
+            other: { active: 'linear-gradient(135deg, #64748b 0%, #475569 100%)', shadow: 'rgba(100, 116, 139, 0.3)' },
           };
 
           return (
