@@ -1667,7 +1667,11 @@ function PortManagement() {
     return 'other';
   };
 
-  const isSwitchDevice = device => getDeviceType(device) === 'switch';
+  // 自定义类型（other）与网络设备一致，均无需关联网卡
+  const isSwitchDevice = device => {
+    const t = getDeviceType(device);
+    return t === 'switch' || t === 'other';
+  };
   const isServerDevice = device => getDeviceType(device) === 'server';
 
   /** 根据设备原始类型获取中文名标签 */
@@ -1680,7 +1684,8 @@ function PortManagement() {
     if (type.includes('firewall')) return '防火墙';
     if (type.includes('storage')) return '存储设备';
     if (type.includes('loadbalancer')) return '负载均衡';
-    return '设备';
+    // 自定义类型直接展示原始值（如"无线控制器"）
+    return device.type;
   };
 
   /** 将设备状态值映射为带颜色的中文文本 */
