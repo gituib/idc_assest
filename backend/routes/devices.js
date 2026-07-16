@@ -524,7 +524,8 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
   try {
     const { keyword, status, type, rackId, roomId, isIdle } = req.query;
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 10));
+    // 上限 1000，匹配前端分页选项的最大值
+    const pageSize = Math.min(1000, Math.max(1, parseInt(req.query.pageSize, 10) || 10));
     const offset = (page - 1) * pageSize;
 
     // 构建查询条件

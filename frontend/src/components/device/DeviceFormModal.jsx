@@ -65,6 +65,9 @@ const DeviceFormModal = ({
   useEffect(() => {
     if (visible) {
       if (editingDevice) {
+        // 先清空表单状态，避免上一个设备的自定义字段值残留被当前设备继承
+        // antd setFieldsValue 是合并式更新，不会清除未传入的字段
+        form.resetFields();
         const initialValues = getFormInitialValues(editingDevice, racks);
         if (initialValues.purchaseDate) {
           initialValues.purchaseDate = dayjs(initialValues.purchaseDate);
@@ -272,8 +275,9 @@ const DeviceFormModal = ({
   // 强制锁定必填的字段（不受字段管理配置影响）
   const FORCE_REQUIRED_FIELDS = ['name', 'serialNumber', 'position', 'height'];
 
+  // 过滤掉 deviceId 以及已在"设备位置选择"区块内单独渲染的字段，避免重复显示
   const filteredFields = deviceFields.filter(
-    field => field.fieldName !== 'deviceId'
+    field => !['deviceId', 'rackId', 'position', 'height'].includes(field.fieldName)
   );
 
   // 获取关键字段的配置（用于设备位置区块）

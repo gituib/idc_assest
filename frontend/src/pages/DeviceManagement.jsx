@@ -1275,7 +1275,7 @@ function DeviceManagement() {
                 ...pagination,
                 showSizeChanger: true,
                 showQuickJumper: true,
-                pageSizeOptions: ['10', '20', '30', '50', '100'],
+                pageSizeOptions: ['10', '20', '30', '50', '100', '200', '500', '1000'],
                 showTotal: total => `共 ${total} 条记录`,
                 style: { marginTop: '16px' },
               }}

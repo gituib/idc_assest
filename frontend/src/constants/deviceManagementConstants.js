@@ -8,7 +8,7 @@ export const PAGINATION_CONFIG = {
   // 默认每页条数
   defaultPageSize: 10,
   // 可选每页条数
-  pageSizeOptions: ['10', '20', '30', '50', '100'],
+  pageSizeOptions: ['10', '20', '30', '50', '100', '200', '500', '1000'],
   // 显示快速跳转
   showSizeChanger: true,
   // 显示总数
