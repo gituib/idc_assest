@@ -62,6 +62,8 @@ import {
   GlobalOutlined,
   BarcodeOutlined,
   DeploymentUnitOutlined,
+  PartitionOutlined,
+  GatewayOutlined,
 } from '@ant-design/icons';
 import api from '../api';
 import { roomAPI, rackAPI } from '../api/cache';
@@ -1642,8 +1644,8 @@ function PortManagement() {
     if (!device?.type) return <AppstoreOutlined />;
     const type = device.type.toLowerCase();
     if (type.includes('server')) return <CloudServerOutlined />;
-    if (type.includes('switch')) return <AppstoreOutlined />;
-    if (type.includes('router')) return <ApiOutlined />;
+    if (type.includes('switch')) return <PartitionOutlined />;
+    if (type.includes('router')) return <GatewayOutlined />;
     if (type.includes('firewall')) return <SafetyOutlined />;
     if (type.includes('storage')) return <HddOutlined />;
     if (type.includes('loadbalancer')) return <SwapOutlined />;
