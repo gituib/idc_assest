@@ -10,6 +10,17 @@ const fs = require('fs');
 const path = require('path');
 const { validateBody, validateQuery } = require('../middleware/validation');
 const { createRackSchema, updateRackSchema, queryRackSchema } = require('../validation/rackSchema');
+const { logOperation } = require('../utils/operationLogger');
+
+/**
+ * 记录机柜操作日志
+ * @param {string} operationType - 操作类型
+ * @param {string} operationDescription - 操作描述
+ * @param {Object} params - 参数
+ * @returns {Promise<Object|null>}
+ */
+const logRackOperation = (operationType, operationDescription, params) =>
+  logOperation({ module: 'rack', operationType, operationDescription, ...params });
 
 // 获取所有机柜
 router.get('/', async (req, res) => {
@@ -405,15 +416,39 @@ router.post('/', validateBody(createRackSchema), async (req, res) => {
     }
 
     const rack = await Rack.create(rackData);
+
+    await logRackOperation('create', `创建机柜【${rack.name}】`, {
+      targetId: rack.rackId,
+      targetName: rack.name,
+      afterState: rack.toJSON(),
+      req,
+      metadata: { type: 'rack_create' },
+    });
+
     res.status(201).json(rack);
   } catch (error) {
+    await logRackOperation('create', '创建机柜失败', {
+      targetName: req.body.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
+
     res.status(400).json({ error: error.message });
   }
 });
 
 // 更新机柜
 router.put('/:rackId', validateBody(updateRackSchema), async (req, res) => {
+  // 查询原始数据用于日志记录（在 try 外声明以便 catch 中可访问）
+  let beforeState = null;
   try {
+    const existingRack = await Rack.findByPk(req.params.rackId);
+    if (!existingRack) {
+      return res.status(404).json({ error: '机柜不存在' });
+    }
+    beforeState = existingRack.toJSON();
+
     const [updated] = await Rack.update(req.body, {
       where: { rackId: req.params.rackId },
     });
@@ -425,17 +460,39 @@ router.put('/:rackId', validateBody(updateRackSchema), async (req, res) => {
         ],
         subQuery: false, // 避免子查询导致的性能问题
       });
+
+      await logRackOperation('update', `更新机柜【${updatedRack.name}】`, {
+        targetId: req.params.rackId,
+        targetName: updatedRack.name,
+        beforeState,
+        afterState: updatedRack.toJSON(),
+        req,
+        metadata: { type: 'rack_update' },
+      });
+
       res.json(updatedRack);
     } else {
       res.status(404).json({ error: '机柜不存在' });
     }
   } catch (error) {
+    await logRackOperation('update', '更新机柜失败', {
+      targetId: req.params.rackId,
+      targetName: req.body.name,
+      beforeState,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
+
     res.status(400).json({ error: error.message });
   }
 });
 
 // 删除机柜
 router.delete('/:rackId', async (req, res) => {
+  // 用于日志记录的机柜信息（在 try 外声明以便 catch 中可访问）
+  let rackName = null;
+  let beforeState = null;
   try {
     // 检查是否有设备关联
     const devices = await Device.findAll({ where: { rackId: req.params.rackId } });
@@ -443,15 +500,40 @@ router.delete('/:rackId', async (req, res) => {
       return res.status(400).json({ error: '该机柜下有设备，无法删除' });
     }
 
+    // 查询机柜信息用于日志记录
+    const existingRack = await Rack.findByPk(req.params.rackId);
+    if (!existingRack) {
+      return res.status(404).json({ error: '机柜不存在' });
+    }
+    rackName = existingRack.name;
+    beforeState = existingRack.toJSON();
+
     const deleted = await Rack.destroy({
       where: { rackId: req.params.rackId },
     });
     if (deleted) {
+      await logRackOperation('delete', `删除机柜【${rackName}】`, {
+        targetId: req.params.rackId,
+        targetName: rackName,
+        beforeState,
+        req,
+        metadata: { type: 'rack_delete' },
+      });
+
       res.status(204).json();
     } else {
       res.status(404).json({ error: '机柜不存在' });
     }
   } catch (error) {
+    await logRackOperation('delete', '删除机柜失败', {
+      targetId: req.params.rackId,
+      targetName: rackName,
+      beforeState,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
+
     res.status(500).json({ error: error.message });
   }
 });
@@ -672,6 +754,17 @@ router.post('/import-preview', async (req, res) => {
         errors: v.errors,
       }));
 
+      // 记录导入预览日志（预览不写库，但属于敏感操作仍记录）
+      await logRackOperation('import_preview', '机柜导入预览', {
+        req,
+        metadata: {
+          fileName: file.name,
+          total: jsonData.length,
+          valid: jsonData.length - validationResults.length,
+          invalid: validationResults.length,
+        },
+      });
+
       res.status(200).json({
         success: true,
         data: {
@@ -690,6 +783,13 @@ router.post('/import-preview', async (req, res) => {
     }
   } catch (error) {
     logger.error('机柜导入预览失败:', error);
+
+    await logRackOperation('import_preview', '机柜导入预览失败', {
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
+
     res.status(500).json({
       success: false,
       error: `预览过程中发生未知错误: ${error.message}`,
@@ -833,6 +933,18 @@ router.post('/import', async (req, res) => {
       const createdRacks = newData.map(item => ({ rackId: item.rackId, name: item.name }));
       const skippedRacks = existingRacks.map(rack => ({ rackId: rack.rackId, name: rack.name }));
 
+      // 记录导入成功日志（包含成功/失败/重复数量）
+      await logRackOperation('import', '机柜导入', {
+        req,
+        metadata: {
+          fileName: file.name,
+          total: jsonData.length,
+          imported: createdCount,
+          duplicates: duplicateCount,
+          failed: 0,
+        },
+      });
+
       res.status(200).json({
         success: true,
         message: '机柜导入完成',
@@ -850,6 +962,17 @@ router.post('/import', async (req, res) => {
     }
   } catch (error) {
     await t.rollback();
+
+    // 记录导入失败日志（file 在 try 块内声明，从 req 重新获取文件名）
+    await logRackOperation('import', '机柜导入失败', {
+      result: 'failed',
+      req,
+      metadata: {
+        fileName: req.files?.file?.name || null,
+        error: error.message,
+      },
+    });
+
     res.status(500).json({
       success: false,
       message: '服务器内部错误',
@@ -860,12 +983,18 @@ router.post('/import', async (req, res) => {
 
 // 更新机柜位置
 router.put('/:rackId/position', async (req, res) => {
+  // 用于日志记录的机柜信息（在 try 外声明以便 catch 中可访问）
+  let beforeState = null;
+  let rackName = null;
   try {
     const { rowPos, colPos, facing } = req.body;
     const rack = await Rack.findByPk(req.params.rackId);
     if (!rack) {
       return res.status(404).json({ error: '机柜不存在' });
     }
+
+    beforeState = rack.toJSON();
+    rackName = rack.name;
 
     if (rowPos !== undefined && colPos !== undefined) {
       const conflict = await Rack.findOne({
@@ -888,8 +1017,32 @@ router.put('/:rackId/position', async (req, res) => {
 
     await Rack.update(updateData, { where: { rackId: req.params.rackId } });
     const updatedRack = await Rack.findByPk(req.params.rackId);
+
+    await logRackOperation('update_position', `调整机柜【${rackName}】位置`, {
+      targetId: req.params.rackId,
+      targetName: rackName,
+      beforeState,
+      afterState: updatedRack.toJSON(),
+      req,
+      metadata: {
+        type: 'rack_position_update',
+        rowPos,
+        colPos,
+        facing,
+      },
+    });
+
     res.json(updatedRack);
   } catch (error) {
+    await logRackOperation('update_position', '调整机柜位置失败', {
+      targetId: req.params.rackId,
+      targetName: rackName,
+      beforeState,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, body: req.body },
+    });
+
     res.status(400).json({ error: error.message });
   }
 });

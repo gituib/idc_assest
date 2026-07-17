@@ -24,6 +24,7 @@ router.use((req, res, next) => {
 });
 const SystemSetting = require('../models/SystemSetting');
 const { FRONTEND } = require('../config');
+const { logSystemOperation } = require('../utils/operationLogger');
 
 // 初始化默认系统设置
 const initDefaultSettings = async () => {
@@ -265,8 +266,17 @@ router.put('/:key', async (req, res) => {
     }
 
     if (!setting.isEditable) {
+      await logSystemOperation('update', `尝试修改不可编辑的设置：${key}`, {
+        targetId: key,
+        targetName: key,
+        result: 'failed',
+        req,
+        metadata: { reason: 'not_editable' },
+      });
       return res.status(403).json({ error: '该设置不可编辑' });
     }
+
+    const beforeValue = JSON.parse(setting.settingValue);
 
     // 验证值类型
     let parsedValue = value;
@@ -288,6 +298,22 @@ router.put('/:key', async (req, res) => {
       clearMaintenanceCache();
     }
 
+    // 维护模式开关单独标记操作类型，便于审计筛选
+    const operationType = key === 'maintenance_mode' ? 'maintenance_mode' : 'update';
+    const description =
+      key === 'maintenance_mode'
+        ? `切换维护模式：${beforeValue ? '开启' : '关闭'} → ${parsedValue ? '开启' : '关闭'}`
+        : `更新设置【${setting.description || key}】`;
+
+    await logSystemOperation(operationType, description, {
+      targetId: key,
+      targetName: setting.description || key,
+      beforeState: { value: beforeValue },
+      afterState: { value: parsedValue },
+      req,
+      metadata: { key, oldValue: beforeValue, newValue: parsedValue },
+    });
+
     res.json({
       message: '设置更新成功',
       setting: {
@@ -297,6 +323,13 @@ router.put('/:key', async (req, res) => {
       },
     });
   } catch (error) {
+    await logSystemOperation('update', `更新设置失败：${req.params.key}`, {
+      targetId: req.params.key,
+      targetName: req.params.key,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -312,6 +345,7 @@ router.put('/', async (req, res) => {
 
     const updatedSettings = [];
     const errors = [];
+    const beforeAfterStates = [];
 
     for (const [key, value] of Object.entries(settings)) {
       try {
@@ -327,6 +361,7 @@ router.put('/', async (req, res) => {
           continue;
         }
 
+        const beforeValue = JSON.parse(setting.settingValue);
         let parsedValue = value;
         if (setting.settingType === 'number') {
           parsedValue = Number(value);
@@ -343,6 +378,7 @@ router.put('/', async (req, res) => {
         });
 
         updatedSettings.push({ key, value: parsedValue });
+        beforeAfterStates.push({ key, before: beforeValue, after: parsedValue });
       } catch (error) {
         errors.push({ key, error: error.message });
       }
@@ -358,7 +394,25 @@ router.put('/', async (req, res) => {
     if ('maintenance_mode' in settings) {
       clearMaintenanceCache();
     }
+
+    // 异步记录批量更新日志
+    logSystemOperation('batch_update', `批量更新系统设置：成功 ${updatedSettings.length} 个，失败 ${errors.length} 个`, {
+      targetName: '系统设置批量更新',
+      afterState: { updated: updatedSettings, errors },
+      req,
+      metadata: {
+        updatedKeys: updatedSettings.map(s => s.key),
+        errorKeys: errors.map(e => e.key),
+        changes: beforeAfterStates,
+      },
+    });
   } catch (error) {
+    await logSystemOperation('batch_update', `批量更新系统设置失败：${error.message}`, {
+      targetName: '系统设置批量更新',
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -393,6 +447,8 @@ router.post('/reset/:key', async (req, res) => {
       return res.status(400).json({ error: '该设置没有默认值' });
     }
 
+    const beforeValue = JSON.parse(setting.settingValue);
+
     await setting.update({
       settingValue: JSON.stringify(defaultValue),
     });
@@ -402,12 +458,28 @@ router.post('/reset/:key', async (req, res) => {
       clearMaintenanceCache();
     }
 
+    await logSystemOperation('reset', `重置设置【${setting.description || key}】为默认值`, {
+      targetId: key,
+      targetName: setting.description || key,
+      beforeState: { value: beforeValue },
+      afterState: { value: defaultValue },
+      req,
+      metadata: { key, oldValue: beforeValue, newValue: defaultValue },
+    });
+
     res.json({
       message: '设置已重置为默认值',
       key,
       value: defaultValue,
     });
   } catch (error) {
+    await logSystemOperation('reset', `重置设置失败：${req.params.key}`, {
+      targetId: req.params.key,
+      targetName: req.params.key,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -486,8 +558,24 @@ router.post('/backup', async (req, res) => {
       fileSize: fs.statSync(backupFile).size,
       backupCount: backupFiles.length,
     });
+
+    await logSystemOperation('backup', `系统设置页手动备份：backup_${timestamp}.json`, {
+      targetId: `backup_${timestamp}.json`,
+      targetName: `backup_${timestamp}.json`,
+      afterState: {
+        fileSize: fs.statSync(backupFile).size,
+        backupCount: backupFiles.length,
+      },
+      req,
+      metadata: { filename: `backup_${timestamp}.json`, trigger: 'system_settings_page' },
+    });
   } catch (error) {
     logger.error('备份失败', { error: error.message, stack: error.stack });
+    await logSystemOperation('backup', `系统设置页手动备份失败：${error.message}`, {
+      result: 'failed',
+      req,
+      metadata: { error: error.message, trigger: 'system_settings_page' },
+    });
     res.status(500).json({ error: '备份失败' });
   }
 });
@@ -561,25 +649,31 @@ router.post('/backup/restore', async (req, res) => {
     // 恢复数据
     const { Device, Rack, Room, Consumable, User } = require('../models');
 
+    const restoreCounts = {};
+
     if (backupData.data.devices) {
+      restoreCounts.devices = backupData.data.devices.length;
       for (const device of backupData.data.devices) {
         await Device.upsert(device);
       }
     }
 
     if (backupData.data.racks) {
+      restoreCounts.racks = backupData.data.racks.length;
       for (const rack of backupData.data.racks) {
         await Rack.upsert(rack);
       }
     }
 
     if (backupData.data.rooms) {
+      restoreCounts.rooms = backupData.data.rooms.length;
       for (const room of backupData.data.rooms) {
         await Room.upsert(room);
       }
     }
 
     if (backupData.data.consumables) {
+      restoreCounts.consumables = backupData.data.consumables.length;
       for (const consumable of backupData.data.consumables) {
         await Consumable.upsert(consumable);
       }
@@ -589,8 +683,23 @@ router.post('/backup/restore', async (req, res) => {
       message: '恢复成功',
       restoredAt: new Date().toISOString(),
     });
+
+    await logSystemOperation('restore', `系统设置页恢复备份：${filename}`, {
+      targetId: filename,
+      targetName: filename,
+      afterState: restoreCounts,
+      req,
+      metadata: { filename, restoreCounts, trigger: 'system_settings_page' },
+    });
   } catch (error) {
     logger.error('恢复备份失败', { error: error.message, stack: error.stack });
+    await logSystemOperation('restore', `系统设置页恢复备份失败：${req.body.filename || '未知'}`, {
+      targetId: req.body.filename,
+      targetName: req.body.filename,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, trigger: 'system_settings_page' },
+    });
     res.status(500).json({ error: '恢复备份失败' });
   }
 });
@@ -609,7 +718,21 @@ router.delete('/backup/:filename', async (req, res) => {
     fs.unlinkSync(backupFile);
 
     res.json({ message: '删除成功', filename });
+
+    await logSystemOperation('delete', `系统设置页删除备份文件：${filename}`, {
+      targetId: filename,
+      targetName: filename,
+      req,
+      metadata: { filename, trigger: 'system_settings_page' },
+    });
   } catch (error) {
+    await logSystemOperation('delete', `系统设置页删除备份文件失败：${req.params.filename}`, {
+      targetId: req.params.filename,
+      targetName: req.params.filename,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, trigger: 'system_settings_page' },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -624,6 +747,14 @@ router.get('/backup/download/:filename', async (req, res) => {
     if (!fs.existsSync(backupFile)) {
       return res.status(404).json({ error: '备份文件不存在' });
     }
+
+    const stats = fs.statSync(backupFile);
+    logSystemOperation('download', `系统设置页下载备份文件：${filename}`, {
+      targetId: filename,
+      targetName: filename,
+      req,
+      metadata: { filename, size: stats.size, trigger: 'system_settings_page' },
+    });
 
     res.download(backupFile, filename);
   } catch (error) {
@@ -751,7 +882,22 @@ router.post('/frontend/port/sync', async (req, res) => {
       configPath: '.frontend-port',
       notice: '配置已更新，请重启前端服务以应用新端口',
     });
+
+    await logSystemOperation('update', `同步前端端口配置：${port}`, {
+      targetId: 'frontend_port',
+      targetName: '前端端口配置',
+      afterState: { port, configPath: '.frontend-port' },
+      req,
+      metadata: { port },
+    });
   } catch (error) {
+    await logSystemOperation('update', `同步前端端口配置失败：${error.message}`, {
+      targetId: 'frontend_port',
+      targetName: '前端端口配置',
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -776,7 +922,21 @@ router.post('/frontend/restart', async (req, res) => {
         url: `http://localhost:${result.port}`,
       },
     });
+
+    await logSystemOperation('restart', `重启前端服务：PID ${beforeStatus?.pid} → ${result.pid}`, {
+      targetName: '前端服务',
+      beforeState: beforeStatus,
+      afterState: { pid: result.pid, port: result.port },
+      req,
+      metadata: { beforePid: beforeStatus?.pid, afterPid: result.pid, port: result.port },
+    });
   } catch (error) {
+    await logSystemOperation('restart', `重启前端服务失败：${error.message}`, {
+      targetName: '前端服务',
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });

@@ -260,6 +260,13 @@ router.post('/', authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
+    // 记录创建用户失败日志
+    await logUserOperation('create', `创建用户【${req.body.username || '未知'}】失败`, {
+      targetName: req.body.username,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('创建用户错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
@@ -414,6 +421,13 @@ router.put('/:userId', authMiddleware, async (req, res) => {
       data: updatedUser,
     });
   } catch (error) {
+    // 记录更新用户失败日志（涵盖权限变更和普通更新）
+    await logUserOperation('update', `更新用户【ID：${req.params.userId}】失败`, {
+      targetId: req.params.userId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('更新用户错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
@@ -513,6 +527,13 @@ router.delete('/:userId', authMiddleware, async (req, res) => {
       message: '删除成功',
     });
   } catch (error) {
+    // 记录删除用户失败日志
+    await logUserOperation('delete', `删除用户【ID：${req.params.userId}】失败`, {
+      targetId: req.params.userId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('删除用户错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,

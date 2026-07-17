@@ -10,6 +10,17 @@ const ConsumableLog = require('../models/ConsumableLog');
 const ConsumableLogArchive = require('../models/ConsumableLogArchive');
 const { PAGINATION, RETRY } = require('../config');
 const { generateId } = require('../utils/idGenerator');
+const { logOperation } = require('../utils/operationLogger');
+
+/**
+ * 记录耗材操作日志
+ * @param {string} operationType - 操作类型
+ * @param {string} operationDescription - 操作描述
+ * @param {Object} params - 参数
+ * @returns {Promise<Object|null>}
+ */
+const logConsumableOperation = (operationType, operationDescription, params) =>
+  logOperation({ module: 'consumable', operationType, operationDescription, ...params });
 
 router.get('/', async (req, res) => {
   try {
@@ -217,10 +228,29 @@ router.post('/', async (req, res) => {
     );
 
     await transaction.commit();
+
+    // 记录创建耗材成功日志
+    await logConsumableOperation('create', `创建耗材【${consumable.name}】`, {
+      targetId: consumable.consumableId,
+      targetName: consumable.name,
+      afterState: consumable.toJSON(),
+      req,
+      metadata: { category: consumable.category, unit: consumable.unit },
+    });
+
     res.status(201).json(consumable);
   } catch (error) {
     await transaction.rollback();
     logger.error('创建耗材错误', { error: error.message, stack: error.stack });
+
+    // 记录创建耗材失败日志
+    await logConsumableOperation('create', '创建耗材失败', {
+      targetName: req.body.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
+
     if (error.name === 'SequelizeValidationError') {
       const messages = error.errors.map(e => `${e.path}: ${e.message}`).join(', ');
       res.status(400).json({ error: `Validation error: ${messages}` });
@@ -343,10 +373,37 @@ router.post('/create-with-inbound', async (req, res) => {
     }
 
     await transaction.commit();
+
+    // 记录创建耗材并入库成功日志
+    await logConsumableOperation('create', `创建耗材并入库【${consumable.name}】`, {
+      targetId: consumable.consumableId,
+      targetName: consumable.name,
+      afterState: consumable.toJSON(),
+      req,
+      metadata: {
+        category: consumable.category,
+        inboundQuantity: inboundQuantity || 0,
+        previousStock: 0,
+        currentStock: consumable.currentStock,
+      },
+    });
+
     res.status(201).json(consumable);
   } catch (error) {
     await transaction.rollback();
     logger.error('创建耗材并入库错误', { error: error.message, stack: error.stack });
+
+    // 记录创建耗材并入库失败日志
+    await logConsumableOperation('create', '创建耗材并入库失败', {
+      targetName: req.body.name,
+      result: 'failed',
+      req,
+      metadata: {
+        error: error.message,
+        inboundQuantity: req.body.inboundQuantity,
+      },
+    });
+
     if (error.name === 'SequelizeValidationError') {
       const messages = error.errors.map(e => `${e.path}: ${e.message}`).join(', ');
       res.status(400).json({ error: `Validation error: ${messages}` });
@@ -594,12 +651,50 @@ router.post('/import', async (req, res) => {
     }
 
     await transaction.commit();
+
+    // 记录批量导入耗材成功日志
+    await logConsumableOperation('import', '批量导入耗材', {
+      targetId: 'batch',
+      targetName: `批量导入${items.length}条`,
+      afterState: {
+        success: results.success,
+        updated: results.updated,
+        skipped: results.skipped,
+        failed: results.failed,
+      },
+      req,
+      metadata: {
+        totalItems: items.length,
+        successCount: results.success,
+        updatedCount: results.updated,
+        skippedCount: results.skipped,
+        failedCount: results.failed,
+        mode,
+        stockMode,
+      },
+    });
+
     res.json({
       message: `导入完成，成功 ${results.success} 条，更新 ${results.updated} 条，跳过 ${results.skipped} 条，失败 ${results.failed} 条`,
       results,
     });
   } catch (error) {
     await transaction.rollback();
+
+    // 记录批量导入耗材失败日志
+    await logConsumableOperation('import', '批量导入耗材失败', {
+      targetId: 'batch',
+      targetName: `批量导入${req.body.items ? req.body.items.length : 0}条`,
+      result: 'failed',
+      req,
+      metadata: {
+        error: error.message,
+        totalItems: req.body.items ? req.body.items.length : 0,
+        mode: req.body.mode,
+        stockMode: req.body.stockMode,
+      },
+    });
+
     res.status(500).json({ error: error.message });
   }
 });
@@ -902,6 +997,24 @@ router.post('/quick-inout', async (req, res) => {
 
       await transaction.commit();
 
+      // 记录快速出入库成功日志
+      const inoutOpType = type === 'in' ? 'stock_in' : 'stock_out';
+      const inoutDesc = type === 'in' ? '快速入库' : '快速出库';
+      await logConsumableOperation(inoutOpType, `${inoutDesc}【${consumable.name}】`, {
+        targetId: consumableId,
+        targetName: consumable.name,
+        beforeState: { currentStock: previousStock },
+        afterState: { currentStock: newStock },
+        req,
+        metadata: {
+          type,
+          quantity: parseFloat(quantity),
+          previousStock,
+          currentStock: newStock,
+          deviceId: deviceInfo.deviceId || null,
+        },
+      });
+
       res.json({
         message: '操作成功',
         record,
@@ -912,6 +1025,19 @@ router.post('/quick-inout', async (req, res) => {
     } catch (error) {
       await transaction.rollback();
       if (attempt >= RETRY.MAX_RETRIES - 1) {
+        // 记录快速出入库失败日志（仅最后一次重试失败时记录）
+        const failedOpType = req.body.type === 'in' ? 'stock_in' : 'stock_out';
+        await logConsumableOperation(failedOpType, '快速出入库失败', {
+          targetId: req.body.consumableId,
+          result: 'failed',
+          req,
+          metadata: {
+            error: error.message,
+            type: req.body.type,
+            quantity: req.body.quantity,
+            attempts: attempt + 1,
+          },
+        });
         return res.status(500).json({ error: error.message });
       }
       attempt++;
@@ -1081,6 +1207,25 @@ router.post('/inout', async (req, res) => {
 
       await transaction.commit();
 
+      // 记录出入库成功日志
+      const inoutOpType = type === 'in' ? 'stock_in' : 'stock_out';
+      const inoutDesc = type === 'in' ? '入库' : '出库';
+      await logConsumableOperation(inoutOpType, `${inoutDesc}【${consumable.name}】`, {
+        targetId: consumableId,
+        targetName: consumable.name,
+        beforeState: { currentStock: previousStock },
+        afterState: { currentStock: newStock },
+        req,
+        metadata: {
+          type,
+          quantity: parseFloat(quantity),
+          previousStock,
+          currentStock: newStock,
+          recipient,
+          deviceId: deviceInfo.deviceId || null,
+        },
+      });
+
       res.json({
         message: '操作成功',
         record,
@@ -1091,6 +1236,19 @@ router.post('/inout', async (req, res) => {
     } catch (error) {
       await transaction.rollback();
       if (attempt >= RETRY.MAX_RETRIES - 1) {
+        // 记录出入库失败日志（仅最后一次重试失败时记录）
+        const failedOpType = req.body.type === 'in' ? 'stock_in' : 'stock_out';
+        await logConsumableOperation(failedOpType, '出入库失败', {
+          targetId: req.body.consumableId,
+          result: 'failed',
+          req,
+          metadata: {
+            error: error.message,
+            type: req.body.type,
+            quantity: req.body.quantity,
+            attempts: attempt + 1,
+          },
+        });
         return res.status(500).json({ error: error.message });
       }
       attempt++;
@@ -1184,6 +1342,22 @@ router.post('/adjust', async (req, res) => {
 
       await transaction.commit();
 
+      // 记录库存调整成功日志
+      await logConsumableOperation('adjust', `库存调整【${consumable.name}】`, {
+        targetId: consumableId,
+        targetName: consumable.name,
+        beforeState: { currentStock: previousStock },
+        afterState: { currentStock: newStock },
+        req,
+        metadata: {
+          adjustType,
+          quantity: parseFloat(quantity),
+          changeQuantity,
+          previousStock,
+          currentStock: newStock,
+        },
+      });
+
       res.json({
         message: '调整成功',
         consumable: await Consumable.findByPk(consumableId),
@@ -1192,6 +1366,18 @@ router.post('/adjust', async (req, res) => {
     } catch (error) {
       await transaction.rollback();
       if (attempt >= RETRY.MAX_RETRIES - 1) {
+        // 记录库存调整失败日志（仅最后一次重试失败时记录）
+        await logConsumableOperation('adjust', '库存调整失败', {
+          targetId: req.body.consumableId,
+          result: 'failed',
+          req,
+          metadata: {
+            error: error.message,
+            adjustType: req.body.adjustType,
+            quantity: req.body.quantity,
+            attempts: attempt + 1,
+          },
+        });
         return res.status(500).json({ error: error.message });
       }
       attempt++;
@@ -1425,9 +1611,36 @@ router.post('/logs', async (req, res) => {
     const log = await ConsumableLog.create(logData, { transaction });
 
     await transaction.commit();
+
+    // 记录创建耗材操作日志成功日志
+    await logConsumableOperation('create', `创建耗材操作日志【${consumableName}】`, {
+      targetId: log.consumableId || log.id,
+      targetName: consumableName,
+      afterState: { operationType, quantity, previousStock, currentStock },
+      req,
+      metadata: {
+        logId: log.id,
+        operationType,
+        operator,
+      },
+    });
+
     res.status(201).json({ message: '日志创建成功', log });
   } catch (error) {
     await transaction.rollback();
+
+    // 记录创建耗材操作日志失败日志
+    await logConsumableOperation('create', '创建耗材操作日志失败', {
+      targetId: req.body.consumableId,
+      targetName: req.body.consumableName,
+      result: 'failed',
+      req,
+      metadata: {
+        error: error.message,
+        operationType: req.body.operationType,
+      },
+    });
+
     res.status(500).json({ error: error.message });
   }
 });
@@ -1499,9 +1712,39 @@ router.post('/logs/import', async (req, res) => {
     }
 
     await transaction.commit();
+
+    // 记录导入耗材操作日志成功日志
+    await logConsumableOperation('import_records', '批量导入耗材操作日志', {
+      targetId: 'batch',
+      targetName: `批量导入${logItems.length}条日志`,
+      afterState: {
+        success: results.success,
+        failed: results.failed,
+      },
+      req,
+      metadata: {
+        totalItems: logItems.length,
+        successCount: results.success,
+        failedCount: results.failed,
+      },
+    });
+
     res.json(results);
   } catch (error) {
     await transaction.rollback();
+
+    // 记录导入耗材操作日志失败日志
+    await logConsumableOperation('import_records', '批量导入耗材操作日志失败', {
+      targetId: 'batch',
+      targetName: `批量导入${req.body.logs ? req.body.logs.length : 0}条日志`,
+      result: 'failed',
+      req,
+      metadata: {
+        error: error.message,
+        totalItems: req.body.logs ? req.body.logs.length : 0,
+      },
+    });
+
     res.status(500).json({ error: error.message });
   }
 });
@@ -1628,9 +1871,35 @@ router.put('/:id', async (req, res) => {
     );
 
     await transaction.commit();
+
+    // 记录更新耗材成功日志
+    await logConsumableOperation('update', `更新耗材【${consumable.name}】`, {
+      targetId: consumable.consumableId,
+      targetName: consumable.name,
+      beforeState: oldData,
+      afterState: consumable.toJSON(),
+      req,
+      metadata: {
+        updatedFields: Object.keys(req.body),
+        nameChanged: oldName !== newName,
+      },
+    });
+
     res.json(consumable);
   } catch (error) {
     await transaction.rollback();
+
+    // 记录更新耗材失败日志
+    await logConsumableOperation('update', '更新耗材失败', {
+      targetId: req.params.id,
+      result: 'failed',
+      req,
+      metadata: {
+        error: error.message,
+        updatedFields: Object.keys(req.body),
+      },
+    });
+
     res.status(400).json({ error: error.message });
   }
 });
@@ -1732,6 +2001,27 @@ router.delete('/:id', async (req, res) => {
     await consumable.destroy({ transaction });
 
     await transaction.commit();
+
+    // 记录删除耗材成功日志
+    await logConsumableOperation('delete', `删除耗材【${consumableName}】`, {
+      targetId: consumableId,
+      targetName: consumableName,
+      beforeState: {
+        consumableId,
+        consumableName,
+        currentStock,
+        ...consumableSnapshot,
+      },
+      req,
+      metadata: {
+        archiveId,
+        archivedLogs: totalOperations,
+        totalInQuantity,
+        totalOutQuantity,
+        deleteReason: req.body.reason || '删除耗材',
+      },
+    });
+
     res.json({
       message: '删除成功',
       archiveId,
@@ -1739,6 +2029,18 @@ router.delete('/:id', async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
+
+    // 记录删除耗材失败日志
+    await logConsumableOperation('delete', '删除耗材失败', {
+      targetId: req.params.id,
+      result: 'failed',
+      req,
+      metadata: {
+        error: error.message,
+        deleteReason: req.body.reason,
+      },
+    });
+
     res.status(500).json({ error: error.message });
   }
 });
@@ -1764,6 +2066,8 @@ router.put('/logs/:id', async (req, res) => {
 
     // 保存原始日志ID（用于追踪修改历史）
     const originalLogId = log.originalLogId || log.id;
+    // 保存修改前状态用于日志记录
+    const oldLogData = log.toJSON();
 
     // 更新当前记录，并标记为已修改
     await log.update(
@@ -1779,12 +2083,39 @@ router.put('/logs/:id', async (req, res) => {
 
     await transaction.commit();
 
+    // 记录修改耗材日志记录成功日志
+    await logConsumableOperation('update', `修改耗材日志记录【${log.consumableName || id}】`, {
+      targetId: id,
+      targetName: log.consumableName,
+      beforeState: oldLogData,
+      afterState: log.toJSON(),
+      req,
+      metadata: {
+        logId: id,
+        consumableId: log.consumableId,
+        modifiedBy: operator || '系统',
+        modificationReason: modificationReason || '用户修改',
+      },
+    });
+
     res.json({
       message: '日志修改成功',
       log: await ConsumableLog.findByPk(id),
     });
   } catch (error) {
     await transaction.rollback();
+
+    // 记录修改耗材日志记录失败日志
+    await logConsumableOperation('update', '修改耗材日志记录失败', {
+      targetId: req.params.id,
+      result: 'failed',
+      req,
+      metadata: {
+        error: error.message,
+        modificationReason: req.body.modificationReason,
+      },
+    });
+
     res.status(500).json({ error: error.message });
   }
 });
@@ -1801,12 +2132,39 @@ router.delete('/logs/:id', async (req, res) => {
       return res.status(404).json({ error: '日志记录不存在' });
     }
 
+    // 保存删除前状态用于日志记录
+    const deletedLogData = log.toJSON();
+
     await log.destroy({ transaction });
     await transaction.commit();
+
+    // 记录删除耗材日志记录成功日志
+    await logConsumableOperation('delete', `删除耗材日志记录【${log.consumableName || id}】`, {
+      targetId: id,
+      targetName: log.consumableName,
+      beforeState: deletedLogData,
+      req,
+      metadata: {
+        logId: id,
+        consumableId: log.consumableId,
+        operationType: log.operationType,
+      },
+    });
 
     res.json({ message: '日志删除成功' });
   } catch (error) {
     await transaction.rollback();
+
+    // 记录删除耗材日志记录失败日志
+    await logConsumableOperation('delete', '删除耗材日志记录失败', {
+      targetId: req.params.id,
+      result: 'failed',
+      req,
+      metadata: {
+        error: error.message,
+      },
+    });
+
     res.status(500).json({ error: error.message });
   }
 });

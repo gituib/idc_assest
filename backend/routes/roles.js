@@ -156,6 +156,13 @@ router.post('/', authMiddleware, async (req, res) => {
       data: role,
     });
   } catch (error) {
+    // 记录创建角色失败日志
+    await logRoleOperation('create', `创建角色【${req.body.roleName || '未知'}】失败`, {
+      targetName: req.body.roleName,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, roleCode: req.body.roleCode },
+    });
     logger.error('创建角色错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
@@ -265,6 +272,14 @@ router.put('/:roleId', authMiddleware, async (req, res) => {
       data: role,
     });
   } catch (error) {
+    // 记录更新角色失败日志
+    await logRoleOperation('update', `更新角色失败`, {
+      targetId: req.params.roleId,
+      targetName: req.body.roleName,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('更新角色错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
@@ -322,6 +337,13 @@ router.delete('/:roleId', authMiddleware, async (req, res) => {
       message: '删除成功',
     });
   } catch (error) {
+    // 记录删除角色失败日志
+    await logRoleOperation('delete', `删除角色失败`, {
+      targetId: req.params.roleId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('删除角色错误', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,

@@ -196,6 +196,14 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(device);
   } catch (error) {
+    // 记录失败操作日志
+    await logDeviceOperation('create', '新增空闲设备失败', {
+      targetId: req.body.deviceId,
+      targetName: req.body.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(400).json({ error: error.message });
   }
 });
@@ -246,6 +254,14 @@ router.post('/from-device/:deviceId', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
+    // 记录失败操作日志
+    await logDeviceOperation('to_idle', '设备转入空闲设备失败', {
+      targetId: req.params.deviceId,
+      targetName: device?.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('设备转入空闲设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
@@ -313,6 +329,15 @@ router.post('/batch-from-devices', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
+    // 记录失败操作日志
+    const requestDeviceIds = Array.isArray(req.body.deviceIds) ? req.body.deviceIds : [];
+    await logDeviceOperation('batch_to_idle', '批量转入空闲设备失败', {
+      targetId: requestDeviceIds.join(','),
+      targetName: `${requestDeviceIds.length}台设备`,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('批量转入空闲设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
@@ -488,6 +513,16 @@ router.put('/batch-restore', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
+    // 记录失败操作日志
+    const requestDevices = Array.isArray(req.body.devices) ? req.body.devices : [];
+    const requestDeviceIds = requestDevices.map(d => d?.deviceId).filter(Boolean);
+    await logDeviceOperation('batch_restore', '批量上架空闲设备失败', {
+      targetId: requestDeviceIds.join(','),
+      targetName: `${requestDeviceIds.length}台设备`,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('批量上架设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
@@ -601,6 +636,14 @@ router.put('/:deviceId/shelve', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
+    // 记录失败操作日志
+    await logDeviceOperation('shelve', '空闲设备上架失败', {
+      targetId: req.params.deviceId,
+      targetName: device?.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('设备上架失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
@@ -671,6 +714,14 @@ router.put('/:deviceId', async (req, res) => {
 
     res.json(device);
   } catch (error) {
+    // 记录失败操作日志
+    await logDeviceOperation('update', '更新空闲设备失败', {
+      targetId: req.params.deviceId,
+      targetName: device?.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(400).json({ error: error.message });
   }
 });
@@ -771,6 +822,14 @@ router.put('/:deviceId/restore', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
+    // 记录失败操作日志
+    await logDeviceOperation('restore', '空闲设备恢复失败', {
+      targetId: req.params.deviceId,
+      targetName: device?.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('恢复设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
@@ -817,6 +876,14 @@ router.delete('/:deviceId', async (req, res) => {
     res.json({ message: '空闲设备删除成功' });
   } catch (error) {
     await t.rollback();
+    // 记录失败操作日志
+    await logDeviceOperation('delete', '删除空闲设备失败', {
+      targetId: req.params.deviceId,
+      targetName: device?.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('删除空闲设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }

@@ -14,6 +14,17 @@ const PendingDevice = require('../models/PendingDevice');
 const { authMiddleware, authorize } = require('../middleware/auth');
 const { PAGINATION } = require('../config');
 const { generateId } = require('../utils/idGenerator');
+const { logOperation } = require('../utils/operationLogger');
+
+/**
+ * 记录库存操作日志
+ * @param {string} operationType - 操作类型
+ * @param {string} operationDescription - 操作描述
+ * @param {Object} params - 参数
+ * @returns {Promise<Object|null>}
+ */
+const logInventoryOperation = (operationType, operationDescription, params) =>
+  logOperation({ module: 'inventory', operationType, operationDescription, ...params });
 
 InventoryTask.belongsTo(InventoryPlan, { foreignKey: 'planId', as: 'Plan' });
 InventoryPlan.hasMany(InventoryTask, { foreignKey: 'planId', as: 'Tasks' });
@@ -131,8 +142,22 @@ router.post('/plans', async (req, res) => {
       createdBy: req.user?.userId,
     });
 
+    await logInventoryOperation('create', `创建盘点计划【${plan.name}】`, {
+      targetId: plan.planId,
+      targetName: plan.name,
+      afterState: { status: plan.status, type: plan.type, scheduledDate: plan.scheduledDate },
+      req,
+      metadata: { targetRooms: plan.targetRooms, targetRacks: plan.targetRacks },
+    });
+
     res.status(201).json(plan);
   } catch (error) {
+    await logInventoryOperation('create', '创建盘点计划失败', {
+      targetName: req.body?.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -143,6 +168,16 @@ router.put('/plans/:planId', async (req, res) => {
     if (!plan) {
       return res.status(404).json({ error: '盘点计划不存在' });
     }
+
+    const beforeState = {
+      name: plan.name,
+      type: plan.type,
+      description: plan.description,
+      scheduledDate: plan.scheduledDate,
+      targetRooms: plan.targetRooms,
+      targetRacks: plan.targetRacks,
+      status: plan.status,
+    };
 
     const { name, type, description, scheduledDate, targetRooms, targetRacks, status } = req.body;
 
@@ -156,8 +191,32 @@ router.put('/plans/:planId', async (req, res) => {
       status: status !== undefined ? status : plan.status,
     });
 
+    await logInventoryOperation('update', `更新盘点计划【${plan.name}】`, {
+      targetId: plan.planId,
+      targetName: plan.name,
+      beforeState,
+      afterState: {
+        name: plan.name,
+        type: plan.type,
+        description: plan.description,
+        scheduledDate: plan.scheduledDate,
+        targetRooms: plan.targetRooms,
+        targetRacks: plan.targetRacks,
+        status: plan.status,
+      },
+      req,
+      metadata: {},
+    });
+
     res.json(plan);
   } catch (error) {
+    await logInventoryOperation('update', '更新盘点计划失败', {
+      targetId: req.params?.planId,
+      targetName: req.body?.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -169,12 +228,33 @@ router.delete('/plans/:planId', async (req, res) => {
       return res.status(404).json({ error: '盘点计划不存在' });
     }
 
+    const beforeState = {
+      planId: plan.planId,
+      name: plan.name,
+      status: plan.status,
+      type: plan.type,
+    };
+
     await InventoryRecord.destroy({ where: { planId: plan.planId } });
     await InventoryTask.destroy({ where: { planId: plan.planId } });
     await plan.destroy();
 
+    await logInventoryOperation('delete', `删除盘点计划【${plan.name}】`, {
+      targetId: plan.planId,
+      targetName: plan.name,
+      beforeState,
+      req,
+      metadata: {},
+    });
+
     res.json({ message: '盘点计划删除成功' });
   } catch (error) {
+    await logInventoryOperation('delete', '删除盘点计划失败', {
+      targetId: req.params?.planId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -190,6 +270,12 @@ router.post('/plans/:planId/start', async (req, res) => {
     if (plan.status !== 'draft' && plan.status !== 'pending') {
       return res.status(400).json({ error: '只有草稿或待执行状态的盘点计划可以启动' });
     }
+
+    const beforeState = {
+      status: plan.status,
+      totalDevices: plan.totalDevices,
+      checkedDevices: plan.checkedDevices,
+    };
 
     const targetRooms = plan.targetRooms || [];
     const targetRacks = plan.targetRacks || [];
@@ -261,6 +347,19 @@ router.post('/plans/:planId/start', async (req, res) => {
       missedDevices: allDevices.length,
     });
 
+    await logInventoryOperation('start', `启动盘点计划【${plan.name}】`, {
+      targetId: plan.planId,
+      targetName: plan.name,
+      beforeState,
+      afterState: {
+        status: plan.status,
+        totalDevices: plan.totalDevices,
+        checkedDevices: plan.checkedDevices,
+      },
+      req,
+      metadata: { taskCount: tasksToCreate.length, deviceCount: allDevices.length, taskId },
+    });
+
     res.json({
       message: '盘点任务已启动',
       taskCount: tasksToCreate.length,
@@ -268,6 +367,12 @@ router.post('/plans/:planId/start', async (req, res) => {
     });
   } catch (error) {
     logger.error('启动盘点错误', { error: error.message, stack: error.stack });
+    await logInventoryOperation('start', '启动盘点计划失败', {
+      targetId: req.params?.planId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -343,6 +448,13 @@ router.put('/tasks/:taskId', async (req, res) => {
       return res.status(404).json({ error: '盘点任务不存在' });
     }
 
+    const beforeState = {
+      assignedTo: task.assignedTo,
+      assignedAt: task.assignedAt,
+      status: task.status,
+      completedAt: task.completedAt,
+    };
+
     const { assignedTo, status } = req.body;
 
     if (assignedTo !== undefined) {
@@ -359,8 +471,28 @@ router.put('/tasks/:taskId', async (req, res) => {
       });
     }
 
+    await logInventoryOperation('update', `更新盘点任务【${task.taskId}】`, {
+      targetId: task.taskId,
+      targetName: task.targetName,
+      beforeState,
+      afterState: {
+        assignedTo: task.assignedTo,
+        assignedAt: task.assignedAt,
+        status: task.status,
+        completedAt: task.completedAt,
+      },
+      req,
+      metadata: { planId: task.planId },
+    });
+
     res.json(task);
   } catch (error) {
+    await logInventoryOperation('update', '更新盘点任务失败', {
+      targetId: req.params?.taskId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, body: req.body },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -374,6 +506,16 @@ router.post('/records/:recordId/check', async (req, res) => {
     if (!record) {
       return res.status(404).json({ error: '盘点记录不存在' });
     }
+
+    const beforeState = {
+      status: record.status,
+      actualSerialNumber: record.actualSerialNumber,
+      actualRackId: record.actualRackId,
+      actualPosition: record.actualPosition,
+      abnormalType: record.abnormalType,
+      checkedBy: record.checkedBy,
+      checkedAt: record.checkedAt,
+    };
 
     const { actualSerialNumber, actualRackId, actualPosition, status, remark, photoUrl } = req.body;
 
@@ -424,8 +566,37 @@ router.post('/records/:recordId/check', async (req, res) => {
 
     await plan.update(planStats);
 
+    await logInventoryOperation('check', `盘点记录【${record.deviceName || record.recordId}】`, {
+      targetId: record.recordId,
+      targetName: record.deviceName,
+      beforeState,
+      afterState: {
+        status: record.status,
+        actualSerialNumber: record.actualSerialNumber,
+        actualRackId: record.actualRackId,
+        actualPosition: record.actualPosition,
+        abnormalType: record.abnormalType,
+        checkedBy: record.checkedBy,
+        checkedAt: record.checkedAt,
+      },
+      req,
+      metadata: {
+        taskId: record.taskId,
+        planId: record.planId,
+        deviceId: record.deviceId,
+        taskStats,
+        planStats,
+      },
+    });
+
     res.json({ record, taskStats, planStats });
   } catch (error) {
+    await logInventoryOperation('check', '盘点记录检查失败', {
+      targetId: req.params?.recordId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, body: req.body },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -487,6 +658,14 @@ router.post('/plans/:planId/complete', async (req, res) => {
       return res.status(404).json({ error: '盘点计划不存在' });
     }
 
+    const beforeState = {
+      status: plan.status,
+      checkedDevices: plan.checkedDevices,
+      normalDevices: plan.normalDevices,
+      abnormalDevices: plan.abnormalDevices,
+      missedDevices: plan.missedDevices,
+    };
+
     await InventoryRecord.update(
       { status: 'missed' },
       { where: { planId: plan.planId, status: 'pending' } }
@@ -508,8 +687,30 @@ router.post('/plans/:planId/complete', async (req, res) => {
       { where: { planId: plan.planId, status: { [Op.ne]: 'completed' } } }
     );
 
+    await logInventoryOperation('complete', `完成盘点计划【${plan.name}】`, {
+      targetId: plan.planId,
+      targetName: plan.name,
+      beforeState,
+      afterState: {
+        status: plan.status,
+        checkedDevices: plan.checkedDevices,
+        normalDevices: plan.normalDevices,
+        abnormalDevices: plan.abnormalDevices,
+        missedDevices: plan.missedDevices,
+        completedDate: plan.completedDate,
+      },
+      req,
+      metadata: { totalRecords: finalRecords.length },
+    });
+
     res.json({ message: '盘点已完成', plan });
   } catch (error) {
+    await logInventoryOperation('complete', '完成盘点计划失败', {
+      targetId: req.params?.planId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -645,12 +846,36 @@ router.post('/quick-add-device', async (req, res) => {
       remark: remark || '盘点时快速添加',
     });
 
+    await logInventoryOperation('create', `快速添加暂存设备【${finalName}】`, {
+      targetId: pendingDevice.pendingId,
+      targetName: finalName,
+      afterState: {
+        status: pendingDevice.status,
+        deviceType: pendingDevice.deviceType,
+        serialNumber: pendingDevice.serialNumber,
+        planId: pendingDevice.planId,
+        taskId: pendingDevice.taskId,
+      },
+      req,
+      metadata: { rackId, roomId, position },
+    });
+
     res.status(201).json({
       message: '设备已暂存，请前往暂存设备页面完善信息后同步',
       pendingDevice,
     });
   } catch (error) {
     logger.error('快速添加设备错误', { error: error.message, stack: error.stack });
+    await logInventoryOperation('create', '快速添加暂存设备失败', {
+      targetName: req.body?.name || req.body?.deviceName,
+      result: 'failed',
+      req,
+      metadata: {
+        error: error.message,
+        planId: req.body?.planId,
+        serialNumber: req.body?.serialNumber || req.body?.SN,
+      },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -755,6 +980,21 @@ router.put('/pending-devices/:pendingId', async (req, res) => {
       return res.status(400).json({ error: '已同步的设备无法修改' });
     }
 
+    const beforeState = {
+      deviceName: pendingDevice.deviceName,
+      deviceType: pendingDevice.deviceType,
+      roomId: pendingDevice.roomId,
+      rackId: pendingDevice.rackId,
+      position: pendingDevice.position,
+      model: pendingDevice.model,
+      brand: pendingDevice.brand,
+      height: pendingDevice.height,
+      powerConsumption: pendingDevice.powerConsumption,
+      ipAddress: pendingDevice.ipAddress,
+      description: pendingDevice.description,
+      remark: pendingDevice.remark,
+    };
+
     const {
       deviceName,
       deviceType,
@@ -808,8 +1048,37 @@ router.put('/pending-devices/:pendingId', async (req, res) => {
 
     await pendingDevice.update(updateData);
 
+    await logInventoryOperation('update', `更新暂存设备【${pendingDevice.deviceName}】`, {
+      targetId: pendingDevice.pendingId,
+      targetName: pendingDevice.deviceName,
+      beforeState,
+      afterState: {
+        deviceName: pendingDevice.deviceName,
+        deviceType: pendingDevice.deviceType,
+        roomId: pendingDevice.roomId,
+        rackId: pendingDevice.rackId,
+        position: pendingDevice.position,
+        model: pendingDevice.model,
+        brand: pendingDevice.brand,
+        height: pendingDevice.height,
+        powerConsumption: pendingDevice.powerConsumption,
+        ipAddress: pendingDevice.ipAddress,
+        description: pendingDevice.description,
+        remark: pendingDevice.remark,
+      },
+      req,
+      metadata: { planId: pendingDevice.planId },
+    });
+
     res.json(pendingDevice);
   } catch (error) {
+    await logInventoryOperation('update', '更新暂存设备失败', {
+      targetId: req.params?.pendingId,
+      targetName: req.body?.deviceName,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -821,9 +1090,32 @@ router.delete('/pending-devices/:pendingId', async (req, res) => {
       return res.status(404).json({ error: '暂存设备不存在' });
     }
 
+    const beforeState = {
+      pendingId: pendingDevice.pendingId,
+      deviceName: pendingDevice.deviceName,
+      serialNumber: pendingDevice.serialNumber,
+      status: pendingDevice.status,
+      planId: pendingDevice.planId,
+    };
+
     await pendingDevice.destroy();
+
+    await logInventoryOperation('delete', `删除暂存设备【${pendingDevice.deviceName}】`, {
+      targetId: pendingDevice.pendingId,
+      targetName: pendingDevice.deviceName,
+      beforeState,
+      req,
+      metadata: {},
+    });
+
     res.json({ message: '删除成功' });
   } catch (error) {
+    await logInventoryOperation('delete', '删除暂存设备失败', {
+      targetId: req.params?.pendingId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -859,6 +1151,13 @@ router.post('/pending-devices/:pendingId/sync', async (req, res) => {
     });
     const deviceId = `DEV${String(maxNumber + 1).padStart(3, '0')}`;
 
+    const beforeState = {
+      status: pendingDevice.status,
+      syncedAt: pendingDevice.syncedAt,
+      syncedBy: pendingDevice.syncedBy,
+      syncedDeviceId: pendingDevice.syncedDeviceId,
+    };
+
     const newDevice = await Device.create({
       deviceId,
       name: pendingDevice.deviceName,
@@ -884,6 +1183,23 @@ router.post('/pending-devices/:pendingId/sync', async (req, res) => {
       syncedDeviceId: newDevice.deviceId,
     });
 
+    await logInventoryOperation('sync', `同步暂存设备【${pendingDevice.deviceName}】到设备管理`, {
+      targetId: pendingDevice.pendingId,
+      targetName: pendingDevice.deviceName,
+      beforeState,
+      afterState: {
+        status: pendingDevice.status,
+        syncedAt: pendingDevice.syncedAt,
+        syncedBy: pendingDevice.syncedBy,
+        syncedDeviceId: pendingDevice.syncedDeviceId,
+      },
+      req,
+      metadata: {
+        newDeviceId: newDevice.deviceId,
+        serialNumber: pendingDevice.serialNumber,
+      },
+    });
+
     res.json({
       message: '同步成功',
       device: newDevice,
@@ -891,6 +1207,12 @@ router.post('/pending-devices/:pendingId/sync', async (req, res) => {
     });
   } catch (error) {
     logger.error('同步设备错误', { error: error.message, stack: error.stack });
+    await logInventoryOperation('sync', '同步暂存设备失败', {
+      targetId: req.params?.pendingId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -976,6 +1298,19 @@ router.post('/pending-devices/batch-sync', async (req, res) => {
       }
     }
 
+    await logInventoryOperation('sync', '批量同步暂存设备', {
+      targetId: pendingIds.join(','),
+      targetName: `批量同步 ${results.length} 台设备`,
+      req,
+      metadata: {
+        totalRequested: pendingIds.length,
+        successCount: results.length,
+        errorCount: errors.length,
+        results,
+        errors,
+      },
+    });
+
     res.json({
       message: `成功同步 ${results.length} 台设备`,
       successCount: results.length,
@@ -985,6 +1320,12 @@ router.post('/pending-devices/batch-sync', async (req, res) => {
     });
   } catch (error) {
     logger.error('批量同步设备错误', { error: error.message, stack: error.stack });
+    await logInventoryOperation('sync', '批量同步暂存设备失败', {
+      targetId: req.body?.pendingIds ? req.body.pendingIds.join(',') : null,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });

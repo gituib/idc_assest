@@ -8,6 +8,17 @@ const NetworkCard = require('../models/NetworkCard');
 const Cable = require('../models/Cable');
 const Rack = require('../models/Rack');
 const Room = require('../models/Room');
+const { logOperation } = require('../utils/operationLogger');
+
+/**
+ * 记录设备端口操作日志
+ * @param {string} operationType - 操作类型
+ * @param {string} operationDescription - 操作描述
+ * @param {Object} params - 参数
+ * @returns {Promise<Object|null>}
+ */
+const logPortOperation = (operationType, operationDescription, params) =>
+  logOperation({ module: 'port', operationType, operationDescription, ...params });
 
 // 设备卡片需要展示的扩展字段（含位置、网络、状态信息）
 const DEVICE_DETAIL_ATTRIBUTES = [
@@ -151,9 +162,26 @@ router.post('/', async (req, res) => {
       ],
     });
 
+    // 记录创建端口成功日志
+    await logPortOperation('create', `创建端口【${portName}】`, {
+      targetId: port.portId,
+      targetName: portName,
+      afterState: createdPort ? createdPort.toJSON() : null,
+      req,
+      metadata: { deviceId },
+    });
+
     res.status(201).json(createdPort);
   } catch (error) {
     logger.error('创建端口失败', { error: error.message, stack: error.stack });
+    // 记录创建端口失败日志
+    await logPortOperation('create', '创建端口失败', {
+      targetId: req.body.portId,
+      targetName: req.body.portName,
+      result: 'failed',
+      req,
+      metadata: { deviceId: req.body.deviceId, error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -308,6 +336,30 @@ router.post('/batch', async (req, res) => {
       }
 
       await transaction.commit();
+
+      // 记录批量创建端口成功日志
+      await logPortOperation(
+        'batch_create',
+        `批量创建端口：成功${results.success}个，失败${results.failed}个，跳过${results.skipped}个，更新${results.updated}个`,
+        {
+          targetName: `${results.success}个端口`,
+          afterState: {
+            success: results.success,
+            failed: results.failed,
+            skipped: results.skipped,
+            updated: results.updated,
+          },
+          req,
+          metadata: {
+            total: results.total,
+            success: results.success,
+            failed: results.failed,
+            skipped: results.skipped,
+            updated: results.updated,
+          },
+        }
+      );
+
       res.json(results);
     } catch (error) {
       await transaction.rollback();
@@ -315,6 +367,16 @@ router.post('/batch', async (req, res) => {
     }
   } catch (error) {
     logger.error('批量创建端口失败', { error: error.message, stack: error.stack });
+    // 记录批量创建端口失败日志
+    await logPortOperation('batch_create', '批量创建端口失败', {
+      targetName: `${(req.body.ports || []).length}个端口`,
+      result: 'failed',
+      req,
+      metadata: {
+        total: (req.body.ports || []).length,
+        error: error.message,
+      },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -334,6 +396,9 @@ router.put('/:portId', async (req, res) => {
       return res.status(400).json({ error: '没有可更新的字段' });
     }
 
+    // 获取更新前的端口状态，用于记录操作日志
+    const beforePort = await DevicePort.findByPk(req.params.portId);
+
     const [updated] = await DevicePort.update(updateData, {
       where: { portId: req.params.portId },
     });
@@ -348,12 +413,31 @@ router.put('/:portId', async (req, res) => {
           },
         ],
       });
+
+      // 记录更新端口成功日志
+      await logPortOperation('update', `更新端口【${beforePort ? beforePort.portName : req.params.portId}】`, {
+        targetId: req.params.portId,
+        targetName: beforePort ? beforePort.portName : req.params.portId,
+        beforeState: beforePort ? beforePort.toJSON() : null,
+        afterState: port ? port.toJSON() : null,
+        req,
+        metadata: { deviceId: beforePort ? beforePort.deviceId : null, updateFields: Object.keys(updateData) },
+      });
+
       res.json(port);
     } else {
       res.status(404).json({ error: '端口不存在' });
     }
   } catch (error) {
     logger.error('更新端口失败', { error: error.message, stack: error.stack });
+    // 记录更新端口失败日志
+    await logPortOperation('update', '更新端口失败', {
+      targetId: req.params.portId,
+      targetName: req.body.portName,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, updateFields: Object.keys(req.body || {}) },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -371,12 +455,28 @@ router.delete('/batch', async (req, res) => {
       where: { portId: { [Op.in]: portIds } },
     });
 
+    // 记录批量删除端口成功日志
+    await logPortOperation('batch_delete', `批量删除${deletedCount}个端口`, {
+      targetId: portIds.join(','),
+      targetName: `${deletedCount}个端口`,
+      req,
+      metadata: { count: deletedCount, portIds },
+    });
+
     res.json({
       message: `批量删除成功，已删除 ${deletedCount} 个端口`,
       deletedCount,
     });
   } catch (error) {
     logger.error('批量删除端口失败', { error: error.message, stack: error.stack });
+    // 记录批量删除端口失败日志
+    await logPortOperation('batch_delete', '批量删除端口失败', {
+      targetId: (req.body.portIds || []).join(','),
+      targetName: `${(req.body.portIds || []).length}个端口`,
+      result: 'failed',
+      req,
+      metadata: { count: (req.body.portIds || []).length, error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -415,9 +515,25 @@ router.delete('/:portId', async (req, res) => {
       where: { portId: req.params.portId },
     });
 
+    // 记录删除端口成功日志
+    await logPortOperation('delete', `删除端口【${port.portName}】`, {
+      targetId: port.portId,
+      targetName: port.portName,
+      beforeState: port.toJSON(),
+      req,
+      metadata: { deviceId: port.deviceId },
+    });
+
     res.status(204).json();
   } catch (error) {
     logger.error('删除端口失败', { error: error.message, stack: error.stack });
+    // 记录删除端口失败日志
+    await logPortOperation('delete', '删除端口失败', {
+      targetId: req.params.portId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -434,12 +550,28 @@ router.post('/batch-delete', async (req, res) => {
       where: { portId: { [Op.in]: portIds } },
     });
 
+    // 记录批量删除端口成功日志
+    await logPortOperation('batch_delete', `批量删除${deletedCount}个端口`, {
+      targetId: portIds.join(','),
+      targetName: `${deletedCount}个端口`,
+      req,
+      metadata: { count: deletedCount, portIds },
+    });
+
     res.json({
       message: `批量删除成功，已删除 ${deletedCount} 个端口`,
       deletedCount,
     });
   } catch (error) {
     logger.error('批量删除端口失败', { error: error.message, stack: error.stack });
+    // 记录批量删除端口失败日志
+    await logPortOperation('batch_delete', '批量删除端口失败', {
+      targetId: (req.body.portIds || []).join(','),
+      targetName: `${(req.body.portIds || []).length}个端口`,
+      result: 'failed',
+      req,
+      metadata: { count: (req.body.portIds || []).length, error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });

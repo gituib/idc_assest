@@ -18,6 +18,128 @@ const generateRecordId = () => {
 };
 
 /**
+ * 模块中文名映射表
+ */
+const MODULE_LABELS = {
+  device: '设备',
+  idle_device: '空闲设备',
+  user: '用户',
+  role: '角色',
+  room: '机房',
+  rack: '机柜',
+  cable: '线缆',
+  port: '端口',
+  network_card: '网卡',
+  consumable: '耗材',
+  ticket: '工单',
+  warehouse: '库房',
+  inventory: '盘点',
+  auth: '认证',
+  backup: '备份',
+  system: '系统设置',
+};
+
+/**
+ * 操作类型中文名映射表
+ */
+const OPERATION_TYPE_LABELS = {
+  create: '创建',
+  update: '更新',
+  delete: '删除',
+  batch_create: '批量创建',
+  batch_delete: '批量删除',
+  batch_update: '批量更新',
+  batch_warranty_update: '批量保修更新',
+  batch_to_idle: '批量转入空闲',
+  batch_restore: '批量上架',
+  status_change: '状态变更',
+  move: '移动',
+  permission_change: '权限变更',
+  to_idle: '转入空闲',
+  shelve: '上架',
+  restore: '恢复',
+  import: '导入',
+  import_preview: '导入预览',
+  import_records: '导入记录',
+  export: '导出',
+  update_position: '位置调整',
+  update_layout: '更新布局',
+  update_rack_position: '调整机柜位置',
+  init_layout: '初始化布局',
+  login: '登录',
+  logout: '登出',
+  register: '注册',
+  unlock: '解锁',
+  change_password: '修改密码',
+  update_profile: '更新资料',
+  upload: '上传',
+  download: '下载',
+  clean: '清理',
+  update_settings: '更新设置',
+  reset: '重置',
+  maintenance_mode: '维护模式',
+  backup: '备份',
+  restart: '重启',
+  adjust: '库存调整',
+  stock_in: '入库',
+  stock_out: '出库',
+  start: '启动',
+  check: '盘点检查',
+  complete: '完成',
+  sync: '同步',
+  evaluate: '评价',
+  process: '流程处理',
+};
+
+/**
+ * 将时间格式化为可读的本地时间字符串
+ * @param {Date} date - 日期对象
+ * @returns {string} 格式化后的时间字符串，如 "2026-07-17 16:30:25"
+ */
+const formatTimestamp = (date) => {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+};
+
+/**
+ * 构建完整的操作描述
+ * 格式：[操作人] 于 [时间] [动作描述] → [结果]
+ * 当传入的 operationDescription 已包含完整信息时，仅补充操作人和时间
+ * @param {Object} params - 参数对象
+ * @param {string} params.operationDescription - 原始操作描述
+ * @param {string} params.module - 模块名称
+ * @param {string} params.operationType - 操作类型
+ * @param {Object} params.operatorInfo - 操作人信息
+ * @param {string} params.result - 操作结果
+ * @param {string} params.targetName - 目标名称
+ * @returns {string} 增强后的操作描述
+ */
+const buildFullDescription = ({
+  operationDescription,
+  module,
+  operationType,
+  operatorInfo,
+  result,
+  targetName,
+}) => {
+  const operator = operatorInfo.operatorName || '系统';
+  const timestamp = formatTimestamp(new Date());
+  const resultText = result === 'success' ? '成功' : '失败';
+
+  // 原始描述为空时，使用模块+操作类型+目标名称生成默认描述
+  let action = operationDescription;
+  if (!action) {
+    const moduleLabel = MODULE_LABELS[module] || module || '';
+    const typeLabel = OPERATION_TYPE_LABELS[operationType] || operationType || '';
+    const target = targetName ? `【${targetName}】` : '';
+    action = `${typeLabel}${moduleLabel}${target}`;
+  }
+
+  // 组合完整描述：操作人 于 时间 动作描述 → 结果
+  return `${operator} 于 ${timestamp} ${action} → ${resultText}`;
+};
+
+/**
  * 获取操作人信息
  * @param {Object} req - Express请求对象
  * @returns {Object} 操作人信息
@@ -193,10 +315,20 @@ async function logOperation({
   const operatorInfo = getOperatorInfo(req);
   const clientInfo = getClientInfo(req);
 
+  // 增强操作描述：自动补充操作人、时间、结果，生成完整审计语句
+  const fullDescription = buildFullDescription({
+    operationDescription,
+    module,
+    operationType,
+    operatorInfo,
+    result,
+    targetName,
+  });
+
   const logData = {
     module,
     operationType,
-    operationDescription,
+    operationDescription: fullDescription,
     targetId: targetId || null,
     targetName: targetName || null,
     operatorId: operatorInfo.operatorId,
@@ -208,7 +340,11 @@ async function logOperation({
     ipAddress: clientInfo.ipAddress,
     userAgent: clientInfo.userAgent,
     requestId: clientInfo.requestId,
-    metadata,
+    metadata: {
+      ...metadata,
+      // 保留原始动作描述，供前端详情面板单独展示
+      rawDescription: operationDescription || '',
+    },
   };
 
   try {
@@ -319,11 +455,92 @@ async function logRoleOperation(
   });
 }
 
+/**
+ * 记录认证操作日志（登录/登出/注册/解锁/密码修改等）
+ * @param {string} operationType - 操作类型
+ * @param {string} operationDescription - 操作描述
+ * @param {Object} params - 参数
+ * @returns {Promise<Object|null>}
+ */
+async function logAuthOperation(
+  operationType,
+  operationDescription,
+  { targetId, targetName, beforeState, afterState, result, req, metadata = {} }
+) {
+  return logOperation({
+    module: 'auth',
+    operationType,
+    operationDescription,
+    targetId,
+    targetName,
+    beforeState,
+    afterState,
+    result,
+    req,
+    metadata,
+  });
+}
+
+/**
+ * 记录备份操作日志（创建/恢复/上传/删除/清理/远端备份等）
+ * @param {string} operationType - 操作类型
+ * @param {string} operationDescription - 操作描述
+ * @param {Object} params - 参数
+ * @returns {Promise<Object|null>}
+ */
+async function logBackupOperation(
+  operationType,
+  operationDescription,
+  { targetId, targetName, beforeState, afterState, result, req, metadata = {} }
+) {
+  return logOperation({
+    module: 'backup',
+    operationType,
+    operationDescription,
+    targetId,
+    targetName,
+    beforeState,
+    afterState,
+    result,
+    req,
+    metadata,
+  });
+}
+
+/**
+ * 记录系统设置操作日志（设置变更/维护模式/重置/前端操作等）
+ * @param {string} operationType - 操作类型
+ * @param {string} operationDescription - 操作描述
+ * @param {Object} params - 参数
+ * @returns {Promise<Object|null>}
+ */
+async function logSystemOperation(
+  operationType,
+  operationDescription,
+  { targetId, targetName, beforeState, afterState, result, req, metadata = {} }
+) {
+  return logOperation({
+    module: 'system',
+    operationType,
+    operationDescription,
+    targetId,
+    targetName,
+    beforeState,
+    afterState,
+    result,
+    req,
+    metadata,
+  });
+}
+
 module.exports = {
   logOperation,
   logDeviceOperation,
   logUserOperation,
   logRoleOperation,
+  logAuthOperation,
+  logBackupOperation,
+  logSystemOperation,
   generateDeviceDescription,
   buildDeviceMetadata,
 };

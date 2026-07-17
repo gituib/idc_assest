@@ -5,6 +5,17 @@ const { Op } = require('sequelize');
 const Cable = require('../models/Cable');
 const Device = require('../models/Device');
 const DevicePort = require('../models/DevicePort');
+const { logOperation } = require('../utils/operationLogger');
+
+/**
+ * 记录线缆操作日志
+ * @param {string} operationType - 操作类型
+ * @param {string} operationDescription - 操作描述
+ * @param {Object} params - 参数
+ * @returns {Promise<Object|null>}
+ */
+const logCableOperation = (operationType, operationDescription, params) =>
+  logOperation({ module: 'cable', operationType, operationDescription, ...params });
 
 const PORT_COMPATIBILITY = {
   RJ45: {
@@ -541,9 +552,31 @@ router.post('/', async (req, res) => {
     await occupyPort(sourceDeviceId, sourcePort);
     await occupyPort(targetDeviceId, targetPort);
 
+    // 记录创建操作日志
+    await logCableOperation('create', `创建接线【${autoCableId}】`, {
+      targetId: autoCableId,
+      targetName: cableLabel || autoCableId,
+      afterState: createdCable ? createdCable.toJSON() : null,
+      req,
+      metadata: {
+        sourceDeviceId,
+        sourcePort,
+        targetDeviceId,
+        targetPort,
+        cableType: cableType || 'ethernet',
+      },
+    });
+
     res.status(201).json(createdCable);
   } catch (error) {
     logger.error('创建接线失败', { error: error.message, stack: error.stack });
+    await logCableOperation('create', '创建接线失败', {
+      targetId: req.body.cableId || null,
+      targetName: req.body.cableLabel || null,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -622,8 +655,32 @@ router.post('/batch', async (req, res) => {
     }
 
     res.json(results);
+
+    // 记录批量创建操作日志
+    await logCableOperation('batch_create', `批量创建接线（成功 ${results.success} 条，失败 ${results.failed} 条）`, {
+      targetId: null,
+      targetName: `批量创建${cables.length}条接线`,
+      afterState: results,
+      req,
+      metadata: {
+        total: cables.length,
+        success: results.success,
+        failed: results.failed,
+        cableIds: cables.map(c => c.cableId),
+      },
+    });
   } catch (error) {
     logger.error('批量创建接线失败', { error: error.message, stack: error.stack });
+    await logCableOperation('batch_create', '批量创建接线失败', {
+      targetId: null,
+      targetName: `批量创建${req.body.cables ? req.body.cables.length : 0}条接线`,
+      result: 'failed',
+      req,
+      metadata: {
+        error: error.message,
+        cableIds: req.body.cables ? req.body.cables.map(c => c.cableId) : [],
+      },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -679,12 +736,29 @@ router.put('/:cableId', async (req, res) => {
         await occupyPort(targetDeviceId, targetPort);
       }
 
+      // 记录更新操作日志
+      await logCableOperation('update', `更新接线【${req.params.cableId}】`, {
+        targetId: req.params.cableId,
+        targetName: cable.cableLabel || req.params.cableId,
+        beforeState: oldCable.toJSON(),
+        afterState: cable.toJSON(),
+        req,
+        metadata: { type: 'cable_update' },
+      });
+
       res.json(cable);
     } else {
       res.status(404).json({ error: '接线不存在' });
     }
   } catch (error) {
     logger.error('更新接线失败', { error: error.message, stack: error.stack });
+    await logCableOperation('update', '更新接线失败', {
+      targetId: req.params.cableId,
+      targetName: req.body.cableLabel || req.params.cableId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -713,12 +787,36 @@ router.delete('/batch', async (req, res) => {
       await freePort(cable.targetDeviceId, cable.targetPort);
     }
 
+    // 记录批量删除操作日志
+    await logCableOperation('batch_delete', `批量删除接线（删除 ${deletedCount} 条）`, {
+      targetId: null,
+      targetName: `批量删除${cableIds.length}条接线`,
+      beforeState: cables.map(c => c.toJSON()),
+      afterState: { deletedCount },
+      req,
+      metadata: {
+        total: cableIds.length,
+        deletedCount,
+        cableIds,
+      },
+    });
+
     res.json({
       message: `批量删除成功，已删除 ${deletedCount} 条接线`,
       deletedCount,
     });
   } catch (error) {
     logger.error('批量删除接线失败', { error: error.message, stack: error.stack });
+    await logCableOperation('batch_delete', '批量删除接线失败', {
+      targetId: null,
+      targetName: `批量删除${req.body.cableIds ? req.body.cableIds.length : 0}条接线`,
+      result: 'failed',
+      req,
+      metadata: {
+        error: error.message,
+        cableIds: req.body.cableIds || [],
+      },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -744,12 +842,28 @@ router.delete('/:cableId', async (req, res) => {
       await freePort(sourceDeviceId, sourcePort);
       await freePort(targetDeviceId, targetPort);
 
+      // 记录删除操作日志
+      await logCableOperation('delete', `删除接线【${req.params.cableId}】`, {
+        targetId: req.params.cableId,
+        targetName: cable.cableLabel || req.params.cableId,
+        beforeState: cable.toJSON(),
+        req,
+        metadata: { type: 'cable_delete' },
+      });
+
       res.status(204).json();
     } else {
       res.status(404).json({ error: '接线不存在' });
     }
   } catch (error) {
     logger.error('删除接线失败', { error: error.message, stack: error.stack });
+    await logCableOperation('delete', '删除接线失败', {
+      targetId: req.params.cableId,
+      targetName: null,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });

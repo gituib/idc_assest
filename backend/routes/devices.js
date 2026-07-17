@@ -804,6 +804,14 @@ router.post('/', validateBody(() => createDeviceSchema(false)), async (req, res)
 
     res.status(201).json(device);
   } catch (error) {
+    // 记录设备创建失败日志
+    await logDeviceOperation('create', '创建设备失败', {
+      targetId: deviceData.deviceId,
+      targetName: deviceData.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(400).json({ error: error.message });
   }
 });
@@ -1651,6 +1659,14 @@ router.put('/batch-status', async (req, res) => {
       newStatus: status,
     });
   } catch (error) {
+    // 记录批量状态变更失败日志
+    await logDeviceOperation('status_change', '批量变更设备状态失败', {
+      targetId: deviceIds.join(','),
+      targetName: `${deviceIds.length}台设备`,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, status },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -1854,6 +1870,14 @@ router.put('/batch-move', async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
+    // 记录批量移动设备失败日志
+    await logDeviceOperation('move', '批量移动设备失败', {
+      targetId: deviceIds.join(','),
+      targetName: `${deviceIds.length}台设备`,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, targetRackId, startPosition },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -1934,6 +1958,14 @@ router.put('/batch-warranty', validateBody(batchWarrantySchema), async (req, res
     });
   } catch (error) {
     await transaction.rollback();
+    // 记录批量更新维保信息失败日志
+    await logDeviceOperation('batch_warranty_update', '批量更新设备维保信息失败', {
+      targetId: deviceIds.join(','),
+      targetName: `${deviceIds.length}台设备`,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, purchaseDate, warrantyExpiry },
+    });
     logger.error('批量更新维保信息失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
@@ -2304,6 +2336,14 @@ router.put('/:deviceId/to-idle', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
+    // 记录设备转入空闲设备失败日志
+    await logDeviceOperation('to_idle', '设备转入空闲设备失败', {
+      targetId: deviceId,
+      targetName: device?.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, idleReason },
+    });
     logger.error('设备转入空闲设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
@@ -2481,6 +2521,14 @@ router.put('/:deviceId', validateBody(() => createDeviceSchema(true)), async (re
       res.status(404).json({ error: '设备不存在' });
     }
   } catch (error) {
+    // 记录设备更新失败日志
+    await logDeviceOperation('update', '更新设备失败', {
+      targetId: req.params.deviceId,
+      targetName: oldDevice?.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(400).json({ error: error.message });
   }
 });
@@ -2581,6 +2629,14 @@ router.post('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, res
     });
   } catch (error) {
     await t.rollback();
+    // 记录批量删除设备失败日志
+    await logDeviceOperation('batch_delete', '批量删除设备失败', {
+      targetId: deviceIds.join(','),
+      targetName: `${deviceIds.length}台设备`,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('批量删除设备错误', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message, stack: error.stack });
   }
@@ -2770,6 +2826,14 @@ router.delete('/:deviceId', async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
+    // 记录删除设备失败日志
+    await logDeviceOperation('delete', '删除设备失败', {
+      targetId: deviceId,
+      targetName: device?.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     logger.error('删除设备失败', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }

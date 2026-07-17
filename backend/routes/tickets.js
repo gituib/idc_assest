@@ -14,6 +14,17 @@ const { createObjectCsvWriter } = require('csv-writer');
 const XLSX = require('xlsx');
 const path = require('path');
 const fs = require('fs');
+const { logOperation } = require('../utils/operationLogger');
+
+/**
+ * 记录工单操作日志
+ * @param {string} operationType - 操作类型
+ * @param {string} operationDescription - 操作描述
+ * @param {Object} params - 参数
+ * @returns {Promise<Object|null>}
+ */
+const logTicketOperation = (operationType, operationDescription, params) =>
+  logOperation({ module: 'ticket', operationType, operationDescription, ...params });
 
 // 获取工单统计 (必须定义在 /:ticketId 之前)
 router.get('/stats', async (req, res) => {
@@ -739,8 +750,29 @@ router.post('/', async (req, res) => {
       afterState: ticket.toJSON(),
     });
 
+    // 记录创建工单成功日志
+    await logTicketOperation('create', `创建工单【${ticket.title}】`, {
+      targetId: ticket.ticketId,
+      targetName: ticket.title,
+      afterState: ticket.toJSON(),
+      req,
+      metadata: {
+        deviceId: ticket.deviceId,
+        deviceName: ticket.deviceName,
+        priority: ticket.priority,
+        faultCategory: ticket.faultCategory,
+      },
+    });
+
     res.status(201).json(ticket);
   } catch (error) {
+    // 记录创建工单失败日志
+    await logTicketOperation('create', '创建工单失败', {
+      targetName: req.body.title || req.body.deviceName,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(400).json({ error: error.message });
   }
 });
@@ -795,8 +827,26 @@ router.put('/:ticketId', async (req, res) => {
       afterState: ticket.toJSON(),
     });
 
+    // 记录更新工单成功日志
+    await logTicketOperation('update', `更新工单【${ticket.title}】`, {
+      targetId: ticket.ticketId,
+      targetName: ticket.title,
+      beforeState,
+      afterState: ticket.toJSON(),
+      req,
+      metadata: { updatedFields: Object.keys(updateData) },
+    });
+
     res.json(ticket);
   } catch (error) {
+    // 记录更新工单失败日志
+    await logTicketOperation('update', '更新工单失败', {
+      targetId: req.params.ticketId,
+      targetName: req.body.title,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(400).json({ error: error.message });
   }
 });
@@ -854,8 +904,26 @@ router.put('/:ticketId/status', async (req, res) => {
       afterState: ticket.toJSON(),
     });
 
+    // 记录工单状态变更成功日志
+    await logTicketOperation('status_change', `工单【${ticket.title}】状态变更为: ${status}`, {
+      targetId: ticket.ticketId,
+      targetName: ticket.title,
+      beforeState,
+      afterState: ticket.toJSON(),
+      req,
+      metadata: { oldStatus: beforeState.status, newStatus: status, resolution: resolution || null },
+    });
+
     res.json(ticket);
   } catch (error) {
+    // 记录工单状态变更失败日志
+    await logTicketOperation('status_change', '工单状态变更失败', {
+      targetId: req.params.ticketId,
+      targetName: req.body.status,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, newStatus: req.body.status },
+    });
     res.status(400).json({ error: error.message });
   }
 });
@@ -899,8 +967,31 @@ router.put('/:ticketId/process', async (req, res) => {
       afterState: ticket.toJSON(),
     });
 
+    // 记录处理工单成功日志
+    await logTicketOperation('process', `处理工单【${ticket.title}】 - 结果: ${result}`, {
+      targetId: ticket.ticketId,
+      targetName: ticket.title,
+      beforeState,
+      afterState: ticket.toJSON(),
+      req,
+      metadata: {
+        oldStatus: beforeState.status,
+        newStatus: updateData.status,
+        result,
+        usedParts: usedParts || null,
+      },
+    });
+
     res.json(ticket);
   } catch (error) {
+    // 记录处理工单失败日志
+    await logTicketOperation('process', '处理工单失败', {
+      targetId: req.params.ticketId,
+      targetName: req.body.solution,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, result: req.body.result },
+    });
     res.status(400).json({ error: error.message });
   }
 });
@@ -941,8 +1032,30 @@ router.post('/:ticketId/operations', async (req, res) => {
       operatorRole,
     });
 
+    // 记录添加工单操作记录成功日志
+    await logTicketOperation('create', `添加工单操作记录【${operationDescription || operationType}】`, {
+      targetId: ticket.ticketId,
+      targetName: ticket.title,
+      afterState: record.toJSON(),
+      req,
+      metadata: {
+        recordId: record.recordId,
+        operationType,
+        duration: duration || null,
+        result,
+      },
+    });
+
     res.status(201).json(record);
   } catch (error) {
+    // 记录添加工单操作记录失败日志
+    await logTicketOperation('create', '添加工单操作记录失败', {
+      targetId: req.params.ticketId,
+      targetName: req.body.operationDescription,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, operationType: req.body.operationType },
+    });
     res.status(400).json({ error: error.message });
   }
 });
@@ -969,9 +1082,32 @@ router.delete('/:ticketId', async (req, res) => {
       return res.status(404).json({ error: '工单不存在' });
     }
 
+    const beforeState = ticket.toJSON();
+
     await ticket.destroy();
+
+    // 记录删除工单成功日志
+    await logTicketOperation('delete', `删除工单【${ticket.title}】`, {
+      targetId: ticket.ticketId,
+      targetName: ticket.title,
+      beforeState,
+      req,
+      metadata: {
+        deviceId: ticket.deviceId,
+        deviceName: ticket.deviceName,
+        status: ticket.status,
+      },
+    });
+
     res.json({ message: '工单已删除' });
   } catch (error) {
+    // 记录删除工单失败日志
+    await logTicketOperation('delete', '删除工单失败', {
+      targetId: req.params.ticketId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -990,6 +1126,8 @@ router.post('/:ticketId/evaluate', async (req, res) => {
       return res.status(400).json({ error: '只有已完成的工单才能评价' });
     }
 
+    const beforeState = ticket.toJSON();
+
     await ticket.update({ evaluation, evaluationRating });
 
     await TicketOperationRecord.create({
@@ -1003,8 +1141,32 @@ router.post('/:ticketId/evaluate', async (req, res) => {
       notes: `评价: ${evaluation}, 星级: ${evaluationRating}`,
     });
 
+    // 记录评价工单成功日志
+    await logTicketOperation('evaluate', `评价工单【${ticket.title}】 - 星级: ${evaluationRating}`, {
+      targetId: ticket.ticketId,
+      targetName: ticket.title,
+      beforeState,
+      afterState: ticket.toJSON(),
+      req,
+      metadata: {
+        evaluation,
+        evaluationRating,
+      },
+    });
+
     res.json(ticket);
   } catch (error) {
+    // 记录评价工单失败日志
+    await logTicketOperation('evaluate', '评价工单失败', {
+      targetId: req.params.ticketId,
+      result: 'failed',
+      req,
+      metadata: {
+        error: error.message,
+        evaluation: req.body.evaluation,
+        evaluationRating: req.body.evaluationRating,
+      },
+    });
     res.status(400).json({ error: error.message });
   }
 });

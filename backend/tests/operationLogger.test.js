@@ -49,7 +49,9 @@ describe('operationLogger 工具函数测试', () => {
       expect(logs.length).toBe(1);
       expect(logs[0].module).toBe('device');
       expect(logs[0].operationType).toBe('create');
-      expect(logs[0].operationDescription).toBe('测试创建设备');
+      expect(logs[0].operationDescription).toContain('测试创建设备');
+      expect(logs[0].operationDescription).toContain('测试用户');
+      expect(logs[0].operationDescription).toContain('→ 成功');
       expect(logs[0].targetId).toBe('DEV_TEST_001');
       expect(logs[0].targetName).toBe('测试设备');
       expect(logs[0].operatorId).toBe('user_test_001');
@@ -157,7 +159,10 @@ describe('operationLogger 工具函数测试', () => {
         where: { targetId: 'DEV_BATCH' },
       });
 
-      expect(logs[0].metadata).toEqual(customMetadata);
+      expect(logs[0].metadata).toEqual({
+        ...customMetadata,
+        rawDescription: '批量更新设备',
+      });
     });
   });
 

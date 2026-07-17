@@ -4,7 +4,17 @@ const router = express.Router();
 const { Op } = require('sequelize');
 const Warehouse = require('../models/Warehouse');
 const Device = require('../models/Device');
-const { logDeviceOperation } = require('../utils/operationLogger');
+const { logOperation } = require('../utils/operationLogger');
+
+/**
+ * 记录库房操作日志
+ * @param {string} operationType - 操作类型
+ * @param {string} operationDescription - 操作描述
+ * @param {Object} params - 参数
+ * @returns {Promise<Object|null>}
+ */
+const logWarehouseOperation = (operationType, operationDescription, params) =>
+  logOperation({ module: 'warehouse', operationType, operationDescription, ...params });
 
 async function generateWarehouseId() {
   const warehouses = await Warehouse.findAll({
@@ -146,7 +156,7 @@ router.post('/', async (req, res) => {
       description: description || '',
     });
 
-    await logDeviceOperation('create', `创建库房【${name}】`, {
+    await logWarehouseOperation('create', `创建库房【${name}】`, {
       targetId: warehouse.warehouseId,
       targetName: name,
       afterState: warehouse.toJSON(),
@@ -188,7 +198,7 @@ router.put('/:warehouseId', async (req, res) => {
 
     await warehouse.save();
 
-    await logDeviceOperation('update', `更新库房【${warehouse.name}】`, {
+    await logWarehouseOperation('update', `更新库房【${warehouse.name}】`, {
       targetId: warehouse.warehouseId,
       targetName: warehouse.name,
       beforeState,
@@ -223,7 +233,7 @@ router.delete('/:warehouseId', async (req, res) => {
     const warehouseName = warehouse.name;
     await warehouse.destroy();
 
-    await logDeviceOperation('delete', `删除库房【${warehouseName}】`, {
+    await logWarehouseOperation('delete', `删除库房【${warehouseName}】`, {
       targetId: req.params.warehouseId,
       targetName: warehouseName,
       req,

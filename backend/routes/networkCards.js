@@ -5,6 +5,17 @@ const { Op } = require('sequelize');
 const NetworkCard = require('../models/NetworkCard');
 const Device = require('../models/Device');
 const DevicePort = require('../models/DevicePort');
+const { logOperation } = require('../utils/operationLogger');
+
+/**
+ * 记录网卡操作日志
+ * @param {string} operationType - 操作类型
+ * @param {string} operationDescription - 操作描述
+ * @param {Object} params - 参数
+ * @returns {Promise<Object|null>}
+ */
+const logNetworkCardOperation = (operationType, operationDescription, params) =>
+  logOperation({ module: 'network_card', operationType, operationDescription, ...params });
 
 NetworkCard.belongsTo(Device, { foreignKey: 'deviceId', as: 'device' });
 Device.hasMany(NetworkCard, { foreignKey: 'deviceId', as: 'networkCards' });
@@ -245,9 +256,26 @@ router.post('/', async (req, res) => {
       ],
     });
 
+    // 记录创建网卡成功日志
+    await logNetworkCardOperation('create', `创建网卡【${name}】`, {
+      targetId: networkCard.nicId,
+      targetName: name,
+      afterState: createdCard ? createdCard.toJSON() : null,
+      req,
+      metadata: { deviceId },
+    });
+
     res.status(201).json(createdCard);
   } catch (error) {
     logger.error('创建网卡失败', { error: error.message, stack: error.stack });
+    // 记录创建网卡失败日志
+    await logNetworkCardOperation('create', '创建网卡失败', {
+      targetId: req.body.nicId,
+      targetName: req.body.name,
+      result: 'failed',
+      req,
+      metadata: { deviceId: req.body.deviceId, error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -374,6 +402,30 @@ router.post('/batch', async (req, res) => {
       }
 
       await transaction.commit();
+
+      // 记录批量创建网卡成功日志
+      await logNetworkCardOperation(
+        'batch_create',
+        `批量创建网卡：成功${results.success}个，失败${results.failed}个，跳过${results.skipped}个，更新${results.updated}个`,
+        {
+          targetName: `${results.success}个网卡`,
+          afterState: {
+            success: results.success,
+            failed: results.failed,
+            skipped: results.skipped,
+            updated: results.updated,
+          },
+          req,
+          metadata: {
+            total: results.total,
+            success: results.success,
+            failed: results.failed,
+            skipped: results.skipped,
+            updated: results.updated,
+          },
+        }
+      );
+
       res.json(results);
     } catch (error) {
       await transaction.rollback();
@@ -381,12 +433,25 @@ router.post('/batch', async (req, res) => {
     }
   } catch (error) {
     logger.error('批量创建网卡失败', { error: error.message, stack: error.stack });
+    // 记录批量创建网卡失败日志
+    await logNetworkCardOperation('batch_create', '批量创建网卡失败', {
+      targetName: `${(req.body.networkCards || []).length}个网卡`,
+      result: 'failed',
+      req,
+      metadata: {
+        total: (req.body.networkCards || []).length,
+        error: error.message,
+      },
+    });
     res.status(500).json({ error: error.message });
   }
 });
 
 router.put('/:nicId', async (req, res) => {
   try {
+    // 获取更新前的网卡状态，用于记录操作日志
+    const beforeCard = await NetworkCard.findByPk(req.params.nicId);
+
     const [updated] = await NetworkCard.update(req.body, {
       where: { nicId: req.params.nicId },
     });
@@ -401,12 +466,38 @@ router.put('/:nicId', async (req, res) => {
           },
         ],
       });
+
+      // 记录更新网卡成功日志
+      await logNetworkCardOperation(
+        'update',
+        `更新网卡【${beforeCard ? beforeCard.name : req.params.nicId}】`,
+        {
+          targetId: req.params.nicId,
+          targetName: beforeCard ? beforeCard.name : req.params.nicId,
+          beforeState: beforeCard ? beforeCard.toJSON() : null,
+          afterState: networkCard ? networkCard.toJSON() : null,
+          req,
+          metadata: {
+            deviceId: beforeCard ? beforeCard.deviceId : null,
+            updateFields: Object.keys(req.body || {}),
+          },
+        }
+      );
+
       res.json(networkCard);
     } else {
       res.status(404).json({ error: '网卡不存在' });
     }
   } catch (error) {
     logger.error('更新网卡失败', { error: error.message, stack: error.stack });
+    // 记录更新网卡失败日志
+    await logNetworkCardOperation('update', '更新网卡失败', {
+      targetId: req.params.nicId,
+      targetName: req.body.name,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, updateFields: Object.keys(req.body || {}) },
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -414,6 +505,9 @@ router.put('/:nicId', async (req, res) => {
 router.delete('/:nicId', async (req, res) => {
   try {
     const { nicId } = req.params;
+
+    // 获取删除前的网卡状态，用于记录操作日志
+    const beforeCard = await NetworkCard.findByPk(nicId);
 
     const portCount = await DevicePort.count({ where: { nicId } });
     if (portCount > 0) {
@@ -427,12 +521,28 @@ router.delete('/:nicId', async (req, res) => {
     });
 
     if (deleted) {
+      // 记录删除网卡成功日志
+      await logNetworkCardOperation('delete', `删除网卡【${beforeCard ? beforeCard.name : nicId}】`, {
+        targetId: nicId,
+        targetName: beforeCard ? beforeCard.name : nicId,
+        beforeState: beforeCard ? beforeCard.toJSON() : null,
+        req,
+        metadata: { deviceId: beforeCard ? beforeCard.deviceId : null },
+      });
+
       res.status(204).json();
     } else {
       res.status(404).json({ error: '网卡不存在' });
     }
   } catch (error) {
     logger.error('删除网卡失败', { error: error.message, stack: error.stack });
+    // 记录删除网卡失败日志
+    await logNetworkCardOperation('delete', '删除网卡失败', {
+      targetId: req.params.nicId,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({ error: error.message });
   }
 });

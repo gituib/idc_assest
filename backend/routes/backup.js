@@ -64,6 +64,7 @@ const {
   getEnabledTargets,
 } = require('../utils/remoteBackupConfig');
 const { testRemoteConnection, PROTOCOL_TYPES, PROTOCOL_LABELS } = require('../utils/remoteBackup');
+const { logBackupOperation } = require('../utils/operationLogger');
 
 const tempDir = path.join(__dirname, '..', 'temp');
 if (!fs.existsSync(tempDir)) {
@@ -83,6 +84,20 @@ router.post('/', async (req, res) => {
       includeFiles: includeFiles !== false,
     });
 
+    await logBackupOperation('create', `创建备份：${result.filename || description || '未命名'}`, {
+      targetId: result.filename,
+      targetName: result.filename || description,
+      afterState: {
+        filename: result.filename,
+        description,
+        includeFiles: includeFiles !== false,
+        size: result.size,
+        timestamp: result.timestamp,
+      },
+      req,
+      metadata: { includeFiles: includeFiles !== false },
+    });
+
     res.json({
       success: true,
       message: '备份创建成功',
@@ -90,6 +105,11 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     logger.error('创建备份失败', { error: error.message, stack: error.stack });
+    await logBackupOperation('create', `创建备份失败：${error.message}`, {
+      result: 'failed',
+      req,
+      metadata: { description: req.body.description, error: error.message },
+    });
     res.status(500).json({
       success: false,
       message: '创建备份失败',
@@ -431,6 +451,23 @@ router.post('/restore', async (req, res) => {
       },
     });
 
+    await logBackupOperation('restore', `恢复备份：${filename}`, {
+      targetId: filename,
+      targetName: filename,
+      afterState: {
+        tablesRestored: result.tablesRestored,
+        recordsRestored: result.recordsRestored,
+        filesRestored: result.filesRestored,
+        restoredAt: result.restoredAt,
+      },
+      req,
+      metadata: {
+        options,
+        tablesRestored: result.tablesRestored,
+        recordsRestored: result.recordsRestored,
+      },
+    });
+
     res.json({
       success: true,
       message: '数据恢复成功',
@@ -438,6 +475,13 @@ router.post('/restore', async (req, res) => {
     });
   } catch (error) {
     logger.error('恢复备份失败', { error: error.message, stack: error.stack });
+    await logBackupOperation('restore', `恢复备份失败：${req.body.filename || '未知'}`, {
+      targetId: req.body.filename,
+      targetName: req.body.filename,
+      result: 'failed',
+      req,
+      metadata: { error: error.message, options: req.body.options },
+    });
     res.status(500).json({
       success: false,
       message: '恢复备份失败',
@@ -481,6 +525,12 @@ router.post('/upload', async (req, res) => {
 
     if (!validation.valid) {
       fs.unlinkSync(tempPath);
+      await logBackupOperation('upload', `上传备份文件验证失败：${originalName}`, {
+        targetName: originalName,
+        result: 'failed',
+        req,
+        metadata: { reason: 'validation_failed', error: validation.error, originalName },
+      });
       return res.status(400).json({
         success: false,
         message: `备份文件验证失败: ${validation.error}`,
@@ -496,6 +546,14 @@ router.post('/upload', async (req, res) => {
 
     fs.renameSync(tempPath, targetPath);
 
+    await logBackupOperation('upload', `上传备份文件：${originalName} → ${newFilename}`, {
+      targetId: newFilename,
+      targetName: newFilename,
+      afterState: { filename: newFilename, originalName, size: backupFile.size, compressed: isCompressed },
+      req,
+      metadata: { originalName, size: backupFile.size, isCompressed },
+    });
+
     res.json({
       success: true,
       message: '备份文件上传成功',
@@ -506,6 +564,11 @@ router.post('/upload', async (req, res) => {
     });
   } catch (error) {
     logger.error('上传备份文件失败', { error: error.message, stack: error.stack });
+    await logBackupOperation('upload', `上传备份文件失败：${error.message}`, {
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({
       success: false,
       message: '上传备份文件失败',
@@ -530,6 +593,14 @@ router.get('/download/:filename', (req, res) => {
         message: '备份文件不存在',
       });
     }
+
+    const stats = fs.statSync(filePath);
+    logBackupOperation('download', `下载备份文件：${filename}`, {
+      targetId: filename,
+      targetName: filename,
+      req,
+      metadata: { size: stats.size },
+    });
 
     res.download(filePath, filename, err => {
       if (err) {
@@ -565,6 +636,12 @@ router.delete('/:filename', (req, res) => {
 
     fs.unlinkSync(filePath);
 
+    logBackupOperation('delete', `删除备份文件：${filename}`, {
+      targetId: filename,
+      targetName: filename,
+      req,
+    });
+
     res.json({
       success: true,
       message: '备份文件已删除',
@@ -572,6 +649,13 @@ router.delete('/:filename', (req, res) => {
     });
   } catch (error) {
     logger.error('删除备份文件失败', { error: error.message, stack: error.stack });
+    logBackupOperation('delete', `删除备份文件失败：${req.params.filename || '未知'}`, {
+      targetId: req.params.filename,
+      targetName: req.params.filename,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({
       success: false,
       message: '删除备份文件失败',
@@ -632,6 +716,13 @@ router.post('/clean', (req, res) => {
 
     const result = cleanOldBackups({ maxCount, maxAgeDays, dryRun });
 
+    logBackupOperation('clean', `${dryRun ? '预览' : '执行'}清理旧备份：删除 ${result.deletedCount || 0} 个文件`, {
+      targetName: '旧备份清理',
+      afterState: { dryRun, deletedCount: result.deletedCount, maxCount, maxAgeDays },
+      req,
+      metadata: { dryRun, maxCount, maxAgeDays, deletedCount: result.deletedCount },
+    });
+
     res.json({
       success: true,
       message: dryRun ? '预览完成' : '清理完成',
@@ -639,6 +730,11 @@ router.post('/clean', (req, res) => {
     });
   } catch (error) {
     logger.error('清理备份失败', { error: error.message, stack: error.stack });
+    logBackupOperation('clean', `清理备份失败：${error.message}`, {
+      result: 'failed',
+      req,
+      metadata: { error: error.message, options: req.body },
+    });
     res.status(500).json({
       success: false,
       message: '清理备份失败',
@@ -731,12 +827,24 @@ router.post('/auto/settings', (req, res) => {
     const success = updateAutoBackupSettings(newSettings);
     if (success) {
       const status = getAutoBackupStatus();
+      logBackupOperation('update_settings', `更新自动备份设置：${Object.keys(newSettings).join(', ')}`, {
+        targetName: '自动备份设置',
+        afterState: newSettings,
+        req,
+        metadata: { settings: newSettings },
+      });
       res.json({
         success: true,
         message: '自动备份设置已更新',
         data: status,
       });
     } else {
+      logBackupOperation('update_settings', `更新自动备份设置失败（保存失败）`, {
+        targetName: '自动备份设置',
+        result: 'failed',
+        req,
+        metadata: { settings: newSettings, reason: 'save_failed' },
+      });
       res.status(500).json({
         success: false,
         message: '保存设置失败',
@@ -744,6 +852,12 @@ router.post('/auto/settings', (req, res) => {
     }
   } catch (error) {
     logger.error('更新自动备份设置失败', { error: error.message, stack: error.stack });
+    logBackupOperation('update_settings', `更新自动备份设置异常：${error.message}`, {
+      targetName: '自动备份设置',
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({
       success: false,
       message: '更新自动备份设置失败',
@@ -765,12 +879,24 @@ router.post('/auto/execute', async (req, res) => {
     });
 
     if (result.success) {
+      await logBackupOperation('create', `手动触发立即备份：${description || '手动触发备份'}`, {
+        targetId: result.result?.filename,
+        targetName: result.result?.filename || description,
+        afterState: result.result,
+        req,
+        metadata: { trigger: 'manual', description, includeFiles, compress, backupType },
+      });
       res.json({
         success: true,
         message: '备份执行成功',
         data: result.result,
       });
     } else {
+      await logBackupOperation('create', `手动触发立即备份失败：${result.error}`, {
+        result: 'failed',
+        req,
+        metadata: { trigger: 'manual', error: result.error, description },
+      });
       res.status(500).json({
         success: false,
         message: result.error,
@@ -778,6 +904,11 @@ router.post('/auto/execute', async (req, res) => {
     }
   } catch (error) {
     logger.error('立即执行备份失败', { error: error.message, stack: error.stack });
+    await logBackupOperation('create', `手动触发立即备份异常：${error.message}`, {
+      result: 'failed',
+      req,
+      metadata: { trigger: 'manual', error: error.message },
+    });
     res.status(500).json({
       success: false,
       message: '立即执行备份失败',
@@ -878,6 +1009,14 @@ router.post('/remote/targets', (req, res) => {
 
     const target = addTarget(targetData);
 
+    logBackupOperation('create', `添加远端备份目标：${target.name}`, {
+      targetId: target.id,
+      targetName: target.name,
+      afterState: { name: target.name, protocol: target.protocol, host: target.host },
+      req,
+      metadata: { protocol: target.protocol, host: target.host },
+    });
+
     res.status(201).json({
       success: true,
       message: '远端备份目标已添加',
@@ -885,6 +1024,11 @@ router.post('/remote/targets', (req, res) => {
     });
   } catch (error) {
     logger.error('添加远端备份目标失败', { error: error.message, stack: error.stack });
+    logBackupOperation('create', `添加远端备份目标失败：${error.message}`, {
+      result: 'failed',
+      req,
+      metadata: { error: error.message, targetData: { name: req.body.name, protocol: req.body.protocol } },
+    });
     res.status(500).json({
       success: false,
       message: '添加远端备份目标失败',
@@ -899,6 +1043,14 @@ router.put('/remote/targets/:id', (req, res) => {
     const updates = req.body;
     const target = updateTarget(req.params.id, updates);
 
+    logBackupOperation('update', `更新远端备份目标：${target.name}`, {
+      targetId: target.id,
+      targetName: target.name,
+      afterState: updates,
+      req,
+      metadata: { updatedFields: Object.keys(updates) },
+    });
+
     res.json({
       success: true,
       message: '远端备份目标已更新',
@@ -906,6 +1058,12 @@ router.put('/remote/targets/:id', (req, res) => {
     });
   } catch (error) {
     logger.error('更新远端备份目标失败', { error: error.message, stack: error.stack });
+    logBackupOperation('update', `更新远端备份目标失败：${req.params.id}`, {
+      targetId: req.params.id,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({
       success: false,
       message: '更新远端备份目标失败',
@@ -926,12 +1084,23 @@ router.delete('/remote/targets/:id', (req, res) => {
       });
     }
 
+    logBackupOperation('delete', `删除远端备份目标：${req.params.id}`, {
+      targetId: req.params.id,
+      req,
+    });
+
     res.json({
       success: true,
       message: '远端备份目标已删除',
     });
   } catch (error) {
     logger.error('删除远端备份目标失败', { error: error.message, stack: error.stack });
+    logBackupOperation('delete', `删除远端备份目标失败：${req.params.id}`, {
+      targetId: req.params.id,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({
       success: false,
       message: '删除远端备份目标失败',
@@ -1145,8 +1314,29 @@ router.post('/remote/upload', async (req, res) => {
         results: uploadResults,
       },
     });
+
+    await logBackupOperation('upload', `手动上传备份到远端：${filename} → ${uploadResults.length} 个目标`, {
+      targetId: filename,
+      targetName: filename,
+      afterState: {
+        successCount: uploadResults.filter(r => r.success).length,
+        failCount: uploadResults.filter(r => !r.success).length,
+      },
+      req,
+      metadata: {
+        filename,
+        targets: uploadResults.map(r => ({ name: r.targetName, success: r.success })),
+      },
+    });
   } catch (error) {
     logger.error('手动上传备份失败', { error: error.message, stack: error.stack });
+    await logBackupOperation('upload', `手动上传备份到远端失败：${req.body.filename || '未知'}`, {
+      targetId: req.body.filename,
+      targetName: req.body.filename,
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
     res.status(500).json({
       success: false,
       message: '手动上传备份失败',
