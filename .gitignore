@@ -38,13 +38,15 @@ Thumbs.db
 # ==============================================
 # Logs (日志文件)
 # ==============================================
-logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+backend/logs/**/*.log
+backend/logs/**/fallback/
+backend/logs/**/.audit.json
 
 # ==============================================
 # Database files (数据库文件)
@@ -64,8 +66,13 @@ backend/backups/*
 # ==============================================
 # Uploads directory (用户上传文件)
 # ==============================================
-backend/uploads/*
+backend/uploads/**
 !backend/uploads/.gitkeep
+
+# ==============================================
+# Avatars directory (用户头像)
+# ==============================================
+backend/uploads/avatars/*
 
 # ==============================================
 # Temporary files (临时文件)
