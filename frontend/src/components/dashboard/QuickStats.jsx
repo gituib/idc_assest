@@ -67,6 +67,7 @@ const QuickStats = ({ onlineRate, powerUsage, totalMaxPower }) => {
         {quickStats.map((stat, index) => (
           <div 
             key={index} 
+            className="quick-stat-card"
             style={{
               background: '#fafafa',
               borderRadius: designTokens.borderRadius.large,
@@ -76,10 +77,6 @@ const QuickStats = ({ onlineRate, powerUsage, totalMaxPower }) => {
               overflow: 'hidden',
               transition: 'all 0.3s ease',
               cursor: 'pointer',
-              '&:hover': {
-                transform: 'translateY(-2px)',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
-              },
             }}
           >
             {/* 装饰性背景 */}
@@ -152,6 +149,14 @@ const QuickStats = ({ onlineRate, powerUsage, totalMaxPower }) => {
           </div>
         ))}
       </div>
+
+      {/* hover 样式：内联 style 不支持伪类，需通过 <style> 标签实现 */}
+      <style>{`
+        .quick-stat-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+        }
+      `}</style>
     </div>
   );
 };

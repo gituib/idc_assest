@@ -47,10 +47,10 @@ const SystemInfo = ({ onRefresh, isRefreshing }) => {
   const uptime = systemData?.system?.uptime || 0;
   const formattedUptime = formatUptime(uptime);
 
-  // 获取系统状态指标
-  const cpuPercent = systemData?.systemMetrics?.cpu?.percent || 45;
-  const memoryPercent = systemData?.systemMetrics?.memory?.percent || 68;
-  const diskPercent = systemData?.systemMetrics?.disk?.percent || 35;
+  // 获取系统状态指标：数据未加载时使用 null，避免显示伪造数据误导用户
+  const cpuPercent = systemData?.systemMetrics?.cpu?.percent ?? null;
+  const memoryPercent = systemData?.systemMetrics?.memory?.percent ?? null;
+  const diskPercent = systemData?.systemMetrics?.disk?.percent ?? null;
 
   const systemMetrics = [
     {
@@ -307,7 +307,12 @@ const SystemInfo = ({ onRefresh, isRefreshing }) => {
           </span>
         </div>
 
-        {systemMetrics.map((metric, index) => (
+        {systemMetrics.map((metric, index) => {
+          // 数据未加载时显示 "-"，进度条宽度为 0%
+          const hasValue = metric.value !== null && metric.value !== undefined;
+          const displayValue = hasValue ? `${metric.value}%` : '-';
+          const barWidth = hasValue ? `${metric.value}%` : '0%';
+          return (
           <div key={index} style={{ marginBottom: index === systemMetrics.length - 1 ? '0' : '8px' }}>
             <div style={{
               display: 'flex',
@@ -318,8 +323,8 @@ const SystemInfo = ({ onRefresh, isRefreshing }) => {
               <span style={{ fontSize: '0.72rem', color: designTokens.colors.text.secondary }}>
                 {metric.label}
               </span>
-              <span style={{ fontSize: '0.72rem', fontWeight: '600', color: metric.color }}>
-                {metric.value}%
+              <span style={{ fontSize: '0.72rem', fontWeight: '600', color: hasValue ? metric.color : designTokens.colors.text.tertiary }}>
+                {displayValue}
               </span>
             </div>
             <div style={{
@@ -330,14 +335,15 @@ const SystemInfo = ({ onRefresh, isRefreshing }) => {
             }}>
               <div style={{
                 height: '100%',
-                width: `${metric.value}%`,
+                width: barWidth,
                 background: `linear-gradient(90deg, ${metric.color} 0%, ${metric.color}cc 100%)`,
                 borderRadius: '3px',
                 transition: 'width 0.5s ease',
               }} />
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* 动画样式 */}

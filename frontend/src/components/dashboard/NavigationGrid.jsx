@@ -86,12 +86,15 @@ const NavigationGrid = ({ hoveredCard, onHover }) => {
   const secondRow = NAV_BUTTONS_DATA.slice(4, 8);
 
   const renderRow = (items) => (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(4, 1fr)',
-      gap: '10px',
-      marginBottom: '10px',
-    }}>
+    <div
+      className="nav-row"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '10px',
+        marginBottom: '10px',
+      }}
+    >
       {items.map(({ key, icon: Icon, text, color, description, path }) => {
         const isHovered = hoveredCard === `nav-${key}`;
         return (
@@ -236,7 +239,7 @@ const NavigationGrid = ({ hoveredCard, onHover }) => {
   );
 
   return (
-    <div>
+    <div className="nav-grid">
       {/* 区域标题 */}
       <div style={{
         display: 'flex',
@@ -314,21 +317,21 @@ const NavigationGrid = ({ hoveredCard, onHover }) => {
           .nav-button {
             padding: 12px 10px !important;
           }
-          .nav-grid > div > div {
+          .nav-row {
             grid-template-columns: repeat(2, 1fr) !important;
             gap: 8px !important;
           }
         }
         
         @media (max-width: 576px) {
-          .nav-grid > div > div {
+          .nav-row {
             grid-template-columns: repeat(2, 1fr) !important;
             gap: 8px !important;
           }
         }
         
         @media (max-width: 400px) {
-          .nav-grid > div > div {
+          .nav-row {
             grid-template-columns: repeat(2, 1fr) !important;
             gap: 6px !important;
           }
