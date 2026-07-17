@@ -1749,8 +1749,10 @@ function PortManagement() {
             // 无引导模式下「网络设备」大类 Tab：包含所有网络设备及自定义类型
             if (type !== 'switch' && type !== 'other') return false;
           } else {
-            // 引导模式下「交换机」子 Tab：仅展示交换机
-            if (type !== 'switch') return false;
+            // 引导模式下「交换机」子 Tab：仅展示真正的交换机，用原始 type 精确匹配
+            // 注意：不能用归一化后的 type === 'switch'，否则路由器/防火墙/存储也会被误纳入
+            const rawType = (d.type || '').toLowerCase();
+            if (!rawType.includes('switch')) return false;
           }
         } else {
           // 子类型过滤：router/firewall/storage 等，检查原始 type 字段
