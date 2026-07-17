@@ -28,58 +28,67 @@ const SHARED_GEOMETRIES = {
 };
 
 // 共享材质（按类型分类，避免重复创建相同材质）
+// 优化：升级为深黑拉丝金属质感，贴近真实服务器面板材质
 const SHARED_MATERIALS = {
-  // 机身材质 - 深灰色哑光金属
+  // 机身材质 - 深黑金属，高金属度+中等粗糙度模拟冷轧钢板
   chassis: new THREE.MeshStandardMaterial({
-    color: '#333333',
-    roughness: 0.9,
-    metalness: 0.3,
+    color: '#1a1a1a',
+    roughness: 0.45,
+    metalness: 0.85,
   }),
-  // 面板材质 - 灰色塑料
+  // 面板材质 - 深黑拉丝铝，metalness 高+roughness 中等
   panel: new THREE.MeshStandardMaterial({
-    color: '#555555',
-    roughness: 0.8,
-    metalness: 0.1,
+    color: '#2a2a2a',
+    roughness: 0.35,
+    metalness: 0.9,
   }),
-  // 面板高亮材质 - 悬停/选中时使用
+  // 面板高亮材质 - 悬停/选中时使用，略浅+发光
   panelHover: new THREE.MeshStandardMaterial({
-    color: '#666666',
-    roughness: 0.8,
-    metalness: 0.1,
+    color: '#3a3a3a',
+    roughness: 0.3,
+    metalness: 0.9,
+    emissive: '#1e40af',
+    emissiveIntensity: 0.08,
   }),
   // LED 灯材质
   led: new THREE.MeshBasicMaterial({
     toneMapped: false,
   }),
-  // 状态灯底座
+  // 状态灯底座 - 银色金属圈
   ledBase: new THREE.MeshStandardMaterial({
-    color: '#333333',
+    color: '#4a4a4a',
+    roughness: 0.3,
+    metalness: 0.9,
   }),
-  // 深色面板
+  // 深色面板 - 用于服务器主面板背景
   darkPanel: new THREE.MeshStandardMaterial({
-    color: '#1e293b',
-    roughness: 0.7,
-    metalness: 0.5,
+    color: '#0d0d0d',
+    roughness: 0.5,
+    metalness: 0.7,
   }),
-  // 硬盘托架
+  // 硬盘托架 - 深灰金属，略带反光
   driveBay: new THREE.MeshStandardMaterial({
-    color: '#334155',
-    roughness: 0.6,
-    metalness: 0.4,
+    color: '#1e293b',
+    roughness: 0.4,
+    metalness: 0.8,
   }),
-  // 装饰条
+  // 装饰条 - 黑色高光
   accent: new THREE.MeshStandardMaterial({
     color: '#000000',
-    roughness: 0.2,
+    roughness: 0.15,
+    metalness: 0.5,
   }),
-  // 金属细节
+  // 金属细节 - 银色铝合金
   metalDetail: new THREE.MeshStandardMaterial({
     color: '#cbd5e1',
+    roughness: 0.25,
+    metalness: 0.95,
   }),
   // 网口
   networkPort: new THREE.MeshStandardMaterial({
     color: '#1e293b',
     roughness: 0.3,
+    metalness: 0.6,
   }),
   // 网口发光
   networkLed: new THREE.MeshBasicMaterial({
@@ -175,13 +184,11 @@ const InstancedStatusLights = ({ count, positions, colors: statusColors, zOffset
     }
   }, [count, statusColors]);
 
-  // 资源清理
+  // 资源清理：geometry/material 为模块级共享资源（SHARED_INSTANCED_GEOMETRIES/MATERIALS），
+  // 生命周期由应用管理，组件卸载时不 dispose，避免影响其他仍在使用的实例
   useEffect(() => {
     return () => {
-      if (meshRef.current) {
-        meshRef.current.geometry?.dispose();
-        meshRef.current.material?.dispose();
-      }
+      // 仅清理 instanceColor 等实例级资源（若有），共享 geometry/material 不在此清理
     };
   }, []);
 
@@ -223,17 +230,10 @@ const InstancedDriveBays = ({ count, positions, color, hasDetail = true }) => {
     }
   }, [count, positions, hasDetail, dummy]);
 
-  // 资源清理
+  // 资源清理：共享资源不 dispose（见 InstancedStatusLights 注释）
   useEffect(() => {
     return () => {
-      if (meshRef.current) {
-        meshRef.current.geometry?.dispose();
-        meshRef.current.material?.dispose();
-      }
-      if (detailRef.current) {
-        detailRef.current.geometry?.dispose();
-        detailRef.current.material?.dispose();
-      }
+      // geometry/material 为模块级共享资源，不在此清理
     };
   }, []);
 
@@ -283,17 +283,10 @@ const InstancedStorageBays = ({ count, positions, color }) => {
     }
   }, [count, positions, dummy]);
 
-  // 资源清理
+  // 资源清理：共享资源不 dispose（见 InstancedStatusLights 注释）
   useEffect(() => {
     return () => {
-      if (meshRef.current) {
-        meshRef.current.geometry?.dispose();
-        meshRef.current.material?.dispose();
-      }
-      if (detailRef.current) {
-        detailRef.current.geometry?.dispose();
-        detailRef.current.material?.dispose();
-      }
+      // geometry/material 为模块级共享资源，不在此清理
     };
   }, []);
 
@@ -373,25 +366,10 @@ const InstancedRJ45Ports = ({ count, positions, statuses, frontZ }) => {
     );
   }, [statuses]);
 
-  // 资源清理
+  // 资源清理：共享资源不 dispose（见 InstancedStatusLights 注释）
   useEffect(() => {
     return () => {
-      if (meshRef.current) {
-        meshRef.current.geometry?.dispose();
-        meshRef.current.material?.dispose();
-      }
-      if (innerRef.current) {
-        innerRef.current.geometry?.dispose();
-        innerRef.current.material?.dispose();
-      }
-      if (tabRef.current) {
-        tabRef.current.geometry?.dispose();
-        tabRef.current.material?.dispose();
-      }
-      if (ledRef.current) {
-        ledRef.current.geometry?.dispose();
-        ledRef.current.material?.dispose();
-      }
+      // geometry/material 为模块级共享资源，不在此清理
     };
   }, []);
 
@@ -495,25 +473,10 @@ const InstancedSFPports = ({ count, positions, statuses, frontZ }) => {
     }
   }, [count, statuses]);
 
-  // 资源清理
+  // 资源清理：共享资源不 dispose（见 InstancedStatusLights 注释）
   useEffect(() => {
     return () => {
-      if (meshRef.current) {
-        meshRef.current.geometry?.dispose();
-        meshRef.current.material?.dispose();
-      }
-      if (innerRef.current) {
-        innerRef.current.geometry?.dispose();
-        innerRef.current.material?.dispose();
-      }
-      if (connectorRef.current) {
-        connectorRef.current.geometry?.dispose();
-        connectorRef.current.material?.dispose();
-      }
-      if (ledRef.current) {
-        ledRef.current.geometry?.dispose();
-        ledRef.current.material?.dispose();
-      }
+      // geometry/material 为模块级共享资源，不在此清理
     };
   }, []);
 
@@ -561,7 +524,10 @@ const FirewallFace = ({ device, height, frontZ, isSelected }) => {
 
       <mesh position={[0, 0, frontZ + 0.0055]}>
         <boxGeometry args={[0.46, height - 0.004, 0.002]} />
-        <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.6} />
+        {/* 防火墙主面板 - 深灰带暖调
+            现实参考：Fortinet（深灰+红条）、Palo Alto（黑+蓝条）、深信服（黑+蓝条）
+            采用 #3a3030 深灰带红调，呼应左侧红色品牌色条，区别于交换机的冷蓝灰 */}
+        <meshStandardMaterial color="#3a3030" roughness={0.55} metalness={0.65} />
       </mesh>
 
       <group position={[-0.08, 0, frontZ + 0.007]}>
@@ -585,8 +551,19 @@ const FirewallFace = ({ device, height, frontZ, isSelected }) => {
               <meshBasicMaterial color="#1a202c" />
             </mesh>
           ))}
+        {/* 优化：移除 pointLight，改用半透明光晕 mesh 模拟橙色辉光
+            原 pointLight distance=0.2 影响范围 20cm，开销大于视觉收益 */}
         {!PERFORMANCE_MODE && (
-          <pointLight position={[0, 0, -0.01]} color="#f97316" intensity={0.8} distance={0.2} />
+          <mesh position={[0, 0, -0.005]} scale={[3, 3, 1]}>
+            <circleGeometry args={[0.008, 16]} />
+            <meshBasicMaterial
+              color="#f97316"
+              transparent
+              opacity={0.3}
+              toneMapped={false}
+              depthWrite={false}
+            />
+          </mesh>
         )}
       </group>
 
@@ -595,9 +572,19 @@ const FirewallFace = ({ device, height, frontZ, isSelected }) => {
           (color, i) => (
             <mesh key={i} position={[0, -i * 0.01, 0]}>
               <circleGeometry args={[0.002, 8]} />
-              <meshBasicMaterial color={color} />
+              <meshBasicMaterial color={color} toneMapped={false} />
+              {/* 优化：移除 pointLight，告警红色 LED 用半透明光晕 mesh 补偿 */}
               {i === 2 && device.status === 'error' && (
-                <pointLight color="#ef4444" intensity={1} distance={0.05} />
+                <mesh scale={[3, 3, 1]}>
+                  <circleGeometry args={[0.002, 8]} />
+                  <meshBasicMaterial
+                    color="#ef4444"
+                    transparent
+                    opacity={0.3}
+                    toneMapped={false}
+                    depthWrite={false}
+                  />
+                </mesh>
               )}
             </mesh>
           )
@@ -739,6 +726,7 @@ const DeviceModel = ({
   const statusColor = colors.status[device.status] || colors.status.running;
 
   // 渲染服务器前面板细节
+  // 增强：硬盘托架拉把、通风孔阵列、USB/VGA接口、品牌标签条
   const renderServerFace = () => {
     const is2U = height > 0.08;
     const driveRows = is2U ? 2 : 1;
@@ -758,44 +746,84 @@ const DeviceModel = ({
 
     return (
       <group>
-        {/* 服务器主面板 - 深蓝色 */}
+        {/* 服务器主面板 - 深灰金属拉丝质感
+            现实参考：Dell PowerEdge/HPE ProLiant 前面板为深灰金属（非纯黑）
+            采用 #2a2e35 深石墨灰，与机柜银灰框架形成层次，与黑色机箱区分 */}
         <mesh position={[0, 0, frontZ + 0.0055]}>
           <boxGeometry args={[0.44, height - 0.004, 0.002]} />
-          <meshStandardMaterial color="#1e293b" roughness={0.7} metalness={0.5} />
+          <meshStandardMaterial color="#2a2e35" roughness={0.5} metalness={0.75} />
         </mesh>
-        {/* 服务器左侧标识条 - 亮蓝色 */}
+        {/* 服务器左侧标识条 - 亮蓝色，模拟 Dell/华为厂商品牌色带 */}
         <mesh position={[-0.21, 0, frontZ + 0.006]}>
           <boxGeometry args={[0.015, height - 0.008, 0.003]} />
-          <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={0.2} />
+          <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={0.3} />
         </mesh>
+        {/* 品牌标签条 - 银色铝合金条，位于顶部 */}
+        <mesh position={[-0.1, height / 2 - 0.008, frontZ + 0.007]}>
+          <boxGeometry args={[0.08, 0.004, 0.001]} />
+          <meshStandardMaterial color="#cbd5e1" roughness={0.25} metalness={0.95} />
+        </mesh>
+        {/* 通风孔阵列 - 右侧用 InstancedMesh 模拟散热孔（深色小方块） */}
+        {!PERFORMANCE_MODE && (
+          <group position={[0.18, is2U ? 0.03 : 0.01, frontZ + 0.007]}>
+            {Array.from({ length: 3 }).map((_, row) =>
+              Array.from({ length: 6 }).map((_, col) => (
+                <mesh
+                  key={`vent-${row}-${col}`}
+                  position={[(col - 2.5) * 0.008, row * 0.003, 0]}
+                >
+                  <boxGeometry args={[0.006, 0.0015, 0.001]} />
+                  <meshStandardMaterial color="#000" roughness={0.6} />
+                </mesh>
+              ))
+            )}
+          </group>
+        )}
 
         <group position={[-0.18, 0, frontZ + 0.006]}>
+          {/* 控制面板底座 - 黑色高光 */}
           <mesh position={[-0.02, 0, 0]}>
             <boxGeometry args={[0.04, height - 0.01, 0.002]} />
-            <meshStandardMaterial color="#000000" roughness={0.2} />
+            <meshStandardMaterial color="#000" roughness={0.15} metalness={0.5} />
           </mesh>
+          {/* 电源按钮 - 银色金属圈 */}
           <group position={[-0.025, 0.01, 0.002]}>
             <mesh rotation={[Math.PI / 2, 0, 0]}>
               <cylinderGeometry args={[0.004, 0.004, 0.002, 16]} />
-              <meshStandardMaterial color="#cbd5e1" metalness={0.8} />
+              <meshStandardMaterial color="#cbd5e1" roughness={0.25} metalness={0.95} />
             </mesh>
-            {!PERFORMANCE_MODE && <pointLight color="#22c55e" intensity={0.5} distance={0.05} />}
+            {/* 电源 LED */}
             <mesh position={[0, 0, 0.0011]} rotation={[Math.PI / 2, 0, 0]}>
               <cylinderGeometry args={[0.002, 0.002, 0.001, 16]} />
-              <meshBasicMaterial color={device.status === 'offline' ? '#4b5563' : '#22c55e'} />
+              <meshBasicMaterial
+                color={device.status === 'offline' ? '#4b5563' : '#22c55e'}
+                toneMapped={false}
+              />
             </mesh>
           </group>
+          {/* 状态 LED - 蓝色心跳灯 */}
           <mesh position={[-0.015, 0.01, 0.002]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.002, 0.002, 0.002, 16]} />
-            <meshStandardMaterial color="#3b82f6" />
+            <meshBasicMaterial color="#3b82f6" toneMapped={false} />
           </mesh>
-          <mesh position={[-0.02, -0.01, 0.002]}>
-            <boxGeometry args={[0.006, 0.012, 0.002]} />
-            <meshStandardMaterial color="#475569" />
+          {/* USB 接口 - 2 个黑色矩形 */}
+          <mesh position={[-0.02, -0.005, 0.002]}>
+            <boxGeometry args={[0.012, 0.006, 0.002]} />
+            <meshStandardMaterial color="#1a1a1a" roughness={0.6} metalness={0.3} />
           </mesh>
-          <mesh position={[-0.02, -0.01, 0.001]}>
-            <boxGeometry args={[0.004, 0.01, 0.001]} />
-            <meshBasicMaterial color="#000" />
+          <mesh position={[-0.02, -0.013, 0.002]}>
+            <boxGeometry args={[0.012, 0.006, 0.002]} />
+            <meshStandardMaterial color="#1a1a1a" roughness={0.6} metalness={0.3} />
+          </mesh>
+          {/* VGA 接口 - 梯形深蓝色 */}
+          <mesh position={[-0.02, -0.02, 0.0015]}>
+            <boxGeometry args={[0.014, 0.008, 0.003]} />
+            <meshStandardMaterial color="#1e3a8a" roughness={0.4} metalness={0.3} />
+          </mesh>
+          {/* VGA 接口中心孔 */}
+          <mesh position={[-0.02, -0.02, 0.003]}>
+            <boxGeometry args={[0.01, 0.005, 0.001]} />
+            <meshStandardMaterial color="#000" />
           </mesh>
         </group>
 
@@ -803,16 +831,40 @@ const DeviceModel = ({
           <InstancedDriveBays
             count={drivePositions.length}
             positions={drivePositions}
-            color="#334155"
+            color="#1e293b"
             hasDetail={!PERFORMANCE_MODE}
           />
+          {/* 硬盘托架拉把 - 每个托架上方添加银色金属拉手 */}
+          {!PERFORMANCE_MODE &&
+            drivePositions.map((pos, i) => (
+              <mesh
+                key={`drive-handle-${i}`}
+                position={[pos.x, pos.y - 0.012, 0.003]}
+              >
+                <boxGeometry args={[0.05, 0.003, 0.002]} />
+                <meshStandardMaterial color="#94a3b8" roughness={0.2} metalness={0.95} />
+              </mesh>
+            ))}
+          {/* 硬盘活动指示灯 - 每个托架左下角小绿点 */}
+          {!PERFORMANCE_MODE &&
+            drivePositions.map((pos, i) => (
+              <mesh
+                key={`drive-led-${i}`}
+                position={[pos.x - 0.025, pos.y - 0.012, 0.004]}
+              >
+                <circleGeometry args={[0.001, 8]} />
+                <meshBasicMaterial color="#22c55e" toneMapped={false} />
+              </mesh>
+            ))}
         </group>
 
         <group position={[0.2, 0, frontZ + 0.006]}>
+          {/* 重置按钮 - 银色小圆点 */}
           <mesh position={[0, 0, 0.002]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.005, 0.005, 0.002, 6]} />
-            <meshStandardMaterial color="#3b82f6" />
+            <meshStandardMaterial color="#3b82f6" roughness={0.3} metalness={0.8} />
           </mesh>
+          {/* 标签插槽 - 黑色凹槽 */}
           <mesh position={[0, 0, 0.003]}>
             <boxGeometry args={[0.012, 0.006, 0.001]} />
             <meshBasicMaterial color="#000" />
@@ -823,6 +875,7 @@ const DeviceModel = ({
   };
 
   // 渲染存储设备前面板细节
+  // 增强：硬盘托架拉把、阵列指示灯、品牌标签
   const renderStorageFace = () => {
     const rows = PERFORMANCE_MODE ? 2 : 3;
     const cols = PERFORMANCE_MODE ? 2 : 4;
@@ -841,23 +894,64 @@ const DeviceModel = ({
 
     return (
       <group>
-        {/* 存储设备主面板 - 深紫色 */}
+        {/* 存储设备主面板 - 深灰金属质感
+            现实参考：Dell EMC/NetApp/华为 OceanStor 前面板为深灰金属
+            采用 #2a2a2e 深炭灰，略偏冷，与服务器形成细微差异 */}
         <mesh position={[0, 0, frontZ + 0.0055]}>
           <boxGeometry args={[0.44, height - 0.004, 0.002]} />
-          <meshStandardMaterial color="#0f172a" roughness={0.8} />
+          <meshStandardMaterial color="#2a2a2e" roughness={0.45} metalness={0.8} />
         </mesh>
-        {/* 存储设备左侧标识条 - 紫色 */}
+        {/* 存储设备左侧标识条 - 紫色，存储品牌色 */}
         <mesh position={[-0.21, 0, frontZ + 0.006]}>
           <boxGeometry args={[0.015, height - 0.008, 0.003]} />
-          <meshStandardMaterial color="#8b5cf6" emissive="#8b5cf6" emissiveIntensity={0.2} />
+          <meshStandardMaterial color="#8b5cf6" emissive="#8b5cf6" emissiveIntensity={0.3} />
         </mesh>
+        {/* 品牌标签条 - 银色铝合金 */}
+        <mesh position={[-0.1, height / 2 - 0.006, frontZ + 0.007]}>
+          <boxGeometry args={[0.08, 0.003, 0.001]} />
+          <meshStandardMaterial color="#cbd5e1" roughness={0.25} metalness={0.95} />
+        </mesh>
+        {/* 阵列状态指示灯排 - 4 个小 LED，位于顶部右侧 */}
+        <group position={[0.15, height / 2 - 0.006, frontZ + 0.007]}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <mesh key={`array-led-${i}`} position={[i * 0.005, 0, 0]}>
+              <circleGeometry args={[0.0012, 8]} />
+              <meshBasicMaterial
+                color={i === 0 ? '#22c55e' : i === 1 ? '#3b82f6' : '#4b5563'}
+                toneMapped={false}
+              />
+            </mesh>
+          ))}
+        </group>
 
         <group position={[0, 0, frontZ + 0.008]}>
           <InstancedStorageBays
             count={bayPositions.length}
             positions={bayPositions}
-            color="#334155"
+            color="#1e293b"
           />
+          {/* 硬盘托架拉把 - 每个托架中间添加银色金属拉手 */}
+          {!PERFORMANCE_MODE &&
+            bayPositions.map((pos, i) => (
+              <mesh
+                key={`storage-handle-${i}`}
+                position={[pos.x, pos.y, 0.003]}
+              >
+                <boxGeometry args={[0.06, 0.003, 0.002]} />
+                <meshStandardMaterial color="#94a3b8" roughness={0.2} metalness={0.95} />
+              </mesh>
+            ))}
+          {/* 硬盘活动指示灯 - 每个托架左下角 */}
+          {!PERFORMANCE_MODE &&
+            bayPositions.map((pos, i) => (
+              <mesh
+                key={`storage-led-${i}`}
+                position={[pos.x - 0.04, pos.y - 0.008, 0.004]}
+              >
+                <circleGeometry args={[0.001, 8]} />
+                <meshBasicMaterial color="#22c55e" toneMapped={false} />
+              </mesh>
+            ))}
         </group>
       </group>
     );
@@ -907,47 +1001,79 @@ const DeviceModel = ({
 
     return (
       <group>
-        {/* 交换机主面板 - 深绿色背景突出显示 */}
+        {/* 交换机主面板 - 中灰偏蓝金属质感
+            现实参考：Cisco Catalyst（深蓝黑）、华为 CloudEngine（深灰）、H3C（浅灰）
+            采用 #3a4250 中灰偏蓝，是所有设备中最浅的，便于与服务器/存储区分
+            网络设备通常为银灰/蓝灰金属，明度高于服务器 */}
         <mesh position={[0, 0, frontZ + 0.0055]}>
           <boxGeometry args={[0.44, height - 0.004, 0.002]} />
-          <meshStandardMaterial color="#064e3b" roughness={0.5} metalness={0.5} />
+          <meshStandardMaterial color="#3a4250" roughness={0.4} metalness={0.8} />
         </mesh>
-        {/* 交换机左侧标识条 - 亮绿色 */}
+        {/* 交换机左侧标识条 - 亮绿色，交换机品牌色 */}
         <mesh position={[-0.21, 0, frontZ + 0.006]}>
           <boxGeometry args={[0.015, height - 0.008, 0.003]} />
-          <meshStandardMaterial color="#10b981" emissive="#10b981" emissiveIntensity={0.2} />
+          <meshStandardMaterial color="#10b981" emissive="#10b981" emissiveIntensity={0.3} />
+        </mesh>
+        {/* 品牌标签条 - 银色铝合金 */}
+        <mesh position={[-0.1, height / 2 - 0.006, frontZ + 0.007]}>
+          <boxGeometry args={[0.08, 0.003, 0.001]} />
+          <meshStandardMaterial color="#cbd5e1" roughness={0.25} metalness={0.95} />
+        </mesh>
+        {/* 端口标签条 - 银色横条，用于刻印端口号 */}
+        <mesh position={[0.05, height / 2 - 0.006, frontZ + 0.007]}>
+          <boxGeometry args={[0.25, 0.002, 0.001]} />
+          <meshStandardMaterial color="#94a3b8" roughness={0.3} metalness={0.9} />
         </mesh>
         {/* 交换机类型标识 */}
         <mesh position={[-0.19, height / 2 - 0.015, frontZ + 0.007]}>
           <boxGeometry args={[0.025, 0.012, 0.002]} />
-          <meshStandardMaterial color="#065f46" />
+          <meshStandardMaterial color="#065f46" roughness={0.3} metalness={0.7} />
         </mesh>
 
         <group position={[-0.19, 0, frontZ + 0.006]}>
+          {/* 控制面板 - 深黑金属 */}
           <mesh position={[0, 0, 0]}>
             <boxGeometry args={[0.05, height - 0.015, 0.002]} />
-            <meshStandardMaterial color="#1e293b" />
+            <meshStandardMaterial color="#0d0d0d" roughness={0.4} metalness={0.7} />
           </mesh>
+          {/* LED 显示屏 - 银色边框 */}
           <mesh position={[-0.015, 0.005, 0.002]}>
             <boxGeometry args={[0.012, 0.01, 0.002]} />
-            <meshStandardMaterial color="#94a3b8" />
+            <meshStandardMaterial color="#94a3b8" roughness={0.2} metalness={0.95} />
           </mesh>
+          {/* 显示屏内容 - 蓝色发光 */}
+          <mesh position={[-0.015, 0.005, 0.003]}>
+            <boxGeometry args={[0.01, 0.008, 0.001]} />
+            <meshBasicMaterial color="#3b82f6" toneMapped={false} />
+          </mesh>
+          {/* 状态指示灯 - 银色金属圈 */}
           <mesh position={[-0.015, 0.012, 0.002]}>
             <boxGeometry args={[0.012, 0.002, 0.001]} />
-            <meshBasicMaterial color="#3b82f6" />
+            <meshBasicMaterial color="#3b82f6" toneMapped={false} />
           </mesh>
 
+          {/* Console 接口 - 银色 */}
           <mesh position={[0.015, 0.005, 0.002]}>
             <boxGeometry args={[0.008, 0.012, 0.002]} />
-            <meshStandardMaterial color="#cbd5e1" />
+            <meshStandardMaterial color="#cbd5e1" roughness={0.25} metalness={0.95} />
           </mesh>
 
+          {/* SYS/PWR 状态 LED 阵列 - 增强为带标签的指示灯组 */}
           <group position={[0, -0.01, 0.002]}>
             {['SYS', 'PWR'].map((label, idx) => (
               <group key={label} position={[(idx - 0.5) * 0.02, 0, 0]}>
-                <mesh>
+                {/* LED 底座 - 银色金属圈 */}
+                <mesh position={[0, 0, 0]}>
+                  <circleGeometry args={[0.002, 16]} />
+                  <meshStandardMaterial color="#4a4a4a" roughness={0.3} metalness={0.9} />
+                </mesh>
+                {/* LED 发光体 */}
+                <mesh position={[0, 0, 0.001]}>
                   <circleGeometry args={[0.0015, 8]} />
-                  <meshBasicMaterial color="#22c55e" />
+                  <meshBasicMaterial
+                    color={idx === 0 ? '#22c55e' : '#3b82f6'}
+                    toneMapped={false}
+                  />
                 </mesh>
               </group>
             ))}
@@ -976,47 +1102,67 @@ const DeviceModel = ({
   };
 
   // 渲染完整版背板（包含 PSU、风扇、网卡等细节）
+  // 增强：PSU 拉把、风扇网格纹理、网卡接口细节、品牌标签
   // 用 useCallback 包装，确保依赖变化时才重建函数
   const renderFullBackPanel = useCallback(backZ => {
     return (
       <group position={[0, 0, backZ]} rotation={[0, Math.PI, 0]}>
-        {/* 基础背板 - 透明玻璃质感 */}
+        {/* 基础背板 - 深黑金属，半透明 */}
         <mesh position={[0, 0, 0.001]}>
           <boxGeometry args={[chassisWidth, height - gap, 0.002]} />
           <meshStandardMaterial
-            color="#94a3b8"
+            color="#1a1a1a"
             transparent
-            opacity={0.3}
-            roughness={0.2}
+            opacity={0.4}
+            roughness={0.4}
             metalness={0.8}
           />
         </mesh>
+        {/* 背板品牌标签 - 银色铝合金 */}
+        <mesh position={[0, height / 2 - 0.006, 0.003]}>
+          <boxGeometry args={[0.1, 0.003, 0.001]} />
+          <meshStandardMaterial color="#cbd5e1" roughness={0.25} metalness={0.95} />
+        </mesh>
 
-        {/* 电源模块 (PSU) - 左侧 */}
+        {/* 电源模块 (PSU) - 左侧，带拉把和细节 */}
         <group position={[0.25, 0, 0.002]}>
           {[-0.02, 0.02].map((yOffset, i) => (
             <group key={i} position={[0, height > 0.15 ? yOffset * 2 : 0, 0]}>
               {(height > 0.15 || i === 0) && (
                 <group position={[i === 1 && height <= 0.15 ? -0.06 : 0, 0, 0]}>
-                  {/* PSU 面板 */}
+                  {/* PSU 面板 - 银色金属 */}
                   <mesh>
                     <boxGeometry args={[0.05, height > 0.15 ? 0.04 : 0.08, 0.004]} />
-                    <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.4} />
+                    <meshStandardMaterial color="#94a3b8" roughness={0.25} metalness={0.95} />
                   </mesh>
-                  {/* 把手 */}
+                  {/* PSU 拉把 - 黑色，带凹槽 */}
                   <mesh position={[0, 0, 0.004]}>
-                    <boxGeometry args={[0.01, 0.02, 0.004]} />
-                    <meshStandardMaterial color="#000000" />
+                    <boxGeometry args={[0.012, 0.022, 0.004]} />
+                    <meshStandardMaterial color="#000" roughness={0.3} metalness={0.4} />
                   </mesh>
-                  {/* 电源插口 */}
+                  {/* 拉把凹槽 */}
+                  <mesh position={[0, 0, 0.006]}>
+                    <boxGeometry args={[0.008, 0.018, 0.001]} />
+                    <meshStandardMaterial color="#1a1a1a" roughness={0.6} />
+                  </mesh>
+                  {/* 电源插口 - 深色 IEC C14 接口 */}
                   <mesh position={[0.015, 0, 0.002]}>
                     <boxGeometry args={[0.012, 0.01, 0.002]} />
-                    <meshStandardMaterial color="#1a202c" />
+                    <meshStandardMaterial color="#1a1a1a" roughness={0.5} metalness={0.3} />
                   </mesh>
-                  {/* 状态灯 */}
-                  <mesh position={[-0.015, 0.01, 0.002]}>
+                  {/* 电源插口孔位 */}
+                  <mesh position={[0.017, 0.002, 0.003]}>
+                    <boxGeometry args={[0.004, 0.004, 0.001]} />
+                    <meshStandardMaterial color="#000" />
+                  </mesh>
+                  <mesh position={[0.017, -0.002, 0.003]}>
+                    <boxGeometry args={[0.004, 0.004, 0.001]} />
+                    <meshStandardMaterial color="#000" />
+                  </mesh>
+                  {/* PSU 状态灯 - 绿色 */}
+                  <mesh position={[-0.015, 0.012, 0.002]}>
                     <circleGeometry args={[0.002, 8]} />
-                    <meshBasicMaterial color="#22c55e" />
+                    <meshBasicMaterial color="#22c55e" toneMapped={false} />
                   </mesh>
                 </group>
               )}
@@ -1024,45 +1170,69 @@ const DeviceModel = ({
           ))}
         </group>
 
-        {/* 风扇模块 (Fan Modules) - 中间 */}
+        {/* 风扇模块 (Fan Modules) - 中间，带网格纹理和拉把 */}
         <group position={[0, 0, 0.002]}>
           {Array.from({ length: 3 }).map((_, i) => (
             <group key={i} position={[-0.1 + i * 0.1, 0, 0]}>
-              {/* 风扇网罩 */}
+              {/* 风扇网罩 - 深黑金属 */}
               <mesh>
                 <boxGeometry args={[0.08, height - 0.03, 0.001]} />
-                <meshStandardMaterial color="#1e293b" />
+                <meshStandardMaterial color="#0d0d0d" roughness={0.4} metalness={0.7} />
               </mesh>
-              {/* 风扇叶片 */}
+              {/* 风扇叶片 - 深灰，带中心轴 */}
               <mesh position={[0, 0, 0.001]}>
-                <circleGeometry args={[Math.min(0.035, (height - 0.03) / 2), 8]} />
-                <meshBasicMaterial color="#334155" />
+                <circleGeometry args={[Math.min(0.035, (height - 0.03) / 2), 16]} />
+                <meshStandardMaterial color="#334155" roughness={0.5} metalness={0.6} />
               </mesh>
-              {/* 红色拉手 */}
-              <mesh position={[0, -0.01, 0.003]}>
-                <boxGeometry args={[0.01, 0.02, 0.002]} />
-                <meshStandardMaterial color="#ef4444" />
+              {/* 风扇中心轴 - 银色 */}
+              <mesh position={[0, 0, 0.002]}>
+                <circleGeometry args={[0.005, 16]} />
+                <meshStandardMaterial color="#cbd5e1" roughness={0.25} metalness={0.95} />
+              </mesh>
+              {/* 风扇网格线 - 4 条横线模拟网罩 */}
+              {[-0.012, -0.004, 0.004, 0.012].map(y => (
+                <mesh key={`fan-line-${i}-${y}`} position={[0, y, 0.0015]}>
+                  <boxGeometry args={[0.07, 0.0005, 0.0005]} />
+                  <meshStandardMaterial color="#1a1a1a" roughness={0.5} metalness={0.4} />
+                </mesh>
+              ))}
+              {/* 红色拉把 - 用于抽拉风扇模块 */}
+              <mesh position={[0, -0.015, 0.003]}>
+                <boxGeometry args={[0.012, 0.004, 0.002]} />
+                <meshStandardMaterial color="#ef4444" roughness={0.3} metalness={0.4} />
               </mesh>
             </group>
           ))}
         </group>
 
-        {/* 网卡/扩展模块 (PCIe/LOM) - 右侧 */}
+        {/* 网卡/扩展模块 (PCIe/LOM) - 右侧，带接口细节 */}
         <group position={[-0.25, 0, 0.002]}>
           {Array.from({ length: 2 }).map((_, i) => (
             <group key={i} position={[i * 0.08, 0, 0]}>
+              {/* 网卡挡板 - 银色铝合金 */}
               <mesh>
                 <boxGeometry args={[0.02, height - 0.02, 0.001]} />
-                <meshStandardMaterial color="#cbd5e1" metalness={0.9} />
+                <meshStandardMaterial color="#cbd5e1" roughness={0.25} metalness={0.95} />
               </mesh>
-              {/* 端口 */}
+              {/* 上端口 - 黑色 RJ45 */}
               <mesh position={[0, 0.01, 0.002]}>
                 <boxGeometry args={[0.012, 0.012, 0.002]} />
-                <meshStandardMaterial color="#000000" />
+                <meshStandardMaterial color="#0d0d0d" roughness={0.5} metalness={0.3} />
               </mesh>
+              {/* 上端口 LED */}
+              <mesh position={[0.006, 0.014, 0.003]}>
+                <boxGeometry args={[0.002, 0.002, 0.001]} />
+                <meshBasicMaterial color="#22c55e" toneMapped={false} />
+              </mesh>
+              {/* 下端口 - 黑色 RJ45 */}
               <mesh position={[0, -0.01, 0.002]}>
                 <boxGeometry args={[0.012, 0.012, 0.002]} />
-                <meshStandardMaterial color="#000000" />
+                <meshStandardMaterial color="#0d0d0d" roughness={0.5} metalness={0.3} />
+              </mesh>
+              {/* 下端口 LED */}
+              <mesh position={[0.006, -0.006, 0.003]}>
+                <boxGeometry args={[0.002, 0.002, 0.001]} />
+                <meshBasicMaterial color="#3b82f6" toneMapped={false} />
               </mesh>
             </group>
           ))}
@@ -1096,15 +1266,17 @@ const DeviceModel = ({
     // 默认通用设备样式
     return (
       <group>
-        {/* 默认面板纹理 */}
+        {/* 默认面板 - 中性灰金属质感
+            用于路由器等未明确分类的设备
+            现实参考：Cisco ISR/华为 AR 路由器多为银灰/深灰金属 */}
         <mesh position={[0, 0, frontZ + 0.0055]}>
           <boxGeometry args={[0.44, height - 0.004, 0.002]} />
-          <meshStandardMaterial color="#374151" roughness={0.6} metalness={0.4} />
+          <meshStandardMaterial color="#3a4250" roughness={0.5} metalness={0.75} />
         </mesh>
-        {/* 左侧灰色标识条 */}
+        {/* 左侧橙色标识条 - 路由器品牌色 */}
         <mesh position={[-0.21, 0, frontZ + 0.006]}>
           <boxGeometry args={[0.015, height - 0.008, 0.003]} />
-          <meshStandardMaterial color="#6b7280" emissive="#6b7280" emissiveIntensity={0.1} />
+          <meshStandardMaterial color="#f59e0b" emissive="#f59e0b" emissiveIntensity={0.3} />
         </mesh>
         {/* 装饰线 */}
         <mesh position={[0, 0, frontZ + 0.007]}>
@@ -1169,21 +1341,53 @@ const DeviceModel = ({
           scale={[panelWidth, height - gap, panelDepth]}
         />
 
-        {/* 告警时的红色辉光 (设备两侧) */}
+        {/* 设备上下银色边框条 - 模拟机箱拉手/前面板边框
+            作用：相邻深黑设备之间形成明显银色分隔条，解决"整块黑色"辨识度问题
+            位置：紧贴面板上下边缘，z 完全在前面板底座之前
+            修复 Z-fighting：原 z 中心 frontZ+0.0005 厚度 0.003，后表面 0.479 与前面板前表面 0.48 重叠
+            现 z 中心 frontZ+0.002 厚度 0.002，z 范围 0.481-0.483 完全在前面板前，间隙 0.001
+            相邻设备的两条边框相接后形成约 4mm 厚银色分隔条 */}
+        <mesh
+          position={[0, (height - gap) / 2, frontZ + 0.002]}
+          geometry={SHARED_GEOMETRIES.box}
+          material={SHARED_MATERIALS.metalDetail}
+          scale={[panelWidth, 0.002, 0.002]}
+        />
+        <mesh
+          position={[0, -(height - gap) / 2, frontZ + 0.002]}
+          geometry={SHARED_GEOMETRIES.box}
+          material={SHARED_MATERIALS.metalDetail}
+          scale={[panelWidth, 0.002, 0.002]}
+        />
+
+        {/* 告警时的红色辉光 (设备两侧)
+            优化：移除 2 个 pointLight，改用半透明红色 mesh 模拟辉光
+            原 pointLight distance=0.3 影响范围约 30cm，会照亮相邻机柜片元开销大
+            emissive mesh 视觉等效且无光源计算开销 */}
         {(device.status === 'error' || device.status === 'fault') && (
           <>
-            <pointLight
-              position={[-0.4, 0, frontZ]}
-              color="#ff0000"
-              intensity={0.8}
-              distance={0.3}
-            />
-            <pointLight
-              position={[0.4, 0, frontZ]}
-              color="#ff0000"
-              intensity={0.8}
-              distance={0.3}
-            />
+            <mesh position={[-chassisWidth / 2 - 0.005, 0, frontZ]}>
+              <planeGeometry args={[0.01, height - gap]} />
+              <meshBasicMaterial
+                color="#ff0000"
+                transparent
+                opacity={0.6}
+                toneMapped={false}
+                side={THREE.DoubleSide}
+                depthWrite={false}
+              />
+            </mesh>
+            <mesh position={[chassisWidth / 2 + 0.005, 0, frontZ]}>
+              <planeGeometry args={[0.01, height - gap]} />
+              <meshBasicMaterial
+                color="#ff0000"
+                transparent
+                opacity={0.6}
+                toneMapped={false}
+                side={THREE.DoubleSide}
+                depthWrite={false}
+              />
+            </mesh>
           </>
         )}
 
@@ -1222,11 +1426,21 @@ const DeviceModel = ({
         />
         {/* 发光体 - 需要动态颜色，使用克隆材质 */}
         <mesh>
-          <circleGeometry args={[0.006, 16]} />
+          <circleGeometry args={[0.008, 16]} />
           <meshBasicMaterial color={statusColor} toneMapped={false} />
         </mesh>
-        {/* 光晕效果 */}
-        <pointLight color={statusColor} intensity={0.5} distance={0.1} />
+        {/* 光晕补偿：移除 pointLight 后用半透明 mesh 模拟光晕扩散
+            原 pointLight distance=0.1 的影响范围极小，光晕 mesh 视觉等效 */}
+        <mesh scale={[2.5, 2.5, 1]}>
+          <circleGeometry args={[0.008, 16]} />
+          <meshBasicMaterial
+            color={statusColor}
+            transparent
+            opacity={0.25}
+            toneMapped={false}
+            depthWrite={false}
+          />
+        </mesh>
       </group>
     </group>
   );
@@ -1239,24 +1453,39 @@ const DeviceModelMemo = React.memo(DeviceModel, (prevProps, nextProps) => {
   if (prevProps.device?.id !== nextProps.device?.id) return false;
   if (prevProps.device?.deviceId !== nextProps.device?.deviceId) return false;
 
+  // 比较设备类型（修复：原比较遗漏 type，设备类型变更时不重渲染导致前面板显示错误）
+  if (prevProps.device?.type !== nextProps.device?.type) return false;
+
   // 比较选中状态
   if (prevProps.isSelected !== nextProps.isSelected) return false;
 
   // 比较滑出动画开关
   if (prevProps.slideEnabled !== nextProps.slideEnabled) return false;
 
-  // 比较位置（使用 JSON.stringify 简单比较）
-  if (JSON.stringify(prevProps.position) !== JSON.stringify(nextProps.position)) return false;
+  // 比较位置（修复：原使用 JSON.stringify 性能差，改为逐元素比较）
+  const prevPos = prevProps.position;
+  const nextPos = nextProps.position;
+  if (prevPos !== nextPos) {
+    if (
+      !prevPos ||
+      !nextPos ||
+      prevPos[0] !== nextPos[0] ||
+      prevPos[1] !== nextPos[1] ||
+      prevPos[2] !== nextPos[2]
+    ) {
+      return false;
+    }
+  }
 
   // 比较机柜相关属性
   if (prevProps.rackHeight !== nextProps.rackHeight) return false;
   if (prevProps.rackDepth !== nextProps.rackDepth) return false;
   if (prevProps.uHeight !== nextProps.uHeight) return false;
 
-  // 修复：比较设备状态，确保状态变化时正确重渲染
+  // 比较设备状态，确保状态变化时正确重渲染
   if (prevProps.device?.status !== nextProps.device?.status) return false;
 
-  // 修复：比较连接线，确保端口状态变化时正确重渲染
+  // 比较连接线，确保端口状态变化时正确重渲染
   const prevCables = prevProps.device?.cables;
   const nextCables = nextProps.device?.cables;
   if (Array.isArray(prevCables) && Array.isArray(nextCables)) {

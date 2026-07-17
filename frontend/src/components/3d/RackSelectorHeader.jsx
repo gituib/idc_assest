@@ -7,8 +7,10 @@ import {
   EyeOutlined,
   SettingOutlined,
   FullscreenOutlined,
+  FullscreenExitOutlined,
   MenuOutlined,
   SwapOutlined,
+  DesktopOutlined,
 } from '@ant-design/icons';
 import CascadingRackPanel from './CascadingRackPanel';
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
@@ -48,6 +50,8 @@ const RackSelectorHeader = ({
   onResetView,
   onOpenConfig,
   onBack,
+  isFullscreen = false,
+  onToggleFullscreen,
 }) => {
   const [selectorVisible, setSelectorVisible] = useState(false);
   const selectorRef = useRef(null);
@@ -382,7 +386,7 @@ const RackSelectorHeader = ({
           height: 36,
         }}
       >
-        <FullscreenOutlined
+        <DesktopOutlined
           style={{
             color: deviceSlideEnabled ? '#1E40AF' : '#94A3B8',
             fontSize: 14,
@@ -430,11 +434,60 @@ const RackSelectorHeader = ({
     );
   };
 
+  /**
+   * 渲染全屏切换按钮
+   * 使用浏览器原生 Fullscreen API，将 3D 场景容器进入全屏
+   * 全屏后 Canvas 自动铺满屏幕，机柜视觉上更大更清晰
+   */
+  const renderFullscreenButton = () => {
+    if (!onToggleFullscreen) return null;
+    const tooltipTitle = isFullscreen ? '退出全屏' : '全屏查看';
+    const icon = isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />;
+
+    // 折叠模式下用图标按钮
+    if (config.collapseActions) {
+      return (
+        <Tooltip title={tooltipTitle} placement="bottom">
+          <Button
+            type="text"
+            icon={icon}
+            onClick={onToggleFullscreen}
+            className="header-icon-btn"
+            style={{ borderRadius: 8, color: '#1E3A8A' }}
+          />
+        </Tooltip>
+      );
+    }
+
+    return (
+      <Tooltip title={tooltipTitle} placement="bottom">
+        <Button
+          type="default"
+          icon={icon}
+          onClick={onToggleFullscreen}
+          className="header-action-btn"
+          style={{
+            borderRadius: 8,
+            borderColor: 'rgba(30, 58, 138, 0.15)',
+            color: '#1E3A8A',
+            background: 'rgba(255, 255, 255, 0.7)',
+            height: 36,
+            padding: '0 12px',
+            fontWeight: 500,
+          }}
+        >
+          {!isMobile && !config.buttonIconOnly && (isFullscreen ? '退出全屏' : '全屏')}
+        </Button>
+      </Tooltip>
+    );
+  };
+
   const renderRightSection = () => {
     if (config.collapseActions) {
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {renderDeviceSlideToggle()}
+          {renderFullscreenButton()}
           <Dropdown menu={{ items: dropdownMenuItems }} trigger={['click']} placement="bottomRight">
             <Button
               type="text"
@@ -458,6 +511,7 @@ const RackSelectorHeader = ({
       >
         {renderDeviceSlideToggle()}
         {ACTION_BUTTONS_CONFIG.map(renderActionButton)}
+        {renderFullscreenButton()}
       </div>
     );
   };

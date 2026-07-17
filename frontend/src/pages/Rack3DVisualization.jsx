@@ -52,6 +52,35 @@ const Rack3DVisualization = () => {
   // Scene 组件的 ref，用于调用重置视角方法
   const sceneRef = useRef(null);
 
+  // 3D 场景容器 ref，用于全屏 API
+  const sceneContainerRef = useRef(null);
+  // 全屏状态：用于切换按钮图标和文案
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // 切换全屏：使用浏览器原生 Fullscreen API
+  // 全屏后 Canvas 自动铺满屏幕，相机视角不变但显示尺寸变大，机柜视觉上更大更清晰
+  const handleToggleFullscreen = useCallback(() => {
+    if (!sceneContainerRef.current) return;
+    if (!document.fullscreenElement) {
+      sceneContainerRef.current.requestFullscreen?.().catch(err => {
+        message.error(`无法进入全屏: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen?.();
+    }
+  }, []);
+
+  // 监听全屏状态变化（用户也可能按 ESC 退出全屏）
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
   // 使用 Zustand Store 管理3D场景状态
   const {
     devices,
@@ -544,9 +573,14 @@ const Rack3DVisualization = () => {
         onResetView={handleResetView}
         onOpenConfig={handleOpenConfig}
         onBack={handleBack}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={handleToggleFullscreen}
       />
 
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <div
+        ref={sceneContainerRef}
+        style={{ flex: 1, overflow: 'hidden', position: 'relative' }}
+      >
         <Content
           style={{
             position: 'absolute',
@@ -1016,6 +1050,39 @@ const Rack3DVisualization = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* 全屏操作提示浮层 - 仅全屏时显示，告知用户可用中键平移查看底部 U 位 */}
+              {isFullscreen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 20,
+                    left: 20,
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(30, 58, 138, 0.08)',
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    boxShadow: '0 4px 20px rgba(15, 23, 42, 0.08)',
+                    zIndex: 20,
+                    fontSize: 12,
+                    color: '#475569',
+                    lineHeight: 1.8,
+                    pointerEvents: 'none',
+                    maxWidth: 240,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: '#1E3A8A', marginBottom: 4 }}>
+                    操作提示
+                  </div>
+                  <div>左键：旋转视角</div>
+                  <div>中键：拖拽平移（查看底部 U 位）</div>
+                  <div>右键：缩放</div>
+                  <div style={{ marginTop: 4, color: '#94A3B8', fontSize: 11 }}>
+                    按 ESC 退出全屏
+                  </div>
                 </div>
               )}
 

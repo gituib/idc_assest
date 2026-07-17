@@ -1,6 +1,6 @@
 {
   "name": "idc-backend",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "IDC设备管理系统后端",
   "scripts": {
     "start": "node server.js",

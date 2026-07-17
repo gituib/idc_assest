@@ -79,11 +79,16 @@ const Controls = ({ rack, onControlsReady, modalsOpen = false }) => {
   const targetArray = useMemo(() => [target.x, target.y, target.z], [target]);
 
   // 稳定 mouseButtons/touches 引用，避免每次渲染创建新对象导致 OrbitControls 重绑事件
+  // 鼠标按键映射（THREE.MOUSE 常量：0=ROTATE 旋转, 1=DOLLY 缩放, 2=PAN 平移）
+  // 优化：中键改为平移，解决放大后底部 U 位超出视野无法查看的问题
+  //   - 左键：旋转视角（最常用操作）
+  //   - 中键：平移视图（拖拽查看机柜上下细节，如底部 U 位）
+  //   - 右键：缩放（替代原中键缩放，保留缩放能力）
   const mouseButtons = useMemo(
     () => ({
       LEFT: 0, // 左键旋转
-      MIDDLE: 1, // 中键缩放
-      RIGHT: 2, // 右键平移
+      MIDDLE: 2, // 中键平移（拖拽查看底部 U 位等细节）
+      RIGHT: 1, // 右键缩放
     }),
     []
   );
@@ -158,6 +163,8 @@ const Scene = forwardRef(
     }));
 
     // 使用 useMemo 稳定 props 引用
+    // 修复 #13：依赖项使用 selectedDevice?.id 而非 selectedDevice 对象，
+    // 避免 store 重新创建 selectedDevice 对象但 id 未变时触发无效重渲染
     const rackModelProps = useMemo(
       () => ({
         rack,
@@ -172,7 +179,7 @@ const Scene = forwardRef(
       [
         rack,
         devices,
-        selectedDevice,
+        selectedDevice?.id,
         onDeviceClick,
         onDeviceLeave,
         onDeviceHover,
@@ -211,17 +218,11 @@ const Scene = forwardRef(
 
           <ambientLight intensity={0.5} color="#ffffff" />
           <pointLight position={[5, 8, 5]} intensity={2} color="#ffffff" />
-          <directionalLight
-            position={[10, 10, 5]}
-            intensity={1}
-            castShadow
-            shadow-mapSize={[512, 512]}
-            shadow-camera-far={20}
-            shadow-camera-left={-10}
-            shadow-camera-right={10}
-            shadow-camera-top={10}
-            shadow-camera-bottom={-10}
-          />
+          {/* 修复 #12：移除 castShadow 及 shadow 配置
+              原因：场景中所有 mesh 均未设置 castShadow/receiveShadow，开启 shadow pass 只会浪费
+              GPU 资源分配 512x512 深度纹理，且每帧执行 shadow map 渲染但不产生可见阴影。
+              如需启用阴影，需同步在机柜框架、设备机身上添加 castShadow/receiveShadow 并启用 Canvas shadows */}
+          <directionalLight position={[10, 10, 5]} intensity={1} />
 
           <Suspense fallback={null}>
             <Environment files={envMapUrl} blur={0.5} resolution={256} background={false} />
