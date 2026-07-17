@@ -1,6 +1,6 @@
 {
   "name": "idc-frontend",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "description": "IDC设备管理系统前端",
   "scripts": {
     "start": "vite",
