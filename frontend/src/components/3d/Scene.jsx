@@ -78,6 +78,23 @@ const Controls = ({ rack, onControlsReady, modalsOpen = false }) => {
   // target 数组形式，用于 OrbitControls 的 target prop
   const targetArray = useMemo(() => [target.x, target.y, target.z], [target]);
 
+  // 稳定 mouseButtons/touches 引用，避免每次渲染创建新对象导致 OrbitControls 重绑事件
+  const mouseButtons = useMemo(
+    () => ({
+      LEFT: 0, // 左键旋转
+      MIDDLE: 1, // 中键缩放
+      RIGHT: 2, // 右键平移
+    }),
+    []
+  );
+  const touches = useMemo(
+    () => ({
+      ONE: 1,
+      TWO: 2,
+    }),
+    []
+  );
+
   // 初始化时确保相机位置和朝向正确
   useEffect(() => {
     camera.position.copy(cameraPosition);
@@ -115,15 +132,8 @@ const Controls = ({ rack, onControlsReady, modalsOpen = false }) => {
       enablePan={!modalsOpen}
       enableZoom={!modalsOpen}
       enableRotate={!modalsOpen}
-      mouseButtons={{
-        LEFT: 0, // 左键旋转
-        MIDDLE: 1, // 中键缩放
-        RIGHT: 2, // 右键平移
-      }}
-      touches={{
-        ONE: 1,
-        TWO: 2,
-      }}
+      mouseButtons={mouseButtons}
+      touches={touches}
     />
   );
 };
@@ -192,7 +202,7 @@ const Scene = forwardRef(
             alpha: true, // 必须开启 alpha 以支持透明背景
             powerPreference: 'high-performance',
           }}
-          style={{ background: 'transparent' }}
+          style={{ background: 'transparent', touchAction: 'none' }}
         >
           <PerspectiveCamera makeDefault position={cameraPosition} fov={45} />
 

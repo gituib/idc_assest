@@ -140,27 +140,27 @@ const RackSelectorHeader = ({
     >
       <Button
         type="text"
-        icon={<ArrowLeftOutlined style={{ color: 'rgba(255,255,255,0.8)' }} />}
+        icon={<ArrowLeftOutlined style={{ color: '#1E3A8A' }} />}
         onClick={onBack}
         className="header-icon-btn"
-        style={{ marginRight: 8 }}
+        style={{ marginRight: 10, width: 36, height: 36, borderRadius: 8, flexShrink: 0 }}
       />
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          background: 'rgba(255,255,255,0.05)',
-          padding: '6px 12px',
-          borderRadius: 8,
-          border: '1px solid rgba(255,255,255,0.05)',
+          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(30, 64, 175, 0.06) 100%)',
+          padding: '6px 14px',
+          borderRadius: 10,
+          border: '1px solid rgba(59, 130, 246, 0.15)',
         }}
       >
-        <CloudServerOutlined style={{ fontSize: 18, color: '#3b82f6', marginRight: 10 }} />
+        <CloudServerOutlined style={{ fontSize: 18, color: '#1E40AF', marginRight: 10 }} />
         <span
           style={{
             fontSize: 15,
             fontWeight: 600,
-            color: '#f8fafc',
+            color: '#1E3A8A',
             letterSpacing: '0.3px',
             whiteSpace: 'nowrap',
           }}
@@ -189,15 +189,18 @@ const RackSelectorHeader = ({
           style={{
             display: 'flex',
             alignItems: 'center',
-            background: selectorVisible ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+            background: selectorVisible ? 'rgba(59, 130, 246, 0.08)' : 'rgba(255, 255, 255, 0.7)',
             border: selectorVisible
-              ? '1px solid rgba(59, 130, 246, 0.5)'
-              : '1px solid rgba(255, 255, 255, 0.12)',
+              ? '1px solid rgba(59, 130, 246, 0.4)'
+              : '1px solid rgba(30, 58, 138, 0.12)',
             borderRadius: 10,
             padding: '8px 14px',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
             minHeight: 40,
+            boxShadow: selectorVisible
+              ? '0 2px 8px rgba(30, 64, 175, 0.08)'
+              : '0 1px 2px rgba(15, 23, 42, 0.04)',
           }}
         >
           <div
@@ -210,7 +213,7 @@ const RackSelectorHeader = ({
           >
             <SwapOutlined
               style={{
-                color: selectorVisible ? '#60a5fa' : 'rgba(255,255,255,0.5)',
+                color: selectorVisible ? '#1E40AF' : '#64748B',
                 marginRight: 10,
                 fontSize: 14,
                 transition: 'color 0.2s',
@@ -218,9 +221,9 @@ const RackSelectorHeader = ({
             />
             <span
               style={{
-                color: selectedRack ? '#f8fafc' : 'rgba(255,255,255,0.5)',
+                color: selectedRack ? '#1E3A8A' : '#94A3B8',
                 fontSize: 13,
-                fontWeight: selectedRack ? 500 : 400,
+                fontWeight: selectedRack ? 600 : 400,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -247,19 +250,19 @@ const RackSelectorHeader = ({
                 style={{
                   padding: '4px 8px',
                   borderRadius: 6,
-                  background: 'rgba(255,255,255,0.08)',
+                  background: 'rgba(30, 58, 138, 0.06)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  color: 'rgba(255,255,255,0.7)',
+                  color: '#1E40AF',
                   fontSize: 12,
                   transition: 'all 0.15s',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                  e.currentTarget.style.background = 'rgba(30, 58, 138, 0.06)';
                 }}
               >
                 ←
@@ -274,19 +277,19 @@ const RackSelectorHeader = ({
                 style={{
                   padding: '4px 8px',
                   borderRadius: 6,
-                  background: 'rgba(255,255,255,0.08)',
+                  background: 'rgba(30, 58, 138, 0.06)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  color: 'rgba(255,255,255,0.7)',
+                  color: '#1E40AF',
                   fontSize: 12,
                   transition: 'all 0.15s',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                  e.currentTarget.style.background = 'rgba(30, 58, 138, 0.06)';
                 }}
               >
                 →
@@ -294,7 +297,7 @@ const RackSelectorHeader = ({
             )}
             <span
               style={{
-                color: 'rgba(255,255,255,0.5)',
+                color: '#64748B',
                 fontSize: 10,
                 transition: 'transform 0.2s',
                 transform: selectorVisible ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -318,6 +321,23 @@ const RackSelectorHeader = ({
     );
   };
 
+  // 根据 key 调用对应的回调函数
+  const handleActionClick = key => {
+    switch (key) {
+      case 'refresh':
+        onRefresh();
+        break;
+      case 'resetView':
+        onResetView();
+        break;
+      case 'config':
+        onOpenConfig();
+        break;
+      default:
+        break;
+    }
+  };
+
   const renderActionButton = (btn, index) => {
     if (isMobile && btn.key === 'config') {
       return null;
@@ -326,17 +346,18 @@ const RackSelectorHeader = ({
     return (
       <Tooltip key={btn.key} title={btn.tooltip} placement="bottom">
         <Button
-          type="primary"
-          ghost
+          type="default"
           icon={btn.icon}
-          onClick={btn.onClick}
+          onClick={() => handleActionClick(btn.key)}
           className="header-action-btn"
           style={{
             borderRadius: 8,
-            borderColor: 'rgba(255,255,255,0.25)',
-            color: 'rgba(255,255,255,0.85)',
+            borderColor: 'rgba(30, 58, 138, 0.15)',
+            color: '#1E3A8A',
+            background: 'rgba(255, 255, 255, 0.7)',
             height: 36,
             padding: '0 12px',
+            fontWeight: 500,
           }}
         >
           {!isMobile && !config.buttonIconOnly && btn.label}
@@ -353,17 +374,17 @@ const RackSelectorHeader = ({
         style={{
           display: 'flex',
           alignItems: 'center',
-          background: 'rgba(255,255,255,0.05)',
+          background: 'rgba(255, 255, 255, 0.7)',
           padding: '4px 10px',
           borderRadius: 8,
-          border: '1px solid rgba(255,255,255,0.05)',
+          border: '1px solid rgba(30, 58, 138, 0.12)',
           gap: 6,
           height: 36,
         }}
       >
         <FullscreenOutlined
           style={{
-            color: deviceSlideEnabled ? '#22c55e' : 'rgba(255,255,255,0.4)',
+            color: deviceSlideEnabled ? '#1E40AF' : '#94A3B8',
             fontSize: 14,
           }}
         />
@@ -371,8 +392,9 @@ const RackSelectorHeader = ({
           <span
             style={{
               fontSize: 12,
-              color: deviceSlideEnabled ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)',
+              color: deviceSlideEnabled ? '#1E3A8A' : '#94A3B8',
               whiteSpace: 'nowrap',
+              fontWeight: 500,
             }}
           >
             设备弹出
@@ -384,7 +406,7 @@ const RackSelectorHeader = ({
             width: 32,
             height: 18,
             borderRadius: 9,
-            background: deviceSlideEnabled ? '#22c55e' : 'rgba(255,255,255,0.2)',
+            background: deviceSlideEnabled ? '#1E40AF' : 'rgba(148, 163, 184, 0.3)',
             position: 'relative',
             cursor: 'pointer',
             transition: 'background 0.2s',
@@ -400,7 +422,7 @@ const RackSelectorHeader = ({
               top: 2,
               left: deviceSlideEnabled ? 16 : 2,
               transition: 'left 0.2s',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
             }}
           />
         </div>
@@ -416,7 +438,7 @@ const RackSelectorHeader = ({
           <Dropdown menu={{ items: dropdownMenuItems }} trigger={['click']} placement="bottomRight">
             <Button
               type="text"
-              icon={<MenuOutlined style={{ color: 'rgba(255,255,255,0.8)' }} />}
+              icon={<MenuOutlined style={{ color: '#1E3A8A' }} />}
               className="header-icon-btn"
               style={{ borderRadius: 8 }}
             />
@@ -447,25 +469,27 @@ const RackSelectorHeader = ({
         alignItems: 'center',
         justifyContent: 'space-between',
         height: 64,
-        padding: '0 20px 0 12px',
+        padding: '0 24px 0 20px',
         marginLeft: -24,
-        background: 'rgba(15, 23, 42, 0.6)',
+        marginRight: -24,
+        background: 'rgba(255, 255, 255, 0.85)',
         backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        borderBottom: '1px solid rgba(30, 58, 138, 0.08)',
         flexShrink: 0,
         position: 'relative',
-        zIndex: 100,
+        zIndex: 50,
+        boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
       }}
     >
       <style>{`
         .header-icon-btn:hover {
-          color: white !important;
-          background: rgba(255,255,255,0.1) !important;
+          color: #1E40AF !important;
+          background: rgba(59, 130, 246, 0.1) !important;
         }
         .header-action-btn:hover {
-          color: white !important;
-          border-color: rgba(255,255,255,0.5) !important;
-          background: rgba(255,255,255,0.1) !important;
+          color: #1E40AF !important;
+          border-color: rgba(59, 130, 246, 0.4) !important;
+          background: rgba(59, 130, 246, 0.06) !important;
         }
       `}</style>
 

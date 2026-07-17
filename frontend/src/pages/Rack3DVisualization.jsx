@@ -23,6 +23,12 @@ import {
   InfoCircleOutlined,
   EditOutlined,
   SettingOutlined,
+  ThunderboltOutlined,
+  DesktopOutlined,
+  ColumnHeightOutlined,
+  ScanOutlined,
+  ZoomInOutlined,
+  SelectOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -515,7 +521,15 @@ const Rack3DVisualization = () => {
   }, [navigate]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: 'calc(100vh - 64px - 48px)',
+        minHeight: 400,
+        overflow: 'hidden',
+      }}
+    >
       <RackSelectorHeader
         rooms={sortedRooms}
         selectedRoomKey={selectedRoom}
@@ -533,7 +547,14 @@ const Rack3DVisualization = () => {
       />
 
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-        <Content style={{ position: 'absolute', inset: 0, background: '#ffffff' }}>
+        <Content
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: '#F8FAFC',
+            userSelect: 'none',
+          }}
+        >
           {loading ? (
             <div
               style={{
@@ -545,7 +566,7 @@ const Rack3DVisualization = () => {
               }}
             >
               <Spin size="large" />
-              <div style={{ marginTop: 16, color: '#1890ff' }}>加载资源中...</div>
+              <div style={{ marginTop: 16, color: '#1E40AF' }}>加载资源中...</div>
             </div>
           ) : selectedRack ? (
             <>
@@ -562,68 +583,53 @@ const Rack3DVisualization = () => {
                 modalsOpen={modalVisible || nicModalVisible || portModalVisible || cableModalVisible}
               />
 
-              {/* Rack Info Overlay (New) */}
+              {/* Rack Info Overlay - 浅色玻璃态右侧面板 */}
               {selectedRack && (
                 <div
                   style={{
                     position: 'absolute',
-                    top: 88,
-                    right: 24,
-                    background:
-                      'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%)',
-                    backdropFilter: 'blur(16px)',
-                    padding: isRackInfoCollapsed ? '14px 18px' : '20px',
-                    borderRadius: '20px',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-                    width: isRackInfoCollapsed ? 'auto' : '300px',
-                    zIndex: 5,
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                    overflow: 'hidden',
+                    top: 20,
+                    right: 20,
+                    background: 'rgba(255, 255, 255, 0.85)',
+                    backdropFilter: 'blur(20px)',
+                    padding: isRackInfoCollapsed ? '12px 16px' : '18px',
+                    borderRadius: '16px',
+                    boxShadow: '0 4px 24px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(30, 58, 138, 0.06)',
+                    width: isRackInfoCollapsed ? 'auto' : '280px',
+                    maxHeight: 'calc(100% - 120px)',
+                    overflowY: 'auto',
+                    zIndex: 20,
+                    border: '1px solid rgba(59, 130, 246, 0.1)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     cursor: isRackInfoCollapsed ? 'pointer' : 'default',
                   }}
                   onClick={() => isRackInfoCollapsed && setIsRackInfoCollapsed(false)}
                 >
-                  {/* Header */}
+                  {/* 头部 - 机柜名称 */}
                   <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      marginBottom: isRackInfoCollapsed ? 0 : 20,
+                      marginBottom: isRackInfoCollapsed ? 0 : 16,
                       justifyContent: 'space-between',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                       <div
                         style={{
-                          width: 44,
-                          height: 44,
-                          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                          borderRadius: '12px',
+                          width: 40,
+                          height: 40,
+                          background: 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)',
+                          borderRadius: '10px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          marginRight: 14,
-                          boxShadow: '0 6px 20px rgba(59, 130, 246, 0.4)',
+                          marginRight: 12,
+                          boxShadow: '0 4px 12px rgba(30, 64, 175, 0.25)',
                           flexShrink: 0,
-                          position: 'relative',
-                          overflow: 'hidden',
                         }}
                       >
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            height: '50%',
-                            background:
-                              'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%)',
-                          }}
-                        />
-                        <CloudServerOutlined
-                          style={{ color: 'white', fontSize: 22, position: 'relative', zIndex: 1 }}
-                        />
+                        <CloudServerOutlined style={{ color: 'white', fontSize: 20 }} />
                       </div>
                       <div
                         style={{
@@ -632,26 +638,30 @@ const Rack3DVisualization = () => {
                           transition: 'opacity 0.3s',
                           overflow: 'hidden',
                           flex: 1,
+                          minWidth: 0,
                         }}
                       >
                         <div
                           style={{
-                            fontSize: '18px',
+                            fontSize: '15px',
                             fontWeight: 700,
-                            color: '#f8fafc',
+                            color: '#1E3A8A',
                             lineHeight: 1.2,
-                            letterSpacing: '0.3px',
+                            letterSpacing: '0.2px',
+                            whiteSpace: 'nowrap',
+                            textOverflow: 'ellipsis',
+                            overflow: 'hidden',
                           }}
                         >
                           {selectedRack.name}
                         </div>
                         <div
                           style={{
-                            fontSize: '12px',
-                            color: 'rgba(148, 163, 184, 0.8)',
-                            marginTop: 4,
+                            fontSize: '11px',
+                            color: '#64748B',
+                            marginTop: 3,
                             fontFamily: 'monospace',
-                            letterSpacing: '0.5px',
+                            letterSpacing: '0.3px',
                           }}
                         >
                           #{selectedRack.rackId}
@@ -668,144 +678,103 @@ const Rack3DVisualization = () => {
                         setIsRackInfoCollapsed(!isRackInfoCollapsed);
                       }}
                       style={{
-                        color: 'rgba(148, 163, 184, 0.7)',
-                        marginLeft: isRackInfoCollapsed ? 0 : 8,
-                        width: isRackInfoCollapsed ? 44 : 32,
-                        height: isRackInfoCollapsed ? 44 : 32,
-                        borderRadius: isRackInfoCollapsed ? 12 : 8,
+                        color: '#64748B',
+                        marginLeft: isRackInfoCollapsed ? 0 : 4,
+                        width: isRackInfoCollapsed ? 40 : 28,
+                        height: isRackInfoCollapsed ? 40 : 28,
+                        borderRadius: isRackInfoCollapsed ? 10 : 6,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         transition: 'all 0.3s',
+                        flexShrink: 0,
                       }}
                     />
                   </div>
 
-                  {/* Content Area - Collapsible */}
+                  {/* 内容区 - 可折叠 */}
                   <div
                     style={{
                       maxHeight: isRackInfoCollapsed ? 0 : '600px',
                       opacity: isRackInfoCollapsed ? 0 : 1,
-                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       overflow: 'hidden',
                     }}
                   >
-                    {/* Stats Grid */}
+                    {/* 统计网格 - 3列KPI */}
                     <div
                       style={{
                         display: 'grid',
                         gridTemplateColumns: 'repeat(3, 1fr)',
-                        gap: 10,
-                        marginBottom: 16,
+                        gap: 8,
+                        marginBottom: 14,
                       }}
                     >
                       <div
                         style={{
-                          background: 'rgba(59, 130, 246, 0.1)',
-                          border: '1px solid rgba(59, 130, 246, 0.2)',
-                          padding: '12px 10px',
-                          borderRadius: '12px',
+                          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(30, 64, 175, 0.04) 100%)',
+                          border: '1px solid rgba(59, 130, 246, 0.15)',
+                          padding: '10px 8px',
+                          borderRadius: '10px',
                           textAlign: 'center',
                         }}
                       >
-                        <div
-                          style={{
-                            fontSize: '22px',
-                            fontWeight: 700,
-                            color: '#60a5fa',
-                            lineHeight: 1,
-                          }}
-                        >
+                        <div style={{ fontSize: '20px', fontWeight: 700, color: '#1E40AF', lineHeight: 1 }}>
                           {selectedRack.height}
                         </div>
-                        <div
-                          style={{
-                            fontSize: '10px',
-                            color: 'rgba(148, 163, 184, 0.7)',
-                            marginTop: 4,
-                            fontWeight: 500,
-                          }}
-                        >
-                          总高度
+                        <div style={{ fontSize: '10px', color: '#64748B', marginTop: 3, fontWeight: 500 }}>
+                          总U位
                         </div>
                       </div>
                       <div
                         style={{
-                          background: 'rgba(16, 185, 129, 0.1)',
-                          border: '1px solid rgba(16, 185, 129, 0.2)',
-                          padding: '12px 10px',
-                          borderRadius: '12px',
+                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.04) 100%)',
+                          border: '1px solid rgba(16, 185, 129, 0.15)',
+                          padding: '10px 8px',
+                          borderRadius: '10px',
                           textAlign: 'center',
                         }}
                       >
-                        <div
-                          style={{
-                            fontSize: '22px',
-                            fontWeight: 700,
-                            color: '#34d399',
-                            lineHeight: 1,
-                          }}
-                        >
+                        <div style={{ fontSize: '20px', fontWeight: 700, color: '#059669', lineHeight: 1 }}>
                           {devices.length}
                         </div>
-                        <div
-                          style={{
-                            fontSize: '10px',
-                            color: 'rgba(148, 163, 184, 0.7)',
-                            marginTop: 4,
-                            fontWeight: 500,
-                          }}
-                        >
+                        <div style={{ fontSize: '10px', color: '#64748B', marginTop: 3, fontWeight: 500 }}>
                           设备数
                         </div>
                       </div>
                       <div
                         style={{
-                          background: 'rgba(245, 158, 11, 0.1)',
-                          border: '1px solid rgba(245, 158, 11, 0.2)',
-                          padding: '12px 10px',
-                          borderRadius: '12px',
+                          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.04) 100%)',
+                          border: '1px solid rgba(245, 158, 11, 0.15)',
+                          padding: '10px 8px',
+                          borderRadius: '10px',
                           textAlign: 'center',
                         }}
                       >
-                        <div
-                          style={{
-                            fontSize: '22px',
-                            fontWeight: 700,
-                            color: '#fbbf24',
-                            lineHeight: 1,
-                          }}
-                        >
+                        <div style={{ fontSize: '20px', fontWeight: 700, color: '#D97706', lineHeight: 1 }}>
                           {Math.round((devices.length / selectedRack.height) * 100)}%
                         </div>
-                        <div
-                          style={{
-                            fontSize: '10px',
-                            color: 'rgba(148, 163, 184, 0.7)',
-                            marginTop: 4,
-                            fontWeight: 500,
-                          }}
-                        >
+                        <div style={{ fontSize: '10px', color: '#64748B', marginTop: 3, fontWeight: 500 }}>
                           负载率
                         </div>
                       </div>
                     </div>
 
-                    {/* Status Indicators */}
+                    {/* 资源监控 - 使用SVG图标替代emoji */}
                     <div
                       style={{
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.06)',
-                        borderRadius: '12px',
-                        padding: '14px',
-                        marginBottom: 16,
+                        background: 'rgba(241, 245, 249, 0.6)',
+                        border: '1px solid rgba(30, 58, 138, 0.06)',
+                        borderRadius: '10px',
+                        padding: '12px',
+                        marginBottom: 12,
                       }}
                     >
                       <div
                         style={{
-                          fontSize: '11px',
-                          color: 'rgba(148, 163, 184, 0.6)',
-                          marginBottom: 12,
+                          fontSize: '10px',
+                          color: '#64748B',
+                          marginBottom: 10,
                           fontWeight: 600,
                           letterSpacing: '0.5px',
                           textTransform: 'uppercase',
@@ -818,21 +787,21 @@ const Rack3DVisualization = () => {
                           label: 'U位使用',
                           value: `${rackStats.usedU}U / ${selectedRack.height}U`,
                           status: rackStats.usagePercent > 80 ? 'warning' : 'normal',
-                          icon: '📊',
+                          icon: <ColumnHeightOutlined style={{ fontSize: 14, color: '#1E40AF' }} />,
                           subValue: `剩余 ${rackStats.availableU}U`,
                         },
                         {
                           label: '总功率',
                           value: `${rackStats.totalPower.toFixed(1)}kW`,
                           status: 'normal',
-                          icon: '⚡',
+                          icon: <ThunderboltOutlined style={{ fontSize: 14, color: '#D97706' }} />,
                           subValue: '当前负载',
                         },
                         {
                           label: '设备数',
                           value: `${devices.length} 台`,
                           status: 'normal',
-                          icon: '🖥️',
+                          icon: <DesktopOutlined style={{ fontSize: 14, color: '#059669' }} />,
                           subValue: `负载率 ${rackStats.usagePercent}%`,
                         },
                       ].map((item, i) => (
@@ -842,34 +811,28 @@ const Rack3DVisualization = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            marginBottom: i < 2 ? 12 : 0,
+                            marginBottom: i < 2 ? 10 : 0,
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ fontSize: 16 }}>{item.icon}</span>
+                            {item.icon}
                             <div>
                               <div
                                 style={{
-                                  fontSize: '13px',
-                                  color: 'rgba(226, 232, 240, 0.9)',
+                                  fontSize: '12px',
+                                  color: '#1E3A8A',
                                   fontWeight: 500,
                                 }}
                               >
                                 {item.label}
                               </div>
-                              <div
-                                style={{
-                                  fontSize: '11px',
-                                  color: 'rgba(148, 163, 184, 0.6)',
-                                  marginTop: 2,
-                                }}
-                              >
+                              <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: 2 }}>
                                 {item.subValue}
                               </div>
                             </div>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: '#1E3A8A' }}>
                               {item.value}
                             </span>
                             <div
@@ -877,8 +840,8 @@ const Rack3DVisualization = () => {
                                 width: 8,
                                 height: 8,
                                 borderRadius: '50%',
-                                background: item.status === 'normal' ? '#10b981' : '#f59e0b',
-                                boxShadow: `0 0 8px ${item.status === 'normal' ? 'rgba(16, 185, 129, 0.6)' : 'rgba(245, 158, 11, 0.6)'}`,
+                                background: item.status === 'normal' ? '#10B981' : '#F59E0B',
+                                boxShadow: `0 0 6px ${item.status === 'normal' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(245, 158, 11, 0.5)'}`,
                               }}
                             />
                           </div>
@@ -886,50 +849,50 @@ const Rack3DVisualization = () => {
                       ))}
                     </div>
 
-                    {/* Guide Section */}
+                    {/* 操作指南 - 使用SVG图标替代emoji */}
                     <div
                       style={{
-                        background: 'rgba(59, 130, 246, 0.05)',
+                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.04) 0%, rgba(30, 64, 175, 0.02) 100%)',
                         border: '1px solid rgba(59, 130, 246, 0.1)',
-                        borderRadius: '12px',
-                        padding: '14px',
+                        borderRadius: '10px',
+                        padding: '12px',
                       }}
                     >
                       <div
                         style={{
-                          fontSize: '11px',
+                          fontSize: '10px',
                           fontWeight: 600,
-                          color: 'rgba(148, 163, 184, 0.6)',
-                          marginBottom: 10,
+                          color: '#64748B',
+                          marginBottom: 8,
                           display: 'flex',
                           alignItems: 'center',
                           letterSpacing: '0.5px',
                           textTransform: 'uppercase',
                         }}
                       >
-                        <InfoCircleOutlined style={{ marginRight: 6, fontSize: 12 }} /> 操作指南
+                        <InfoCircleOutlined style={{ marginRight: 6, fontSize: 11 }} /> 操作指南
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {[
-                          { icon: '🖱️', text: '左键旋转视图', color: '#3b82f6' },
-                          { icon: '🔍', text: '滚轮缩放视图', color: '#8b5cf6' },
-                          { icon: '👆', text: '点击设备查看详情', color: '#10b981' },
+                          { icon: <ScanOutlined style={{ fontSize: 13, color: '#1E40AF' }} />, text: '左键旋转视图', color: '#1E40AF' },
+                          { icon: <ZoomInOutlined style={{ fontSize: 13, color: '#7C3AED' }} />, text: '滚轮缩放视图', color: '#7C3AED' },
+                          { icon: <SelectOutlined style={{ fontSize: 13, color: '#059669' }} />, text: '点击设备查看详情', color: '#059669' },
                         ].map((item, i) => (
                           <div
                             key={i}
                             style={{
-                              fontSize: '12px',
-                              color: 'rgba(226, 232, 240, 0.8)',
+                              fontSize: '11px',
+                              color: '#475569',
                               display: 'flex',
                               alignItems: 'center',
                               gap: 10,
-                              padding: '8px 10px',
-                              background: 'rgba(255, 255, 255, 0.02)',
-                              borderRadius: '8px',
+                              padding: '6px 8px',
+                              background: 'rgba(255, 255, 255, 0.6)',
+                              borderRadius: '6px',
                               transition: 'all 0.2s',
                             }}
                           >
-                            <span style={{ fontSize: 14 }}>{item.icon}</span>
+                            {item.icon}
                             <span style={{ flex: 1 }}>{item.text}</span>
                             <div
                               style={{
@@ -937,7 +900,7 @@ const Rack3DVisualization = () => {
                                 height: 4,
                                 borderRadius: '50%',
                                 background: item.color,
-                                boxShadow: `0 0 6px ${item.color}`,
+                                opacity: 0.6,
                               }}
                             />
                           </div>
@@ -948,30 +911,111 @@ const Rack3DVisualization = () => {
                 </div>
               )}
 
-              {/* Overlay Info for Hovered Device */}
+              {/* Hovered Device 浮层 - 移至左侧避免与Rack Info面板冲突 */}
               {hoveredDevice && !selectedDevice && (
                 <div
                   style={{
                     position: 'absolute',
-                    top: 88, // Moved down to avoid header overlap
-                    right: 24,
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    color: 'white',
+                    top: 20,
+                    left: 20,
+                    background: 'rgba(255, 255, 255, 0.92)',
+                    padding: '12px 14px',
+                    borderRadius: '10px',
+                    color: '#1E3A8A',
                     pointerEvents: 'none',
-                    maxWidth: '300px',
-                    backdropFilter: 'blur(4px)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    zIndex: 10,
+                    maxWidth: '240px',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(59, 130, 246, 0.15)',
+                    boxShadow: '0 4px 16px rgba(15, 23, 42, 0.08)',
+                    zIndex: 30,
                   }}
                 >
-                  <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{hoveredDevice.name}</div>
-                  <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 6, color: '#1E40AF', fontSize: 13 }}>
+                    {hoveredDevice.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#64748B', lineHeight: 1.6 }}>
                     <div>位置: U{hoveredDevice.position}</div>
                     <div>高度: {hoveredDevice.height}U</div>
                     <div>状态: {hoveredDevice.status}</div>
                   </div>
+                </div>
+              )}
+
+              {/* 底部KPI快捷栏 - 横向统计指标，提升空间利用率 */}
+              {selectedRack && !isRackInfoCollapsed && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 20,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(30, 58, 138, 0.08)',
+                    borderRadius: '14px',
+                    padding: '10px 8px',
+                    boxShadow: '0 4px 20px rgba(15, 23, 42, 0.08)',
+                    zIndex: 20,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    maxWidth: 'calc(100% - 340px)',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {[
+                    {
+                      icon: <ColumnHeightOutlined style={{ fontSize: 14, color: '#1E40AF' }} />,
+                      label: '总高度',
+                      value: `${selectedRack.height}U`,
+                      color: '#1E40AF',
+                    },
+                    {
+                      icon: <DesktopOutlined style={{ fontSize: 14, color: '#059669' }} />,
+                      label: '设备数',
+                      value: `${devices.length}`,
+                      color: '#059669',
+                    },
+                    {
+                      icon: <ColumnHeightOutlined style={{ fontSize: 14, color: '#D97706' }} />,
+                      label: '已用',
+                      value: `${rackStats.usedU}U`,
+                      color: '#D97706',
+                    },
+                    {
+                      icon: <ColumnHeightOutlined style={{ fontSize: 14, color: '#10B981' }} />,
+                      label: '可用',
+                      value: `${rackStats.availableU}U`,
+                      color: '#10B981',
+                    },
+                    {
+                      icon: <ThunderboltOutlined style={{ fontSize: 14, color: '#7C3AED' }} />,
+                      label: '功率',
+                      value: `${rackStats.totalPower.toFixed(1)}kW`,
+                      color: '#7C3AED',
+                    },
+                  ].map((item, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '6px 14px',
+                        borderRight: i < 4 ? '1px solid rgba(30, 58, 138, 0.08)' : 'none',
+                      }}
+                    >
+                      {item.icon}
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 500, lineHeight: 1 }}>
+                          {item.label}
+                        </div>
+                        <div style={{ fontSize: '13px', color: item.color, fontWeight: 700, marginTop: 2, lineHeight: 1 }}>
+                          {item.value}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
