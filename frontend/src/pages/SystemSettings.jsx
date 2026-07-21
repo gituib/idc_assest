@@ -1923,10 +1923,19 @@ const SystemSettings = () => {
                             icon={<CopyOutlined />}
                             onClick={() => {
                               const cmd = `cd ${updateInfo.projectPath} && node update.js`;
-                              navigator.clipboard.writeText(cmd).then(
-                                () => message.success('已复制'),
-                                () => message.error('复制失败')
-                              );
+                              const textarea = document.createElement('textarea');
+                              textarea.value = cmd;
+                              textarea.style.position = 'fixed';
+                              textarea.style.opacity = '0';
+                              document.body.appendChild(textarea);
+                              textarea.select();
+                              try {
+                                document.execCommand('copy');
+                                message.success('已复制');
+                              } catch {
+                                message.error('复制失败，请手动复制');
+                              }
+                              document.body.removeChild(textarea);
                             }}
                             style={{ flexShrink: 0, borderRadius: 4, color: '#595959' }}
                           >
