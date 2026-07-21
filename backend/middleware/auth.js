@@ -276,11 +276,40 @@ const clearMaintenanceCache = () => {
   maintenanceModeCache = { value: false, updatedAt: 0 };
 };
 
+/**
+ * 超级管理员权限校验中间件
+ * 通过 UserRole + Role 关联查询判断 roleCode === 'admin'
+ * 必须在 authMiddleware 之后使用（依赖 req.user）
+ * @param {Object} req - Express 请求对象
+ * @param {Object} res - Express 响应对象
+ * @param {Function} next - Express next 函数
+ */
+const requireAdmin = async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ success: false, message: '未认证' });
+    }
+    const userRole = await UserRole.findOne({
+      where: { UserId: req.user.userId },
+      include: [{ model: Role }],
+    });
+    const isAdmin = userRole && userRole.Role && userRole.Role.roleCode === 'admin';
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, message: '需要超级管理员权限' });
+    }
+    next();
+  } catch (error) {
+    logger.error('超管权限校验失败', { error: error.message });
+    return res.status(500).json({ success: false, message: '权限校验失败' });
+  }
+};
+
 module.exports = {
   generateToken,
   verifyToken,
   authMiddleware,
   optionalAuth,
+  requireAdmin,
   JWT_SECRET,
   TOKEN_EXPIRY,
   clearMaintenanceCache,

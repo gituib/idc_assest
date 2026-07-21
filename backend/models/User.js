@@ -13,7 +13,7 @@ const User = sequelize.define(
     username: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
+      unique: 'users_username_unique',
     },
     password: {
       type: DataTypes.STRING,
@@ -25,6 +25,12 @@ const User = sequelize.define(
       validate: {
         isEmail: true,
       },
+    },
+    emailVerified: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      comment: '邮箱是否已验证',
     },
     phone: {
       type: DataTypes.STRING,

@@ -1,7 +1,17 @@
 {
   "name": "idc-device-management",
-  "version": "2.2.4",
+  "version": "2.3.0",
   "description": "IDC设备管理系统",
+  "author": "gituib",
+  "license": "MIT",
+  "homepage": "https://github.com/gituib/idc_assest#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gituib/idc_assest.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gituib/idc_assest/issues"
+  },
   "scripts": {
     "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
     "start:backend": "cd backend && npm run dev",
@@ -16,8 +26,6 @@
     "device",
     "management"
   ],
-  "author": "",
-  "license": "MIT",
   "devDependencies": {
     "concurrently": "^9.2.1"
   },

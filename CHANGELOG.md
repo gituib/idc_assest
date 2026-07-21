@@ -4,6 +4,186 @@
 
 ---
 
+## [2.3.0] - 2026-07-21
+
+### 新增功能
+- 邮箱验证 新增邮箱验证码登录与找回密码功能，支持 6 位验证码 5 分钟有效期
+- SMTP 邮件服务 新增邮件服务配置管理，支持发送测试邮件与验证码邮件
+- EmailVerifyBanner 组件 新增邮箱验证状态横幅，提醒未验证用户
+- 找回密码页面 新增基于邮箱验证码的密码重置流程
+- 邮件模板 新增测试邮件与验证码邮件的 EJS 模板
+
+### 功能改进
+- SystemSettings 邮件服务页面 基于 ui-ux-pro-max 优化交互体验
+- AccountSettings 账户设置页面增强，支持邮箱绑定与验证
+- Login 登录页面新增「忘记密码」入口
+- auth 路由 简化密码重置与找回密码接口逻辑
+- crypto 工具 新增 SMTP 密码加密存储功能
+
+### 问题修复
+- authStore 修复 /profile 返回的 roles 未合并到 user 对象导致前端权限判断失败
+- SystemSettings 修复邮件服务页面表单控件大小不一致问题
+- SystemSettings 修复发送测试邮件错误提示逻辑
+
+---
+
+## [2.2.4] - 2026-07-17
+
+### 新增功能
+
+#### 操作日志审计增强
+- 增强操作日志审计功能，提升日志记录与查询能力
+
+#### 3D 可视化重构
+- 重构设备前面板布局与硬盘细节，提升 3D 机柜中设备的视觉辨识度
+
+### 修复
+
+- 修复端口管理中交换机子页签误显示防火墙/路由器/存储设备的问题
+- 修复仪表盘 5 个 P0 级功能正确性问题
+
+### 优化
+
+- 版本号升级至 2.2.4
+
+---
+
+## [2.2.3] - 2026-07-17
+
+### 新增功能
+
+#### 端口管理支持自定义设备类型
+- 放开准入过滤，允许自定义设备类型进入端口管理
+- 网络设备引导下新增「其他」Tab，展示自定义类型设备
+- 子类型过滤支持「其他」Tab 及无引导大类包含自定义类型
+- 自定义类型设备走无需网卡分支，并展示原始类型名
+- 自定义类型设备图标改用 `DeploymentUnitOutlined` 与交换机区分
+- 引导弹窗文案补充自定义网络设备类型说明
+- 新增端口管理支持自定义设备类型的设计文档与实现计划
+
+#### 端口管理图标优化
+- 设备类型图标优化：交换机=`PartitionOutlined`，路由器=`GatewayOutlined`
+- 设备图标背景色按类型全套区分，提升辨识度
+
+### 优化
+
+#### 3D 可视化
+- 优化 3D 机柜设备辨识度，修复侧面闪烁问题
+- 优化 3D 机柜可视化页面布局与交互
+
+#### 代码质量
+- 禁用 eslint `react-hooks/preserve-manual-memoization` 规则
+- 状态字段过滤 `idle` 选项
+
+---
+
+## [2.2.2] - 2026-07-16
+
+### 优化
+
+#### 分页配置
+- 更新设备管理分页配置
+- 调整 `DeviceFormModal` 与 `DeviceManagement` 分页参数
+
+### 修复
+
+- 修复 `backend/routes/devices.js` 设备列表查询逻辑
+
+---
+
+## [2.2.1] - 2026-07-11
+
+### 新增功能
+
+#### 批量维保更新
+- 新增 `BatchWarrantyModal` 组件，支持设备批量维保信息更新
+- 新增设备批量维保 API（`backend/routes/devices.js`）
+- 新增设备维保字段校验规则（`deviceSchema.js`）
+
+#### 端口选项配置
+- 新增 `backend/config/portOptions.js` 端口选项配置模块
+- 新增 `backend/routes/portOptions.js` 端口选项管理 API
+- 路由配置（`config/routes.js`）注册端口选项路由
+
+### 优化
+
+#### 3D 可视化重构
+- 重构 3D 场景核心组件（`Scene`、`RackModel`、`DeviceModel`、`LODManager`）
+- 移除旧的 3D 材质模块（`materials/constants`、`devicePanel`、`rackFrame`、`utils`）
+- 优化 `CascadingRackPanel` 级联面板逻辑
+
+#### 端口与网卡组件重构
+- 重构 `PortCreateModal` 端口创建弹窗
+- 重构 `NetworkCardPanel`、`NetworkCardCreateModal` 网卡组件
+- 优化 `PortManagementPanel`、`PortPanel` 端口面板
+- 优化 `DeviceDetailDrawer` 设备详情抽屉
+
+#### 数据模型
+- 调整 `Cable`、`DevicePort` 模型字段定义
+
+---
+
+## [2.2.0] - 2026-07-03
+
+### 新增功能
+
+#### 端口管理模块重构
+- 重构 `backend/routes/devicePorts.js` 设备端口路由（+121 行）
+- 重构 `frontend/src/pages/PortManagement.jsx` 端口管理页面（+473 行）
+- 优化 `CableWizardModal` 线缆向导、`PortAddGuideModal` 端口引导弹窗
+- 优化 `CableManagement` 线缆管理页面
+
+#### 数据库索引修复
+- 新增 `backend/scripts/fixCompoundIndexes.js` 复合索引修复脚本
+- 新增 `backend/scripts/fixDuplicateIndexes.js` 重复索引修复脚本
+
+### 优化
+
+#### 系统功能
+- 优化 `backend/server.js` 启动流程
+- 优化 `backend/utils/backup.js` 备份工具
+- 调整多个数据模型字段定义（`DeviceBusiness`、`DevicePort`、`NetworkCard`、`Permission`、`Role`）
+
+#### 文档
+- Docker 部署引导至文档站链接
+- 更新 README，添加文档教程链接，精简功能特性与手动安装章节
+
+---
+
+## [2.1.2] - 2026-07-02
+
+### 新增功能
+
+#### 端口管理
+- 新增设备分组端口列表 API 与前端实现
+
+### 修复
+
+- 修复注册页面用户名重复渲染问题
+- 注册页面邮箱、手机号改为选填
+- 修复 `systemSettings` 中 `package.json` 路径错误（`../../` → `../`）
+
+### 优化
+
+#### Docker 部署
+- 重构镜像仓库配置，支持多镜像源拉取
+- 改用覆盖文件方式重写 `docker-compose.prod.yml`
+- 优化 Docker 部署教程的目录创建流程
+- 完善 README 和新增 Docker 部署文档
+
+---
+
+## [2.1.1] - 2026-06-16
+
+### 优化
+
+#### Docker 部署
+- 完善 Docker 部署目录结构与教程
+- 更新镜像默认 tag 为 `latest` 并新增部署文档
+- 调整默认镜像版本从 `latest` 改为 `v2.1.0`
+
+---
+
 ## [2.1.0] - 2026-06-12
 
 ### 新增功能

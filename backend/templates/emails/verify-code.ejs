@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>邮箱验证码</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f5f7fa;padding:32px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="560" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+          <!-- 顶部品牌条 -->
+          <tr>
+            <td style="background-color:#1677ff;padding:24px 40px;">
+              <div style="color:#ffffff;font-size:18px;font-weight:600;letter-spacing:0.5px;">
+                <%= locals.mailFromName || 'IDC资产管理系统' %>
+              </div>
+            </td>
+          </tr>
+          <!-- 正文 -->
+          <tr>
+            <td style="padding:40px;">
+              <h1 style="margin:0 0 16px 0;font-size:20px;color:#1f2937;font-weight:600;">
+                邮箱验证码
+              </h1>
+              <p style="margin:0 0 24px 0;font-size:14px;color:#4b5563;line-height:1.6;">
+                您好<% if (locals.nickname) { %><%= locals.nickname %><% } %>，您正在进行邮箱验证操作。请使用下方验证码完成验证：
+              </p>
+
+              <!-- 验证码区块 -->
+              <div style="background-color:#f3f4f6;border:1px dashed #d1d5db;border-radius:6px;padding:24px;text-align:center;margin:24px 0;">
+                <div style="font-size:32px;font-weight:700;letter-spacing:8px;color:#1677ff;font-family:'Courier New',monospace;">
+                  <%= code %>
+                </div>
+              </div>
+
+              <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;line-height:1.6;">
+                验证码有效期：<strong style="color:#374151;">10 分钟</strong>
+              </p>
+              <p style="margin:0 0 24px 0;font-size:13px;color:#6b7280;line-height:1.6;">
+                如果验证码已过期，请返回系统重新获取。
+              </p>
+
+              <!-- 分隔线 -->
+              <hr style="border:0;border-top:1px solid #e5e7eb;margin:24px 0;">
+
+              <!-- 提示信息 -->
+              <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">
+                此邮件由系统自动发送，请勿直接回复。若非本人操作，请忽略此邮件，您的账号安全不受影响。
+              </p>
+            </td>
+          </tr>
+          <!-- 底部 -->
+          <tr>
+            <td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;">
+              <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
+                © <%= new Date().getFullYear() %> <%= locals.mailFromName || 'IDC资产管理系统' %> · 发送时间：<%= new Date().toLocaleString('zh-CN') %>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

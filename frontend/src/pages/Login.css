@@ -796,6 +796,32 @@
   color: var(--lp-primary);
 }
 
+/* "忘记密码?" 链接：使用主色调，hover 加深 + 下划线浮现 */
+.forgot-link {
+  position: relative;
+  text-decoration: none;
+}
+
+.forgot-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 2px;
+  width: 0;
+  height: 1px;
+  background: var(--lp-primary, #14b8a6);
+  transition: width 0.2s ease;
+}
+
+.forgot-link:hover {
+  color: var(--lp-primary-dark, #0d9488) !important;
+  opacity: 0.85;
+}
+
+.forgot-link:hover::after {
+  width: 100%;
+}
+
 .action-link--danger {
   color: rgba(239, 68, 68, 0.7);
 }

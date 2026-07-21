@@ -138,6 +138,11 @@ const migrations = [
     description: '为 users 表添加 lockedUntil 字段，支持账户自动解锁',
     migrate: migrateUserLockedUntil,
   },
+  {
+    name: '用户邮箱验证字段',
+    description: '为 users 表添加 emailVerified 字段，支持邮箱验证功能（v2.3.0）',
+    migrate: migrateUserEmailVerified,
+  },
 ];
 
 async function runMigrations() {
@@ -935,6 +940,20 @@ async function migrateUserLockedUntil() {
 
   await addColumnIfNotExists(tableName, 'lockedUntil', 'DATETIME');
   console.log('    users 表 lockedUntil 字段迁移完成');
+}
+
+async function migrateUserEmailVerified() {
+  const tableName = 'users';
+
+  if (!(await tableExists(tableName))) {
+    console.log(`    ${tableName} 表不存在，跳过`);
+    return;
+  }
+
+  // BOOLEAN DEFAULT 0 在 MySQL（TINYINT(1)）和 SQLite（INTEGER）上均兼容
+  // 与现有 migrateConsumableLogDecouple 的 isConsumableDeleted 写法一致
+  await addColumnIfNotExists(tableName, 'emailVerified', 'BOOLEAN DEFAULT 0');
+  console.log('    users 表 emailVerified 字段迁移完成');
 }
 
 // 执行迁移

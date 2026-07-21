@@ -36,9 +36,16 @@ if (DB_TYPE === 'mysql') {
   );
   dbDialect = 'mysql';
 } else {
+  // SQLite 配置
+  // 安全保护：测试环境强制使用内存数据库，防止 force: true sync 清空开发数据库
+  let storage = process.env.DB_PATH || './idc_management.db';
+  if (process.env.NODE_ENV === 'test' && storage !== ':memory:') {
+    // 测试环境必须使用内存数据库，避免误删开发数据
+    storage = ':memory:';
+  }
   sequelize = new Sequelize({
     dialect: 'sqlite',
-    storage: process.env.DB_PATH || './idc_management.db',
+    storage,
     logging: sqlLogger,
     pool: {
       max: 5,

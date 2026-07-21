@@ -4,7 +4,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const { Op } = require('sequelize');
-const { authMiddleware, clearMaintenanceCache } = require('../middleware/auth');
+const { authMiddleware, clearMaintenanceCache, requireAdmin } = require('../middleware/auth');
 
 // 读取 package.json 获取版本号
 const packageJsonPath = path.join(__dirname, '../package.json');
@@ -12,7 +12,10 @@ const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 const APP_VERSION = packageJson.version || '1.0.0';
 
 // 公开路由（无需认证）- 使用 originalUrl 匹配，兼容子路由挂载
-const publicRoutes = ['/system/info'];
+const publicRoutes = [
+  '/system/info',
+  '/system/licenses',
+];
 
 // 全局认证中间件：所有路由默认需要认证
 router.use((req, res, next) => {
@@ -226,6 +229,224 @@ router.get('/idle-timeout', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== 邮件服务（SMTP）配置管理 ==========
+// 重要：以下 /mail* 路由必须在 /:key 之前定义，否则会被当作 key 参数处理
+
+/**
+ * 辅助函数：读取 SystemSetting 中邮件配置项（已 JSON.parse）
+ * @param {string} key - 配置键
+ * @param {*} defaultValue - 默认值
+ * @returns {Promise<*>}
+ */
+async function readMailSetting(key, defaultValue) {
+  const setting = await SystemSetting.findByPk(key);
+  if (!setting || setting.settingValue == null) return defaultValue;
+  try {
+    return JSON.parse(setting.settingValue);
+  } catch {
+    return setting.settingValue;
+  }
+}
+
+/**
+ * 写入或更新单个 SystemSetting 记录
+ * @param {string} key - 配置键
+ * @param {*} value - 配置值
+ * @param {string} type - 配置类型
+ * @param {string} description - 描述
+ * @returns {Promise<void>}
+ */
+async function upsertMailSetting(key, value, type, description) {
+  const existing = await SystemSetting.findByPk(key);
+  if (existing) {
+    await existing.update({
+      settingValue: JSON.stringify(value),
+      settingType: type,
+    });
+  } else {
+    await SystemSetting.create({
+      settingKey: key,
+      settingValue: JSON.stringify(value),
+      settingType: type,
+      category: 'mail',
+      description,
+      isEditable: true,
+    });
+  }
+}
+
+/**
+ * 获取 SMTP 邮件配置（密码字段返回掩码，不暴露明文）
+ * GET /api/system-settings/mail
+ * 权限：仅超级管理员
+ */
+router.get('/mail', requireAdmin, async (req, res) => {
+  try {
+    const { MAIL_KEYS } = require('../config/mail');
+    const { decrypt, maskSecret } = require('../utils/crypto');
+
+    const [host, port, secure, user, passEncrypted, from, fromName] = await Promise.all([
+      readMailSetting(MAIL_KEYS.HOST, ''),
+      readMailSetting(MAIL_KEYS.PORT, 465),
+      readMailSetting(MAIL_KEYS.SECURE, true),
+      readMailSetting(MAIL_KEYS.USER, ''),
+      readMailSetting(MAIL_KEYS.PASS_ENCRYPTED, ''),
+      readMailSetting(MAIL_KEYS.FROM, ''),
+      readMailSetting(MAIL_KEYS.FROM_NAME, 'IDC资产管理系统'),
+    ]);
+
+    // 尝试解密密码以生成掩码（保留后 4 位）
+    let passMasked = '';
+    let hasPassword = false;
+    if (passEncrypted) {
+      hasPassword = true;
+      try {
+        const passPlain = decrypt(passEncrypted);
+        passMasked = maskSecret(passPlain);
+      } catch {
+        // 解密失败（如 SMTP_SECRET_KEY 变更），仅显示占位
+        passMasked = '••••';
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        smtpHost: host,
+        smtpPort: Number(port) || 465,
+        smtpSecure: secure === true || secure === 'true',
+        smtpUser: user,
+        smtpPassMasked: passMasked,
+        hasPassword,
+        mailFrom: from,
+        mailFromName: fromName,
+      },
+    });
+  } catch (error) {
+    logger.error('获取邮件配置失败', { error: error.message });
+    res.status(500).json({ success: false, message: '获取邮件配置失败', error: error.message });
+  }
+});
+
+/**
+ * 保存 SMTP 邮件配置（密码字段 AES-256-CBC 加密存储）
+ * PUT /api/system-settings/mail
+ * 权限：仅超级管理员
+ * body: { smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass?, mailFrom, mailFromName }
+ *       smtpPass 为空字符串/undefined 时保留原密码不变
+ */
+router.put('/mail', requireAdmin, async (req, res) => {
+  try {
+    const { MAIL_KEYS } = require('../config/mail');
+    const { encrypt } = require('../utils/crypto');
+    const mailer = require('../services/mailer');
+
+    const { smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, mailFrom, mailFromName } = req.body;
+
+    // 校验必填字段
+    if (!smtpHost || !smtpUser) {
+      return res.status(400).json({ success: false, message: 'SMTP 服务器和用户名为必填项' });
+    }
+
+    // 读取现有密码密文（用于 smtpPass 为空时保留）
+    const existingPassEncrypted = await readMailSetting(MAIL_KEYS.PASS_ENCRYPTED, '');
+
+    // 决定最终密码密文
+    let finalPassEncrypted = existingPassEncrypted;
+    const passwordChanged = smtpPass && String(smtpPass).trim() !== '';
+    if (passwordChanged) {
+      finalPassEncrypted = encrypt(smtpPass);
+    } else if (!existingPassEncrypted) {
+      return res.status(400).json({ success: false, message: '请输入 SMTP 密码/授权码' });
+    }
+
+    // 写入所有配置项
+    await Promise.all([
+      upsertMailSetting(MAIL_KEYS.HOST, smtpHost, 'string', 'SMTP 服务器地址'),
+      upsertMailSetting(MAIL_KEYS.PORT, Number(smtpPort) || 465, 'number', 'SMTP 端口'),
+      upsertMailSetting(MAIL_KEYS.SECURE, smtpSecure === true || smtpSecure === 'true', 'boolean', '是否使用 SSL'),
+      upsertMailSetting(MAIL_KEYS.USER, smtpUser, 'string', 'SMTP 用户名'),
+      upsertMailSetting(MAIL_KEYS.PASS_ENCRYPTED, finalPassEncrypted, 'string', 'SMTP 密码（加密存储）'),
+      upsertMailSetting(MAIL_KEYS.FROM, mailFrom || smtpUser, 'string', '发件人邮箱'),
+      upsertMailSetting(MAIL_KEYS.FROM_NAME, mailFromName || 'IDC资产管理系统', 'string', '发件人名称'),
+    ]);
+
+    // 重建 transporter 使新配置立即生效
+    await mailer.rebuildTransporter();
+
+    await logSystemOperation('update', '更新邮件服务 SMTP 配置', {
+      targetName: '邮件服务配置',
+      afterState: {
+        smtpHost,
+        smtpPort: Number(smtpPort) || 465,
+        smtpUser,
+        mailFrom: mailFrom || smtpUser,
+        passwordChanged,
+      },
+      req,
+      metadata: {
+        changedFields: Object.keys(req.body),
+        passwordChanged,
+      },
+    });
+
+    res.json({ success: true, message: '邮件配置保存成功' });
+  } catch (error) {
+    logger.error('保存邮件配置失败', { error: error.message });
+    await logSystemOperation('update', '保存邮件服务配置失败', {
+      targetName: '邮件服务配置',
+      result: 'failed',
+      req,
+      metadata: { error: error.message },
+    });
+    res.status(500).json({ success: false, message: '保存邮件配置失败', error: error.message });
+  }
+});
+
+/**
+ * 发送测试邮件（不写入数据库，仅用当前配置发送一封测试邮件）
+ * POST /api/system-settings/mail/test
+ * 权限：仅超级管理员
+ * body: { to: 'admin@example.com' }
+ */
+router.post('/mail/test', requireAdmin, async (req, res) => {
+  try {
+    const { to } = req.body;
+    if (!to) {
+      return res.status(400).json({ success: false, message: '请提供收件人邮箱' });
+    }
+
+    const mailer = require('../services/mailer');
+    const result = await mailer.sendTemplate(
+      to,
+      'test-mail',
+      { to, mailFromName: 'IDC资产管理系统' },
+      '【测试邮件】IDC资产管理系统'
+    );
+
+    await logSystemOperation('test', `发送测试邮件到 ${to}`, {
+      targetName: '测试邮件',
+      afterState: { to, success: result.success },
+      result: result.success ? 'success' : 'failed',
+      req,
+      metadata: { to, success: result.success, error: result.error },
+    });
+
+    if (result.success) {
+      res.json({ success: true, message: `测试邮件已发送到 ${to}` });
+    } else {
+      const errorMsg =
+        result.error === 'MAIL_NOT_CONFIGURED'
+          ? '邮件服务未配置，请先保存 SMTP 配置'
+          : result.hint || `测试邮件发送失败：${result.error}`;
+      res.status(400).json({ success: false, message: errorMsg, error: result.error });
+    }
+  } catch (error) {
+    logger.error('发送测试邮件异常', { error: error.message });
+    res.status(500).json({ success: false, message: '发送测试邮件异常', error: error.message });
   }
 });
 
@@ -769,7 +990,9 @@ router.get('/system/info', async (req, res) => {
     const Rack = require('../models/Rack');
     const Room = require('../models/Room');
     const User = require('../models/User');
+    const { sequelize, DB_TYPE, dbDialect } = require('../db');
     const os = require('os');
+    const osUtils = require('os');
 
     // 同步版本号到数据库
     try {
@@ -795,12 +1018,12 @@ router.get('/system/info', async (req, res) => {
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
     const usedMemPercent = Math.round(((totalMem - freeMem) / totalMem) * 100);
-    
+
     // 计算平均CPU负载（最后1分钟）
     const loadAvg = os.loadavg()[0];
     const cpuCores = os.cpus().length;
     const cpuPercent = Math.round((loadAvg / cpuCores) * 100);
-    
+
     // 获取磁盘使用情况（获取根目录）
     let diskPercent = 30; // 默认值
     try {
@@ -811,6 +1034,114 @@ router.get('/system/info', async (req, res) => {
       logger.error('获取磁盘信息失败', { error: diskError });
     }
 
+    // 数据库连接信息
+    let dbInfo;
+    const sequelizeVersion = require('sequelize/package.json').version;
+    if (DB_TYPE === 'mysql') {
+      dbInfo = {
+        type: 'mysql',
+        dialect: 'mysql',
+        host: process.env.MYSQL_HOST || 'localhost',
+        port: parseInt(process.env.MYSQL_PORT, 10) || 3306,
+        database: process.env.MYSQL_DATABASE || 'idc_management',
+        sequelizeVersion,
+        dialectModule: 'mysql2',
+        status: 'unknown',
+        version: null,
+      };
+    } else {
+      // SQLite：本地文件数据库，无主机/端口概念
+      const dbPath = process.env.DB_PATH || './idc_management.db';
+      dbInfo = {
+        type: 'sqlite',
+        dialect: 'sqlite',
+        host: 'local file',
+        port: null,
+        database: dbPath,
+        sequelizeVersion,
+        dialectModule: 'sqlite3',
+        status: 'unknown',
+        version: null,
+      };
+    }
+
+    try {
+      await sequelize.authenticate();
+      dbInfo.status = 'connected';
+      // 查询数据库版本
+      const [result] = await sequelize.query(
+        DB_TYPE === 'mysql' ? 'SELECT VERSION() AS version;' : 'SELECT sqlite_version() AS version;'
+      );
+      if (result && result[0] && result[0].version) {
+        dbInfo.version = result[0].version;
+      }
+    } catch (dbError) {
+      dbInfo.status = 'disconnected';
+      dbInfo.error = dbError.message;
+    }
+
+    // 仓库与许可信息
+    // 解析仓库信息，统一输出可点击的 URL 和 owner/repo
+    const rawRepo = packageJson.repository || null;
+    let repoUrl = null;
+    let repoOwner = null;
+    let repoName = null;
+    if (rawRepo) {
+      const rawUrl = typeof rawRepo === 'string' ? rawRepo : rawRepo.url;
+      if (rawUrl) {
+        // 去除 git+/ssh 协议前缀，规范化为 https URL
+        let normalized = rawUrl
+          .replace(/^git\+/, '')
+          .replace(/^git@github\.com:/, 'https://github.com/')
+          .replace(/\.git$/, '');
+        if (!/^https?:\/\//.test(normalized) && normalized.includes('github.com')) {
+          normalized = `https://${normalized}`;
+        }
+        repoUrl = normalized;
+        const match = normalized.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
+        if (match) {
+          repoOwner = match[1];
+          repoName = match[2];
+        }
+      }
+    }
+    const repoInfo = {
+      repository: rawRepo,
+      repoUrl,
+      repoOwner,
+      repoName,
+      license: packageJson.license || null,
+      author: packageJson.author || null,
+      homepage: packageJson.homepage || null,
+      issuesUrl: repoOwner && repoName ? `https://github.com/${repoOwner}/${repoName}/issues` : null,
+    };
+
+    // 技术支持信息（来自系统设置中的公司信息）
+    const supportInfo = {
+      companyName: null,
+      contactEmail: null,
+      contactPhone: null,
+      companyAddress: null,
+      systemDescription: null,
+    };
+    try {
+      const supportKeys = ['company_name', 'contact_email', 'contact_phone', 'company_address', 'system_description'];
+      const supportSettings = await SystemSetting.findAll({
+        where: { settingKey: { [Op.in]: supportKeys } },
+      });
+      const supportMap = {};
+      supportSettings.forEach(s => {
+        supportMap[s.settingKey] = s.settingValue ? JSON.parse(s.settingValue) : null;
+      });
+      supportInfo.companyName = supportMap.company_name || null;
+      supportInfo.contactEmail = supportMap.contact_email || null;
+      supportInfo.contactPhone = supportMap.contact_phone || null;
+      supportInfo.companyAddress = supportMap.company_address || null;
+      supportInfo.systemDescription = supportMap.system_description || null;
+    } catch (supportErr) {
+      logger.error('获取技术支持信息失败', { error: supportErr });
+    }
+
     res.json({
       system: {
         name: '机柜管理系统',
@@ -819,6 +1150,7 @@ router.get('/system/info', async (req, res) => {
         nodeVersion: process.version,
         platform: process.platform,
         arch: process.arch,
+        hostname: osUtils.hostname(),
         memoryUsage: process.memoryUsage(),
         pid: process.pid,
       },
@@ -837,6 +1169,9 @@ router.get('/system/info', async (req, res) => {
           percent: diskPercent,
         },
       },
+      database: dbInfo,
+      repoInfo,
+      supportInfo,
       statistics: {
         devices: deviceCount,
         racks: rackCount,
@@ -847,6 +1182,105 @@ router.get('/system/info', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * 获取开源许可列表
+ * GET /api/system-settings/system/licenses
+ * 读取 backend 和 frontend 的 package.json 以及 node_modules 中的 license 字段
+ */
+router.get('/system/licenses', async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const backendPkgPath = path.join(__dirname, '..', 'package.json');
+    const frontendPkgPath = path.join(__dirname, '..', '..', 'frontend', 'package.json');
+
+    const readPkg = (pkgPath) => {
+      try {
+        return JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const backendPkg = readPkg(backendPkgPath);
+    const frontendPkg = readPkg(frontendPkgPath);
+
+    // 收集所有依赖（含 dependencies 和 devDependencies）
+    const collectDeps = (pkg, scope) => {
+      const result = [];
+      if (!pkg) return result;
+      ['dependencies', 'devDependencies'].forEach((depType) => {
+        if (pkg[depType]) {
+          Object.entries(pkg[depType]).forEach(([name, version]) => {
+            result.push({
+              name,
+              versionSpec: version,
+              scope,
+              type: depType === 'devDependencies' ? 'dev' : 'runtime',
+            });
+          });
+        }
+      });
+      return result;
+    };
+
+    const allDeps = [
+      ...collectDeps(backendPkg, 'backend'),
+      ...collectDeps(frontendPkg, 'frontend'),
+    ];
+
+    // 尝试读取每个依赖的实际版本和 license（从 node_modules）
+    const resolveLicenseInfo = (dep, scopeRoot) => {
+      try {
+        const depPkgPath = path.join(scopeRoot, 'node_modules', dep.name, 'package.json');
+        const depPkg = JSON.parse(fs.readFileSync(depPkgPath, 'utf8'));
+        let license = depPkg.license;
+        if (!license && Array.isArray(depPkg.licenses) && depPkg.licenses.length > 0) {
+          license = depPkg.licenses[0].type || depPkg.licenses[0].name;
+        }
+        return {
+          installedVersion: depPkg.version || null,
+          license: license || 'Unknown',
+          homepage: depPkg.homepage || null,
+          repository: depPkg.repository
+            ? (typeof depPkg.repository === 'string' ? depPkg.repository : depPkg.repository.url)
+            : null,
+        };
+      } catch (e) {
+        return { installedVersion: null, license: 'Unknown', homepage: null, repository: null };
+      }
+    };
+
+    const backendRoot = path.join(__dirname, '..');
+    const frontendRoot = path.join(__dirname, '..', '..', 'frontend');
+
+    const licenses = allDeps.map(dep => {
+      const info = resolveLicenseInfo(dep, dep.scope === 'backend' ? backendRoot : frontendRoot);
+      return { ...dep, ...info };
+    }).filter(dep => dep.name !== 'all'); // 过滤掉 "all" 占位依赖
+
+    // 按许可类型分组统计
+    const licenseGroups = {};
+    licenses.forEach(dep => {
+      const lic = dep.license || 'Unknown';
+      if (!licenseGroups[lic]) licenseGroups[lic] = [];
+      licenseGroups[lic].push(dep);
+    });
+
+    res.json({
+      success: true,
+      total: licenses.length,
+      licenses,
+      groups: Object.keys(licenseGroups).map(k => ({
+        license: k,
+        count: licenseGroups[k].length,
+      })).sort((a, b) => b.count - a.count),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

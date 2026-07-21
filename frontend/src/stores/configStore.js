@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import axios from 'axios';
 
+// 主题色固定为默认紫蓝渐变（外观设置已移除，不再支持自定义）
 const defaultConfig = {
   site_name: '机柜管理系统',
   site_logo: '',
@@ -16,23 +17,7 @@ const defaultConfig = {
   maintenance_mode: false,
 };
 
-const applyThemeColors = (primaryColor, secondaryColor) => {
-  const root = document.documentElement;
-  if (primaryColor) {
-    root.style.setProperty('--primary-color', primaryColor);
-    root.style.setProperty('--primary-light', `${primaryColor}20`);
-    root.style.setProperty(
-      '--primary-gradient',
-      `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor || '#764ba2'} 100%)`
-    );
-  }
-  if (secondaryColor) {
-    root.style.setProperty('--secondary-color', secondaryColor);
-    root.style.setProperty('--secondary-light', `${secondaryColor}20`);
-  }
-};
-
-export const useConfigStore = create((set, get) => ({
+export const useConfigStore = create((set) => ({
   config: defaultConfig,
   loading: true,
 
@@ -49,10 +34,6 @@ export const useConfigStore = create((set, get) => ({
       set((state) => ({
         config: { ...state.config, ...configValues },
       }));
-
-      if (configValues.primary_color || configValues.secondary_color) {
-        applyThemeColors(configValues.primary_color, configValues.secondary_color);
-      }
     } catch {
       // 加载失败使用默认配置
     } finally {
@@ -64,15 +45,10 @@ export const useConfigStore = create((set, get) => ({
     set((state) => ({
       config: { ...state.config, ...newConfig },
     }));
-
-    if (newConfig.primary_color || newConfig.secondary_color) {
-      const { config } = get();
-      applyThemeColors(config.primary_color, config.secondary_color);
-    }
   },
 
   reloadConfig: async () => {
-    await get().loadConfig();
+    await useConfigStore.getState().loadConfig();
   },
 }));
 

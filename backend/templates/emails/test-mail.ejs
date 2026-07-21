@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>测试邮件</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f5f7fa;padding:32px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="560" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+          <!-- 顶部品牌条 -->
+          <tr>
+            <td style="background-color:#10b981;padding:24px 40px;">
+              <div style="color:#ffffff;font-size:18px;font-weight:600;letter-spacing:0.5px;">
+                <%= locals.mailFromName || 'IDC资产管理系统' %>
+              </div>
+            </td>
+          </tr>
+          <!-- 正文 -->
+          <tr>
+            <td style="padding:40px;">
+              <h1 style="margin:0 0 16px 0;font-size:20px;color:#1f2937;font-weight:600;">
+                测试邮件
+              </h1>
+              <p style="margin:0 0 16px 0;font-size:14px;color:#4b5563;line-height:1.6;">
+                您好，这是一封来自 <%= locals.mailFromName || 'IDC资产管理系统' %> 的测试邮件。
+              </p>
+              <div style="background-color:#ecfdf5;border-left:4px solid #10b981;padding:16px 20px;margin:24px 0;border-radius:4px;">
+                <p style="margin:0;font-size:14px;color:#065f46;line-height:1.6;">
+                  <strong>✓ 邮件服务配置正确</strong><br>
+                  如果您收到此邮件，说明 SMTP 配置已生效，系统可以正常发送邮件。
+                </p>
+              </div>
+              <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;line-height:1.6;">
+                发送时间：<%= new Date().toLocaleString('zh-CN') %>
+              </p>
+              <p style="margin:0 0 24px 0;font-size:13px;color:#6b7280;line-height:1.6;">
+                收件人：<%= to %>
+              </p>
+
+              <hr style="border:0;border-top:1px solid #e5e7eb;margin:24px 0;">
+
+              <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">
+                此邮件由系统自动发送，请勿直接回复。
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

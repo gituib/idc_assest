@@ -1,7 +1,18 @@
 {
   "name": "idc-frontend",
-  "version": "2.2.4",
+  "version": "2.3.0",
   "description": "IDC设备管理系统前端",
+  "author": "gituib",
+  "license": "MIT",
+  "homepage": "https://github.com/gituib/idc_assest#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gituib/idc_assest.git",
+    "directory": "frontend"
+  },
+  "bugs": {
+    "url": "https://github.com/gituib/idc_assest/issues"
+  },
   "scripts": {
     "start": "vite",
     "dev": "vite",

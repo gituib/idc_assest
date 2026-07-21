@@ -7,6 +7,7 @@ import {
   message,
   Typography,
   Alert,
+  Modal,
 } from 'antd';
 import {
   UserOutlined,
@@ -19,8 +20,9 @@ import {
   DashboardOutlined,
   SecurityScanOutlined,
   ApiOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import './Login.css';
 
@@ -78,10 +80,16 @@ const Login = () => {
       if (result.success) {
         message.success(result.isFirstUser ? '管理员账号创建成功' : '注册成功，请等待管理员审核');
         if (result.isFirstUser) {
+          // 首位管理员：提醒配置邮件服务（管理员职责），同时若填了邮箱附带验证提示
           setIsFirstUser(false);
-          navigate('/dashboard');
+          showAdminSetupPrompt(!!values.email);
         } else {
-          setRegisterMode(false);
+          // 普通用户：仅填了邮箱时提醒验证；未填邮箱直接切回登录表单
+          if (values.email) {
+            showEmailVerifyPrompt();
+          } else {
+            setRegisterMode(false);
+          }
         }
       } else {
         message.error(result.message);
@@ -91,6 +99,65 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * 首位管理员注册成功后引导：优先配置邮件服务（管理员职责）
+   * 邮箱验证由登录后的 EmailVerifyBanner 持续提醒，不在弹窗中要求
+   * @param {boolean} hasEmail - 注册时是否填了邮箱（影响提示文案）
+   */
+  const showAdminSetupPrompt = (hasEmail) => {
+    Modal.info({
+      title: '系统初始化提醒',
+      icon: <ExclamationCircleOutlined style={{ color: '#faad14' }} />,
+      content: (
+        <div style={{ marginTop: 8 }}>
+          <p style={{ margin: '4px 0 8px', color: '#475569', fontSize: 14 }}>
+            作为首位管理员，建议您前往「系统设置 → 邮件服务」配置 SMTP，以启用邮箱验证、找回密码等功能。
+          </p>
+          {hasEmail && (
+            <p style={{ margin: '0 0 8px', color: '#94a3b8', fontSize: 12 }}>
+              您已填写邮箱，配置完邮件服务后可前往「账号设置」完成邮箱验证。
+            </p>
+          )}
+          <p style={{ margin: 0, color: '#94a3b8', fontSize: 12 }}>
+            未配置邮件服务时，邮箱验证、找回密码等依赖邮件的功能将不可用。
+          </p>
+        </div>
+      ),
+      okText: '去配置邮件服务',
+      cancelText: '稍后再说',
+      okButtonProps: { type: 'primary' },
+      onOk: () => navigate('/system-settings'),
+      onCancel: () => navigate('/dashboard'),
+      centered: true,
+      maskClosable: false,
+    });
+  };
+
+  /**
+   * 普通用户注册成功后弹出邮箱验证引导提示（账户审核通过后登录系统验证）
+   */
+  const showEmailVerifyPrompt = () => {
+    Modal.info({
+      title: '邮箱验证提醒',
+      icon: <ExclamationCircleOutlined style={{ color: '#faad14' }} />,
+      content: (
+        <div style={{ marginTop: 8 }}>
+          <p style={{ margin: '4px 0 8px', color: '#475569', fontSize: 14 }}>
+            您已填写邮箱，但尚未完成验证。验证邮箱后可启用「找回密码」功能，并在重要操作时接收通知。
+          </p>
+          <p style={{ margin: 0, color: '#94a3b8', fontSize: 12 }}>
+            账户审核通过后登录系统，前往「账号设置」完成验证。
+          </p>
+        </div>
+      ),
+      okText: '我知道了',
+      okButtonProps: { type: 'primary' },
+      onOk: () => setRegisterMode(false),
+      centered: true,
+      maskClosable: false,
+    });
   };
 
   const features = [
@@ -279,6 +346,11 @@ const Login = () => {
                     rules={[
                       { type: 'email', message: '请输入有效的邮箱地址' },
                     ]}
+                    extra={
+                      <div style={{ fontSize: 12, color: 'var(--lp-text-muted, #94a3b8)', marginTop: 4, lineHeight: 1.5 }}>
+                        填写后可在「账号设置」中验证邮箱，启用找回密码与邮件通知；不填可后续补填，但未验证前相关功能不可用。
+                      </div>
+                    }
                   >
                     <Input
                       placeholder="请输入邮箱（选填）"
@@ -327,6 +399,25 @@ const Login = () => {
                   className="login-input"
                 />
               </Form.Item>
+
+              {!isFirstUser && !registerMode && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -8, marginBottom: 12 }}>
+                  <Link
+                    to="/forgot-password"
+                    className="forgot-link"
+                    style={{
+                      fontSize: 13,
+                      color: 'var(--lp-primary, #14b8a6)',
+                      fontWeight: 500,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '4px 0',
+                    }}
+                  >
+                    忘记密码?
+                  </Link>
+                </div>
+              )}
 
               {(registerMode || isFirstUser) && (
                 <Form.Item

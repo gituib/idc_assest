@@ -134,7 +134,17 @@ export const authAPI = {
   unlock: data => api.post('/auth/unlock', data),
   getProfile: () => api.get('/auth/profile'),
   updateProfile: data => api.put('/auth/profile', data),
-  changePassword: data => api.put('/auth/password', data),
+  // 邮箱验证
+  sendVerifyCode: email => api.post('/auth/send-verify-code', { email }),
+  verifyEmail: (email, code) => api.post('/auth/verify-email', { email, code }),
+  // 修改密码（已登录，旧密码校验）
+  changePassword: (oldPassword, newPassword) =>
+    api.post('/auth/change-password', { oldPassword, newPassword }),
+  // 找回密码（未登录）—— account 可为邮箱或用户名
+  forgotPasswordSendCode: account =>
+    api.post('/auth/forgot-password/send-code', { account }),
+  forgotPasswordReset: (account, code, newPassword) =>
+    api.post('/auth/forgot-password/reset', { account, code, newPassword }),
 };
 
 export const userAPI = {
@@ -255,6 +265,15 @@ export const backupAPI = {
   getLogs: params => api.get('/backup/logs', { params }),
   getLogDetail: id => api.get(`/backup/logs/${id}`),
   cleanOldLogs: days => api.delete('/backup/logs/clean', { params: { days } }),
+};
+
+export const systemSettingsAPI = {
+  // SMTP 邮件服务配置
+  getMailConfig: () => api.get('/system-settings/mail'),
+  saveMailConfig: data => api.put('/system-settings/mail', data),
+  sendTestMail: to => api.post('/system-settings/mail/test', { to }),
+  // 关于系统：开源许可列表
+  getLicenses: () => api.get('/system-settings/system/licenses'),
 };
 
 export default api;

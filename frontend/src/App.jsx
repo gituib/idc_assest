@@ -56,6 +56,7 @@ import axios from 'axios';
 import { Spin } from 'antd';
 import ErrorBoundary from './components/ErrorBoundary';
 import MaintenanceBanner from './components/MaintenanceBanner';
+import EmailVerifyBanner from './components/EmailVerifyBanner';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const DeviceManagement = lazy(() => import('./pages/DeviceManagement'));
@@ -69,10 +70,12 @@ const ConsumableLogs = lazy(() => import('./pages/ConsumableLogs'));
 const CategoryManagement = lazy(() => import('./pages/CategoryManagement'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const Login = lazy(() => import('./pages/Login'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const TicketManagement = lazy(() => import('./pages/TicketManagement'));
 const TicketCategoryManagement = lazy(() => import('./pages/TicketCategoryManagement'));
 const TicketStatistics = lazy(() => import('./pages/TicketStatistics'));
 const SystemSettings = lazy(() => import('./pages/SystemSettings'));
+const AccountSettings = lazy(() => import('./pages/AccountSettings'));
 const CableManagement = lazy(() => import('./pages/CableManagement'));
 const PortManagement = lazy(() => import('./pages/PortManagement'));
 const InventoryManagement = lazy(() => import('./pages/InventoryManagement'));
@@ -207,6 +210,7 @@ const AppLayout = ({ children }) => {
       path.startsWith('/login-history') ||
       path.startsWith('/operation-logs') ||
       path.startsWith('/settings') ||
+      path.startsWith('/account-settings') ||
       path.startsWith('/backup')
     )
       return 'system-management';
@@ -536,52 +540,77 @@ const AppLayout = ({ children }) => {
                 height: '100%',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '4px 12px',
-                  background: designTokens.colors.background.secondary,
-                  borderRadius: designTokens.borderRadius.medium,
-                  height: '40px',
-                  boxSizing: 'border-box',
+              <Dropdown
+                overlayStyle={{ minWidth: 160 }}
+                menu={{
+                  items: [
+                    {
+                      key: 'account-settings',
+                      icon: <UserOutlined />,
+                      label: '账号设置',
+                      onClick: () => navigate('/account-settings'),
+                    },
+                    { type: 'divider' },
+                    {
+                      key: 'logout',
+                      icon: <LogoutOutlined />,
+                      label: '退出登录',
+                      danger: true,
+                      onClick: handleLogout,
+                    },
+                  ],
                 }}
+                placement="bottomRight"
+                trigger={['click']}
               >
-                <Avatar
+                <div
                   style={{
-                    backgroundColor: designTokens.colors.primary.main,
-                    cursor: 'pointer',
-                    width: 32,
-                    height: 32,
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '4px 12px',
+                    background: designTokens.colors.background.secondary,
+                    borderRadius: designTokens.borderRadius.medium,
+                    height: '40px',
+                    boxSizing: 'border-box',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s ease',
                   }}
-                  icon={<UserOutlined style={{ fontSize: '14px' }} />}
-                />
-                <span
-                  style={{
-                    color: designTokens.colors.text.primary,
-                    fontSize: 14,
-                    fontWeight: 500,
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = designTokens.colors.sidebar.bgHover;
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = designTokens.colors.background.secondary;
                   }}
                 >
-                  {user.username}
-                </span>
-              </div>
-              <Button
-                type="text"
-                danger
-                icon={<LogoutOutlined />}
-                onClick={handleLogout}
-                className="logout-btn"
-              >
-                退出
-              </Button>
+                  <Avatar
+                    style={{
+                      backgroundColor: designTokens.colors.primary.main,
+                      cursor: 'pointer',
+                      width: 32,
+                      height: 32,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    icon={<UserOutlined style={{ fontSize: '14px' }} />}
+                  />
+                  <span
+                    style={{
+                      color: designTokens.colors.text.primary,
+                      fontSize: 14,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {user.username}
+                  </span>
+                </div>
+              </Dropdown>
             </div>
           )}
         </Header>
+        {/* 邮箱未验证提示横幅：仅登录态显示，引导用户验证邮箱 */}
+        <EmailVerifyBanner />
         <Content
           style={{
             padding: 24,
@@ -612,6 +641,7 @@ const routeConfig = [
   { path: '/ticket-categories', component: TicketCategoryManagement },
   { path: '/ticket-statistics', component: TicketStatistics },
   { path: '/settings', component: SystemSettings },
+  { path: '/account-settings', component: AccountSettings },
   { path: '/cables', component: CableManagement },
   { path: '/inventory', component: InventoryManagement },
   { path: '/inventory/execution', component: InventoryTaskExecution },
@@ -669,6 +699,14 @@ const ThemeConfig = () => {
                 element={
                   <ErrorBoundary fullPage>
                     <Login />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/forgot-password"
+                element={
+                  <ErrorBoundary fullPage>
+                    <ForgotPassword />
                   </ErrorBoundary>
                 }
               />

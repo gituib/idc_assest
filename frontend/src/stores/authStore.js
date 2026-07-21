@@ -29,8 +29,10 @@ export const useAuthStore = create((set, get) => ({
       try {
         const response = await authAPI.getProfile();
         if (response.success) {
-          set({ user: response.data.user });
-          await secureStorage.set(USER_KEY, response.data.user);
+          // 将 roles 合并进 user 对象，便于前端组件通过 user.roles 判断权限
+          const mergedUser = { ...response.data.user, roles: response.data.roles || [] };
+          set({ user: mergedUser });
+          await secureStorage.set(USER_KEY, mergedUser);
         }
       } catch (error) {
         const status = error?.response?.status;

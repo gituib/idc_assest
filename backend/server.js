@@ -1,7 +1,8 @@
 require('dotenv').config();
 const path = require('path');
-const { ensureJwtSecret } = require('./initConfig');
+const { ensureJwtSecret, ensureSmtpSecretKey } = require('./initConfig');
 ensureJwtSecret();
+ensureSmtpSecretKey();
 
 const express = require('express');
 const cors = require('cors');
@@ -92,6 +93,7 @@ async function syncOperationLogModel() {
 }
 
 async function syncBusinessModels() {
+  const User = require('./models/User');
   const Business = require('./models/Business');
   const DeviceBusiness = require('./models/DeviceBusiness');
   const Warehouse = require('./models/Warehouse');
@@ -106,15 +108,50 @@ async function syncBusinessModels() {
   const TicketOperationRecord = require('./models/TicketOperationRecord');
 
   /**
-   * 安全同步单个模型：alter:true 可能因历史遗留索引/数据问题失败，
-   * 单个模型失败不应导致整个服务崩溃，仅记录错误后继续。
+   * 安全同步单个模型
+   * - 表不存在：直接创建（非生产环境用 alter:true，生产环境用普通 sync）
+   * - 表已存在：仅用 ADD COLUMN 添加缺失字段，不重建表（避免 SQLite
+   *   backup→drop→create→restore 重建失败导致数据丢失，也避免 MySQL 上的
+   *   ADD FOREIGN KEY 因历史孤儿数据失败）
+   * - 如需修改/删除已有字段、调整索引，请使用 migration 脚本
+   * - 单个模型失败不应导致整个服务崩溃，仅记录错误后继续
    */
   const safeSync = async (model, label) => {
     try {
-      if (process.env.NODE_ENV !== 'production') {
-        await model.sync({ alter: true });
-      } else {
-        await model.sync();
+      const qi = sequelize.getQueryInterface();
+      const tableName = model.getTableName();
+      const tableExists = await qi.tableExists(tableName);
+
+      if (!tableExists) {
+        if (process.env.NODE_ENV !== 'production') {
+          await model.sync({ alter: true });
+        } else {
+          await model.sync();
+        }
+        logger.info(`模型 ${label} 表不存在，已创建`);
+        return;
+      }
+
+      // 表已存在：对比模型字段与数据库实际字段，仅 ADD COLUMN 添加缺失列
+      const tableDesc = await qi.describeTable(tableName);
+      const attributes = model.rawAttributes;
+      const missingColumns = Object.keys(attributes).filter(
+        col => !(col in tableDesc)
+      );
+
+      if (missingColumns.length === 0) {
+        return;
+      }
+
+      for (const col of missingColumns) {
+        const attr = attributes[col];
+        await qi.addColumn(tableName, col, {
+          type: attr.type,
+          allowNull: attr.allowNull !== false,
+          defaultValue: attr.defaultValue,
+          comment: attr.comment,
+        });
+        logger.info(`模型 ${label} 添加缺失字段: ${col}`);
       }
     } catch (err) {
       logger.error(`模型 ${label} 同步失败，服务将继续启动（请手动修复表结构）`, {
@@ -123,6 +160,7 @@ async function syncBusinessModels() {
     }
   };
 
+  await safeSync(User, 'User');
   await safeSync(Warehouse, 'Warehouse');
   await safeSync(Business, 'Business');
   await safeSync(Role, 'Role');
@@ -136,7 +174,7 @@ async function syncBusinessModels() {
   await safeSync(Ticket, 'Ticket');
   await safeSync(TicketOperationRecord, 'TicketOperationRecord');
 
-  logger.info('业务/库房/工单等扩展模型同步完成' + (process.env.NODE_ENV !== 'production' ? '（alter mode）' : '（safe mode）'));
+  logger.info('用户/业务/库房/工单等扩展模型同步完成' + (process.env.NODE_ENV !== 'production' ? '（alter mode）' : '（safe mode）'));
 }
 
 async function initDefaultSystemSettings() {
