@@ -274,6 +274,8 @@ export const systemSettingsAPI = {
   sendTestMail: to => api.post('/system-settings/mail/test', { to }),
   // 关于系统：开源许可列表
   getLicenses: () => api.get('/system-settings/system/licenses'),
+  // 在线更新：检查是否有新版本
+  checkUpdate: () => api.get('/system-settings/system/check-update'),
 };
 
 export default api;

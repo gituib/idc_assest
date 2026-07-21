@@ -112,56 +112,7 @@ JWT_SECRET=${newSecret}
   }
 }
 
-/**
- * 确保 SMTP_SECRET_KEY 已配置（用于 AES 加密 SMTP 密码）
- * - 已配置且长度 >= 32：直接使用
- * - 生产环境未配置：抛错
- * - 开发环境未配置：自动生成并写入 .env
- * @returns {string} SMTP_SECRET_KEY
- */
-function ensureSmtpSecretKey() {
-  const currentKey = process.env.SMTP_SECRET_KEY;
-
-  if (currentKey && currentKey.length >= 32) {
-    console.log('✓ SMTP_SECRET_KEY 已配置');
-    return currentKey;
-  }
-
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      '[致命错误] 生产环境未设置 SMTP_SECRET_KEY 环境变量！\n' +
-        '该密钥用于加密存储 SMTP 密码，缺失将导致邮件功能不可用。\n' +
-        '生成命令（PowerShell）：-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 64 | ForEach-Object { [char]$_ })'
-    );
-  }
-
-  const newKey = generateSecret(64);
-  console.log('⚠️  SMTP_SECRET_KEY 未配置或长度不足，正在自动生成...');
-
-  try {
-    if (fs.existsSync(ENV_FILE_PATH)) {
-      const originalContent = fs.readFileSync(ENV_FILE_PATH, 'utf-8');
-      const updatedContent = stringifyEnvContent({ SMTP_SECRET_KEY: newKey }, originalContent);
-      fs.writeFileSync(ENV_FILE_PATH, updatedContent, 'utf-8');
-      console.log('✓ SMTP_SECRET_KEY 已自动生成并保存到 .env 文件');
-    } else {
-      const defaultContent = `# IDC设备管理系统 - 环境配置\n# 自动生成时间: ${new Date().toISOString()}\n\nSMTP_SECRET_KEY=${newKey}\n`;
-      fs.writeFileSync(ENV_FILE_PATH, defaultContent, 'utf-8');
-      console.log('✓ SMTP_SECRET_KEY 已自动生成并创建 .env 文件');
-    }
-
-    process.env.SMTP_SECRET_KEY = newKey;
-    return newKey;
-  } catch (err) {
-    console.warn('⚠️  无法保存 SMTP_SECRET_KEY 到 .env 文件，使用临时密钥（重启后失效）');
-    console.warn('   错误信息:', err.message);
-    process.env.SMTP_SECRET_KEY = newKey;
-    return newKey;
-  }
-}
-
 module.exports = {
   ensureJwtSecret,
-  ensureSmtpSecretKey,
   generateSecret,
 };

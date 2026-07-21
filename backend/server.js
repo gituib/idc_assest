@@ -1,8 +1,7 @@
 require('dotenv').config();
 const path = require('path');
-const { ensureJwtSecret, ensureSmtpSecretKey } = require('./initConfig');
+const { ensureJwtSecret } = require('./initConfig');
 ensureJwtSecret();
-ensureSmtpSecretKey();
 
 const express = require('express');
 const cors = require('cors');

@@ -22,6 +22,7 @@ import {
   InputNumber,
   Skeleton,
   Table,
+  Spin,
 } from 'antd';
 import {
   SettingOutlined,
@@ -51,6 +52,10 @@ import {
   DesktopOutlined,
   ExportOutlined,
   CodeOutlined,
+  CloudSyncOutlined,
+  CheckCircleOutlined,
+  WarningOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { useConfig } from '../hooks/useConfig';
@@ -148,6 +153,12 @@ const SystemSettings = () => {
   // 关于系统：开源许可
   const [licenseModal, setLicenseModal] = useState({ open: false, loading: false, data: null });
 
+  // 在线更新检查
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateChecked, setUpdateChecked] = useState(false);
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+
   useEffect(() => {
     fetchSettings();
     fetchSystemInfo();
@@ -206,6 +217,28 @@ const SystemSettings = () => {
       setLicenseModal({ open: true, loading: false, data: null });
       message.error('获取开源许可列表失败');
     }
+  };
+
+  /** 检查系统更新 */
+  const handleCheckUpdate = async () => {
+    setUpdateModalOpen(true);
+    setUpdateChecking(true);
+    try {
+      const res = await systemSettingsAPI.checkUpdate();
+      if (res?.success) {
+        setUpdateInfo(res.data);
+        setUpdateChecked(true);
+      }
+    } catch (error) {
+      message.error('检查更新失败');
+    } finally {
+      setUpdateChecking(false);
+    }
+  };
+
+  /** 关闭更新弹窗 */
+  const handleCloseUpdateModal = () => {
+    setUpdateModalOpen(false);
   };
 
   /** 获取邮件服务（SMTP）配置 */
@@ -686,6 +719,29 @@ const SystemSettings = () => {
             <Paragraph style={{ color: 'rgba(255,255,255,0.85)', margin: 0, fontSize: 13, maxWidth: 480, marginLeft: 'auto', marginRight: 'auto' }}>
               专业的数据中心设备管理平台，提供机房、机柜、设备的全生命周期管理
             </Paragraph>
+          </div>
+        </Card>
+
+        {/* 在线更新：紧凑触发行 */}
+        <Card
+          style={{ marginBottom: 16, borderRadius: 12, border: '1px solid #e8e8e8' }}
+          bodyStyle={{ padding: '16px 20px' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Space size={10}>
+              <Avatar style={{ backgroundColor: '#1890ff', borderRadius: 8 }} icon={<CloudSyncOutlined />} size={32} />
+              <Text strong style={{ fontSize: 15 }}>在线更新</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>检查并查看系统最新版本</Text>
+            </Space>
+            <Button
+              type="primary"
+              ghost
+              icon={<CloudSyncOutlined />}
+              onClick={handleCheckUpdate}
+              style={{ borderRadius: 8 }}
+            >
+              检查更新
+            </Button>
           </div>
         </Card>
 
@@ -1727,6 +1783,150 @@ const SystemSettings = () => {
             description="无法获取开源许可列表，请稍后重试"
           />
         )}
+      </Modal>
+
+      {/* 在线更新检查 Modal */}
+      <Modal
+        open={updateModalOpen}
+        onCancel={handleCloseUpdateModal}
+        title={
+          <Space>
+            <CloudSyncOutlined style={{ color: '#1890ff' }} />
+            <span>在线更新</span>
+          </Space>
+        }
+        footer={
+          <Button onClick={handleCloseUpdateModal} style={{ borderRadius: 8 }}>
+            关闭
+          </Button>
+        }
+        width={420}
+        centered
+        destroyOnClose
+      >
+        {updateChecking ? (
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <Spin />
+            <div style={{ marginTop: 12 }}>
+              <Text type="secondary" style={{ fontSize: 13 }}>正在检查更新...</Text>
+            </div>
+          </div>
+        ) : updateChecked && updateInfo ? (
+          <div>
+            {/* 版本状态 */}
+            <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
+              {updateInfo.hasUpdate ? (
+                <>
+                  <WarningOutlined style={{ fontSize: 36, color: '#faad14', marginBottom: 8 }} />
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#d48806', marginBottom: 8 }}>
+                    发现新版本
+                  </div>
+                  <Space size={8} align="center">
+                    <Tag color="default" style={{ fontSize: 13, padding: '1px 10px', borderRadius: 10 }}>
+                      当前 v{updateInfo.currentVersion}
+                    </Tag>
+                    <span style={{ color: '#bbb' }}>→</span>
+                    <Tag color="orange" style={{ fontSize: 13, padding: '1px 10px', borderRadius: 10, fontWeight: 600 }}>
+                      最新 v{updateInfo.latestVersion}
+                    </Tag>
+                  </Space>
+                </>
+              ) : updateInfo.error ? (
+                <>
+                  <InfoCircleOutlined style={{ fontSize: 36, color: '#8c8c8c', marginBottom: 8 }} />
+                  <div style={{ fontSize: 14, color: '#8c8c8c' }}>
+                    {updateInfo.error}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <CheckCircleOutlined style={{ fontSize: 36, color: '#52c41a', marginBottom: 8 }} />
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#52c41a', marginBottom: 6 }}>
+                    已是最新版本
+                  </div>
+                  <Tag color="green" style={{ fontSize: 13, padding: '1px 10px', borderRadius: 10 }}>
+                    v{updateInfo.currentVersion}
+                  </Tag>
+                </>
+              )}
+            </div>
+
+            {/* 更新详情 */}
+            {updateInfo.hasUpdate && (
+              <>
+                <Divider style={{ margin: '0 0 12px' }} />
+
+                {/* 更新命令提示 */}
+                <div style={{ marginBottom: 12 }}>
+                  <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>更新命令</Text>
+                  <div style={{
+                    marginTop: 6, padding: '10px 12px', background: '#f6f6f6',
+                    borderRadius: 6, border: '1px solid #e8e8e8',
+                  }}>
+                    <div style={{ fontSize: 12, color: '#595959', marginBottom: 6 }}>
+                      请在服务器终端中执行以下命令：
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <code style={{
+                        flex: 1, fontSize: 12, color: '#1677ff', background: '#fff',
+                        padding: '6px 8px', borderRadius: 4, border: '1px solid #d9d9d9',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        cd {updateInfo.projectPath} && node update.js
+                      </code>
+                      <Button
+                        size="small"
+                        icon={<CopyOutlined />}
+                        onClick={() => {
+                          const cmd = `cd ${updateInfo.projectPath} && node update.js`;
+                          navigator.clipboard.writeText(cmd).then(
+                            () => message.success('已复制到剪贴板'),
+                            () => message.error('复制失败')
+                          );
+                        }}
+                        style={{ flexShrink: 0, borderRadius: 4 }}
+                      >
+                        复制
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {updateInfo.publishedAt && (
+                  <div style={{ marginBottom: 8, fontSize: 12, color: '#8c8c8c' }}>
+                    发布时间：{new Date(updateInfo.publishedAt).toLocaleString('zh-CN')}
+                  </div>
+                )}
+                {updateInfo.releaseNotes && (
+                  <div style={{ marginBottom: 12 }}>
+                    <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>更新日志</Text>
+                    <div style={{
+                      marginTop: 6, padding: '8px 10px', background: '#fafafa',
+                      borderRadius: 6, maxHeight: 150, overflow: 'auto',
+                      fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+                      border: '1px solid #f0f0f0',
+                    }}>
+                      {updateInfo.releaseNotes}
+                    </div>
+                  </div>
+                )}
+                {updateInfo.releaseUrl && (
+                  <div style={{ textAlign: 'center' }}>
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<GithubOutlined />}
+                      onClick={() => window.open(updateInfo.releaseUrl, '_blank')}
+                      style={{ borderRadius: 6 }}
+                    >
+                      查看 GitHub Release
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : null}
       </Modal>
     </div>
   );

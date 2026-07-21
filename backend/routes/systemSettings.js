@@ -1375,5 +1375,205 @@ router.post('/frontend/restart', async (req, res) => {
   }
 });
 
+/**
+ * 检查系统更新
+ * GET /api/system-settings/system/check-update
+ * 调用 GitHub API 获取最新 tag，与当前版本比较
+ */
+// 版本检查结果缓存（5 分钟）
+let updateCheckCache = null;
+let updateCheckCacheTime = 0;
+const UPDATE_CHECK_CACHE_TTL = 5 * 60 * 1000;
+
+router.get('/system/check-update', async (req, res) => {
+  try {
+    const now = Date.now();
+
+    // 命中缓存直接返回
+    if (updateCheckCache && (now - updateCheckCacheTime) < UPDATE_CHECK_CACHE_TTL) {
+      return res.json(updateCheckCache);
+    }
+
+    // 解析仓库信息
+    const rawRepo = packageJson.repository || null;
+    let repoOwner = null;
+    let repoName = null;
+    if (rawRepo) {
+      const rawUrl = typeof rawRepo === 'string' ? rawRepo : rawRepo.url;
+      if (rawUrl) {
+        const match = rawUrl
+          .replace(/^git\+/, '')
+          .replace(/^git@github\.com:/, 'https://github.com/')
+          .replace(/\.git$/, '')
+          .match(/github\.com[/:]([^/]+)\/([^/.]+)/);
+        if (match) {
+          repoOwner = match[1];
+          repoName = match[2];
+        }
+      }
+    }
+
+    if (!repoOwner || !repoName) {
+      const result = {
+        success: true,
+        data: {
+          hasUpdate: false,
+          currentVersion: APP_VERSION,
+          latestVersion: null,
+          latestTag: null,
+          releaseUrl: null,
+          releaseNotes: null,
+          publishedAt: null,
+          error: '未配置 GitHub 仓库信息，无法检查更新',
+        },
+      };
+      updateCheckCache = result;
+      updateCheckCacheTime = now;
+      return res.json(result);
+    }
+
+    // 调用 GitHub API 获取 tags
+    const axios = require('axios');
+    const https = require('https');
+    const githubAgent = new https.Agent({ rejectUnauthorized: false });
+    let tags = [];
+    try {
+      const response = await axios.get(
+        `https://api.github.com/repos/${repoOwner}/${repoName}/tags`,
+        {
+          params: { per_page: 10 },
+          timeout: 10000,
+          headers: { 'Accept': 'application/vnd.github.v3+json' },
+          httpsAgent: githubAgent,
+        }
+      );
+      tags = response.data || [];
+    } catch (githubError) {
+      logger.warn('GitHub API 请求失败', { error: githubError.message });
+      const result = {
+        success: true,
+        data: {
+          hasUpdate: false,
+          currentVersion: APP_VERSION,
+          latestVersion: null,
+          latestTag: null,
+          releaseUrl: null,
+          releaseNotes: null,
+          publishedAt: null,
+          error: `无法访问 GitHub（${githubError.message}）`,
+        },
+      };
+      updateCheckCache = result;
+      updateCheckCacheTime = now;
+      return res.json(result);
+    }
+
+    if (tags.length === 0) {
+      const result = {
+        success: true,
+        data: {
+          hasUpdate: false,
+          currentVersion: APP_VERSION,
+          latestVersion: null,
+          latestTag: null,
+          releaseUrl: null,
+          releaseNotes: null,
+          publishedAt: null,
+          error: '未找到任何版本 tag',
+        },
+      };
+      updateCheckCache = result;
+      updateCheckCacheTime = now;
+      return res.json(result);
+    }
+
+    // 从 tag 名中提取语义化版本号（去掉 v 前缀）
+    const parseVersion = (tag) => {
+      const match = tag.name.match(/^v?(\d+\.\d+\.\d+)/);
+      if (!match) return null;
+      const parts = match[1].split('.').map(Number);
+      return { major: parts[0], minor: parts[1], patch: parts[2], raw: match[1] };
+    };
+
+    // 找到最新有效版本的 tag
+    let latestTag = null;
+    let latestVersion = null;
+    for (const tag of tags) {
+      const v = parseVersion(tag);
+      if (v) {
+        if (!latestVersion || isNewer(v, latestVersion)) {
+          latestVersion = v;
+          latestTag = tag;
+        }
+      }
+    }
+
+    // 解析当前版本
+    const currentParts = APP_VERSION.split('.').map(Number);
+    const currentVersion = { major: currentParts[0], minor: currentParts[1], patch: currentParts[2] };
+
+    const hasUpdate = latestVersion && isNewer(latestVersion, currentVersion);
+
+    // 尝试获取 release 信息（用于 changelog）
+    let releaseNotes = null;
+    let publishedAt = null;
+    if (hasUpdate && latestTag) {
+      try {
+        const releaseRes = await axios.get(
+          `https://api.github.com/repos/${repoOwner}/${repoName}/releases/tags/${latestTag.name}`,
+          {
+            timeout: 10000,
+            headers: { 'Accept': 'application/vnd.github.v3+json' },
+            httpsAgent: githubAgent,
+          }
+        );
+        if (releaseRes.data) {
+          releaseNotes = releaseRes.data.body || null;
+          publishedAt = releaseRes.data.published_at || null;
+        }
+      } catch (releaseError) {
+        // release 不存在不影响版本检查结果
+        logger.debug('获取 release 信息失败', { tag: latestTag.name, error: releaseError.message });
+      }
+    }
+
+    const result = {
+      success: true,
+      data: {
+        hasUpdate,
+        currentVersion: APP_VERSION,
+        latestVersion: latestVersion ? latestVersion.raw : null,
+        latestTag: latestTag ? latestTag.name : null,
+        releaseUrl: hasUpdate ? `https://github.com/${repoOwner}/${repoName}/releases/tag/${latestTag.name}` : null,
+        releaseNotes,
+        publishedAt,
+        // 项目根目录（update.js 所在位置）
+        projectPath: path.join(__dirname, '..'),
+        error: null,
+      },
+    };
+
+    updateCheckCache = result;
+    updateCheckCacheTime = now;
+    res.json(result);
+  } catch (error) {
+    logger.error('检查更新失败', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: '检查更新失败',
+    });
+  }
+});
+
+/**
+ * 比较两个语义化版本号，返回 a > b 是否成立
+ * a.newer(b) => a 比 b 新
+ */
+function isNewer(a, b) {
+  if (a.major !== b.major) return a.major > b.major;
+  if (a.minor !== b.minor) return a.minor > b.minor;
+  return a.patch > b.patch;
+}
+
 module.exports = router;
 module.exports.initDefaultSettings = initDefaultSettings;
