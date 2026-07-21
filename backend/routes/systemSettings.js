@@ -1549,6 +1549,8 @@ router.get('/system/check-update', async (req, res) => {
         publishedAt,
         // 项目根目录（update.js 所在位置）
         projectPath: path.join(__dirname, '..'),
+        // 是否运行在 Docker 容器中
+        isDocker: fs.existsSync('/.dockerenv'),
         error: null,
       },
     };

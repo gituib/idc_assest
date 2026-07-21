@@ -22,7 +22,6 @@ import {
   InputNumber,
   Skeleton,
   Table,
-  Spin,
 } from 'antd';
 import {
   SettingOutlined,
@@ -1805,11 +1804,20 @@ const SystemSettings = () => {
         destroyOnClose
       >
         {updateChecking ? (
-          <div style={{ textAlign: 'center', padding: '24px 0' }}>
-            <Spin />
-            <div style={{ marginTop: 12 }}>
-              <Text type="secondary" style={{ fontSize: 13 }}>正在检查更新...</Text>
+          /* 加载态：骨架屏脉冲动画 */
+          <div style={{ padding: '20px 0' }}>
+            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #e8e8e8 25%, #f0f0f0 50%, #e8e8e8 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'updateShimmer 1.5s infinite linear',
+                margin: '0 auto 12px',
+              }} />
+              <div style={{ height: 14, width: 120, borderRadius: 4, background: '#f0f0f0', margin: '0 auto 8px' }} />
+              <div style={{ height: 12, width: 180, borderRadius: 4, background: '#f6f6f6', margin: '0 auto' }} />
             </div>
+            <style>{`@keyframes updateShimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
           </div>
         ) : updateChecked && updateInfo ? (
           <div>
@@ -1817,34 +1825,57 @@ const SystemSettings = () => {
             <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
               {updateInfo.hasUpdate ? (
                 <>
-                  <WarningOutlined style={{ fontSize: 36, color: '#faad14', marginBottom: 8 }} />
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#d48806', marginBottom: 8 }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #fff7e6 0%, #fff1cc 100%)',
+                    border: '1px solid #ffe58f',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 10,
+                  }}>
+                    <WarningOutlined style={{ fontSize: 22, color: '#faad14' }} />
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#262626', marginBottom: 8 }}>
                     发现新版本
                   </div>
                   <Space size={8} align="center">
-                    <Tag color="default" style={{ fontSize: 13, padding: '1px 10px', borderRadius: 10 }}>
-                      当前 v{updateInfo.currentVersion}
+                    <Tag style={{ fontSize: 12, padding: '1px 8px', borderRadius: 8, background: '#f5f5f5', border: '1px solid #e8e8e8', color: '#8c8c8c' }}>
+                      v{updateInfo.currentVersion}
                     </Tag>
-                    <span style={{ color: '#bbb' }}>→</span>
-                    <Tag color="orange" style={{ fontSize: 13, padding: '1px 10px', borderRadius: 10, fontWeight: 600 }}>
-                      最新 v{updateInfo.latestVersion}
+                    <span style={{ color: '#bfbfbf', fontSize: 12 }}>→</span>
+                    <Tag style={{ fontSize: 12, padding: '1px 8px', borderRadius: 8, background: '#fff7e6', border: '1px solid #ffe58f', color: '#d48806', fontWeight: 600 }}>
+                      v{updateInfo.latestVersion}
                     </Tag>
                   </Space>
                 </>
               ) : updateInfo.error ? (
                 <>
-                  <InfoCircleOutlined style={{ fontSize: 36, color: '#8c8c8c', marginBottom: 8 }} />
-                  <div style={{ fontSize: 14, color: '#8c8c8c' }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: '50%',
+                    background: '#f5f5f5',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 10,
+                  }}>
+                    <InfoCircleOutlined style={{ fontSize: 22, color: '#bfbfbf' }} />
+                  </div>
+                  <div style={{ fontSize: 13, color: '#8c8c8c' }}>
                     {updateInfo.error}
                   </div>
                 </>
               ) : (
                 <>
-                  <CheckCircleOutlined style={{ fontSize: 36, color: '#52c41a', marginBottom: 8 }} />
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#52c41a', marginBottom: 6 }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%)',
+                    border: '1px solid #b7eb8f',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 10,
+                  }}>
+                    <CheckCircleOutlined style={{ fontSize: 22, color: '#52c41a' }} />
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#262626', marginBottom: 6 }}>
                     已是最新版本
                   </div>
-                  <Tag color="green" style={{ fontSize: 13, padding: '1px 10px', borderRadius: 10 }}>
+                  <Tag style={{ fontSize: 12, padding: '1px 8px', borderRadius: 8, background: '#f6ffed', border: '1px solid #b7eb8f', color: '#52c41a' }}>
                     v{updateInfo.currentVersion}
                   </Tag>
                 </>
@@ -1854,72 +1885,86 @@ const SystemSettings = () => {
             {/* 更新详情 */}
             {updateInfo.hasUpdate && (
               <>
-                <Divider style={{ margin: '0 0 12px' }} />
+                <Divider style={{ margin: '0 0 12px', borderColor: '#f0f0f0' }} />
 
                 {/* 更新命令提示 */}
                 <div style={{ marginBottom: 12 }}>
-                  <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>更新命令</Text>
+                  <Text type="secondary" style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.5 }}>更新方式</Text>
                   <div style={{
-                    marginTop: 6, padding: '10px 12px', background: '#f6f6f6',
-                    borderRadius: 6, border: '1px solid #e8e8e8',
+                    marginTop: 6, padding: '10px 12px',
+                    borderRadius: 6,
+                    background: updateInfo.isDocker ? '#fffbe6' : '#fafafa',
+                    border: `1px solid ${updateInfo.isDocker ? '#ffe58f' : '#f0f0f0'}`,
                   }}>
-                    <div style={{ fontSize: 12, color: '#595959', marginBottom: 6 }}>
-                      请在服务器终端中执行以下命令：
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <code style={{
-                        flex: 1, fontSize: 12, color: '#1677ff', background: '#fff',
-                        padding: '6px 8px', borderRadius: 4, border: '1px solid #d9d9d9',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        cd {updateInfo.projectPath} && node update.js
-                      </code>
-                      <Button
-                        size="small"
-                        icon={<CopyOutlined />}
-                        onClick={() => {
-                          const cmd = `cd ${updateInfo.projectPath} && node update.js`;
-                          navigator.clipboard.writeText(cmd).then(
-                            () => message.success('已复制到剪贴板'),
-                            () => message.error('复制失败')
-                          );
-                        }}
-                        style={{ flexShrink: 0, borderRadius: 4 }}
-                      >
-                        复制
-                      </Button>
-                    </div>
+                    {updateInfo.isDocker ? (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <InfoCircleOutlined style={{ color: '#faad14', marginTop: 1, flexShrink: 0 }} />
+                        <Text style={{ fontSize: 12, color: '#874d00' }}>
+                          当前运行在 Docker 容器中，无法通过终端脚本更新。请拉取最新 Docker 镜像后重建容器。
+                        </Text>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>
+                          在服务器终端中执行以下命令：
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <code style={{
+                            flex: 1, fontSize: 12, color: '#1677ff',
+                            background: '#fff', fontFamily: 'Consolas, Monaco, monospace',
+                            padding: '6px 8px', borderRadius: 4, border: '1px solid #e8e8e8',
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            lineHeight: 1.5,
+                          }}>
+                            cd {updateInfo.projectPath} && node update.js
+                          </code>
+                          <Button
+                            size="small"
+                            icon={<CopyOutlined />}
+                            onClick={() => {
+                              const cmd = `cd ${updateInfo.projectPath} && node update.js`;
+                              navigator.clipboard.writeText(cmd).then(
+                                () => message.success('已复制'),
+                                () => message.error('复制失败')
+                              );
+                            }}
+                            style={{ flexShrink: 0, borderRadius: 4, color: '#595959' }}
+                          >
+                            复制
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 {updateInfo.publishedAt && (
-                  <div style={{ marginBottom: 8, fontSize: 12, color: '#8c8c8c' }}>
-                    发布时间：{new Date(updateInfo.publishedAt).toLocaleString('zh-CN')}
+                  <div style={{ marginBottom: 8, fontSize: 11, color: '#bfbfbf' }}>
+                    发布于 {new Date(updateInfo.publishedAt).toLocaleDateString('zh-CN')}
                   </div>
                 )}
                 {updateInfo.releaseNotes && (
                   <div style={{ marginBottom: 12 }}>
-                    <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>更新日志</Text>
+                    <Text type="secondary" style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.5 }}>更新日志</Text>
                     <div style={{
                       marginTop: 6, padding: '8px 10px', background: '#fafafa',
                       borderRadius: 6, maxHeight: 150, overflow: 'auto',
                       fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap',
-                      border: '1px solid #f0f0f0',
+                      border: '1px solid #f0f0f0', color: '#595959',
                     }}>
                       {updateInfo.releaseNotes}
                     </div>
                   </div>
                 )}
                 {updateInfo.releaseUrl && (
-                  <div style={{ textAlign: 'center' }}>
+                  <div style={{ textAlign: 'center', paddingTop: 4 }}>
                     <Button
-                      type="primary"
                       size="small"
                       icon={<GithubOutlined />}
                       onClick={() => window.open(updateInfo.releaseUrl, '_blank')}
-                      style={{ borderRadius: 6 }}
+                      style={{ borderRadius: 4, color: '#595959', borderColor: '#d9d9d9' }}
                     >
-                      查看 GitHub Release
+                      查看 Release
                     </Button>
                   </div>
                 )}
