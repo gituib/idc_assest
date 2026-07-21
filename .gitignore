@@ -44,9 +44,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-backend/logs/**/*.log
-backend/logs/**/fallback/
-backend/logs/**/.audit.json
+# 后端运行时日志目录：忽略所有内容，仅保留 .gitkeep 占位文件
+backend/logs/**
+!backend/logs/.gitkeep
 
 # ==============================================
 # Database files (数据库文件)
@@ -117,11 +117,15 @@ backend/config/remote-backup-configs.json
 # ==============================================
 .trae/
 .vercel/
-.gitignore
-.vercelignore
 3d-datacenter-dashboard/
 docs/install-improvement-plan.md
 docs/install-split-plan.md
+.superpowers/
+docs/superpowers/
+CODE_WIKI.md
+AGENTS.md
+docs/docker-deployment-plan.md
+backend/tests/*.disabled
 
 # ==============================================
 # Local-only references (本地参考文档)
