@@ -35,17 +35,19 @@ import CloseButton from '../components/CloseButton';
 
 const { Option = Select.Option } = Select;
 
-const OptionsEditor = ({ value = [], onChange }) => {
+const OptionsEditor = ({ value, onChange }) => {
+  const options = Array.isArray(value) ? value : [];
+
   const handleAdd = () => {
-    onChange([...value, { value: '', label: '' }]);
+    onChange([...options, { value: '', label: '' }]);
   };
 
   const handleRemove = index => {
-    onChange(value.filter((_, i) => i !== index));
+    onChange(options.filter((_, i) => i !== index));
   };
 
   const handleUpdate = (index, field, fieldValue) => {
-    const newOptions = value.map((opt, i) => (i === index ? { ...opt, [field]: fieldValue } : opt));
+    const newOptions = options.map((opt, i) => (i === index ? { ...opt, [field]: fieldValue } : opt));
     onChange(newOptions);
   };
 
@@ -79,7 +81,7 @@ const OptionsEditor = ({ value = [], onChange }) => {
         <span style={{ color: '#999', fontSize: '12px' }}>（值用于提交，标签用于显示）</span>
       </div>
 
-      {value.length === 0 ? (
+      {options.length === 0 ? (
         <div
           style={{
             textAlign: 'center',
@@ -123,7 +125,7 @@ const OptionsEditor = ({ value = [], onChange }) => {
               标签（label）
             </span>
           </div>
-          {value.map((opt, index) => (
+          {options.map((opt, index) => (
             <div
               key={index}
               style={{
@@ -180,7 +182,7 @@ const OptionsEditor = ({ value = [], onChange }) => {
         </div>
       )}
 
-      {value.length > 0 && (
+      {options.length > 0 && (
         <Button
           type="dashed"
           icon={<PlusCircleOutlined />}
@@ -381,7 +383,7 @@ function DeviceFieldManagement() {
     if (field) {
       const fieldData = {
         ...field,
-        options: field.options || [],
+        options: Array.isArray(field.options) ? field.options : [],
       };
       setSelectedFieldType(field.fieldType || 'string');
       form.setFieldsValue(fieldData);

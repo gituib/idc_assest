@@ -4,6 +4,20 @@
 
 ---
 
+## [2.3.1] - 2026-07-21
+
+### 问题修复
+- 备份恢复 修复 JSON 字段反序列化仅处理 Device.customFields，其他表 JSON 字段丢失的问题
+- 备份恢复 修复增量恢复中 JSON 字段未做反序列化的问题
+- 备份日志 修复日志模板字符串 ${var} 在单引号中不生效的问题
+- DeviceFieldManagement 修复 OptionsEditor 组件 value 传入 undefined 导致 .map() 报错
+
+### 功能改进
+- 备份模块 新增 Warehouse（仓库）、OperationLog（操作日志）的备份配置
+- 备份列表 过滤规则新增 incremental_ 文件前缀支持
+
+---
+
 ## [2.3.0] - 2026-07-21
 
 ### 新增功能

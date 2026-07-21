@@ -142,8 +142,14 @@ async function restoreFromSnapshot(snapshotId) {
         try {
           const Model = require(config.modelPath);
 
-          for (let i = 0; i < tableData.length; i += BATCH_SIZE) {
-            const batch = tableData.slice(i, i + BATCH_SIZE);
+          // 还原点数据同样可能包含 raw:true 产生的字符串化 JSON 字段
+          const jsonFields = getJsonFieldNames(Model);
+          const processedData = tableData.map(record =>
+            deserializeJsonFields(record, jsonFields, tableName)
+          );
+
+          for (let i = 0; i < processedData.length; i += BATCH_SIZE) {
+            const batch = processedData.slice(i, i + BATCH_SIZE);
             try {
               await Model.bulkCreate(batch, {
                 validate: false,
@@ -176,6 +182,52 @@ async function restoreFromSnapshot(snapshotId) {
     logger.error('从还原点回滚失败', { error: error.message, stack: error.stack });
     return false;
   }
+}
+
+/**
+ * 获取模型中所有 JSON 类型字段的名称列表
+ * 通过 Model.rawAttributes 自动识别，无需硬编码
+ * @param {Object} Model - Sequelize 模型
+ * @returns {string[]} JSON 字段名数组
+ */
+function getJsonFieldNames(Model) {
+  const names = [];
+  const { DataTypes } = require('sequelize');
+  const attrs = Model.rawAttributes || {};
+  for (const [fieldName, attr] of Object.entries(attrs)) {
+    if (attr.type && (attr.type.key === 'JSON' || attr.type instanceof DataTypes.JSON)) {
+      names.push(fieldName);
+    }
+  }
+  return names;
+}
+
+/**
+ * 对单条记录的 JSON 字段进行反序列化
+ * 备份时使用 raw:true 导致 JSON 字段被序列化为字符串，恢复时需要还原
+ * @param {Object} record - 数据库记录
+ * @param {string[]} jsonFieldNames - 该表的 JSON 字段名列表
+ * @param {string} tableName - 表名（用于错误日志）
+ * @returns {Object} 处理后的记录
+ */
+function deserializeJsonFields(record, jsonFieldNames, tableName) {
+  if (!jsonFieldNames.length) return record;
+
+  const processed = { ...record };
+  for (const fieldName of jsonFieldNames) {
+    const value = processed[fieldName];
+    if (value !== undefined && value !== null && typeof value === 'string') {
+      try {
+        processed[fieldName] = JSON.parse(value);
+      } catch (e) {
+        logger.warn(`恢复时解析 ${tableName}.${fieldName} 失败，设为 null`, {
+          error: e.message,
+        });
+        processed[fieldName] = null;
+      }
+    }
+  }
+  return processed;
 }
 
 /**
@@ -252,6 +304,7 @@ const TABLE_NAME_MAPPING = {
   Permission: '权限',
   Room: '机房',
   Rack: '机柜',
+  Warehouse: '仓库',
   Device: '设备',
   DeviceField: '设备自定义字段',
   DevicePort: '设备端口',
@@ -271,6 +324,7 @@ const TABLE_NAME_MAPPING = {
   InventoryTask: '盘点任务',
   InventoryRecord: '盘点记录',
   SystemSetting: '系统设置',
+  OperationLog: '操作日志',
 };
 
 // 增量备份配置
@@ -285,6 +339,7 @@ const INCREMENTAL_BACKUP_CONFIG = {
     'ConsumableLog',
     'InventoryTask',
     'InventoryRecord',
+    'OperationLog',
   ],
   // 必须全量备份的表
   fullBackupTables: [
@@ -294,6 +349,7 @@ const INCREMENTAL_BACKUP_CONFIG = {
     'Permission',
     'Room',
     'Rack',
+    'Warehouse',
     'DeviceField',
     'DevicePort',
     'NetworkCard',
@@ -315,6 +371,7 @@ const BACKUP_MODELS_CONFIG = [
   { name: 'Permission', modelPath: '../models/Permission' },
   { name: 'Room', modelPath: '../models/Room' },
   { name: 'Rack', modelPath: '../models/Rack' },
+  { name: 'Warehouse', modelPath: '../models/Warehouse' },
   { name: 'Device', modelPath: '../models/Device' },
   { name: 'DeviceField', modelPath: '../models/DeviceField' },
   { name: 'DevicePort', modelPath: '../models/DevicePort' },
@@ -334,6 +391,7 @@ const BACKUP_MODELS_CONFIG = [
   { name: 'InventoryTask', modelPath: '../models/InventoryTask' },
   { name: 'InventoryRecord', modelPath: '../models/InventoryRecord' },
   { name: 'SystemSetting', modelPath: '../models/SystemSetting' },
+  { name: 'OperationLog', modelPath: '../models/OperationLog' },
 ];
 
 const RESTORE_ORDER = [
@@ -344,12 +402,12 @@ const RESTORE_ORDER = [
   'Permission',
   'Room',
   'Rack',
+  'Warehouse',
   'DeviceField',
   'Device',
   'DevicePort',
   'NetworkCard',
   'Cable',
-  'PendingDevice',
   'FaultCategory',
   'TicketField',
   'Ticket',
@@ -361,7 +419,9 @@ const RESTORE_ORDER = [
   'ConsumableLogArchive',
   'InventoryPlan',
   'InventoryTask',
+  'PendingDevice',
   'InventoryRecord',
+  'OperationLog',
 ];
 
 function getBackupPath() {
@@ -990,28 +1050,11 @@ async function restoreData(backupData, options = {}) {
           await Model.destroy({ where: {}, truncate: true });
         }
 
-        const processedRecords = tableData.map(record => {
-          const processed = { ...record };
-
-          if (
-            tableName === 'Device' &&
-            processed.customFields !== undefined &&
-            processed.customFields !== null
-          ) {
-            if (typeof processed.customFields === 'string') {
-              try {
-                processed.customFields = JSON.parse(processed.customFields);
-              } catch (e) {
-                console.warn(
-                  `解析 Device.customFields 失败：${processed.deviceId}, 错误：${e.message}`
-                );
-                processed.customFields = {};
-              }
-            }
-          }
-
-          return processed;
-        });
+        // 自动识别该模型的所有 JSON 字段，统一反序列化字符串值
+        const jsonFields = getJsonFieldNames(Model);
+        const processedRecords = tableData.map(record =>
+          deserializeJsonFields(record, jsonFields, tableName)
+        );
 
         let insertedCount = 0;
 
@@ -1118,8 +1161,14 @@ async function restoreIncrementalData(incrementalData, options = {}) {
       let updatedCount = 0;
 
       if (tableIncrement.new && tableIncrement.new.length > 0) {
-        for (let i = 0; i < tableIncrement.new.length; i += BATCH_SIZE) {
-          const batch = tableIncrement.new.slice(i, i + BATCH_SIZE);
+        // 处理 JSON 字段反序列化
+        const jsonFields = getJsonFieldNames(Model);
+        const processedNewRecords = tableIncrement.new.map(record =>
+          deserializeJsonFields(record, jsonFields, tableName)
+        );
+
+        for (let i = 0; i < processedNewRecords.length; i += BATCH_SIZE) {
+          const batch = processedNewRecords.slice(i, i + BATCH_SIZE);
           try {
             await Model.bulkCreate(batch, {
               validate: false,

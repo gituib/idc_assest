@@ -133,7 +133,7 @@ router.get('/list', async (req, res) => {
       .readdirSync(backupPath)
       .filter(
         f =>
-          (f.startsWith('backup_') || f.startsWith('uploaded_')) &&
+          (f.startsWith('backup_') || f.startsWith('uploaded_') || f.startsWith('incremental_')) &&
           (f.endsWith('.json') || f.endsWith('.json.gz'))
       )
       .map(async f => {
@@ -269,7 +269,7 @@ router.get('/restore-progress/:filename', async (req, res) => {
   };
 
   try {
-    logger.info('开始恢复备份: ${filename}');
+    logger.info(`开始恢复备份: ${filename}`);
     logger.info('恢复选项', { data: options });
     sendProgress({ stage: 'start', message: '正在验证备份文件...', progress: 5 });
 
@@ -438,7 +438,7 @@ router.post('/restore', async (req, res) => {
       });
     }
 
-    logger.info('开始恢复备份: ${filename}');
+    logger.info(`开始恢复备份: ${filename}`);
     logger.info('恢复选项', { data: options });
 
     const result = await restoreBackup(filePath, {
@@ -513,7 +513,7 @@ router.post('/upload', async (req, res) => {
 
     const isCompressed = nameLower.endsWith('.gz');
 
-    logger.info('上传备份文件: ${originalName}, 压缩: ${isCompressed}, 大小: ${backupFile.size}');
+    logger.info(`上传备份文件: ${originalName}, 压缩: ${isCompressed}, 大小: ${backupFile.size}`);
 
     // 保存到临时文件
     const tempFilename = `upload_${Date.now()}`;
