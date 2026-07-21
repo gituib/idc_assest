@@ -40,6 +40,28 @@ const { Panel } = Collapse;
 
 const PAGE_SIZE = 3;
 
+/**
+ * 按端口名称中的数字段进行自然排序
+ * @param {Array} ports - 端口数组
+ * @returns {Array} 排序后的新数组
+ */
+function sortPortsByName(ports) {
+  const extractNumbers = str => {
+    const matches = str ? String(str).match(/\d+/g) : null;
+    return matches ? matches.map(Number) : [];
+  };
+  return [...ports].sort((a, b) => {
+    const numsA = extractNumbers(a.portName);
+    const numsB = extractNumbers(b.portName);
+    for (let i = 0; i < Math.min(numsA.length, numsB.length); i++) {
+      if (numsA[i] !== numsB[i]) {
+        return numsA[i] - numsB[i];
+      }
+    }
+    return String(a.portName).localeCompare(String(b.portName));
+  });
+}
+
 function DeviceDetailDrawer({
   device,
   visible,
@@ -245,6 +267,9 @@ function DeviceDetailDrawer({
   }, []);
 
   const renderPortTable = ports => {
+    // 按端口名称自然排序（如 1/0/1, 1/0/2, ..., 1/0/10）
+    const sortedPorts = sortPortsByName(ports || []);
+    
     const columns = [
       {
         title: '端口名称',
@@ -285,7 +310,7 @@ function DeviceDetailDrawer({
     return (
       <Table
         columns={columns}
-        dataSource={ports}
+        dataSource={sortedPorts}
         rowKey="portId"
         pagination={false}
         size="small"
