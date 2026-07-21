@@ -1904,45 +1904,55 @@ const SystemSettings = () => {
                         </Text>
                       </div>
                     ) : (
-                      <>
-                        <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>
-                          在服务器终端中执行以下命令：
+                      <div style={{
+                        background: '#1e1e1e', borderRadius: 6, overflow: 'hidden',
+                        border: '1px solid #333',
+                      }}>
+                        {/* 终端顶栏 */}
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '6px 10px', background: '#2d2d2d',
+                          borderBottom: '1px solid #333',
+                        }}>
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57' }} />
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#febc2e' }} />
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c840' }} />
+                          <span style={{ fontSize: 11, color: '#888', marginLeft: 6, fontFamily: 'Consolas, Monaco, monospace' }}>terminal</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <code style={{
-                            flex: 1, fontSize: 12, color: '#1677ff',
-                            background: '#fff', fontFamily: 'Consolas, Monaco, monospace',
-                            padding: '6px 8px', borderRadius: 4, border: '1px solid #e8e8e8',
-                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                            lineHeight: 1.5,
-                          }}>
-                            cd {updateInfo.projectPath} && node update.js
-                          </code>
-                          <Button
-                            size="small"
-                            icon={<CopyOutlined />}
-                            onClick={() => {
-                              const cmd = `cd ${updateInfo.projectPath} && node update.js`;
-                              const textarea = document.createElement('textarea');
-                              textarea.value = cmd;
-                              textarea.style.position = 'fixed';
-                              textarea.style.opacity = '0';
-                              document.body.appendChild(textarea);
-                              textarea.select();
-                              try {
-                                document.execCommand('copy');
-                                message.success('已复制');
-                              } catch {
-                                message.error('复制失败，请手动复制');
-                              }
-                              document.body.removeChild(textarea);
-                            }}
-                            style={{ flexShrink: 0, borderRadius: 4, color: '#595959' }}
-                          >
-                            复制
-                          </Button>
+                        {/* 命令内容 */}
+                        <div style={{ padding: '10px 12px' }}>
+                          <div style={{ fontSize: 12, fontFamily: 'Consolas, Monaco, monospace', lineHeight: 1.8, color: '#ccc' }}>
+                            <div><span style={{ color: '#28c840' }}>$</span> <span style={{ color: '#9cdcfe' }}>cd {updateInfo.projectPath}</span></div>
+                            <div><span style={{ color: '#28c840' }}>$</span> <span style={{ color: '#9cdcfe' }}>node update.js</span></div>
+                          </div>
+                          {/* 复制按钮 */}
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                            <Button
+                              size="small"
+                              icon={<CopyOutlined style={{ color: '#888', fontSize: 12 }} />}
+                              onClick={() => {
+                                const cmd = `cd ${updateInfo.projectPath} && node update.js`;
+                                const textarea = document.createElement('textarea');
+                                textarea.value = cmd;
+                                textarea.style.position = 'fixed';
+                                textarea.style.opacity = '0';
+                                document.body.appendChild(textarea);
+                                textarea.select();
+                                try {
+                                  document.execCommand('copy');
+                                  message.success('已复制');
+                                } catch {
+                                  message.error('复制失败，请手动复制');
+                                }
+                                document.body.removeChild(textarea);
+                              }}
+                              style={{ borderRadius: 4, color: '#888', borderColor: '#444', background: 'transparent', fontSize: 12 }}
+                            >
+                              复制命令
+                            </Button>
+                          </div>
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
