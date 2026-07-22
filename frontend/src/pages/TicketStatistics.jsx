@@ -40,6 +40,7 @@ const getStatusColor = status => {
     in_progress: 'processing',
     completed: 'green',
     closed: 'default',
+    cancelled: 'volcano',
   };
   return colors[status] || 'default';
 };
@@ -51,6 +52,7 @@ const getStatusText = status => {
     in_progress: '处理中',
     completed: '已完成',
     closed: '已关闭',
+    cancelled: '已取消',
   };
   return texts[status] || status;
 };
@@ -60,6 +62,7 @@ const getPriorityColor = priority => {
     low: 'green',
     medium: 'orange',
     high: 'red',
+    critical: 'magenta',
     urgent: 'magenta',
   };
   return colors[priority] || 'default';
@@ -70,6 +73,7 @@ const getPriorityText = priority => {
     low: '低',
     medium: '中',
     high: '高',
+    critical: '紧急',
     urgent: '紧急',
   };
   return texts[priority] || priority;
@@ -78,7 +82,10 @@ const getPriorityText = priority => {
 function TicketStatistics() {
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [dateRange, setDateRange] = useState([dayjs().subtract(30, 'days'), dayjs()]);
+  const [dateRange, setDateRange] = useState(null);
+  const [trendDateRange, setTrendDateRange] = useState([dayjs().subtract(30, 'days'), dayjs()]);
+  const [trendData, setTrendData] = useState([]);
+  const [trendLoading, setTrendLoading] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState(null);
   const [statistics, setStatistics] = useState({
     total: 0,
@@ -86,6 +93,7 @@ function TicketStatistics() {
     inProgress: 0,
     completed: 0,
     closed: 0,
+    cancelled: 0,
     avgProcessingTime: 0,
     byCategory: [],
     byPriority: [],
@@ -102,10 +110,11 @@ function TicketStatistics() {
         if (isManual) {
           setLoading(true);
         }
-        const params = {
-          startDate: dateRange[0].format('YYYY-MM-DD'),
-          endDate: dateRange[1].format('YYYY-MM-DD'),
-        };
+        const params = {};
+        if (dateRange && dateRange[0] && dateRange[1]) {
+          params.startDate = dateRange[0].format('YYYY-MM-DD');
+          params.endDate = dateRange[1].format('YYYY-MM-DD');
+        }
 
         const response = await axios.get('/api/tickets/stats', { params });
         setStatistics(response.data);
@@ -120,9 +129,31 @@ function TicketStatistics() {
     [dateRange]
   );
 
+  const fetchTrend = useCallback(
+    async (range = trendDateRange) => {
+      try {
+        setTrendLoading(true);
+        const params = {};
+        if (range && range[0] && range[1]) {
+          params.startDate = range[0].format('YYYY-MM-DD');
+          params.endDate = range[1].format('YYYY-MM-DD');
+        }
+        const response = await axios.get('/api/tickets/stats', { params });
+        setTrendData(response.data.trend || []);
+      } catch (error) {
+        message.error('获取趋势数据失败');
+        console.error('获取趋势数据失败:', error);
+      } finally {
+        setTrendLoading(false);
+      }
+    },
+    [trendDateRange]
+  );
+
   useEffect(() => {
     fetchStatistics();
-  }, [fetchStatistics]);
+    fetchTrend();
+  }, [fetchStatistics, fetchTrend]);
 
   useEffect(() => {
     if (autoRefresh) {
@@ -143,10 +174,16 @@ function TicketStatistics() {
   }, [autoRefresh, fetchStatistics]);
 
   const handleDateChange = useCallback(dates => {
-    if (dates) {
-      setDateRange(dates);
-    }
+    setDateRange(dates);
   }, []);
+
+  const handleTrendDateChange = useCallback(
+    dates => {
+      setTrendDateRange(dates);
+      fetchTrend(dates);
+    },
+    [fetchTrend]
+  );
 
   const handleManualRefresh = useCallback(() => {
     fetchStatistics(true);
@@ -159,6 +196,7 @@ function TicketStatistics() {
       in_progress: 'processing',
       completed: 'green',
       closed: 'default',
+      cancelled: 'volcano',
     };
     return colors[status] || 'default';
   };
@@ -170,6 +208,7 @@ function TicketStatistics() {
       in_progress: '处理中',
       completed: '已完成',
       closed: '已关闭',
+      cancelled: '已取消',
     };
     return texts[status] || status;
   };
@@ -179,6 +218,7 @@ function TicketStatistics() {
       low: 'green',
       medium: 'orange',
       high: 'red',
+      critical: 'magenta',
       urgent: 'magenta',
     };
     return colors[priority] || 'default';
@@ -189,6 +229,7 @@ function TicketStatistics() {
       low: '低',
       medium: '中',
       high: '高',
+      critical: '紧急',
       urgent: '紧急',
     };
     return texts[priority] || priority;
@@ -338,6 +379,7 @@ function TicketStatistics() {
     { name: '处理中', value: statistics.inProgress },
     { name: '已完成', value: statistics.completed },
     { name: '已关闭', value: statistics.closed },
+    { name: '已取消', value: statistics.cancelled },
   ];
 
   return (
@@ -369,7 +411,18 @@ function TicketStatistics() {
             <Button icon={<ReloadOutlined />} onClick={handleManualRefresh} size="small">
               刷新
             </Button>
-            <RangePicker value={dateRange} onChange={handleDateChange} allowClear={false} />
+            <RangePicker
+              value={dateRange}
+              onChange={handleDateChange}
+              allowClear
+              presets={[
+                { label: '全部', value: null },
+                { label: '最近7天', value: [dayjs().subtract(7, 'days'), dayjs()] },
+                { label: '最近30天', value: [dayjs().subtract(30, 'days'), dayjs()] },
+                { label: '最近90天', value: [dayjs().subtract(90, 'days'), dayjs()] },
+                { label: '最近1年', value: [dayjs().subtract(1, 'year'), dayjs()] },
+              ]}
+            />
           </Space>
         }
       >
@@ -454,17 +507,12 @@ function TicketStatistics() {
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
-            <Card bordered={false} style={{ background: '#f6ffed' }}>
+            <Card bordered={false} style={{ background: '#fff2f0' }}>
               <Statistic
-                title="处理中占比"
-                value={
-                  statistics.total > 0
-                    ? ((statistics.inProgress / statistics.total) * 100).toFixed(1)
-                    : 0
-                }
-                suffix="%"
-                prefix={<RiseOutlined style={{ color: '#52c41a' }} />}
-                valueStyle={{ color: '#52c41a' }}
+                title="已取消工单"
+                value={statistics.cancelled}
+                prefix={<FallOutlined style={{ color: '#fa541c' }} />}
+                valueStyle={{ color: '#fa541c' }}
               />
             </Card>
           </Col>
@@ -472,40 +520,25 @@ function TicketStatistics() {
       </Card>
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col xs={24} lg={12}>
-          <Card title="按状态分布" loading={loading}>
-            <Table
-              columns={statusColumns}
-              dataSource={statistics.byStatus}
-              rowKey="status"
-              pagination={false}
-              size="small"
-            />
-          </Card>
-        </Col>
-        <Col xs={24} lg={12}>
-          <Card title="按优先级分布" loading={loading}>
-            <Table
-              columns={priorityColumns}
-              dataSource={statistics.byPriority}
-              rowKey="priority"
-              pagination={false}
-              size="small"
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24}>
-          <Card title="按故障分类统计" loading={loading}>
-            <Table
-              columns={categoryColumns}
-              dataSource={statistics.byCategory}
-              rowKey="category"
-              pagination={{ pageSize: 10 }}
-              size="small"
-            />
+          <Card
+            title="工单趋势统计"
+            loading={trendLoading}
+            extra={
+              <RangePicker
+                value={trendDateRange}
+                onChange={handleTrendDateChange}
+                allowClear
+                presets={[
+                  { label: '最近7天', value: [dayjs().subtract(7, 'days'), dayjs()] },
+                  { label: '最近30天', value: [dayjs().subtract(30, 'days'), dayjs()] },
+                  { label: '最近90天', value: [dayjs().subtract(90, 'days'), dayjs()] },
+                  { label: '最近1年', value: [dayjs().subtract(1, 'year'), dayjs()] },
+                ]}
+              />
+            }
+          >
+            <TrendChart data={trendData} />
           </Card>
         </Col>
       </Row>
@@ -526,60 +559,267 @@ function TicketStatistics() {
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24}>
-          <Card title="工单趋势统计" loading={loading}>
+          <Card title="按故障分类统计" loading={loading}>
             <Table
-              columns={[
-                {
-                  title: '日期',
-                  dataIndex: 'date',
-                  key: 'date',
-                  width: 120,
-                  render: text => (text ? dayjs(text).format('YYYY-MM-DD') : '-'),
-                },
-                {
-                  title: '新建工单',
-                  dataIndex: 'created',
-                  key: 'created',
-                  width: 100,
-                  render: count => <Tag color="blue">{count}</Tag>,
-                },
-                {
-                  title: '已完成',
-                  dataIndex: 'completed',
-                  key: 'completed',
-                  width: 100,
-                  render: count => <Tag color="green">{count}</Tag>,
-                },
-                {
-                  title: '关闭工单',
-                  dataIndex: 'closed',
-                  key: 'closed',
-                  width: 100,
-                  render: count => <Tag color="default">{count}</Tag>,
-                },
-                {
-                  title: '当日处理中',
-                  dataIndex: 'inProgress',
-                  key: 'inProgress',
-                  width: 120,
-                  render: count => <Tag color="processing">{count}</Tag>,
-                },
-                {
-                  title: '新增待处理',
-                  dataIndex: 'pending',
-                  key: 'pending',
-                  width: 120,
-                  render: count => <Tag color="orange">{count}</Tag>,
-                },
-              ]}
-              dataSource={statistics.trend}
-              rowKey="date"
+              columns={categoryColumns}
+              dataSource={statistics.byCategory}
+              rowKey="category"
               pagination={{ pageSize: 10 }}
               size="small"
             />
           </Card>
         </Col>
       </Row>
+    </div>
+  );
+}
+
+/**
+ * 工单趋势折线图组件（纯 SVG，无第三方图表库依赖）
+ */
+const TREND_SERIES = [
+  { key: 'created', label: '新建工单', color: '#1890ff' },
+  { key: 'completed', label: '已完成', color: '#52c41a' },
+  { key: 'closed', label: '已关闭', color: '#8c8c8c' },
+  { key: 'inProgress', label: '处理中', color: '#722ed1' },
+  { key: 'pending', label: '待处理', color: '#fa8c16' },
+];
+
+function TrendChart({ data }) {
+  const [hoverInfo, setHoverInfo] = useState(null);
+  const containerRef = useRef(null);
+
+  const chartWidth = 1000;
+  const chartHeight = 320;
+  const padding = { top: 20, right: 20, bottom: 50, left: 50 };
+  const plotWidth = chartWidth - padding.left - padding.right;
+  const plotHeight = chartHeight - padding.top - padding.bottom;
+
+  if (!data || data.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 0', color: '#999' }}>
+        暂无趋势数据
+      </div>
+    );
+  }
+
+  const allValues = data.flatMap(d => TREND_SERIES.map(s => d[s.key] || 0));
+  const maxValue = Math.max(...allValues, 1);
+  const yMax = Math.ceil(maxValue * 1.1);
+
+  const xStep = data.length > 1 ? plotWidth / (data.length - 1) : plotWidth;
+
+  const getX = i => (data.length === 1 ? padding.left + plotWidth / 2 : padding.left + i * xStep);
+  const getY = val => padding.top + plotHeight - (val / yMax) * plotHeight;
+
+  // Y 轴刻度（5 等分）
+  const yTicks = Array.from({ length: 6 }, (_, i) => Math.round((yMax / 5) * i));
+
+  // X 轴标签（数据多时稀疏显示）
+  const labelInterval = data.length > 30 ? Math.ceil(data.length / 10) : 1;
+
+  // 计算 tooltip 在容器中的像素位置（SVG viewBox 缩放到容器宽度）
+  const containerWidth = containerRef.current?.clientWidth || 600;
+  const scale = containerWidth / chartWidth;
+  const tooltipX = hoverInfo ? hoverInfo.x * scale : 0;
+  const tooltipWidth = 280;
+  const tooltipLeft = tooltipX + tooltipWidth > containerWidth - 20 ? tooltipX - tooltipWidth - 10 : tooltipX + 15;
+
+  return (
+    <div ref={containerRef} style={{ width: '100%', overflowX: 'auto', position: 'relative' }}>
+      <svg
+        viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+        style={{ width: '100%', minWidth: 600, height: 'auto' }}
+      >
+        {/* 网格线 + Y 轴刻度 */}
+        {yTicks.map((tick, i) => {
+          const y = getY(tick);
+          return (
+            <g key={`y-${i}`}>
+              <line
+                x1={padding.left}
+                y1={y}
+                x2={chartWidth - padding.right}
+                y2={y}
+                stroke="#f0f0f0"
+                strokeWidth={1}
+              />
+              <text x={padding.left - 8} y={y + 4} textAnchor="end" fontSize={11} fill="#999">
+                {tick}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* X 轴标签 */}
+        {data.map((d, i) => {
+          if (i % labelInterval !== 0 && i !== data.length - 1) return null;
+          const x = getX(i);
+          const dateStr = d.date ? dayjs(d.date).format('MM-DD') : '';
+          return (
+            <text
+              key={`x-${i}`}
+              x={x}
+              y={chartHeight - padding.bottom + 20}
+              textAnchor="middle"
+              fontSize={11}
+              fill="#999"
+              transform={data.length > 20 ? `rotate(-30 ${x} ${chartHeight - padding.bottom + 20})` : ''}
+            >
+              {dateStr}
+            </text>
+          );
+        })}
+
+        {/* 折线 */}
+        {TREND_SERIES.map(series => {
+          const points = data.map((d, i) => `${getX(i)},${getY(d[series.key] || 0)}`).join(' ');
+          return (
+            <g key={series.key}>
+              <polyline
+                points={points}
+                fill="none"
+                stroke={series.color}
+                strokeWidth={2}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              {data.length <= 30 &&
+                data.map((d, i) => {
+                  const cx = getX(i);
+                  const cy = getY(d[series.key] || 0);
+                  return (
+                    <circle
+                      key={`pt-${series.key}-${i}`}
+                      cx={cx}
+                      cy={cy}
+                      r={3}
+                      fill="#fff"
+                      stroke={series.color}
+                      strokeWidth={1.5}
+                    />
+                  );
+                })}
+            </g>
+          );
+        })}
+
+        {/* 悬浮交互区域 */}
+        {data.map((d, i) => {
+          const x = getX(i);
+          const values = TREND_SERIES.map(s => d[s.key] || 0);
+          const total = values.reduce((a, b) => a + b, 0);
+          if (total === 0) return null;
+          return (
+            <rect
+              key={`hover-${i}`}
+              x={x - xStep / 2}
+              y={padding.top}
+              width={xStep}
+              height={plotHeight}
+              fill="transparent"
+              onMouseEnter={() =>
+                setHoverInfo({
+                  x,
+                  y: getY(Math.max(...values)),
+                  data: d,
+                  index: i,
+                })
+              }
+              onMouseLeave={() => setHoverInfo(null)}
+            />
+          );
+        })}
+
+        {/* 悬浮提示线 */}
+        {hoverInfo && (
+          <line
+            x1={hoverInfo.x}
+            y1={padding.top}
+            x2={hoverInfo.x}
+            y2={padding.top + plotHeight}
+            stroke="#d9d9d9"
+            strokeWidth={1}
+            strokeDasharray="4 4"
+          />
+        )}
+      </svg>
+
+      {/* HTML tooltip 浮层 */}
+      {hoverInfo && (
+        <div
+          style={{
+            position: 'absolute',
+            left: tooltipLeft,
+            top: 10,
+            width: tooltipWidth,
+            maxHeight: 400,
+            overflowY: 'auto',
+            background: 'rgba(255,255,255,0.97)',
+            border: '1px solid #e8e8e8',
+            borderRadius: 6,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+            padding: '10px 12px',
+            zIndex: 10,
+            pointerEvents: 'none',
+            fontSize: 12,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 6, color: '#333' }}>
+            {hoverInfo.data.date ? dayjs(hoverInfo.data.date).format('YYYY-MM-DD') : ''}
+          </div>
+          {TREND_SERIES.map(s => (
+            <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: s.color }} />
+              <span style={{ color: '#666' }}>{s.label}：{hoverInfo.data[s.key] || 0}</span>
+            </div>
+          ))}
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
+            {hoverInfo.data.devices && hoverInfo.data.devices.length > 0 ? (
+              <>
+                <div style={{ fontWeight: 600, marginBottom: 4, color: '#333' }}>
+                  当日新建工单设备（{hoverInfo.data.devices.length}）
+                </div>
+                {hoverInfo.data.devices.slice(0, 10).map((dev, di) => (
+                  <div
+                    key={`dev-${di}`}
+                    style={{
+                      padding: '3px 0',
+                    borderBottom: di < Math.min(hoverInfo.data.devices.length, 10) - 1 ? '1px dashed #f5f5f5' : 'none',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <div style={{ color: '#1890ff', fontWeight: 500 }}>{dev.deviceName}</div>
+                  <div style={{ color: '#666' }}>{dev.title}</div>
+                  <div style={{ color: '#999', fontSize: 11 }}>
+                    {[dev.faultCategory, getPriorityText(dev.priority)].filter(Boolean).join(' · ')}
+                  </div>
+                </div>
+              ))}
+              {hoverInfo.data.devices.length > 10 && (
+                <div style={{ color: '#999', textAlign: 'center', paddingTop: 4 }}>
+                  还有 {hoverInfo.data.devices.length - 10} 条...
+                </div>
+              )}
+              </>
+            ) : (
+              <div style={{ color: '#999', textAlign: 'center', padding: '4px 0' }}>
+                当日无新建工单
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 图例 */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 8, flexWrap: 'wrap' }}>
+        {TREND_SERIES.map(s => (
+          <span key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            <span style={{ display: 'inline-block', width: 16, height: 3, background: s.color, borderRadius: 2 }} />
+            {s.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

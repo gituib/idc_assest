@@ -117,19 +117,16 @@ const InventoryTaskExecution = () => {
     }
     setBatchLoading(true);
     try {
-      const promises = selectedRowKeys.map(recordId =>
-        api.post(`/inventory/records/${recordId}/check`, {
-          status,
-          checkedAt: new Date().toISOString(),
-        })
-      );
-      await Promise.all(promises);
-      message.success(`已批量标记 ${selectedRowKeys.length} 条记录`);
+      const res = await api.post('/inventory/records/batch-check', {
+        recordIds: selectedRowKeys,
+        status,
+      });
+      message.success(res.message || `已批量标记 ${selectedRowKeys.length} 条记录`);
       if (currentTask) {
         fetchTaskRecords(currentTask.taskId);
       }
     } catch (error) {
-      message.error('批量操作失败');
+      message.error(error.response?.data?.error || '批量操作失败');
     } finally {
       setBatchLoading(false);
       setSelectedRowKeys([]);
@@ -144,19 +141,16 @@ const InventoryTaskExecution = () => {
     }
     setBatchLoading(true);
     try {
-      const promises = pendingRecords.map(record =>
-        api.post(`/inventory/records/${record.recordId}/check`, {
-          status,
-          checkedAt: new Date().toISOString(),
-        })
-      );
-      await Promise.all(promises);
-      message.success(`已一键标记 ${pendingRecords.length} 条记录`);
+      const res = await api.post('/inventory/records/batch-check', {
+        recordIds: pendingRecords.map(r => r.recordId),
+        status,
+      });
+      message.success(res.message || `已一键标记 ${pendingRecords.length} 条记录`);
       if (currentTask) {
         fetchTaskRecords(currentTask.taskId);
       }
     } catch (error) {
-      message.error('操作失败');
+      message.error(error.response?.data?.error || '操作失败');
     } finally {
       setBatchLoading(false);
     }

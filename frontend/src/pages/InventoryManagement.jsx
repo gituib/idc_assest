@@ -57,6 +57,8 @@ const InventoryManagement = () => {
   const [racks, setRacks] = useState([]);
   const [filteredRacks, setFilteredRacks] = useState([]);
   const [selectedRooms, setSelectedRooms] = useState([]);
+  // 正在启动中的 planId，防止重复点击
+  const [startingPlanId, setStartingPlanId] = useState(null);
   const [stats, setStats] = useState({
     totalPlans: 0,
     completedPlans: 0,
@@ -216,6 +218,8 @@ const InventoryManagement = () => {
   };
 
   const handleStart = async plan => {
+    if (startingPlanId) return; // 防止并发点击
+    setStartingPlanId(plan.planId);
     try {
       await api.post(`/inventory/plans/${plan.planId}/start`);
       message.success('盘点任务已启动');
@@ -223,6 +227,8 @@ const InventoryManagement = () => {
       fetchStats();
     } catch (error) {
       message.error(error.response?.data?.error || '启动失败');
+    } finally {
+      setStartingPlanId(null);
     }
   };
 
@@ -399,6 +405,8 @@ const InventoryManagement = () => {
                 type="text"
                 icon={<PlayCircleOutlined />}
                 onClick={() => handleStart(record)}
+                loading={startingPlanId === record.planId}
+                disabled={!!startingPlanId}
                 style={{ color: '#52c41a' }}
               />
             </Tooltip>

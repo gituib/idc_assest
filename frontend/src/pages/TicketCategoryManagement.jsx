@@ -1,10 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, Select, message, Card, Space, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, message, Card, Space, Popconfirm, Tag } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import CloseButton from '../components/CloseButton';
 
 const { Option } = Select;
+
+const getPriorityText = priority => {
+  const texts = {
+    low: '低',
+    medium: '中',
+    high: '高',
+    critical: '紧急',
+    urgent: '紧急',
+  };
+  return texts[priority] || priority;
+};
+
+const getPriorityColor = priority => {
+  const colors = {
+    low: 'green',
+    medium: 'orange',
+    high: 'red',
+    critical: 'magenta',
+    urgent: 'magenta',
+  };
+  return colors[priority] || 'default';
+};
 
 function TicketCategoryManagement() {
   const [categories, setCategories] = useState([]);
@@ -133,6 +155,7 @@ function TicketCategoryManagement() {
       dataIndex: 'defaultPriority',
       key: 'defaultPriority',
       width: 100,
+      render: value => <Tag color={getPriorityColor(value)}>{getPriorityText(value)}</Tag>,
     },
     {
       title: '预计时长(分钟)',
@@ -224,7 +247,7 @@ function TicketCategoryManagement() {
               <Option value="low">低</Option>
               <Option value="medium">中</Option>
               <Option value="high">高</Option>
-              <Option value="urgent">紧急</Option>
+              <Option value="critical">紧急</Option>
             </Select>
           </Form.Item>
 

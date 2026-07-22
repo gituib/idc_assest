@@ -139,7 +139,7 @@ const DEFAULT_TICKET_FIELDS = [
       { value: 'low', label: '低' },
       { value: 'medium', label: '中' },
       { value: 'high', label: '高' },
-      { value: 'urgent', label: '紧急' },
+      { value: 'critical', label: '紧急' },
     ],
   },
   {
@@ -154,6 +154,7 @@ const DEFAULT_TICKET_FIELDS = [
       { value: 'in_progress', label: '处理中' },
       { value: 'completed', label: '已完成' },
       { value: 'closed', label: '已关闭' },
+      { value: 'cancelled', label: '已取消' },
     ],
   },
   {
@@ -196,6 +197,7 @@ const getStatusColor = status => {
     in_progress: 'processing',
     completed: 'green',
     closed: 'default',
+    cancelled: 'volcano',
   };
   return colors[status] || 'default';
 };
@@ -206,6 +208,7 @@ const getStatusText = status => {
     in_progress: '处理中',
     completed: '已完成',
     closed: '已关闭',
+    cancelled: '已取消',
   };
   return texts[status] || status;
 };
@@ -215,6 +218,7 @@ const getPriorityColor = priority => {
     low: 'green',
     medium: 'orange',
     high: 'red',
+    critical: 'magenta',
     urgent: 'magenta',
   };
   return colors[priority] || 'default';
@@ -225,6 +229,7 @@ const getPriorityText = priority => {
     low: '低',
     medium: '中',
     high: '高',
+    critical: '紧急',
     urgent: '紧急',
   };
   return texts[priority] || priority;
@@ -1162,6 +1167,7 @@ function TicketManagement() {
               <Option value="in_progress">处理中</Option>
               <Option value="completed">已完成</Option>
               <Option value="closed">已关闭</Option>
+              <Option value="cancelled">已取消</Option>
             </Select>
           </Form.Item>
           <Form.Item name="priority" label="优先级">
@@ -1169,7 +1175,7 @@ function TicketManagement() {
               <Option value="low">低</Option>
               <Option value="medium">中</Option>
               <Option value="high">高</Option>
-              <Option value="urgent">紧急</Option>
+              <Option value="critical">紧急</Option>
             </Select>
           </Form.Item>
           <Form.Item name="faultCategory" label="故障分类">
@@ -1534,7 +1540,7 @@ function TicketManagement() {
                       高
                     </Tag>
                   </Option>
-                  <Option value="urgent">
+                  <Option value="critical">
                     <Tag color="magenta" style={{ margin: 0 }}>
                       紧急
                     </Tag>

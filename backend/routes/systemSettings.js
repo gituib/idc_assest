@@ -29,6 +29,58 @@ const SystemSetting = require('../models/SystemSetting');
 const { FRONTEND } = require('../config');
 const { logSystemOperation } = require('../utils/operationLogger');
 
+// ===== CPU 使用率采样器 =====
+// 说明：os.loadavg() 在 Windows 上始终返回 [0,0,0]，且在 Linux 上是平均负载而非使用率，
+// 因此改用 os.cpus().times 差值计算真实 CPU 使用率。后台每 5 秒采样一次，请求时直接读取缓存。
+const os = require('os');
+const cpuSampleState = {
+  prev: null,        // 上次采样的 os.cpus() 结果
+  percent: 0,        // 最近一次计算得到的 CPU 使用率
+  cores: (os.cpus() || []).length,
+  updatedAt: 0,
+};
+
+function sampleCpuUsage() {
+  try {
+    const current = os.cpus();
+    if (!current || current.length === 0) {
+      return;
+    }
+    cpuSampleState.cores = current.length;
+
+    // 首次采样只建立基线，无法计算差值
+    if (!cpuSampleState.prev) {
+      cpuSampleState.prev = current;
+      return;
+    }
+
+    let totalDiff = 0;
+    let idleDiff = 0;
+    for (let i = 0; i < cpuSampleState.prev.length && i < current.length; i++) {
+      const t1 = cpuSampleState.prev[i].times;
+      const t2 = current[i].times;
+      const idle = t2.idle - t1.idle;
+      const total = (t2.user - t1.user) + (t2.nice - t1.nice) + (t2.sys - t1.sys) + idle + (t2.irq - t1.irq);
+      totalDiff += total;
+      idleDiff += idle;
+    }
+
+    if (totalDiff > 0) {
+      let percent = Math.round((1 - idleDiff / totalDiff) * 100);
+      percent = Math.min(100, Math.max(0, percent));
+      cpuSampleState.percent = percent;
+    }
+    cpuSampleState.prev = current;
+    cpuSampleState.updatedAt = Date.now();
+  } catch (err) {
+    logger.error('CPU 使用率采样失败', { error: err });
+  }
+}
+
+// 模块加载时立即采样一次（建立基线），之后每 5 秒采样一次
+sampleCpuUsage();
+setInterval(sampleCpuUsage, 5000).unref();
+
 // 初始化默认系统设置
 const initDefaultSettings = async () => {
   const defaultSettings = [
@@ -991,8 +1043,6 @@ router.get('/system/info', async (req, res) => {
     const Room = require('../models/Room');
     const User = require('../models/User');
     const { sequelize, DB_TYPE, dbDialect } = require('../db');
-    const os = require('os');
-    const osUtils = require('os');
 
     // 同步版本号到数据库
     try {
@@ -1019,10 +1069,9 @@ router.get('/system/info', async (req, res) => {
     const freeMem = os.freemem();
     const usedMemPercent = Math.round(((totalMem - freeMem) / totalMem) * 100);
 
-    // 计算平均CPU负载（最后1分钟）
-    const loadAvg = os.loadavg()[0];
-    const cpuCores = os.cpus().length;
-    const cpuPercent = Math.round((loadAvg / cpuCores) * 100);
+    // CPU 使用率：读取后台采样器缓存（基于 os.cpus().times 差值，跨平台准确）
+    const cpuCores = cpuSampleState.cores;
+    const cpuPercent = cpuSampleState.percent;
 
     // 获取磁盘使用情况（获取根目录）
     let diskPercent = 30; // 默认值
@@ -1150,7 +1199,7 @@ router.get('/system/info', async (req, res) => {
         nodeVersion: process.version,
         platform: process.platform,
         arch: process.arch,
-        hostname: osUtils.hostname(),
+        hostname: os.hostname(),
         memoryUsage: process.memoryUsage(),
         pid: process.pid,
       },

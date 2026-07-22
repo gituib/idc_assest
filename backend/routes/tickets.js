@@ -63,6 +63,7 @@ router.get('/stats', async (req, res) => {
       dailyPendingStats,
       priorityCompletedStats,
       categoryCompletedStats,
+      dailyCreatedDevices,
     ] = await Promise.all([
       Ticket.count({ where }),
       Ticket.findAll({
@@ -100,10 +101,11 @@ router.get('/stats', async (req, res) => {
         attributes: [
           'deviceId',
           'deviceName',
+          'deviceModel',
           [Sequelize.fn('COUNT', '*'), 'count'],
           [Sequelize.fn('MAX', Sequelize.col('Ticket.createdAt')), 'lastFaultTime'],
         ],
-        group: [Sequelize.col('Ticket.deviceId'), 'deviceName'],
+        group: [Sequelize.col('Ticket.deviceId'), 'deviceName', 'deviceModel'],
         order: [[Sequelize.fn('COUNT', '*'), 'DESC']],
         limit: 10,
         include: [{ model: Device, attributes: ['type'] }],
@@ -214,6 +216,25 @@ router.get('/stats', async (req, res) => {
         ],
         group: [Sequelize.col('Ticket.faultCategory')],
       }),
+      // 每天新建工单的设备明细（用于趋势图 tooltip 展示）
+      Ticket.findAll({
+        where,
+        attributes: [
+          [
+            dbDialect === 'mysql'
+              ? Sequelize.fn('DATE_FORMAT', Sequelize.col('Ticket.createdAt'), '%Y-%m-%d')
+              : Sequelize.fn('date', Sequelize.col('Ticket.createdAt')),
+            'date',
+          ],
+          'deviceName',
+          'title',
+          'faultCategory',
+          'priority',
+          [Sequelize.fn('COUNT', '*'), 'count'],
+        ],
+        group: ['date', 'Ticket.deviceName', 'Ticket.title', 'Ticket.faultCategory', 'Ticket.priority'],
+        order: [['date', 'ASC']],
+      }),
     ]);
 
     const statusData = statusStats.map(s => s.dataValues);
@@ -221,6 +242,7 @@ router.get('/stats', async (req, res) => {
     const inProgress = statusData.find(s => s.status === 'in_progress')?.count || 0;
     const completed = statusData.find(s => s.status === 'completed')?.count || 0;
     const closed = statusData.find(s => s.status === 'closed')?.count || 0;
+    const cancelled = statusData.find(s => s.status === 'cancelled')?.count || 0;
 
     const byStatus = statusData.map(item => ({
       status: item.status,
@@ -263,7 +285,7 @@ router.get('/stats', async (req, res) => {
       deviceName: d.deviceName,
       count: d.dataValues.count,
       lastFaultTime: d.dataValues.lastFaultTime,
-      deviceType: d.Device?.type || '',
+      deviceType: d.Device?.type || d.deviceModel || '',
     }));
 
     const createdMap = {};
@@ -287,6 +309,22 @@ router.get('/stats', async (req, res) => {
       pendingMap[d.dataValues.date] = d.dataValues.pending;
     });
 
+    // 按日期分组设备明细（用于趋势图 tooltip）
+    const createdDevicesMap = {};
+    dailyCreatedDevices.forEach(d => {
+      const dv = d.dataValues;
+      if (!createdDevicesMap[dv.date]) {
+        createdDevicesMap[dv.date] = [];
+      }
+      createdDevicesMap[dv.date].push({
+        deviceName: dv.deviceName || '未知设备',
+        title: dv.title || '',
+        faultCategory: dv.faultCategory || '',
+        priority: dv.priority || '',
+        count: dv.count,
+      });
+    });
+
     const allDates = [
       ...new Set([
         ...Object.keys(createdMap),
@@ -303,6 +341,7 @@ router.get('/stats', async (req, res) => {
       closed: closedMap[date] || 0,
       inProgress: inProgressMap[date] || 0,
       pending: pendingMap[date] || 0,
+      devices: createdDevicesMap[date] || [],
     }));
 
     const completedTickets = await Ticket.findAll({
@@ -333,6 +372,7 @@ router.get('/stats', async (req, res) => {
       inProgress,
       completed,
       closed,
+      cancelled,
       avgProcessingTime: parseFloat(avgProcessingTime),
       byStatus,
       byPriority,

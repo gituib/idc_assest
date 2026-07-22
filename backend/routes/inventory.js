@@ -222,10 +222,20 @@ router.put('/plans/:planId', async (req, res) => {
 });
 
 router.delete('/plans/:planId', async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
-    const plan = await InventoryPlan.findByPk(req.params.planId);
+    const plan = await InventoryPlan.findByPk(req.params.planId, { transaction });
     if (!plan) {
+      await transaction.rollback();
       return res.status(404).json({ error: '盘点计划不存在' });
+    }
+
+    // 状态保护：进行中不可删除，避免孤儿 task/record 及盘点数据被破坏
+    if (plan.status === 'in_progress') {
+      await transaction.rollback();
+      return res.status(400).json({
+        error: '盘点进行中，不可删除，请先完成盘点或中止后再删除',
+      });
     }
 
     const beforeState = {
@@ -235,9 +245,12 @@ router.delete('/plans/:planId', async (req, res) => {
       type: plan.type,
     };
 
-    await InventoryRecord.destroy({ where: { planId: plan.planId } });
-    await InventoryTask.destroy({ where: { planId: plan.planId } });
-    await plan.destroy();
+    // 事务保护：record/task/plan 三表删除原子性
+    await InventoryRecord.destroy({ where: { planId: plan.planId }, transaction });
+    await InventoryTask.destroy({ where: { planId: plan.planId }, transaction });
+    await plan.destroy({ transaction });
+
+    await transaction.commit();
 
     await logInventoryOperation('delete', `删除盘点计划【${plan.name}】`, {
       targetId: plan.planId,
@@ -249,6 +262,8 @@ router.delete('/plans/:planId', async (req, res) => {
 
     res.json({ message: '盘点计划删除成功' });
   } catch (error) {
+    await transaction.rollback();
+    logger.error('删除盘点计划错误', { error: error.message, stack: error.stack });
     await logInventoryOperation('delete', '删除盘点计划失败', {
       targetId: req.params?.planId,
       result: 'failed',
@@ -260,19 +275,40 @@ router.delete('/plans/:planId', async (req, res) => {
 });
 
 router.post('/plans/:planId/start', async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
-    const plan = await InventoryPlan.findByPk(req.params.planId);
+    // 原子抢占：UPDATE ... WHERE status IN ('draft','pending')
+    // 任一请求抢到后，其他并发请求因 status 不匹配而 affectedCount=0
+    // 所有数据库（SQLite/MySQL）通用，不依赖行锁语义
+    const [affectedCount] = await InventoryPlan.update(
+      { status: 'in_progress' },
+      {
+        where: {
+          planId: req.params.planId,
+          status: { [Op.in]: ['draft', 'pending'] },
+        },
+        transaction,
+      }
+    );
 
-    if (!plan) {
-      return res.status(404).json({ error: '盘点计划不存在' });
+    if (affectedCount === 0) {
+      // 区分两种情况：plan 不存在 / 已被别的请求抢先启动
+      const exists = await InventoryPlan.findByPk(req.params.planId, {
+        attributes: ['planId', 'status'],
+        transaction,
+      });
+      await transaction.rollback();
+      if (!exists) {
+        return res.status(404).json({ error: '盘点计划不存在' });
+      }
+      return res.status(409).json({ error: '盘点计划正在启动或已启动，请勿重复操作' });
     }
 
-    if (plan.status !== 'draft' && plan.status !== 'pending') {
-      return res.status(400).json({ error: '只有草稿或待执行状态的盘点计划可以启动' });
-    }
+    // 此时该 plan 已变为 in_progress，其他并发请求都会因 status 不匹配而失败
+    const plan = await InventoryPlan.findByPk(req.params.planId, { transaction });
 
     const beforeState = {
-      status: plan.status,
+      status: 'draft', // 抢占前必为 draft/pending
       totalDevices: plan.totalDevices,
       checkedDevices: plan.checkedDevices,
     };
@@ -284,68 +320,80 @@ router.post('/plans/:planId/start', async (req, res) => {
     if (targetRacks.length > 0) {
       allDevices = await Device.findAll({
         where: { rackId: { [Op.in]: targetRacks } },
+        transaction,
       });
     } else if (targetRooms.length > 0) {
       const racksInRooms = await Rack.findAll({
         where: { roomId: { [Op.in]: targetRooms } },
         attributes: ['rackId'],
+        transaction,
       });
       const rackIds = racksInRooms.map(r => r.rackId);
       allDevices = await Device.findAll({
         where: { rackId: { [Op.in]: rackIds } },
+        transaction,
       });
     } else {
-      allDevices = await Device.findAll();
+      allDevices = await Device.findAll({ transaction });
     }
-
-    const tasksToCreate = [];
-    const recordsToCreate = [];
 
     const taskId = generateTaskId();
 
-    tasksToCreate.push({
-      taskId,
-      planId: plan.planId,
-      targetType: 'all',
-      targetId: 'all',
-      targetName: '全部设备',
-      status: 'pending',
-      totalDevices: allDevices.length,
-    });
-
-    for (let i = 0; i < allDevices.length; i++) {
-      const device = allDevices[i];
-      recordsToCreate.push({
-        recordId: generateRecordId(),
+    const tasksToCreate = [
+      {
         taskId,
         planId: plan.planId,
-        deviceId: device.deviceId,
-        deviceName: device.name,
-        deviceType: device.type,
-        serialNumber: device.serialNumber,
-        rackId: device.rackId,
-        position: device.position,
+        targetType: 'all',
+        targetId: 'all',
+        targetName: '全部设备',
         status: 'pending',
-      });
-    }
+        totalDevices: allDevices.length,
+      },
+    ];
 
-    if (tasksToCreate.length > 0) {
-      await InventoryTask.bulkCreate(tasksToCreate, { individualHooks: false });
-    }
+    const recordsToCreate = allDevices.map(device => ({
+      recordId: generateRecordId(),
+      taskId,
+      planId: plan.planId,
+      deviceId: device.deviceId,
+      deviceName: device.name,
+      deviceType: device.type,
+      serialNumber: device.serialNumber,
+      rackId: device.rackId,
+      position: device.position,
+      status: 'pending',
+    }));
+
+    await InventoryTask.bulkCreate(tasksToCreate, {
+      individualHooks: false,
+      transaction,
+    });
 
     if (recordsToCreate.length > 0) {
-      // 使用 Sequelize bulkCreate 替代原始 SQL，自动参数化防止 SQL 注入
-      await InventoryRecord.bulkCreate(recordsToCreate, { individualHooks: false });
+      // 分批 bulkCreate，避免单次 SQL 超出变量数限制（SQLite 默认 999）
+      // 每批 500 条，事务内串行执行
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < recordsToCreate.length; i += BATCH_SIZE) {
+        await InventoryRecord.bulkCreate(recordsToCreate.slice(i, i + BATCH_SIZE), {
+          individualHooks: false,
+          transaction,
+        });
+      }
     }
 
-    await plan.update({
-      status: 'in_progress',
-      totalDevices: allDevices.length,
-      checkedDevices: 0,
-      normalDevices: 0,
-      abnormalDevices: 0,
-      missedDevices: allDevices.length,
-    });
+    // 抢占时已设为 in_progress，这里补全统计字段
+    await plan.update(
+      {
+        totalDevices: allDevices.length,
+        checkedDevices: 0,
+        normalDevices: 0,
+        abnormalDevices: 0,
+        missedDevices: allDevices.length,
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
 
     await logInventoryOperation('start', `启动盘点计划【${plan.name}】`, {
       targetId: plan.planId,
@@ -366,6 +414,7 @@ router.post('/plans/:planId/start', async (req, res) => {
       deviceCount: allDevices.length,
     });
   } catch (error) {
+    await transaction.rollback();
     logger.error('启动盘点错误', { error: error.message, stack: error.stack });
     await logInventoryOperation('start', '启动盘点计划失败', {
       targetId: req.params?.planId,
@@ -497,6 +546,184 @@ router.put('/tasks/:taskId', async (req, res) => {
   }
 });
 
+/**
+ * 通过 SQL GROUP BY 聚合统计 records 的状态分布
+ * 避免把全表加载到内存再 filter（大数据量时内存暴涨 + N 次遍历）
+ * @param {Object} where - 查询条件
+ * @param {Object} transaction - 事务
+ * @returns {Promise<{totalDevices:number, checkedDevices:number, normalDevices:number, abnormalDevices:number, missedDevices:number}>}
+ */
+async function aggregateStatsByStatus(where, transaction) {
+  const groups = await InventoryRecord.findAll({
+    where,
+    attributes: [
+      'status',
+      [sequelize.fn('COUNT', sequelize.col('status')), 'count'],
+    ],
+    group: ['status'],
+    raw: true,
+    transaction,
+  });
+  const counts = { pending: 0, normal: 0, abnormal: 0, not_found: 0, missed: 0 };
+  groups.forEach(g => {
+    counts[g.status] = parseInt(g.count, 10) || 0;
+  });
+  const totalDevices = counts.pending + counts.normal + counts.abnormal + counts.not_found + counts.missed;
+  // pending + missed 都算作未盘点（missed 在 plan.complete 时由 pending 转换而来）
+  const pendingCount = counts.pending + counts.missed;
+  return {
+    totalDevices,
+    checkedDevices: counts.normal + counts.abnormal + counts.not_found,
+    normalDevices: counts.normal,
+    abnormalDevices: counts.abnormal,
+    missedDevices: pendingCount,
+  };
+}
+
+/**
+ * 根据统计数据推导 task/plan 应有的状态
+ * - 未开始（无任何已盘点记录）：pending
+ * - 部分盘点：in_progress
+ * - 全部盘点完成：completed
+ * @param {Object} stats - aggregateStatsByStatus 返回的统计
+ * @param {string} currentStatus - 当前状态（避免已 completed 的被回退）
+ * @returns {string} 推导出的状态
+ */
+function deriveStatusFromStats(stats, currentStatus) {
+  if (stats.totalDevices === 0) return currentStatus || 'pending';
+  if (stats.missedDevices === 0) return 'completed';
+  if (stats.checkedDevices > 0) return 'in_progress';
+  return currentStatus || 'pending';
+}
+
+/**
+ * 批量盘点记录（一键正常/异常/未找到）
+ * 单事务批量更新，只聚合统计一次 task/plan，避免 N 次并发请求导致的超时与锁竞争
+ * @route POST /api/inventory/records/batch-check
+ */
+router.post('/records/batch-check', async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const { recordIds, status, remark } = req.body;
+
+    if (!Array.isArray(recordIds) || recordIds.length === 0) {
+      return res.status(400).json({ error: '未提供需要盘点的记录' });
+    }
+    if (!['normal', 'abnormal', 'not_found'].includes(status)) {
+      return res.status(400).json({ error: '无效的盘点状态' });
+    }
+
+    // 只取统计/日志需要的少量字段，不 include Device（避免大数据量时加载完整关联）
+    // 仅查询 pending 状态的记录，自动过滤已盘点的记录（API 层重复盘点防护）
+    const records = await InventoryRecord.findAll({
+      where: { recordId: { [Op.in]: recordIds }, status: 'pending' },
+      attributes: ['recordId', 'taskId', 'planId', 'deviceName'],
+      transaction,
+    });
+
+    if (records.length === 0) {
+      await transaction.rollback();
+      return res.status(409).json({ error: '所选记录均已盘点或不存在，无需重复操作' });
+    }
+
+    const now = new Date();
+    const checkedBy = req.user?.userId;
+    // 一键批量场景未提供具体差异字段，abnormal 仅标记状态；not_found 固定为设备丢失
+    const abnormalType = status === 'not_found' ? 'device_missing' : null;
+
+    // 单条 UPDATE ... WHERE recordId IN (...) 一次性批量更新，N 次 SQL 降为 1 次
+    await InventoryRecord.update(
+      {
+        status,
+        abnormalType,
+        checkedBy,
+        checkedAt: now,
+        remark: remark || null,
+      },
+      {
+        where: { recordId: { [Op.in]: recordIds } },
+        transaction,
+      }
+    );
+
+    // SQL GROUP BY 聚合统计涉及的 task（通常只有一个），避免全表加载到内存
+    const taskIds = [...new Set(records.map(r => r.taskId))];
+    const taskStatsMap = {};
+    for (const taskId of taskIds) {
+      const stats = await aggregateStatsByStatus({ taskId }, transaction);
+      taskStatsMap[taskId] = stats;
+      const task = await InventoryTask.findByPk(taskId, { transaction });
+      if (task) {
+        // 同步推导 status：全部盘点完成 → completed；有盘点记录 → in_progress
+        const derivedStatus = deriveStatusFromStats(stats, task.status);
+        await task.update(
+          {
+            ...stats,
+            status: derivedStatus,
+            completedAt: derivedStatus === 'completed' ? task.completedAt || new Date() : null,
+          },
+          { transaction }
+        );
+      }
+    }
+
+    // SQL GROUP BY 聚合统计涉及的 plan（通常只有一个）
+    const planIds = [...new Set(records.map(r => r.planId))];
+    const planStatsMap = {};
+    for (const planId of planIds) {
+      const stats = await aggregateStatsByStatus({ planId }, transaction);
+      planStatsMap[planId] = stats;
+      const plan = await InventoryPlan.findByPk(planId, { transaction });
+      if (plan) {
+        const derivedStatus = deriveStatusFromStats(stats, plan.status);
+        await plan.update(
+          {
+            ...stats,
+            status: derivedStatus,
+            completedDate:
+              derivedStatus === 'completed' ? plan.completedDate || new Date() : null,
+          },
+          { transaction }
+        );
+      }
+    }
+
+    await transaction.commit();
+
+    const statusLabel = { normal: '正常', abnormal: '异常', not_found: '未找到' }[status];
+    await logInventoryOperation('check', `批量盘点 ${records.length} 条记录（${statusLabel}）`, {
+      targetId: records[0].recordId,
+      targetName: records[0].deviceName,
+      req,
+      metadata: {
+        recordIds: records.map(r => r.recordId),
+        count: records.length,
+        status,
+        taskIds,
+        planIds,
+        taskStatsMap,
+        planStatsMap,
+      },
+    });
+
+    res.json({
+      message: `已批量标记 ${records.length} 条记录`,
+      updatedCount: records.length,
+      taskStats: taskStatsMap,
+      planStats: planStatsMap,
+    });
+  } catch (error) {
+    await transaction.rollback();
+    logger.error('批量盘点记录失败', { error: error.message, stack: error.stack });
+    await logInventoryOperation('check', '批量盘点记录失败', {
+      result: 'failed',
+      req,
+      metadata: { error: error.message, body: req.body },
+    });
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/records/:recordId/check', async (req, res) => {
   try {
     const record = await InventoryRecord.findByPk(req.params.recordId, {
@@ -505,6 +732,13 @@ router.post('/records/:recordId/check', async (req, res) => {
 
     if (!record) {
       return res.status(404).json({ error: '盘点记录不存在' });
+    }
+
+    // API 层重复盘点防护：已盘点的记录不可再次盘点
+    if (record.status !== 'pending') {
+      return res.status(409).json({
+        error: `该记录已盘点（当前状态：${record.status}），不可重复盘点`,
+      });
     }
 
     const beforeState = {
@@ -545,26 +779,26 @@ router.post('/records/:recordId/check', async (req, res) => {
     const task = await InventoryTask.findByPk(record.taskId);
     const plan = await InventoryPlan.findByPk(record.planId);
 
-    const taskRecords = await InventoryRecord.findAll({ where: { taskId: task.taskId } });
-    const taskStats = {
-      totalDevices: taskRecords.length,
-      checkedDevices: taskRecords.filter(r => r.status !== 'pending').length,
-      normalDevices: taskRecords.filter(r => r.status === 'normal').length,
-      abnormalDevices: taskRecords.filter(r => r.status === 'abnormal').length,
-    };
+    // 复用 SQL GROUP BY 聚合，避免全表加载到内存
+    const taskStats = await aggregateStatsByStatus({ taskId: task.taskId });
 
-    await task.update(taskStats);
+    // 同步推导 task 状态
+    const taskDerivedStatus = deriveStatusFromStats(taskStats, task.status);
+    await task.update({
+      ...taskStats,
+      status: taskDerivedStatus,
+      completedAt: taskDerivedStatus === 'completed' ? task.completedAt || new Date() : null,
+    });
 
-    const planRecords = await InventoryRecord.findAll({ where: { planId: plan.planId } });
-    const planStats = {
-      totalDevices: planRecords.length,
-      checkedDevices: planRecords.filter(r => r.status !== 'pending').length,
-      normalDevices: planRecords.filter(r => r.status === 'normal').length,
-      abnormalDevices: planRecords.filter(r => r.status === 'abnormal').length,
-      missedDevices: planRecords.filter(r => r.status === 'pending').length,
-    };
+    const planStats = await aggregateStatsByStatus({ planId: plan.planId });
 
-    await plan.update(planStats);
+    // 同步推导 plan 状态
+    const planDerivedStatus = deriveStatusFromStats(planStats, plan.status);
+    await plan.update({
+      ...planStats,
+      status: planDerivedStatus,
+      completedDate: planDerivedStatus === 'completed' ? plan.completedDate || new Date() : null,
+    });
 
     await logInventoryOperation('check', `盘点记录【${record.deviceName || record.recordId}】`, {
       targetId: record.recordId,
@@ -651,11 +885,23 @@ router.get('/records', async (req, res) => {
 });
 
 router.post('/plans/:planId/complete', async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
-    const plan = await InventoryPlan.findByPk(req.params.planId);
+    const plan = await InventoryPlan.findByPk(req.params.planId, { transaction });
 
     if (!plan) {
+      await transaction.rollback();
       return res.status(404).json({ error: '盘点计划不存在' });
+    }
+
+    // 状态保护：仅 in_progress 状态可完成；已 completed 直接返回成功（幂等）
+    if (plan.status === 'completed') {
+      await transaction.rollback();
+      return res.json({ message: '盘点已完成', plan });
+    }
+    if (plan.status !== 'in_progress') {
+      await transaction.rollback();
+      return res.status(400).json({ error: `当前状态（${plan.status}）不可完成，需先启动盘点` });
     }
 
     const beforeState = {
@@ -666,26 +912,45 @@ router.post('/plans/:planId/complete', async (req, res) => {
       missedDevices: plan.missedDevices,
     };
 
-    await InventoryRecord.update(
-      { status: 'missed' },
-      { where: { planId: plan.planId, status: 'pending' } }
-    );
-
-    const finalRecords = await InventoryRecord.findAll({ where: { planId: plan.planId } });
-
-    await plan.update({
-      status: 'completed',
-      completedDate: new Date(),
-      checkedDevices: finalRecords.filter(r => r.status !== 'pending').length,
-      normalDevices: finalRecords.filter(r => r.status === 'normal').length,
-      abnormalDevices: finalRecords.filter(r => r.status === 'abnormal').length,
-      missedDevices: finalRecords.filter(r => r.status === 'missed').length,
+    // 完成前先统计 pending 数量，用于返回提示信息
+    const pendingCount = await InventoryRecord.count({
+      where: { planId: plan.planId, status: 'pending' },
+      transaction,
     });
 
+    // 把剩余 pending 记录标记为 missed（未盘点）
+    if (pendingCount > 0) {
+      await InventoryRecord.update(
+        { status: 'missed' },
+        {
+          where: { planId: plan.planId, status: 'pending' },
+          transaction,
+        }
+      );
+    }
+
+    // 复用 SQL GROUP BY 聚合，避免全表加载到内存
+    const finalStats = await aggregateStatsByStatus({ planId: plan.planId }, transaction);
+
+    await plan.update(
+      {
+        ...finalStats,
+        status: 'completed',
+        completedDate: new Date(),
+      },
+      { transaction }
+    );
+
+    // 同步完成所有未完成的 task
     await InventoryTask.update(
       { status: 'completed' },
-      { where: { planId: plan.planId, status: { [Op.ne]: 'completed' } } }
+      {
+        where: { planId: plan.planId, status: { [Op.ne]: 'completed' } },
+        transaction,
+      }
     );
+
+    await transaction.commit();
 
     await logInventoryOperation('complete', `完成盘点计划【${plan.name}】`, {
       targetId: plan.planId,
@@ -700,11 +965,23 @@ router.post('/plans/:planId/complete', async (req, res) => {
         completedDate: plan.completedDate,
       },
       req,
-      metadata: { totalRecords: finalRecords.length },
+      metadata: {
+        totalRecords: finalStats.totalDevices,
+        missedPendingCount: pendingCount,
+      },
     });
 
-    res.json({ message: '盘点已完成', plan });
+    res.json({
+      message:
+        pendingCount > 0
+          ? `盘点已完成，其中 ${pendingCount} 条未盘点的记录已标记为遗漏`
+          : '盘点已完成',
+      plan,
+      missedPendingCount: pendingCount,
+    });
   } catch (error) {
+    await transaction.rollback();
+    logger.error('完成盘点计划错误', { error: error.message, stack: error.stack });
     await logInventoryOperation('complete', '完成盘点计划失败', {
       targetId: req.params?.planId,
       result: 'failed',
