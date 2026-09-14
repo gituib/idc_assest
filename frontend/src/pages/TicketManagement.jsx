@@ -34,10 +34,13 @@ import {
   CloudServerOutlined,
   TagOutlined,
   ExportOutlined,
+  ThunderboltOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import CloseButton from '../components/CloseButton';
 import TicketExportModal from '../components/TicketExportModal';
+import QuickReportModal from '../components/QuickReportModal';
 import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router-dom';
 import { debounce, getUserFromStorage } from '../utils/common';
@@ -243,6 +246,7 @@ function TicketManagement() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+  const [quickVisible, setQuickVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [processingModalVisible, setProcessingModalVisible] = useState(false);
   const [exportModalVisible, setExportModalVisible] = useState(false);
@@ -1151,6 +1155,12 @@ function TicketManagement() {
             <Button icon={<ExportOutlined />} onClick={() => setExportModalVisible(true)}>
               导出
             </Button>
+            <Button
+              icon={<RobotOutlined />}
+              onClick={() => setQuickVisible(true)}
+            >
+              快速报修
+            </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
               创建工单
             </Button>
@@ -1628,6 +1638,13 @@ function TicketManagement() {
           </div>
         </Form>
       </Modal>
+
+      <QuickReportModal
+        open={quickVisible}
+        onClose={() => setQuickVisible(false)}
+        onCreated={fetchTickets}
+        categories={categories}
+      />
 
       <Modal
         title="处理工单"

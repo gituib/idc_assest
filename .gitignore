@@ -136,3 +136,9 @@ backend/tests/*.disabled
 deploy/nginx-troubleshooting.md
 docs/trae-creativity-contest-proposal.html
 TRAE-创意提案-IDC设备资产管理系统.html
+
+# ==============================================
+# 临时测试脚手架文件（不应提交）
+# ==============================================
+frontend/__*
+.workbuddy/
