@@ -455,6 +455,29 @@ router.put('/:portId', requirePermission('port:edit'), async (req, res) => {
       return res.status(404).json({ error: '端口不存在' });
     }
 
+    // 端口有接线时拒绝修改任何信息——防止绕过 Cable 表直接改端口造成数据不一致
+    const relatedCable = await Cable.findOne({
+      where: {
+        [Op.or]: [
+          { sourceDeviceId: beforePort.deviceId, sourcePort: beforePort.portName },
+          { targetDeviceId: beforePort.deviceId, targetPort: beforePort.portName },
+        ],
+      },
+    });
+
+    if (relatedCable) {
+      return res.status(400).json({
+        error: '该端口存在关联接线，请先删除接线后再修改端口信息',
+        relatedCable: {
+          cableId: relatedCable.cableId,
+          sourceDeviceId: relatedCable.sourceDeviceId,
+          sourcePort: relatedCable.sourcePort,
+          targetDeviceId: relatedCable.targetDeviceId,
+          targetPort: relatedCable.targetPort,
+        },
+      });
+    }
+
     // 修改端口名时校验同设备下是否重名，避免唯一索引冲突抛出原始错误
     if (updateData.portName !== undefined && updateData.portName !== beforePort.portName) {
       const duplicatePort = await DevicePort.findOne({
