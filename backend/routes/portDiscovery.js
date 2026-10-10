@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 端口自动采集路由
  * - POST /discover  执行采集并返回差异预览（不写库）
  * - POST /apply     根据差异预览批量落库（调用现有 /device-ports/batch 逻辑）
@@ -123,21 +123,22 @@ router.post('/discover', authMiddleware, requirePermission('port:view'), async (
  * 注意：幂等合并，事务原子性
  */
 router.post('/apply', authMiddleware, requirePermission('port:create'), async (req, res) => {
-  const transaction = await sequelize.transaction();
+  let transaction;
   try {
     const { deviceId, diff, options = {} } = req.body;
     const { applyAdded = true, applyChanged = true, applyRemoved = false } = options;
 
     if (!deviceId || !diff) {
-      await transaction.rollback();
       return res.status(400).json({ success: false, message: 'deviceId 和 diff 必填' });
     }
 
     const device = await Device.findByPk(deviceId);
     if (!device) {
-      await transaction.rollback();
       return res.status(400).json({ success: false, message: '设备不存在' });
     }
+
+    // transaction() 放在参数校验之后、try 内部：锁冲突异常能被捕获
+    transaction = await sequelize.transaction();
 
     const stats = { added: 0, changed: 0, removed: 0, failed: 0, errors: [] };
 
@@ -161,7 +162,7 @@ router.post('/apply', authMiddleware, requirePermission('port:create'), async (r
               portName: p.portName,
               portType: p.portType || 'RJ45',
               portSpeed: p.portSpeed || '1G',
-              status: p.status || 'free',
+              status: 'free', // 自动发现的端口统一默认未使用
               vlanId: p.vlanId,
               description: p.description,
             },
@@ -182,13 +183,14 @@ router.post('/apply', authMiddleware, requirePermission('port:create'), async (r
           if (!p.portId) continue;
           const updates = {};
           if (p.fieldChanges) {
-            // 只更新有差异的字段
+            // 只更新有差异的字段，跳过 status（使用状态由用户手动管理，采集结果仅作参考）
             for (const [field, change] of Object.entries(p.fieldChanges)) {
+              if (field === 'status') continue;
               updates[field] = change.to;
             }
           } else {
-            // 没有 fieldChanges 信息时，全量更新关键字段
-            for (const f of ['portType', 'portSpeed', 'status', 'description', 'vlanId']) {
+            // 没有 fieldChanges 信息时，全量更新关键字段（同样跳过 status）
+            for (const f of ['portType', 'portSpeed', 'description', 'vlanId']) {
               if (p[f] !== undefined && p[f] !== null) updates[f] = p[f];
             }
           }
@@ -233,7 +235,7 @@ router.post('/apply', authMiddleware, requirePermission('port:create'), async (r
     res.json({ success: true, stats });
   } catch (error) {
     try {
-      await transaction.rollback();
+      if (transaction) await transaction.rollback();
     } catch {
       // 回滚失败（如事务已结束）可忽略，不影响错误响应
     }

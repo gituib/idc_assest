@@ -59,6 +59,8 @@ if (DB_TYPE === 'mysql') {
   dbDialect = 'sqlite';
 
   sequelize.query('PRAGMA foreign_keys = ON');
+  // SQLite 并发写入锁冲突时等待 30s 再超时（默认 busy_timeout=0 立即失败）
+  sequelize.query('PRAGMA busy_timeout = 30000');
 }
 
 module.exports = { sequelize, DB_TYPE, dbDialect };

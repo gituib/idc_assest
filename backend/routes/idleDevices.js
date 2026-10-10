@@ -899,6 +899,28 @@ router.delete('/:deviceId', authMiddleware, requirePermission('idle:delete'), as
     }
 
     const beforeState = device.toJSON();
+    const deviceId = req.params.deviceId;
+
+    // 有接线时拒绝删除——空闲设备应该先清理完接线再删除
+    const Cable = require('../models/Cable');
+    const relatedCables = await Cable.findAll({
+      where: {
+        [Op.or]: [{ sourceDeviceId: deviceId }, { targetDeviceId: deviceId }],
+      },
+      transaction: t,
+    });
+
+    if (relatedCables.length > 0) {
+      await t.rollback();
+      return res.status(400).json({
+        error: `该设备存在 ${relatedCables.length} 条关联接线，请先删除接线后再删除设备`,
+        relatedCables: relatedCables.map(c => ({
+          cableId: c.cableId,
+          sourcePort: c.sourcePort,
+          targetPort: c.targetPort,
+        })),
+      });
+    }
 
     await device.destroy({ transaction: t });
 

@@ -155,14 +155,23 @@ function CableManagement() {
   const fetchCables = useCallback(async () => {
     try {
       setLoading(true);
-      const params = {};
+      // 使用大 pageSize 一次性拉取全部接线数据，避免后端默认只返回 10 条
+      const params = { pageSize: 10000 };
 
-      if (filters.switchDeviceId) params.sourceDeviceId = filters.switchDeviceId;
       if (filters.status !== 'all') params.status = filters.status;
       if (filters.cableType !== 'all') params.cableType = filters.cableType;
 
       const response = await axios.get('/api/cables', { params });
-      const cablesData = response.data.cables || [];
+      let cablesData = response.data.cables || [];
+
+      // 若指定了设备筛选，前端自行过滤 source/target 双向匹配
+      if (filters.switchDeviceId) {
+        cablesData = cablesData.filter(
+          c =>
+            c.sourceDeviceId === filters.switchDeviceId ||
+            c.targetDeviceId === filters.switchDeviceId
+        );
+      }
 
       // 搜索过滤
       let filteredCables = cablesData;
@@ -180,26 +189,40 @@ function CableManagement() {
 
       setCables(filteredCables);
 
+      // 分组：同时按源设备和目标设备双向分组，确保每个参与接线的设备都能显示
       const grouped = {};
       filteredCables.forEach(cable => {
-        const switchId = cable.sourceDeviceId;
-        if (!grouped[switchId]) {
-          grouped[switchId] = {
-            switch: cable.sourceDevice,
+        // 源设备分组
+        const srcId = cable.sourceDeviceId;
+        if (!grouped[srcId]) {
+          grouped[srcId] = {
+            device: cable.sourceDevice,
             cables: [],
           };
         }
-        grouped[switchId].cables.push(cable);
+        grouped[srcId].cables.push({ ...cable, direction: 'source' });
+
+        // 目标设备分组（避免与源设备是同一台）
+        const tgtId = cable.targetDeviceId;
+        if (srcId !== tgtId) {
+          if (!grouped[tgtId]) {
+            grouped[tgtId] = {
+              device: cable.targetDevice,
+              cables: [],
+            };
+          }
+          grouped[tgtId].cables.push({ ...cable, direction: 'target' });
+        }
       });
       setGroupedCables(grouped);
 
       // 自动展开前5个
-      const switchIds = Object.keys(grouped);
-      setExpandedKeys(switchIds.slice(0, 5));
+      const deviceIds = Object.keys(grouped);
+      setExpandedKeys(deviceIds.slice(0, 5));
 
-      // 并行加载未加载过的交换机端口数据
+      // 并行加载未加载过的设备端口数据
       // 用 ref 跟踪已加载的 id，避免把 devicePorts 作为依赖导致无限渲染循环
-      const missingIds = switchIds.filter(id => !loadedPortsRef.current.has(id));
+      const missingIds = deviceIds.filter(id => !loadedPortsRef.current.has(id));
       if (missingIds.length > 0) {
         // 先标记为已加载，防止并发重复请求
         missingIds.forEach(id => loadedPortsRef.current.add(id));
@@ -210,7 +233,7 @@ function CableManagement() {
               .get(`/api/device-ports/device/${id}`)
               .then(res => ({ id, data: res.data || [] }))
               .catch(error => {
-                console.error(`获取交换机 ${id} 端口失败:`, error);
+                console.error(`获取设备 ${id} 端口失败:`, error);
                 // 加载失败时移除标记，允许后续重试
                 loadedPortsRef.current.delete(id);
                 return { id, data: [] };
@@ -693,12 +716,30 @@ function CableManagement() {
     );
   };
 
-  const getPortConnectionStatus = (portName, switchData) => {
-    const cable = switchData.cables.find(c => {
-      if (c.sourcePort === portName) return true;
-      if (c.sourcePort?.toLowerCase() === portName?.toLowerCase()) return true;
-      return false;
+  /**
+   * 根据端口名查找该设备参与的接线
+   * 双向匹配：sourcePort 或 targetPort 命中都算
+   * @param {Array} cables - 该设备分组下的接线列表
+   * @param {string} portName - 端口名
+   * @returns {Object|undefined} 匹配的接线对象
+   */
+  const findCableByPort = (cables, portName) => {
+    if (!cables || !portName) return undefined;
+    const pn = portName.toLowerCase();
+    return cables.find(c => {
+      const sp = c.sourcePort?.toLowerCase();
+      const tp = c.targetPort?.toLowerCase();
+      return sp === pn || tp === pn;
     });
+  };
+
+  /**
+   * 获取端口连接状态
+   * @param {string} portName - 端口名
+   * @param {Object} groupData - 设备分组数据 { device, cables }
+   */
+  const getPortConnectionStatus = (portName, groupData) => {
+    const cable = findCableByPort(groupData?.cables, portName);
     if (!cable) {
       return { status: 'disconnected', text: '未连接', color: 'default' };
     }
@@ -755,7 +796,7 @@ function CableManagement() {
         key: 'connectionStatus',
         width: 100,
         render: (_, record) => {
-          const status = getPortConnectionStatus(record.portName, record.switchData);
+          const status = getPortConnectionStatus(record.portName, record.groupData);
           return (
             <Badge
               status={
@@ -771,24 +812,26 @@ function CableManagement() {
         },
       },
       {
-        title: '目标设备',
-        dataIndex: 'targetDevice',
-        key: 'targetDevice',
+        title: '对端设备',
+        dataIndex: 'peerDevice',
+        key: 'peerDevice',
         width: 200,
         render: (_, record) => {
-          const cable = record.switchData.cables.find(c => {
-            if (c.sourcePort === record.portName) return true;
-            if (c.sourcePort?.toLowerCase() === record.portName?.toLowerCase()) return true;
-            return false;
-          });
+          const cable = findCableByPort(record.groupData?.cables, record.portName);
           if (!cable) return <Text type="secondary">-</Text>;
+          // 双向分组后，根据 direction 或端口匹配判断对端
+          const isSourceSide =
+            cable.direction === 'source' ||
+            cable.sourcePort?.toLowerCase() === record.portName?.toLowerCase();
+          const peerDevice = isSourceSide ? cable.targetDevice : cable.sourceDevice;
+          const peerPort = isSourceSide ? cable.targetPort : cable.sourcePort;
           return (
             <div>
               <div style={{ fontWeight: 500, color: designTokens.colors.neutral[800] }}>
-                {cable.targetDevice?.name || '-'}
+                {peerDevice?.name || '-'}
               </div>
               <div style={{ fontSize: 12, color: designTokens.colors.neutral[500] }}>
-                {cable.targetPort}
+                {peerPort}
               </div>
             </div>
           );
@@ -800,11 +843,7 @@ function CableManagement() {
         key: 'cableType',
         width: 100,
         render: (_, record) => {
-          const cable = record.switchData.cables.find(c => {
-            if (c.sourcePort === record.portName) return true;
-            if (c.sourcePort?.toLowerCase() === record.portName?.toLowerCase()) return true;
-            return false;
-          });
+          const cable = findCableByPort(record.groupData?.cables, record.portName);
           if (!cable) return <Text type="secondary">-</Text>;
           return getCableTypeTag(cable.cableType);
         },
@@ -815,11 +854,7 @@ function CableManagement() {
         key: 'cableLength',
         width: 80,
         render: (_, record) => {
-          const cable = record.switchData.cables.find(c => {
-            if (c.sourcePort === record.portName) return true;
-            if (c.sourcePort?.toLowerCase() === record.portName?.toLowerCase()) return true;
-            return false;
-          });
+          const cable = findCableByPort(record.groupData?.cables, record.portName);
           if (!cable) return <Text type="secondary">-</Text>;
           return cable.cableLength ? (
             <Tag color="orange" style={{ borderRadius: '4px' }}>
@@ -835,11 +870,7 @@ function CableManagement() {
         key: 'action',
         width: 160,
         render: (_, record) => {
-          const cable = record.switchData.cables.find(c => {
-            if (c.sourcePort === record.portName) return true;
-            if (c.sourcePort?.toLowerCase() === record.portName?.toLowerCase()) return true;
-            return false;
-          });
+          const cable = findCableByPort(record.groupData?.cables, record.portName);
           if (!cable) {
             return <Text type="secondary">-</Text>;
           }
@@ -1186,18 +1217,18 @@ function CableManagement() {
               onChange={setExpandedKeys}
               style={{ background: 'transparent', border: 'none' }}
             >
-              {Object.entries(groupedCables).map(([switchId, switchData], index) => {
-                const switchDevice = switchData.switch;
-                const switchPorts = devicePorts[switchId] || [];
-                const connectedCount = switchData.cables.filter(c => c.status === 'normal').length;
-                const disconnectedCount = switchData.cables.filter(
+              {Object.entries(groupedCables).map(([deviceId, groupData], index) => {
+                const deviceInfo = groupData.device;
+                const devicePortsList = devicePorts[deviceId] || [];
+                const connectedCount = groupData.cables.filter(c => c.status === 'normal').length;
+                const disconnectedCount = groupData.cables.filter(
                   c => c.status === 'disconnected'
                 ).length;
-                const faultCount = switchData.cables.filter(c => c.status === 'fault').length;
+                const faultCount = groupData.cables.filter(c => c.status === 'fault').length;
 
                 return (
                   <Panel
-                    key={switchId}
+                    key={deviceId}
                     header={
                       <div
                         style={{
@@ -1233,7 +1264,7 @@ function CableManagement() {
                                 color: designTokens.colors.neutral[800],
                               }}
                             >
-                              {switchDevice?.name || '未知设备'}
+                              {deviceInfo?.name || '未知设备'}
                             </div>
                             <div
                               style={{
@@ -1242,7 +1273,7 @@ function CableManagement() {
                                 marginTop: '2px',
                               }}
                             >
-                              {switchDevice?.deviceId || '-'} · {switchDevice?.model || '交换机'}
+                              {deviceInfo?.deviceId || '-'} · {deviceInfo?.model || deviceInfo?.type || '设备'}
                             </div>
                           </div>
                         </div>
@@ -1279,7 +1310,7 @@ function CableManagement() {
                             color="blue"
                             style={{ borderRadius: '4px', padding: '4px 12px', fontWeight: 500 }}
                           >
-                            总计: {switchData.cables.length}
+                            总计: {groupData.cables.length}
                           </Tag>
                         </Space>
                       </div>
@@ -1291,7 +1322,7 @@ function CableManagement() {
                             type="text"
                             icon={<PlusOutlined />}
                             onClick={() => {
-                              setWizardInitialSourceDevice(switchData.switch);
+                              setWizardInitialSourceDevice(deviceInfo);
                               setWizardVisible(true);
                             }}
                             style={{ color: designTokens.colors.primary.main }}
@@ -1309,9 +1340,10 @@ function CableManagement() {
                   >
                     <Table
                       columns={portColumns}
-                      dataSource={switchPorts.map(port => ({
+                      dataSource={devicePortsList.map(port => ({
                         ...port,
-                        switchData: switchData,
+                        groupData: groupData,
+                        deviceId: deviceId,
                       }))}
                       rowKey="portId"
                       pagination={false}

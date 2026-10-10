@@ -2551,6 +2551,36 @@ router.post('/batch-delete', validateBody(batchDeviceIdsSchema), requirePermissi
     });
 
     // 3. 删除相关接线
+    // 先查询接线记录，以便释放对端端口的 occupied 状态
+    const relatedCables = await Cable.findAll({
+      where: {
+        [Op.or]: [
+          { sourceDeviceId: { [Op.in]: deviceIds } },
+          { targetDeviceId: { [Op.in]: deviceIds } },
+        ],
+      },
+      transaction: t,
+    });
+
+    // 释放对端端口的 occupied 状态（仅释放不在删除列表中的对端）
+    for (const cable of relatedCables) {
+      const sourceInList = deviceIds.includes(cable.sourceDeviceId);
+      const targetInList = deviceIds.includes(cable.targetDeviceId);
+
+      if (!sourceInList) {
+        await DevicePort.update(
+          { status: 'free' },
+          { where: { deviceId: cable.sourceDeviceId, portName: cable.sourcePort }, transaction: t }
+        );
+      }
+      if (!targetInList) {
+        await DevicePort.update(
+          { status: 'free' },
+          { where: { deviceId: cable.targetDeviceId, portName: cable.targetPort }, transaction: t }
+        );
+      }
+    }
+
     await Cable.destroy({
       where: {
         [Op.or]: [
@@ -2657,6 +2687,36 @@ router.delete('/delete-all', requirePermission('device:delete'), async (req, res
     });
 
     // 3. 删除相关接线
+    // 先查询接线记录，以便释放对端端口的 occupied 状态
+    const relatedCables = await Cable.findAll({
+      where: {
+        [Op.or]: [
+          { sourceDeviceId: { [Op.in]: deviceIds } },
+          { targetDeviceId: { [Op.in]: deviceIds } },
+        ],
+      },
+      transaction: t,
+    });
+
+    // 释放对端端口的 occupied 状态（仅释放不在删除列表中的对端）
+    for (const cable of relatedCables) {
+      const sourceInList = deviceIds.includes(cable.sourceDeviceId);
+      const targetInList = deviceIds.includes(cable.targetDeviceId);
+
+      if (!sourceInList) {
+        await DevicePort.update(
+          { status: 'free' },
+          { where: { deviceId: cable.sourceDeviceId, portName: cable.sourcePort }, transaction: t }
+        );
+      }
+      if (!targetInList) {
+        await DevicePort.update(
+          { status: 'free' },
+          { where: { deviceId: cable.targetDeviceId, portName: cable.targetPort }, transaction: t }
+        );
+      }
+    }
+
     await Cable.destroy({
       where: {
         [Op.or]: [
@@ -2742,12 +2802,32 @@ router.delete('/:deviceId', requirePermission('device:delete'), async (req, res)
 
     // 3. 删除相关接线
     // 必须在删除设备之前删除，否则可能触发外键约束错误
-    const deletedCables = await Cable.destroy({
+    // 先查询接线记录，以便释放对端端口的 occupied 状态
+    const relatedCables = await Cable.findAll({
       where: {
         [Op.or]: [{ sourceDeviceId: deviceId }, { targetDeviceId: deviceId }],
       },
       transaction: t,
     });
+
+    // 释放对端端口的 occupied 状态
+    for (const cable of relatedCables) {
+      const otherDeviceId = cable.sourceDeviceId === deviceId ? cable.targetDeviceId : cable.sourceDeviceId;
+      const otherPort = cable.sourceDeviceId === deviceId ? cable.targetPort : cable.sourcePort;
+      await DevicePort.update(
+        { status: 'free' },
+        { where: { deviceId: otherDeviceId, portName: otherPort }, transaction: t }
+      );
+    }
+
+    const deletedCables = relatedCables.length > 0
+      ? await Cable.destroy({
+          where: {
+            [Op.or]: [{ sourceDeviceId: deviceId }, { targetDeviceId: deviceId }],
+          },
+          transaction: t,
+        })
+      : 0;
 
     // 4. 解除工单关联 (Unlink Tickets)
     await Ticket.update({ deviceId: null }, { where: { deviceId: deviceId }, transaction: t });
