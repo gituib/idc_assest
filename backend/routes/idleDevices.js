@@ -6,6 +6,7 @@ const Device = require('../models/Device');
 const Rack = require('../models/Rack');
 const Room = require('../models/Room');
 const requirePermission = require('../middleware/requirePermission');
+const { friendlyDbErrorMessage } = require('../utils/errorHandler');
 const { authMiddleware } = require('../middleware/auth');
 const {
   logDeviceOperation,
@@ -152,6 +153,15 @@ router.post('/', authMiddleware, requirePermission('idle:shelve'), async (req, r
       }
     }
 
+    // U 位冲突校验：空闲设备不允许与在位设备占用同一 U 位段
+    if (rackId && position) {
+      const heightCheck = parseInt(req.body.height, 10) || 1;
+      const positionCheck = await checkPositionAvailable(rackId, position, heightCheck, null);
+      if (!positionCheck.available) {
+        return res.status(400).json({ error: positionCheck.reason });
+      }
+    }
+
     const device = await Device.create({
       deviceId,
       name: name || '',
@@ -206,17 +216,19 @@ router.post('/', authMiddleware, requirePermission('idle:shelve'), async (req, r
       req,
       metadata: { error: error.message },
     });
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: friendlyDbErrorMessage(error) });
   }
 });
 
 router.post('/from-device/:deviceId', authMiddleware, requirePermission('idle:shelve'), async (req, res) => {
   const t = await require('../db').sequelize.transaction();
+  // 声明在 try 外，catch 块记录日志时可安全访问（try 内 const 存在作用域隔离问题）
+  let device = null;
   try {
     const { idleReason } = req.body;
     const { deviceId } = req.params;
 
-    const device = await Device.findByPk(deviceId, { transaction: t });
+    device = await Device.findByPk(deviceId, { transaction: t });
     if (!device) {
       await t.rollback();
       return res.status(404).json({ error: '设备不存在' });
@@ -237,6 +249,19 @@ router.post('/from-device/:deviceId', authMiddleware, requirePermission('idle:sh
       },
       { transaction: t }
     );
+
+    // 转入空闲时从原机柜扣除功耗（与 to-idle 语义一致：空闲设备不计机柜功耗）
+    if (device.rackId) {
+      const powerRack = await Rack.findByPk(device.rackId, { transaction: t });
+      if (powerRack) {
+        await powerRack.update(
+          {
+            currentPower: Math.max(0, (Number(powerRack.currentPower) || 0) - (Number(device.powerConsumption) || 0)),
+          },
+          { transaction: t }
+        );
+      }
+    }
 
     await t.commit();
 
@@ -308,6 +333,25 @@ router.post('/batch-from-devices', authMiddleware, requirePermission('idle:shelv
           transaction: t,
         }
       );
+
+      // 按机柜分组扣减功耗（与单台转空闲语义一致：空闲设备不计机柜功耗）
+      const rackPowerMap = new Map();
+      notIdleDevices.forEach(d => {
+        if (!d.rackId) return;
+        rackPowerMap.set(d.rackId, (rackPowerMap.get(d.rackId) || 0) + (Number(d.powerConsumption) || 0));
+      });
+      for (const [rackId, powerToSubtract] of rackPowerMap) {
+        // 用 JS 计算避免方言差异（MySQL UPDATE 中 MAX(x,0) 标量多参写法不被支持）
+        const powerRack = await Rack.findByPk(rackId, { transaction: t });
+        if (powerRack) {
+          await powerRack.update(
+            {
+              currentPower: Math.max(0, (Number(powerRack.currentPower) || 0) - powerToSubtract),
+            },
+            { transaction: t }
+          );
+        }
+      }
     }
 
     await t.commit();
@@ -551,6 +595,8 @@ router.put('/batch-restore', authMiddleware, requirePermission('idle:restore'), 
 
 router.put('/:deviceId/shelve', authMiddleware, requirePermission('idle:shelve'), async (req, res) => {
   const t = await require('../db').sequelize.transaction();
+  // 声明在 try 外，catch 块记录日志时可安全访问
+  let device = null;
   try {
     const { deviceId } = req.params;
     const {
@@ -565,7 +611,7 @@ router.put('/:deviceId/shelve', authMiddleware, requirePermission('idle:shelve')
       description,
     } = req.body;
 
-    const device = await Device.findOne({
+    device = await Device.findOne({
       where: { deviceId, isIdle: true },
       transaction: t,
     });
@@ -690,8 +736,10 @@ router.put('/:deviceId/shelve', authMiddleware, requirePermission('idle:shelve')
 });
 
 router.put('/:deviceId', authMiddleware, requirePermission('idle:edit'), async (req, res) => {
+  // 声明在 try 外，catch 块记录日志时可安全访问
+  let device = null;
   try {
-    const device = await Device.findOne({
+    device = await Device.findOne({
       where: { deviceId: req.params.deviceId, isIdle: true },
     });
 
@@ -737,6 +785,22 @@ router.put('/:deviceId', authMiddleware, requirePermission('idle:edit'), async (
       device.position = req.body.position || null;
     }
 
+    // U 位冲突校验：仅当本次变更了 position 或 rackId 时校验，防止空闲设备与在位设备重叠
+    const positionChanged =
+      (req.body.position !== undefined && (req.body.position || null) !== beforeState.position) ||
+      (req.body.rackId !== undefined && (req.body.rackId || null) !== beforeState.rackId);
+    if (positionChanged && device.rackId && device.position) {
+      const positionCheck = await checkPositionAvailable(
+        device.rackId,
+        device.position,
+        device.height,
+        req.params.deviceId
+      );
+      if (!positionCheck.available) {
+        return res.status(400).json({ error: positionCheck.reason });
+      }
+    }
+
     await device.save();
 
     await logDeviceOperation(
@@ -762,17 +826,19 @@ router.put('/:deviceId', authMiddleware, requirePermission('idle:edit'), async (
       req,
       metadata: { error: error.message },
     });
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: friendlyDbErrorMessage(error) });
   }
 });
 
 router.put('/:deviceId/restore', authMiddleware, requirePermission('idle:restore'), async (req, res) => {
   const t = await require('../db').sequelize.transaction();
+  // 声明在 try 外，catch 块记录日志时可安全访问
+  let device = null;
   try {
     const { targetRackId, targetPosition } = req.body;
     const { deviceId } = req.params;
 
-    const device = await Device.findOne({
+    device = await Device.findOne({
       where: { deviceId, isIdle: true },
       transaction: t,
     });
@@ -887,8 +953,10 @@ router.put('/:deviceId/restore', authMiddleware, requirePermission('idle:restore
 
 router.delete('/:deviceId', authMiddleware, requirePermission('idle:delete'), async (req, res) => {
   const t = await require('../db').sequelize.transaction();
+  // 声明在 try 外，catch 块记录日志时可安全访问
+  let device = null;
   try {
-    const device = await Device.findOne({
+    device = await Device.findOne({
       where: { deviceId: req.params.deviceId, isIdle: true },
       transaction: t,
     });
@@ -921,6 +989,32 @@ router.delete('/:deviceId', authMiddleware, requirePermission('idle:delete'), as
         })),
       });
     }
+
+    // 级联清理关联数据（端口/网卡/工单/盘点记录），否则外键约束会导致设备删除失败
+    const DevicePort = require('../models/DevicePort');
+    const NetworkCard = require('../models/NetworkCard');
+    const Ticket = require('../models/Ticket');
+    const InventoryRecord = require('../models/InventoryRecord');
+
+    await DevicePort.destroy({
+      where: { deviceId },
+      transaction: t,
+    });
+
+    await NetworkCard.destroy({
+      where: { deviceId },
+      transaction: t,
+    });
+
+    await Ticket.update(
+      { deviceId: null },
+      { where: { deviceId }, transaction: t }
+    );
+
+    await InventoryRecord.destroy({
+      where: { deviceId },
+      transaction: t,
+    });
 
     await device.destroy({ transaction: t });
 
@@ -976,6 +1070,15 @@ async function checkPositionAvailable(
   const deviceHeight = parseInt(height, 10) || 1;
   const startU = pos;
   const endU = pos + deviceHeight - 1;
+
+  // 校验 U 位不超过机柜物理高度上限（如 42U 机柜不允许 U50）
+  const rackForCheck = await Rack.findByPk(rackId, transaction ? { transaction } : undefined);
+  if (rackForCheck && rackForCheck.height && endU > rackForCheck.height) {
+    return {
+      available: false,
+      reason: `U位超出机柜范围：机柜高度 ${rackForCheck.height}U，当前位置范围 U${startU}-U${endU} 超出上限`,
+    };
+  }
 
   const queryOptions = {
     where: {

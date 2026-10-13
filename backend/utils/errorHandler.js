@@ -84,6 +84,26 @@ function createError(code, message, statusCode = 500, details = null) {
   return new AppError(code, message, statusCode, details);
 }
 
+/**
+ * 将数据库层错误转换为友好中文提示
+ * 重点处理唯一约束冲突（序列号/设备编号重复），其余错误原样返回
+ * @param {Error} error - 原始错误对象
+ * @returns {string} 友好中文错误信息
+ */
+function friendlyDbErrorMessage(error) {
+  if (error?.name === 'SequelizeUniqueConstraintError') {
+    const detail = JSON.stringify(error.errors || []) + String(error.original?.sqlMessage || '');
+    if (detail.includes('serialNumber')) {
+      return '序列号已存在，请勿重复添加';
+    }
+    if (detail.includes('deviceId')) {
+      return '设备编号已存在，请更换';
+    }
+    return '数据已存在，请勿重复添加';
+  }
+  return error?.message || '操作失败';
+}
+
 function sendErrorResponse(res, error, req = null) {
   logError(error, req);
 
@@ -129,6 +149,7 @@ module.exports = {
   AppError,
   ERROR_CODES,
   createError,
+  friendlyDbErrorMessage,
   logError,
   buildErrorResponse,
   sendErrorResponse,

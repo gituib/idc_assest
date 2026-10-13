@@ -24,6 +24,7 @@ const {
 } = require('../validation/deviceSchema');
 const { createDeviceSchema } = require('../validation/dynamicDeviceSchema');
 const requirePermission = require('../middleware/requirePermission');
+const { friendlyDbErrorMessage } = require('../utils/errorHandler');
 
 const PREVIEW_COUNT = 20;
 
@@ -52,6 +53,15 @@ async function checkPositionAvailable(
   const deviceHeight = parseInt(height, 10) || 1;
   const startU = pos;
   const endU = pos + deviceHeight - 1;
+
+  // 校验 U 位不超过机柜物理高度上限（如 42U 机柜不允许 U50）
+  const rackForCheck = await Rack.findByPk(rackId, transaction ? { transaction } : undefined);
+  if (rackForCheck && rackForCheck.height && endU > rackForCheck.height) {
+    return {
+      available: false,
+      reason: `U位超出机柜范围：机柜高度 ${rackForCheck.height}U，当前位置范围 U${startU}-U${endU} 超出上限`,
+    };
+  }
 
   const queryOptions = {
     where: {
@@ -755,9 +765,7 @@ router.post('/', validateBody(() => createDeviceSchema(false)), requirePermissio
   try {
     const deviceData = { ...req.body };
 
-    if (!deviceData.deviceId || deviceData.deviceId.trim() === '') {
-      deviceData.deviceId = await generateDeviceId();
-    }
+    const autoAllocateId = !deviceData.deviceId || deviceData.deviceId.trim() === '';
 
     if (deviceData.rackId && deviceData.position) {
       const positionCheck = await checkPositionAvailable(
@@ -770,12 +778,41 @@ router.post('/', validateBody(() => createDeviceSchema(false)), requirePermissio
       }
     }
 
-    const device = await Device.create(deviceData);
+    // deviceId 唯一键竞态重试：MAX+1 生成策略在并发创建下可能撞号，
+    // 撞号时重新生成 deviceId 再试（仅限自动分配场景，用户自定义 ID 不覆盖）。
+    // 加随机退避避免重试者之间再次同时撞号（N 并发需 N+1 轮内收敛）
+    let device = null;
+    let lastError = null;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      if (autoAllocateId) {
+        deviceData.deviceId = await generateDeviceId();
+      }
+      try {
+        device = await Device.create(deviceData);
+        break;
+      } catch (err) {
+        lastError = err;
+        // 仅 deviceId 撞号才重试；序列号等其它唯一约束冲突直接抛出
+        const isDeviceIdDup =
+          err.name === 'SequelizeUniqueConstraintError' &&
+          (JSON.stringify(err.errors || []).includes('deviceId') ||
+            String(err.original?.sqlMessage || '').includes('deviceId'));
+        if (!isDeviceIdDup || !autoAllocateId) {
+          throw err;
+        }
+        deviceData.deviceId = null;
+        // 随机退避 5-25ms，错开并发重试
+        await new Promise(resolve => setTimeout(resolve, 5 + Math.floor(Math.random() * 20)));
+      }
+    }
+    if (!device) {
+      throw lastError;
+    }
 
     const rack = await Rack.findByPk(deviceData.rackId);
     if (rack) {
       await rack.update({
-        currentPower: rack.currentPower + deviceData.powerConsumption,
+        currentPower: (Number(rack.currentPower) || 0) + (Number(deviceData.powerConsumption) || 0),
       });
     }
 
@@ -805,15 +842,14 @@ router.post('/', validateBody(() => createDeviceSchema(false)), requirePermissio
 
     res.status(201).json(device);
   } catch (error) {
-    // 记录设备创建失败日志
+    // 记录设备创建失败日志（deviceData 在 try 块内，此处回退使用 req.body）
     await logDeviceOperation('create', '创建设备失败', {
-      targetId: deviceData.deviceId,
-      targetName: deviceData.name,
+      targetName: req.body?.name,
       result: 'failed',
       req,
       metadata: { error: error.message },
     });
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: friendlyDbErrorMessage(error) });
   }
 });
 
@@ -1081,6 +1117,8 @@ router.get('/export', requirePermission('device:view'), async (req, res) => {
 
 router.post('/import', requirePermission('device:create'), async (req, res) => {
   const t = await sequelize.transaction();
+  // 声明在 try 外，catch 块清理临时文件时可安全访问（try 内 const 存在作用域隔离问题）
+  let filePath = null;
 
   try {
     if (!req.files || !req.files.csvFile) {
@@ -1101,7 +1139,7 @@ router.post('/import', requirePermission('device:create'), async (req, res) => {
     if (!safeFileName || safeFileName.startsWith('.') || safeFileName !== csvFile.name) {
       return res.status(400).json({ error: '文件名不合法' });
     }
-    const filePath = path.join(__dirname, '../temp', safeFileName);
+    filePath = path.join(__dirname, '../temp', safeFileName);
     await csvFile.mv(filePath);
 
     // 读取并解析CSV文件（GBK编码）
@@ -1564,9 +1602,9 @@ router.put('/batch-offline', validateBody(batchDeviceIdsSchema), requirePermissi
 });
 
 router.put('/batch-status', requirePermission('device:edit'), async (req, res) => {
+  // 声明在 try 外，catch 块记录日志时可安全访问
+  const { deviceIds, status } = req.body;
   try {
-    const { deviceIds, status } = req.body;
-
     if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
       return res.status(400).json({ error: '请提供有效的设备ID列表' });
     }
@@ -1670,10 +1708,10 @@ router.put('/batch-status', requirePermission('device:edit'), async (req, res) =
 });
 
 router.put('/batch-move', requirePermission('device:edit'), async (req, res) => {
+  // 声明在 try 外，catch 块记录日志时可安全访问
+  const { deviceIds, targetRackId, startPosition } = req.body;
   const transaction = await sequelize.transaction();
   try {
-    const { deviceIds, targetRackId, startPosition } = req.body;
-
     if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
       await transaction.rollback();
       return res.status(400).json({ error: '请提供有效的设备ID列表' });
@@ -1881,10 +1919,10 @@ router.put('/batch-move', requirePermission('device:edit'), async (req, res) => 
 
 // 批量更新维保信息
 router.put('/batch-warranty', validateBody(batchWarrantySchema), requirePermission('device:edit'), async (req, res) => {
+  // 声明在 try 外，catch 块记录日志时可安全访问
+  const { deviceIds, purchaseDate, warrantyExpiry } = req.body;
   const transaction = await sequelize.transaction();
   try {
-    const { deviceIds, purchaseDate, warrantyExpiry } = req.body;
-
     // 检查数据库中是否存在这些设备
     const existingDevices = await Device.findAll({
       where: { deviceId: { [Op.in]: deviceIds } },
@@ -2270,11 +2308,12 @@ router.get('/:deviceId', requirePermission('device:view'), async (req, res) => {
 
 router.put('/:deviceId/to-idle', requirePermission('device:edit'), async (req, res) => {
   const t = await sequelize.transaction();
+  // 声明在 try 外，catch 块记录日志时可安全访问
+  const { idleReason } = req.body;
+  const { deviceId } = req.params;
+  let device = null;
   try {
-    const { idleReason } = req.body;
-    const { deviceId } = req.params;
-
-    const device = await Device.findByPk(deviceId, { transaction: t });
+    device = await Device.findByPk(deviceId, { transaction: t });
     if (!device) {
       await t.rollback();
       return res.status(404).json({ error: '设备不存在' });
@@ -2511,23 +2550,23 @@ router.put('/:deviceId', validateBody(() => createDeviceSchema(true)), requirePe
       res.status(404).json({ error: '设备不存在' });
     }
   } catch (error) {
-    // 记录设备更新失败日志
+    // 记录设备更新失败日志（oldDevice 在 try 块内，此处回退使用请求参数）
     await logDeviceOperation('update', '更新设备失败', {
       targetId: req.params.deviceId,
-      targetName: oldDevice?.name,
+      targetName: req.body?.name,
       result: 'failed',
       req,
       metadata: { error: error.message },
     });
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: friendlyDbErrorMessage(error) });
   }
 });
 
 router.post('/batch-delete', validateBody(batchDeviceIdsSchema), requirePermission('device:delete'), async (req, res) => {
+  // 声明在 try 外，catch 块记录日志时可安全访问
+  const { deviceIds } = req.body;
   const t = await sequelize.transaction();
   try {
-    const { deviceIds } = req.body;
-
     if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
       await t.rollback();
       return res.status(400).json({ error: '请提供有效的设备 ID 列表' });
@@ -2775,11 +2814,12 @@ router.delete('/delete-all', requirePermission('device:delete'), async (req, res
 
 router.delete('/:deviceId', requirePermission('device:delete'), async (req, res) => {
   const t = await sequelize.transaction();
+  // 声明在 try 外，catch 块记录日志时可安全访问
+  const { deviceId } = req.params;
+  let device = null;
   try {
-    const { deviceId } = req.params;
-
     // 获取设备信息以更新功率
-    const device = await Device.findByPk(deviceId, { transaction: t });
+    device = await Device.findByPk(deviceId, { transaction: t });
     if (!device) {
       await t.rollback();
       return res.status(404).json({ error: '设备不存在' });

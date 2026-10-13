@@ -177,7 +177,7 @@ async function updatePortStatus(deviceId, portName, status) {
   try {
     await DevicePort.update({ status }, { where: { deviceId, portName } });
   } catch (error) {
-    logger.error('更新端口状态失败: ${deviceId}:${portName} -> ${status}', { error: error.message, stack: error.stack });
+    logger.error(`更新端口状态失败: ${deviceId}:${portName} -> ${status}`, { error: error.message, stack: error.stack });
   }
 }
 
@@ -616,11 +616,14 @@ router.post('/batch', authMiddleware, requirePermission('cable:create'), async (
           throw new Error('源设备和目标设备不能相同');
         }
 
+        // 四向冲突检查（含反向），与单条创建接口保持一致，防止反向端口分配绕过占用
         const existingCable = await Cable.findOne({
           where: {
             [Op.or]: [
               { sourceDeviceId: cableData.sourceDeviceId, sourcePort: cableData.sourcePort },
               { targetDeviceId: cableData.targetDeviceId, targetPort: cableData.targetPort },
+              { sourceDeviceId: cableData.targetDeviceId, sourcePort: cableData.targetPort },
+              { targetDeviceId: cableData.sourceDeviceId, targetPort: cableData.sourcePort },
             ],
           },
         });
@@ -702,6 +705,46 @@ router.put('/:cableId', authMiddleware, requirePermission('cable:edit'), async (
       targetDeviceId: oldTargetDeviceId,
       targetPort: oldTargetPort,
     } = oldCable;
+
+    // 若本次更新涉及端口变更，校验新端口未被其它接线占用（排除自身）
+    const newSourceDeviceId = req.body.sourceDeviceId ?? oldSourceDeviceId;
+    const newSourcePort = req.body.sourcePort ?? oldSourcePort;
+    const newTargetDeviceId = req.body.targetDeviceId ?? oldTargetDeviceId;
+    const newTargetPort = req.body.targetPort ?? oldTargetPort;
+
+    const sourceChanged = newSourceDeviceId !== oldSourceDeviceId || newSourcePort !== oldSourcePort;
+    const targetChanged = newTargetDeviceId !== oldTargetDeviceId || newTargetPort !== oldTargetPort;
+
+    if (sourceChanged || targetChanged) {
+      const conflictConditions = [];
+      if (sourceChanged) {
+        conflictConditions.push(
+          { sourceDeviceId: newSourceDeviceId, sourcePort: newSourcePort },
+          { targetDeviceId: newSourceDeviceId, targetPort: newSourcePort }
+        );
+      }
+      if (targetChanged) {
+        conflictConditions.push(
+          { sourceDeviceId: newTargetDeviceId, sourcePort: newTargetPort },
+          { targetDeviceId: newTargetDeviceId, targetPort: newTargetPort }
+        );
+      }
+
+      const conflictCable = await Cable.findOne({
+        where: {
+          [Op.or]: conflictConditions,
+          cableId: { [Op.ne]: req.params.cableId },
+        },
+      });
+
+      if (conflictCable) {
+        return res.status(409).json({
+          error: '目标端口已被其它接线占用',
+          conflict: true,
+          existingCable: conflictCable,
+        });
+      }
+    }
 
     const [updated] = await Cable.update(req.body, {
       where: { cableId: req.params.cableId },

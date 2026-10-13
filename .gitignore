@@ -148,3 +148,10 @@ debug-result.txt
 # 本地项目管理文档（不提交）
 # ==============================================
 说明文档.md
+
+# Playwright 测试产物
+e2e/report/
+e2e/test-results/
+playwright-report/
+e2e-ui-run.txt
+e2e-ui-run2.txt

@@ -338,7 +338,15 @@ function pullCode(options) {
   return { success: false };
 }
 
-function checkDepsNeedInstall(dirPath, dirName) {
+/**
+ * 检测目录依赖是否需要安装
+ * 功能：逐个检查 package.json 中的直接依赖是否已安装（存在即视为已装），
+ *      再比对依赖清单（package.json/package-lock.json）与安装记录的更新时间，
+ *      任一依赖缺失或清单晚于安装记录时判定需要重新安装
+ * @param {string} dirPath - 项目目录绝对路径（如 backend、frontend）
+ * @returns {{needInstall: boolean, reason: string}} 是否需要安装及判定原因
+ */
+function checkDepsNeedInstall(dirPath) {
   const nodeModulesPath = path.join(dirPath, 'node_modules');
   const packageJsonPath = path.join(dirPath, 'package.json');
 
@@ -350,35 +358,48 @@ function checkDepsNeedInstall(dirPath, dirName) {
     return { needInstall: true, reason: 'node_modules 不存在' };
   }
 
-  try {
-    const gitDiff = execSync(`git diff HEAD~1 --name-only -- "${dirName}/package.json" "${dirName}/package-lock.json" 2>nul`, {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      cwd: __dirname
-    }).trim();
-
-    if (gitDiff) {
-      return { needInstall: true, reason: 'package.json 或 package-lock.json 有更新' };
-    }
-  } catch {}
-
+  // 逐个检查直接依赖（含 devDependencies），精确发现"整体装了但缺个别新包"
   try {
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-    const depsCount = Object.keys(packageJson.dependencies || {}).length +
-                      Object.keys(packageJson.devDependencies || {}).length;
+    const expectedDeps = {
+      ...(packageJson.dependencies || {}),
+      ...(packageJson.devDependencies || {})
+    };
+    const missing = Object.keys(expectedDeps).filter(
+      name => !fs.existsSync(path.join(nodeModulesPath, name, 'package.json'))
+    );
 
-    const installedCount = fs.readdirSync(nodeModulesPath).filter(f =>
-      !f.startsWith('.') && fs.statSync(path.join(nodeModulesPath, f)).isDirectory()
-    ).length;
-
-    if (depsCount > 0 && installedCount < depsCount * 0.5) {
-      return { needInstall: true, reason: `已安装依赖数量不足 (${installedCount}/${depsCount})` };
+    if (missing.length > 0) {
+      const shown = missing.slice(0, 5).join(', ');
+      return {
+        needInstall: true,
+        reason: `缺失依赖: ${shown}${missing.length > 5 ? ` 等 ${missing.length} 个` : ''}`
+      };
     }
-  } catch {
-    return { needInstall: true, reason: '依赖状态检测失败' };
+  } catch (error) {
+    return { needInstall: true, reason: `解析 package.json 失败: ${error.message}` };
   }
 
-  return { needInstall: false, reason: '依赖已是最新' };
+  // 比对依赖清单与安装记录的更新时间：git pull 更新了依赖清单但未重装时判定需要安装
+  try {
+    // npm 安装时会刷新 node_modules/.package-lock.json，作为"上次安装时间"记录
+    const installStampPath = path.join(nodeModulesPath, '.package-lock.json');
+    const stampPath = fs.existsSync(installStampPath) ? installStampPath : nodeModulesPath;
+    const installTime = fs.statSync(stampPath).mtimeMs;
+
+    const newerFile = ['package.json', 'package-lock.json'].find(fileName => {
+      const filePath = path.join(dirPath, fileName);
+      return fs.existsSync(filePath) && fs.statSync(filePath).mtimeMs > installTime;
+    });
+
+    if (newerFile) {
+      return { needInstall: true, reason: `${newerFile} 更新时间晚于已安装依赖` };
+    }
+  } catch (error) {
+    return { needInstall: true, reason: `依赖状态检测失败: ${error.message}` };
+  }
+
+  return { needInstall: false, reason: '依赖齐全且为最新' };
 }
 
 function installDependencies(options) {
@@ -400,7 +421,7 @@ function installDependencies(options) {
   let frontendSkipped = false;
 
   log.subStep('检测后端依赖状态...');
-  const backendCheck = checkDepsNeedInstall(backendPath, 'backend');
+  const backendCheck = checkDepsNeedInstall(backendPath);
   if (backendCheck.needInstall) {
     log.info(`后端依赖需要更新: ${backendCheck.reason}`);
     const backendResult = runCommand('npm install --production=false', { cwd: backendPath });
@@ -415,7 +436,7 @@ function installDependencies(options) {
   }
 
   log.subStep('检测前端依赖状态...');
-  const frontendCheck = checkDepsNeedInstall(frontendPath, 'frontend');
+  const frontendCheck = checkDepsNeedInstall(frontendPath);
   if (frontendCheck.needInstall) {
     log.info(`前端依赖需要更新: ${frontendCheck.reason}`);
     const frontendResult = runCommand('npm install', { cwd: frontendPath });

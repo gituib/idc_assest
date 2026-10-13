@@ -4,6 +4,40 @@
 
 ***
 
+## [2.8.2] - 2026-10-13
+
+### 新增功能
+
+- 自动化测试 新增 Playwright E2E 测试框架：root 引入 @playwright/test 依赖与 test:e2e* 脚本，新增 playwright.config.js（api/ui/perm/biz/e2e 五个项目，自动拉起前后端、串行规避 SQLite 写锁）与 e2e/ specs/fixtures/global-setup
+
+- 错误处理 后端新增 friendlyDbErrorMessage 工具：唯一约束冲突（序列号/设备编号重复等）转为友好中文提示
+
+### 功能改进
+
+- 在线更新 update.js 依赖检测重构：逐个核对 package.json 直接依赖（含 devDependencies）是否已安装，并比对依赖清单与安装记录时间，精确发现"整体装了但缺个别新包"；移除对 git diff HEAD~1 的脆性依赖
+
+### 问题修复
+
+- 设备管理 创建设备 deviceId 自动分配并发撞号重试：MAX+1 生成策略并发下撞号时重新生成再试（最多 8 轮 + 随机退避），仅限自动分配场景，用户自定义 ID 不覆盖
+- 设备管理 新增 U 位越界校验：设备占用的 U 位范围不得超过机柜物理高度上限（如 42U 机柜不允许 U50）
+- 设备管理 修复 try 块内 const 作用域隔离导致 catch 块日志记录访问不到变量的问题（import/batch-status/batch-move/batch-warranty/to-idle/batch-delete/单条删除等）
+- 设备管理 机柜功耗累加改为 Number 数值安全计算，避免字符串拼接
+- 空闲设备 上新/编辑/恢复上架增加 U 位冲突校验，空闲设备不允许与在位设备占用同一 U 位段
+- 空闲设备 转入空闲与批量转入空闲时从原机柜扣减功耗，与 to-idle 语义一致（空闲设备不计机柜功耗）
+- 空闲设备 删除空闲设备时级联清理端口/网卡/工单/盘点记录，避免外键约束导致删除失败
+- 接线管理 批量创建线缆补齐四向冲突检查（含反向），防止通过反向端口分配绕过占用校验
+- 接线管理 编辑线缆时校验新端口未被其它接线占用（排除自身），冲突返回 409
+- 盘点任务 限制生成 recordId 去重：时间戳毫秒 + 4 位随机存在生日碰撞，改用集合去重避免批量生成时 ER_DUP_ENTRY
+- 端口日志 logger.js 修复 shouldLog 优先级误判：error 优先级为 0，被 `||` 错误吞掉导致 error 级日志永远被拦截，改用 `??` 空值合并
+- 端口日志 cables.js 修复日志模板字符串误用单引号导致 ${var} 不生效的问题
+
+### 其他
+
+- 项目规则 .gitignore 新增 Playwright 测试产物目录（e2e/report、e2e/test-results、playwright-report）
+- 文档 新增「服务器端口自动化配置可行性分析报告」「测试用例」文档
+
+---
+
 ## [2.8.1] - 2026-10-10
 
 ### 问题修复

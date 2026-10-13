@@ -340,6 +340,18 @@ router.post('/plans/:planId/start', requirePermission('inventory:*'), async (req
 
     const taskId = generateTaskId();
 
+    // recordId 时间戳仅精确到毫秒 + 4 位随机（36^4≈168 万），
+    // 同毫秒批量生成 7000+ 条时必然出现生日碰撞（ER_DUP_ENTRY → 500），必须去重
+    const usedRecordIds = new Set();
+    const genUniqueRecordId = () => {
+      let id = generateRecordId();
+      while (usedRecordIds.has(id)) {
+        id = generateRecordId();
+      }
+      usedRecordIds.add(id);
+      return id;
+    };
+
     const tasksToCreate = [
       {
         taskId,
@@ -353,7 +365,7 @@ router.post('/plans/:planId/start', requirePermission('inventory:*'), async (req
     ];
 
     const recordsToCreate = allDevices.map(device => ({
-      recordId: generateRecordId(),
+      recordId: genUniqueRecordId(),
       taskId,
       planId: plan.planId,
       deviceId: device.deviceId,

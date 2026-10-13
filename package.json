@@ -1,6 +1,6 @@
 {
   "name": "idc-device-management",
-  "version": "2.8.1",
+  "version": "2.8.2",
   "description": "IDC设备管理系统",
   "author": "gituib",
   "license": "GPL-3.0-or-later",
@@ -17,6 +17,13 @@
     "start:backend": "cd backend && npm run dev",
     "start:frontend": "cd frontend && npm run dev",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "test:e2e": "playwright test",
+    "test:e2e:api": "playwright test --project=api",
+    "test:e2e:ui": "playwright test --project=ui",
+    "test:e2e:biz": "playwright test --project=biz",
+    "test:e2e:perm": "playwright test --project=perm",
+    "test:e2e:report": "playwright show-report e2e/report",
+    "test:backend": "cd backend && npm test",
     "deploy": "node install.js",
     "update": "node update.js",
     "uninstall": "node uninstall.js"
@@ -27,6 +34,7 @@
     "management"
   ],
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "concurrently": "^9.2.1"
   },
   "dependencies": {

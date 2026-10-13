@@ -72,7 +72,10 @@ const LEVEL_PRIORITY = { error: 0, warn: 1, info: 2, debug: 3 };
  * @returns {boolean}
  */
 const shouldLog = (level, minLevel) => {
-  return (LEVEL_PRIORITY[level] || 99) <= (LEVEL_PRIORITY[minLevel] || 99);
+  // 注意必须用 ?? 而非 ||：error 优先级为 0，会被 || 错误吞掉导致 error 日志永远被拦截
+  const current = LEVEL_PRIORITY[level] ?? 99;
+  const min = LEVEL_PRIORITY[minLevel] ?? 99;
+  return current <= min;
 };
 
 /**
