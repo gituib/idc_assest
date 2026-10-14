@@ -1748,8 +1748,55 @@ async function migrateIpamV6IpFields() {
 }
 
 /**
- * 为现有 IPv4 网段和 IP 回填 IPv6 相关字段
- * 幂等：startInt/endInt 已经非零则跳过
+ * 锁等待诊断辅助：MySQL 上有锁等待时打印出来帮助定位
+ * @param {string} tableName - 要检查的表名
+ */
+async function diagnoseLockWait(tableName) {
+  if (sequelize.getDialect() !== 'mysql') return;
+  try {
+    const [processes] = await sequelize.query(
+      `SHOW PROCESSLIST WHERE Command = 'Sleep' OR Command = 'Query' OR Info LIKE '%${tableName}%'`
+    );
+    const blockers = processes.filter(p => p.Info && p.Info.toLowerCase().includes(tableName.toLowerCase()));
+    if (blockers.length > 0) {
+      console.log(`    ⚠ 检测到 ${tableName} 可能有活动连接持有锁：`);
+      blockers.forEach(b => {
+        console.log(`      [${b.Id}] ${b.User}@${b.Host} Command=${b.Command} State=${b.State}`);
+      });
+      console.log('    建议：停掉生产服务（pm2 stop / docker stop）后重新执行迁移');
+    }
+  } catch (_) { /* 诊断失败不影响主流程 */ }
+}
+
+/**
+ * 带超时的查询包装：超时后自动执行锁诊断并抛错
+ * @param {Promise} promise - 要执行的异步查询
+ * @param {number} timeoutMs - 超时毫秒数
+ * @param {string} label - 表名标签（用于日志和锁诊断）
+ */
+async function queryWithTimeout(promise, timeoutMs, label) {
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(async () => {
+      await diagnoseLockWait(label);
+      reject(new Error(`执行超时（${timeoutMs}ms）：${label}，疑似锁等待`));
+    }, timeoutMs);
+  });
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    clearTimeout(timer);
+    return result;
+  } catch (e) {
+    clearTimeout(timer);
+    throw e;
+  }
+}
+
+/**
+ * IPAM IPv6 字段数据回填
+ * 为现有 IPv4 网段和 IP 回填 ipVersion / startInt / endInt / ipInt128
+ * 幂等：已经回填过的记录自动跳过
+ * 安全：带超时锁等待诊断，不会静默卡住
  */
 async function migrateIpamV6Backfill() {
   const ipam = require('../utils/ipam');
@@ -1760,63 +1807,140 @@ async function migrateIpamV6Backfill() {
       'SELECT subnetId, cidr, ipVersion, startInt, endInt FROM subnets'
     );
     let subnetUpdated = 0;
+    let subnetSkipped = 0;
     for (const s of subnets) {
       try {
+        // 幂等：ipVersion 已回填且 startInt 非空的跳过
+        if (s.ipVersion && s.startInt != null && s.startInt !== '') {
+          subnetSkipped++;
+          continue;
+        }
+
         const parsed = ipam.parseCidr(s.cidr);
         const ipVer = parsed.ipVersion;
         const startStr = parsed.startInt.toString();
         const endStr = parsed.endInt.toString();
         const hostsStr = parsed.totalHostsStr || String(parsed.totalHosts);
 
-        await sequelize.query(
-          `UPDATE subnets SET ipVersion = ?, startInt = ?, endInt = ?,
-             totalHosts = ?, usableHosts = ?
-           WHERE subnetId = ?`,
-          { replacements: [ipVer, startStr, endStr, hostsStr, hostsStr, s.subnetId] }
+        await queryWithTimeout(
+          sequelize.query(
+            `UPDATE subnets SET ipVersion = ?, startInt = ?, endInt = ?,
+               totalHosts = ?, usableHosts = ?
+             WHERE subnetId = ?`,
+            { replacements: [ipVer, startStr, endStr, hostsStr, hostsStr, s.subnetId] }
+          ),
+          15000,
+          'subnets'
         );
         subnetUpdated++;
       } catch (e) {
         console.log(`    网段 ${s.subnetId} 回填跳过: ${e.message}`);
       }
     }
-    console.log(`    网段回填完成（${subnetUpdated}/${subnets.length}）`);
+    console.log(`    网段回填完成（${subnetUpdated}/${subnets.length}）跳过 ${subnetSkipped}`);
   }
 
   // ----- 回填 ip_addresses -----
   if (await tableExists('ip_addresses')) {
+    // 只查未回填的（ipVersion 为空或 ipInt128 为空），幂等
     const [ips] = await sequelize.query(
-      'SELECT ipId, ipAddress, ipVersion, ipInt128 FROM ip_addresses'
+      "SELECT ipId, ipAddress, ipVersion, ipInt128 FROM ip_addresses WHERE ipVersion IS NULL OR ipVersion = '' OR ipVersion = '0' OR ipInt128 IS NULL"
     );
-    let ipUpdated = 0;
-    for (const ip of ips) {
-      try {
-        const ipVer = ipam.detectIpVersion(ip.ipAddress);
-        const bigInt = ipam.ipv6ToBigInt ? null : null;
-        let int128Str = '0';
+    if (ips.length === 0) {
+      console.log('    IP 全部已回填，跳过');
+    } else {
+      console.log(`    待回填 IP 共 ${ips.length} 条`);
+      const startTime = Date.now();
 
-        if (ipVer === 'ipv4') {
-          const parts = ip.ipAddress.split('.').map(Number);
-          int128Str = String(((parts[0] << 24) >>> 0) + (parts[1] << 16) + (parts[2] << 8) + parts[3]);
-        } else {
-          // IPv6
-          const expanded = ipam.expandIPv6(ip.ipAddress);
-          let val = 0n;
-          for (const seg of expanded) {
-            val = (val << 16n) | BigInt(parseInt(seg, 16));
+      // 第一阶段：内存中预处理所有行的 ipVersion 和 int128
+      // 纯计算，不涉及 DB，非常快
+      const batch = [];
+      for (const ip of ips) {
+        try {
+          const ipVer = ipam.detectIpVersion(ip.ipAddress);
+          let int128Str = '0';
+
+          if (ipVer === 'ipv4') {
+            const parts = (ip.ipAddress || '').split('.').map(Number);
+            if (parts.length !== 4 || parts.some(p => isNaN(p) || p < 0 || p > 255)) {
+              throw new Error(`IPv4 格式非法`);
+            }
+            int128Str = String(((parts[0] << 24) >>> 0) + (parts[1] << 16) + (parts[2] << 8) + parts[3]);
+          } else {
+            const expanded = ipam.expandIPv6(ip.ipAddress);
+            let val = 0n;
+            for (const seg of expanded) {
+              val = (val << 16n) | BigInt(parseInt(seg, 16));
+            }
+            int128Str = val.toString();
           }
-          int128Str = val.toString();
+          batch.push({ ipId: ip.ipId, ipVer, int128Str });
+        } catch (e) {
+          console.log(`    IP ${ip.ipId} (${ip.ipAddress}) 预处理跳过: ${e.message}`);
         }
-
-        await sequelize.query(
-          'UPDATE ip_addresses SET ipVersion = ?, ipInt128 = ? WHERE ipId = ?',
-          { replacements: [ipVer, int128Str, ip.ipId] }
-        );
-        ipUpdated++;
-      } catch (e) {
-        console.log(`    IP ${ip.ipId} 回填跳过: ${e.message}`);
       }
+
+      console.log(`    预处理完成（${batch.length} 条有效），开始并发回填...`);
+
+      // 第二阶段：分批 + 限流并发 UPDATE
+      // ipId 是主键，每条写不同行，不会锁冲突
+      const CONCURRENCY = 30;      // 同时在飞的 UPDATE 数
+      const BATCH_SIZE = 500;     // 每批 500 条打印一次进度
+      let ipUpdated = 0;
+      let ipErr = 0;
+
+      // 按并发数分小组执行
+      async function runWithConcurrency(items, limit) {
+        const results = new Array(items.length);
+        let idx = 0;
+        async function worker() {
+          while (idx < items.length) {
+            const myIdx = idx++;
+            try {
+              await queryWithTimeout(
+                sequelize.query(
+                  'UPDATE ip_addresses SET ipVersion = ?, ipInt128 = ? WHERE ipId = ?',
+                  { replacements: [items[myIdx].ipVer, items[myIdx].int128Str, items[myIdx].ipId] }
+                ),
+                15000,
+                'ip_addresses'
+              );
+              results[myIdx] = 'ok';
+            } catch (e) {
+              results[myIdx] = e;
+            }
+          }
+        }
+        const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker());
+        await Promise.all(workers);
+        return results;
+      }
+
+      for (let batchStart = 0; batchStart < batch.length; batchStart += BATCH_SIZE) {
+        const chunk = batch.slice(batchStart, batchStart + BATCH_SIZE);
+        const results = await runWithConcurrency(chunk, CONCURRENCY);
+
+        // 统计结果
+        results.forEach((r, i) => {
+          if (r === 'ok') {
+            ipUpdated++;
+          } else {
+            ipErr++;
+            if (r && r.message && r.message.includes('锁等待')) {
+              console.log('    ✗ 检测到锁等待，中断 IP 回填。请停掉生产服务后重新执行迁移。');
+              return;
+            }
+            const item = chunk[i];
+            console.log(`    IP ${item.ipId} 回填失败: ${r?.message || r}`);
+          }
+        });
+
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        const progress = Math.min(batchStart + BATCH_SIZE, batch.length);
+        console.log(`      进度: ${progress}/${batch.length} 更新 ${ipUpdated} 错误 ${ipErr} 耗时 ${elapsed}s`);
+      }
+      console.log(`    IP 回填完成（更新 ${ipUpdated} / 错误 ${ipErr} / 共 ${ips.length}）`);
     }
-    console.log(`    IP 回填完成（${ipUpdated}/${ips.length}）`);
   }
 
   console.log('    IPv6 数据回填完成');
