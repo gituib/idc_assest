@@ -1306,19 +1306,45 @@ export default function IpamManagement() {
         {/* 底部操作 */}
         <div
           style={{
-            padding: '8px 12px',
+            padding: '12px',
             borderTop: '1px solid #f0f0f0',
-            background: '#fafafa',
+            background: '#fff',
           }}
         >
-          <Button
-            block
-            icon={<PlusOutlined />}
-            size="small"
+          <button
+            type="button"
             onClick={() => handleAddSubnet(null)}
+            style={{
+              width: '100%',
+              height: 36,
+              borderRadius: 8,
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              fontSize: 13,
+              fontWeight: 500,
+              color: '#fff',
+              background: 'linear-gradient(135deg, #1677ff 0%, #4096ff 100%)',
+              boxShadow: '0 2px 6px rgba(22,119,255,0.3)',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, #0958d9 0%, #1677ff 100%)';
+              e.currentTarget.style.boxShadow = '0 4px 10px rgba(22,119,255,0.4)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, #1677ff 0%, #4096ff 100%)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(22,119,255,0.3)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
           >
+            <PlusOutlined style={{ fontSize: 14 }} />
             新增顶级网段
-          </Button>
+          </button>
         </div>
       </Sider>
 
@@ -1853,8 +1879,8 @@ export default function IpamManagement() {
                               {ipStatusFilter || ipKeyword
                                 ? '没有符合筛选条件的 IP'
                                 : isOnDemand
-                                ? '该网段尚未预生成 IP'
-                                : '该网段下暂无 IP 记录'}
+                                ? `该网段（${currentSubnet?.cidr || ''}）过大，系统未预生成 IP 记录，可手动添加`
+                                : '该网段下暂无 IP 记录，请手动添加'}
                             </div>
                             {(ipStatusFilter || ipKeyword) && (
                               <Button
