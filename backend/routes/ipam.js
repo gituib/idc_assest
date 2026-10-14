@@ -2,11 +2,13 @@ const logger = require('../utils/logger').module('IPAM');
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
+const cron = require('node-cron');
 const { Subnet, IpAddress } = require('../models');
 const ipam = require('../utils/ipam');
 const ipProbe = require('../services/ipProbe');
 const SystemSetting = require('../models/SystemSetting');
 const { logOperation } = require('../utils/operationLogger');
+const { reloadProbeScheduler, runOnce, isProbeRunning } = require('../utils/ipProbeScheduler');
 
 // ========== 网段工具函数 ==========
 
@@ -1363,6 +1365,129 @@ router.put('/probe/config', async (req, res) => {
     res.json({ success: true, data: full });
   } catch (error) {
     logger.error('保存探测配置失败', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ========== 定时探测调度配置 API ==========
+
+/** 默认 cron 表达式：每天凌晨 3 点（与 ipProbeScheduler 保持一致） */
+const DEFAULT_PROBE_CRON = '0 3 * * *';
+
+/**
+ * 读取 cron 表达式（容错解析，兼容未按 JSON 字符串存储的历史脏数据）
+ */
+async function readCronExpression() {
+  const setting = await SystemSetting.findOne({ where: { settingKey: 'ipam_probe_cron_expression' } });
+  if (!setting) return DEFAULT_PROBE_CRON;
+  try {
+    return JSON.parse(setting.settingValue);
+  } catch (_) {
+    return setting.settingValue;
+  }
+}
+
+/** 读取定时探测调度配置 */
+router.get('/probe/schedule', async (req, res) => {
+  try {
+    const enabledSetting = await SystemSetting.findOne({ where: { settingKey: 'ipam_probe_cron_enabled' } });
+    const expression = await readCronExpression();
+    res.json({
+      success: true,
+      data: {
+        enabled: enabledSetting ? enabledSetting.settingValue === 'true' : false,
+        expression,
+      },
+    });
+  } catch (error) {
+    logger.error('读取定时探测配置失败', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * 保存定时探测调度配置
+ * @body { enabled?: boolean, expression?: string }
+ * 未传的字段保持原值；保存后热重载调度器立即生效
+ */
+router.put('/probe/schedule', async (req, res) => {
+  try {
+    const { enabled, expression } = req.body;
+
+    // 以现有配置为基线，支持只改一项
+    const enabledSetting = await SystemSetting.findOne({ where: { settingKey: 'ipam_probe_cron_enabled' } });
+    let finalEnabled = enabledSetting ? enabledSetting.settingValue === 'true' : false;
+    let finalExpression = await readCronExpression();
+
+    if (typeof enabled === 'boolean') {
+      finalEnabled = enabled;
+    }
+    if (expression !== undefined) {
+      if (typeof expression !== 'string' || !cron.validate(expression.trim())) {
+        return res.status(400).json({ success: false, message: 'Cron 表达式格式不正确' });
+      }
+      finalExpression = expression.trim();
+    }
+
+    if (finalEnabled && !finalExpression) {
+      return res.status(400).json({ success: false, message: '启用定时探测需要有效的 Cron 表达式' });
+    }
+
+    await SystemSetting.upsert({
+      settingKey: 'ipam_probe_cron_enabled',
+      settingValue: finalEnabled ? 'true' : 'false',
+      settingType: 'string',
+      category: 'ipam',
+      description: 'IP 在线探测定时任务开关',
+      isEditable: true,
+    });
+    await SystemSetting.upsert({
+      settingKey: 'ipam_probe_cron_expression',
+      settingValue: JSON.stringify(finalExpression),
+      settingType: 'json',
+      category: 'ipam',
+      description: 'IP 在线探测定时任务 cron 表达式',
+      isEditable: true,
+    });
+
+    // 热重载调度器；失败不阻断保存（重启后仍会按新配置注册）
+    let warning = null;
+    try {
+      await reloadProbeScheduler();
+    } catch (e) {
+      warning = '调度器热重载失败，重启服务后生效';
+      logger.error('定时探测调度器重载失败', e);
+    }
+
+    res.json({
+      success: true,
+      data: { enabled: finalEnabled, expression: finalExpression, warning },
+    });
+  } catch (error) {
+    logger.error('保存定时探测配置失败', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/** 立即执行一次全量探测（异步执行、立即返回；与定时任务共用运行中去重保护） */
+router.post('/probe/run-once', async (req, res) => {
+  try {
+    if (isProbeRunning()) {
+      return res.json({
+        success: true,
+        data: { triggered: false },
+        message: '上一次全量探测仍在进行中，已跳过本次触发',
+      });
+    }
+    // 异步执行，不阻塞响应；内部有 running 去重，异常在 Promise 内兜底
+    Promise.resolve(runOnce()).catch((e) => logger.error('手动全量探测失败', e));
+    res.json({
+      success: true,
+      data: { triggered: true },
+      message: '已触发全量探测，结果将写入各 IP 的探测状态',
+    });
+  } catch (error) {
+    logger.error('触发全量探测失败', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

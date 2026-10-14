@@ -14,14 +14,38 @@ const SystemSetting = require('../models/SystemSetting');
 /** 运行时状态 */
 let currentTask = null;
 let currentCron = null;
+let running = false;
 
 /** 默认配置 */
 const DEFAULT_CRON = '0 3 * * *'; // 每天凌晨 3 点
 
+/** 常用 cron 预设（供前端快捷选择） */
+const CRON_PRESETS = [
+  { label: '每小时', expression: '0 * * * *' },
+  { label: '每 6 小时', expression: '0 */6 * * *' },
+  { label: '每天凌晨 3 点', expression: '0 3 * * *' },
+  { label: '每周一凌晨 3 点', expression: '0 3 * * 1' },
+];
+
 /**
  * 执行一次全量网段探测
+ * 内置运行中去重保护：上一次未结束时重复触发直接跳过
  */
 async function runOnce() {
+  if (running) {
+    logger.info('上一次全量探测仍在进行，跳过本次触发');
+    return { skipped: true };
+  }
+  running = true;
+  try {
+    return await doRunOnce();
+  } finally {
+    running = false;
+  }
+}
+
+/** 全量探测主逻辑 */
+async function doRunOnce() {
   logger.info('定时全量探测开始');
   const subnets = await Subnet.findAll({
     attributes: ['subnetId', 'name', 'cidr', 'ipVersion'],
@@ -72,6 +96,7 @@ async function runOnce() {
   }
 
   logger.info(`定时全量探测完成：共扫 ${totalScanned}，在线 ${totalOnline}，离线 ${totalOffline}`);
+  return { skipped: false, totalScanned, totalOnline, totalOffline };
 }
 
 async function getConfig() {
@@ -128,8 +153,16 @@ async function reloadProbeScheduler() {
   return initProbeScheduler();
 }
 
+/** 当前是否有全量探测正在执行（供 API 层做触发前检查） */
+function isProbeRunning() {
+  return running;
+}
+
 module.exports = {
+  DEFAULT_CRON,
+  CRON_PRESETS,
   initProbeScheduler,
   reloadProbeScheduler,
   runOnce,
+  isProbeRunning,
 };

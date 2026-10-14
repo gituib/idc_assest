@@ -61,6 +61,12 @@ export const ipamAPI = {
   probeBatch: (ips, detail = false) => api.post('/ipam/probe/batch', { ips, detail }),
   /** 探测整个网段下所有 IP */
   probeSubnet: (subnetId) => api.post(`/ipam/probe/subnet/${subnetId}`),
+  /** 读取定时探测调度配置（启用开关 + cron 表达式） */
+  getProbeSchedule: () => api.get('/ipam/probe/schedule'),
+  /** 保存定时探测调度配置（保存后立即热重载生效） */
+  saveProbeSchedule: (data) => api.put('/ipam/probe/schedule', data),
+  /** 立即执行一次全量探测（异步执行） */
+  runProbeOnce: () => api.post('/ipam/probe/run-once'),
 };
 
 export default ipamAPI;

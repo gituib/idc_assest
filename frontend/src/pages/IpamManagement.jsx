@@ -41,6 +41,7 @@ import {
   Descriptions,
   Skeleton,
   Checkbox,
+  Switch,
 } from 'antd';
 import {
   PlusOutlined,
@@ -482,6 +483,21 @@ export default function IpamManagement() {
   const [submitting, setSubmitting] = useState(false);
   const [probing, setProbing] = useState(false);
 
+  // --- 探测设置（定时探测调度）状态 ---
+  const [probeSettingOpen, setProbeSettingOpen] = useState(false);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleExpression, setScheduleExpression] = useState('0 3 * * *');
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [runOnceLoading, setRunOnceLoading] = useState(false);
+
+  /** 常用 cron 预设（与后端 ipProbeScheduler.CRON_PRESETS 对齐） */
+  const CRON_PRESETS = [
+    { label: '每小时', expression: '0 * * * *' },
+    { label: '每 6 小时', expression: '0 */6 * * *' },
+    { label: '每天凌晨 3 点', expression: '0 3 * * *' },
+    { label: '每周一凌晨 3 点', expression: '0 3 * * 1' },
+  ];
+
   // --- 探测轮询 timer 引用（网段切换时清理） ---
   const probePollTimerRef = useRef(null);
 
@@ -636,6 +652,62 @@ export default function IpamManagement() {
       setProbing(false);
     }
   }, [currentSubnet, probing, mutateDetail, mutateIps]);
+
+  /** 打开探测设置：拉取当前定时探测配置回填 */
+  const handleOpenProbeSetting = useCallback(async () => {
+    setProbeSettingOpen(true);
+    try {
+      const res = await ipamAPI.getProbeSchedule();
+      if (res.success) {
+        setScheduleEnabled(!!res.data?.enabled);
+        setScheduleExpression(res.data?.expression || '0 3 * * *');
+      } else {
+        message.error(res.message || '读取定时探测配置失败');
+      }
+    } catch (e) {
+      message.error(e.message || '读取定时探测配置失败');
+    }
+  }, []);
+
+  /** 保存定时探测配置（后端保存后热重载调度器） */
+  const handleSaveProbeSchedule = useCallback(async () => {
+    const expression = (scheduleExpression || '').trim();
+    if (scheduleEnabled && !expression) {
+      message.error('启用定时探测需要填写 Cron 表达式');
+      return;
+    }
+    setScheduleSaving(true);
+    try {
+      const res = await ipamAPI.saveProbeSchedule({ enabled: scheduleEnabled, expression });
+      if (res.success) {
+        message.success(res.data?.warning || '已保存，定时探测配置已生效');
+        setProbeSettingOpen(false);
+      } else {
+        message.error(res.message || '保存失败');
+      }
+    } catch (e) {
+      message.error(e.message || '保存失败');
+    } finally {
+      setScheduleSaving(false);
+    }
+  }, [scheduleEnabled, scheduleExpression]);
+
+  /** 立即执行一次全量探测（异步执行，结果写回各 IP 探测状态） */
+  const handleRunProbeOnce = useCallback(async () => {
+    setRunOnceLoading(true);
+    try {
+      const res = await ipamAPI.runProbeOnce();
+      if (res.success) {
+        message.success(res.message || '已触发全量探测');
+      } else {
+        message.error(res.message || '触发失败');
+      }
+    } catch (e) {
+      message.error(e.message || '触发失败');
+    } finally {
+      setRunOnceLoading(false);
+    }
+  }, []);
 
   /** 刷新所有 */
   const handleRefresh = useCallback(() => {
@@ -1444,6 +1516,11 @@ export default function IpamManagement() {
                     探测在线
                   </Button>
                 </Tooltip>
+                <Tooltip title="探测设置（定时探测开关与周期）">
+                  <Button icon={<ControlOutlined />} onClick={handleOpenProbeSetting}>
+                    探测设置
+                  </Button>
+                </Tooltip>
                 <Button
                   icon={<PlusOutlined />}
                   onClick={() => handleAddSubnet(currentSubnet.subnetId)}
@@ -1972,6 +2049,72 @@ export default function IpamManagement() {
         onCancel={() => setBindModalOpen(false)}
         onSubmit={handleBindDevice}
       />
+
+      {/* ============ 探测设置（定时探测调度） ============ */}
+      <Modal
+        title="探测设置"
+        open={probeSettingOpen}
+        onCancel={() => setProbeSettingOpen(false)}
+        footer={[
+          <Button key="run-once" onClick={handleRunProbeOnce} loading={runOnceLoading}>
+            立即执行一次
+          </Button>,
+          <Button
+            key="save"
+            type="primary"
+            loading={scheduleSaving}
+            onClick={handleSaveProbeSchedule}
+          >
+            保存
+          </Button>,
+        ]}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>定时探测</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <Switch checked={scheduleEnabled} onChange={setScheduleEnabled} />
+            <span style={{ color: scheduleEnabled ? '#1677ff' : '#8c8c8c' }}>
+              {scheduleEnabled ? '已开启' : '未开启'}
+            </span>
+            <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+              按设定时间自动探测全部网段的 IP 在线状态
+            </span>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ marginBottom: 4 }}>Cron 表达式</div>
+          <Input
+            value={scheduleExpression}
+            onChange={(e) => setScheduleExpression(e.target.value)}
+            placeholder="0 3 * * *"
+            disabled={!scheduleEnabled}
+            status={scheduleEnabled && !scheduleExpression.trim() ? 'error' : undefined}
+          />
+          <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 4, lineHeight: 1.6 }}>
+            格式：分 时 日 月 周，默认 0 3 * * *（每天凌晨 3 点）。关闭开关后表达式会保留，下次开启时继续使用。
+          </div>
+        </div>
+
+        <div>
+          <span style={{ color: '#8c8c8c', fontSize: 12, marginRight: 8 }}>快捷设置：</span>
+          <Space size={[4, 4]} wrap>
+            {CRON_PRESETS.map((p) => (
+              <Tag
+                key={p.expression}
+                color={scheduleExpression === p.expression ? 'blue' : undefined}
+                style={{
+                  cursor: scheduleEnabled ? 'pointer' : 'not-allowed',
+                  opacity: scheduleEnabled ? 1 : 0.5,
+                }}
+                onClick={() => scheduleEnabled && setScheduleExpression(p.expression)}
+              >
+                {p.label}
+              </Tag>
+            ))}
+          </Space>
+        </div>
+      </Modal>
 
       <DeviceDetailDrawer
         visible={!!selectedDevice}
