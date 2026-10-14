@@ -222,6 +222,11 @@ const migrations = [
     migrate: migrateIpDeviceBindingFields,
   },
   {
+    name: 'IPAM IP 字符串列宽扩容',
+    description: 'ip_addresses.ipAddress 和 subnets 表多个地址字段从 VARCHAR(50) 扩大到 VARCHAR(80)，适配 IPv6 长地址',
+    migrate: migrateIpamWidenColumns,
+  },
+  {
     name: '旧 Device.ipAddress 导入 IPAM',
     description: '将 devices.ipAddress 非空记录导入 ip_addresses 表（status=used, ipType=management），幂等可重跑',
     migrate: migrateDeviceIpToIpam,
@@ -1978,6 +1983,59 @@ async function migrateIpDeviceBindingFields() {
   } catch (_) { /* 字段可能还没完全就绪 */ }
 
   console.log('    IP-设备关联字段迁移完成');
+}
+
+/**
+ * IPAM 字符串列宽扩容
+ * IPv6 完整展开地址 + zone id 可能超过 50 字符，模型已改为 STRING(80)
+ * MySQL/MariaDB 使用 ALTER TABLE MODIFY COLUMN；SQLite 不支持 ALTER COLUMN，跳过
+ */
+async function migrateIpamWidenColumns() {
+  const dialect = sequelize.getDialect();
+  if (dialect !== 'mysql' && dialect !== 'mariadb') {
+    console.log('    非 MySQL 数据库，跳过（SQLite 无 ALTER COLUMN）');
+    return;
+  }
+
+  const widens = [
+    { table: 'ip_addresses', column: 'ipAddress', target: 'VARCHAR(80)' },
+    { table: 'subnets', column: 'cidr', target: 'VARCHAR(80)' },
+    { table: 'subnets', column: 'networkAddress', target: 'VARCHAR(80)' },
+    { table: 'subnets', column: 'broadcastAddress', target: 'VARCHAR(80)' },
+    { table: 'subnets', column: 'gateway', target: 'VARCHAR(80)' },
+  ];
+
+  for (const { table, column, target } of widens) {
+    if (!(await tableExists(table))) {
+      console.log(`    ${table} 表不存在，跳过 ${column}`);
+      continue;
+    }
+    const cols = await getTableColumns(table);
+    if (!cols.includes(column)) {
+      console.log(`    ${table}.${column} 不存在，跳过`);
+      continue;
+    }
+    try {
+      // 先检查当前是否已经够宽
+      const [info] = await sequelize.query(
+        `SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '${table}' AND COLUMN_NAME = '${column}'`
+      );
+      const currentLen = info[0]?.CHARACTER_MAXIMUM_LENGTH;
+      if (currentLen >= 80) {
+        console.log(`    ${table}.${column} 已是 VARCHAR(${currentLen})，跳过`);
+        continue;
+      }
+      await sequelize.query(
+        `ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` ${target} NULL`
+      );
+      console.log(`    ${table}.${column} 已扩容至 ${target}`);
+    } catch (e) {
+      console.log(`    ${table}.${column} 扩容跳过: ${e.message}`);
+    }
+  }
+
+  console.log('    IPAM 列宽扩容完成');
 }
 
 /**
