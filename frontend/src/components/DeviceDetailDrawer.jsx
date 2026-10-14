@@ -41,6 +41,15 @@ const { Panel } = Collapse;
 
 const PAGE_SIZE = 3;
 
+/** IP 业务类型配置（与 IpamManagement 保持一致） */
+const IP_TYPE_CONFIG = {
+  management: { label: '带外管理', color: '#ff4d4f' },
+  business:   { label: '带内业务', color: '#1677ff' },
+  public:     { label: '公网出口', color: '#52c41a' },
+  storage:    { label: '存储网络', color: '#722ed1' },
+  other:      { label: '其他',     color: '#8c8c8c' },
+};
+
 /**
  * 按端口名称中的数字段进行自然排序
  * @param {Array} ports - 端口数组
@@ -91,6 +100,34 @@ function DeviceDetailDrawer({
   const [portsPage, setPortsPage] = useState(1);
 
   const [cablesPage, setCablesPage] = useState(1);
+
+  /** IPAM 绑定 IP 列表（完整，不分页） */
+  const [deviceIps, setDeviceIps] = useState([]);
+  const [deviceIpsLoading, setDeviceIpsLoading] = useState(false);
+
+  /** 从 IPAM 拉设备所有绑定 IP */
+  const fetchDeviceIps = useCallback(async () => {
+    if (!device?.deviceId) return;
+    setDeviceIpsLoading(true);
+    try {
+      const res = await api.get(`/ipam/ips?deviceId=${device.deviceId}&pageSize=500`);
+      // interceptor 自动解包 response.data，后端返回 { success, data: { rows } }
+      const rows = res?.data?.rows || res?.rows || [];
+      setDeviceIps(rows);
+    } catch (e) {
+      console.warn('拉取 IPAM 绑定 IP 失败:', e.message);
+      setDeviceIps([]);
+    } finally {
+      setDeviceIpsLoading(false);
+    }
+  }, [device?.deviceId]);
+
+  useEffect(() => {
+    if (visible && device?.deviceId) {
+      fetchDeviceIps();
+    }
+  }, [visible, device?.deviceId, fetchDeviceIps]);
+
 
   const fetchNetworkCards = useCallback(async () => {
     if (!device?.deviceId) return;
@@ -711,6 +748,7 @@ function DeviceDetailDrawer({
       </div>
 
       <div style={{ padding: '20px 24px' }}>
+        {/* ========== 基本信息卡 ========== */}
         <Card title="基本信息" size="small" style={{ marginBottom: 16 }}>
           <Row gutter={[24, 16]}>
             <Col span={8}>
@@ -722,16 +760,26 @@ function DeviceDetailDrawer({
               <div style={{ fontWeight: 500 }}>{device.serialNumber || '-'}</div>
             </Col>
             <Col span={8}>
-              <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>IP地址</div>
-              <div style={{ fontWeight: 500 }}>{device.ipAddress || '-'}</div>
+              <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>设备来源</div>
+              <div style={{ fontWeight: 500 }}>
+                {device.sourceType
+                  ? { purchase: '采购', lease: '租赁', trial: '试用', donation: '捐赠' }[device.sourceType] || device.sourceType
+                  : '-'}
+              </div>
             </Col>
             <Col span={8}>
-              <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>位置</div>
-              <div style={{ fontWeight: 500 }}>U{device.position || '-'}</div>
+              <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>所在房间</div>
+              <div style={{ fontWeight: 500 }}>{device.Rack?.Room?.name || '-'}</div>
             </Col>
             <Col span={8}>
-              <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>高度</div>
-              <div style={{ fontWeight: 500 }}>{device.height ? `${device.height}U` : '-'}</div>
+              <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>所在机架</div>
+              <div style={{ fontWeight: 500 }}>
+                {device.rackId ? `${device.Rack?.name || device.rackId} · U${device.position || '-'} · ${device.height ? device.height + 'U' : ''}` : '-'}
+              </div>
+            </Col>
+            <Col span={8}>
+              <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>仓库</div>
+              <div style={{ fontWeight: 500 }}>{device.warehouseId || '-'}</div>
             </Col>
             <Col span={8}>
               <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>功耗</div>
@@ -742,6 +790,73 @@ function DeviceDetailDrawer({
           </Row>
         </Card>
 
+        {/* ========== IP 地址（IPAM 绑定） ========== */}
+        <Card
+          title={
+            <Space>
+              <span>IP 地址</span>
+              <Tag color="blue">{deviceIps.length}</Tag>
+            </Space>
+          }
+          size="small"
+          style={{ marginBottom: 16 }}
+        >
+          {deviceIpsLoading ? (
+            <Spin size="small" />
+          ) : deviceIps.length === 0 ? (
+            <span style={{ color: '#bfbfbf' }}>暂未绑定 IP（设备.ipAddress 旧值: {device.ipAddress || '无'}）</span>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {deviceIps.map((ip) => {
+                const cfg = IP_TYPE_CONFIG[ip.ipType] || IP_TYPE_CONFIG.other;
+                return (
+                  <Tooltip
+                    key={ip.ipId}
+                    title={
+                      <div style={{ fontSize: 12 }}>
+                        <div>网段: {ip.Subnet?.name || ip.subnetId || '-'}</div>
+                        {ip.customTag && <div>分组标签: {ip.customTag}</div>}
+                        <div>状态: {ip.status}</div>
+                        {ip.networkCardId && <div>网卡: {ip.networkCardId}</div>}
+                      </div>
+                    }
+                  >
+                    <Tag
+                      color={cfg.color}
+                      style={{ padding: '2px 10px', fontSize: 13, fontWeight: 500 }}
+                    >
+                      {ip.isPrimaryForDevice && <span style={{ color: '#faad14', marginRight: 4 }}>★</span>}
+                      {ip.ipAddress}
+                      <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, marginLeft: 6 }}>
+                        ({cfg.label})
+                      </span>
+                    </Tag>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+
+        {/* ========== 闲置信息（条件渲染） ========== */}
+        {device.status === 'idle' && (
+          <Card title="闲置信息" size="small" style={{ marginBottom: 16 }}>
+            <Row gutter={[24, 16]}>
+              <Col span={12}>
+                <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>闲置日期</div>
+                <div style={{ fontWeight: 500 }}>
+                  {device.idleDate ? dayjs(device.idleDate).format('YYYY-MM-DD') : '-'}
+                </div>
+              </Col>
+              <Col span={12}>
+                <div style={{ color: '#666', fontSize: '12px', marginBottom: 4 }}>闲置原因</div>
+                <div style={{ fontWeight: 500 }}>{device.idleReason || '-'}</div>
+              </Col>
+            </Row>
+          </Card>
+        )}
+
+        {/* ========== 维保信息 ========== */}
         <Card title="维保信息" size="small" style={{ marginBottom: 16 }}>
           <Row gutter={[24, 16]}>
             <Col span={12}>

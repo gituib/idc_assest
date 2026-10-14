@@ -327,6 +327,10 @@ async function initializeApp() {
     await initFaultCategories();
     await initAutoBackupScheduler();
 
+    // IP 在线探测定时调度
+    const { initProbeScheduler } = require('./utils/ipProbeScheduler');
+    await initProbeScheduler();
+
     const premiumLoaded = await loadPremiumModule(app);
     if (premiumLoaded) {
       logger.info('闭源模块已就绪');

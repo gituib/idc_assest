@@ -130,6 +130,10 @@ const routesConfig = [
     path: '/api/device-credentials',
   },
   {
+    file: 'ipam.js',
+    path: '/api/ipam',
+  },
+  {
     file: 'public.js',
     path: '/p',
   },

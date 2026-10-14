@@ -92,6 +92,7 @@ const OperationLogs = lazy(() => import('./pages/OperationLogs'));
 const ErrorBoundaryTest = lazy(() => import('./pages/ErrorBoundaryTest'));
 const IdleDeviceManagement = lazy(() => import('./pages/IdleDeviceManagement'));
 const RoomFloorPlan = lazy(() => import('./pages/RoomFloorPlan'));
+const IpamManagement = lazy(() => import('./pages/IpamManagement'));
 
 const { Header, Content, Sider } = Layout;
 
@@ -201,6 +202,7 @@ const AppLayout = ({ children }) => {
     if (path.startsWith('/visualization-3d')) return 'visualization-3d';
     if (path.startsWith('/rooms') || path.startsWith('/racks')) return 'room-management';
     if (path.startsWith('/cables') || path.startsWith('/ports')) return 'line-management';
+    if (path.startsWith('/ipam')) return 'ipam-management';
     if (
       path.startsWith('/devices') ||
       path.startsWith('/fields') ||
@@ -257,6 +259,14 @@ const AppLayout = ({ children }) => {
       children: [
         ...(hasPermission('port:view') ? [{ key: 'ports', icon: <PartitionOutlined style={{ fontSize: '16px' }} />, label: <Link to="/ports">端口管理</Link> }] : []),
         ...(hasPermission('cable:view') ? [{ key: 'cables', icon: <SwapOutlined style={{ fontSize: '16px' }} />, label: <Link to="/cables">接线管理</Link> }] : []),
+      ].filter(Boolean),
+    }] : []),
+    ...(hasPermission('ipam:view') ? [{
+      key: 'ipam-management',
+      icon: <ApiOutlined style={{ fontSize: '18px' }} />,
+      label: 'IP地址管理',
+      children: [
+        ...(hasPermission('ipam:view') ? [{ key: 'ipam', icon: <ApiOutlined style={{ fontSize: '16px' }} />, label: <Link to="/ipam">网段与IP</Link> }] : []),
       ].filter(Boolean),
     }] : []),
     ...(hasPermission('consumable:view') || hasPermission('consumable:stats') || hasPermission('consumable:category') || hasPermission('consumable:log') ? [{
@@ -614,6 +624,7 @@ const routeConfig = [
   { path: '/error-boundary-test', component: ErrorBoundaryTest },
   { path: '/idle-devices', component: IdleDeviceManagement },
   { path: '/floor-plan', component: RoomFloorPlan },
+  { path: '/ipam', component: IpamManagement },
 ];
 
 const ThemeConfig = () => {

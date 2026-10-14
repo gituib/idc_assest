@@ -4,6 +4,28 @@
 
 ***
 
+## [2.8.3] - 2026-10-13
+
+### 新增功能
+
+- IPAM IP 地址与设备关联：IpAddress 新增 ipType（management/business/public/storage/other 固定枚举）、customTag（自定义标签）、isPrimaryForDevice（设备主 IP）、statusAutoDriven（状态自动驱动追踪）四个字段
+- IPAM 网段用途标记：Subnet 新增 purpose 字段，标记网段默认用途，网段内 IP 绑定时自动推荐 ipType
+- IPAM 绑定/解绑 API：PATCH /ips/:id/bind、PATCH /ips/:id/unbind、POST /ips/batch-bind，支持事务、主 IP 互斥、状态自动驱动（free→used、used→free）
+- IPAM 全局 IP 查询：GET /ips 支持 deviceId / ipType / status / keyword 筛选，用于设备侧反向查询
+- 设备删除级联清理：删除设备时自动解绑所有已绑 IP，自动驱动的 used 状态回退 free
+
+### 功能改进
+
+- Device.ipAddress 旧字段自动迁移：5266 条旧数据导入 IpAddress 表（ipType=management, status=used, subnetId=NULL），旧字段保留但废弃
+- PUT /ips/:id 增强：支持修改 ipType/customTag/isPrimaryForDevice，绑定中的 IP 禁止改为 gateway/excluded，status 手动变更自动标记 statusAutoDriven=false
+- IpamManagement 前端表格新增 IP 类型彩色标签列、已绑设备列（主 IP 带 ★ 标记）
+
+### 其他
+
+- 数据库迁移脚本迁移到 migrate-all.js 集合，幂等可重跑
+
+---
+
 ## [2.8.2] - 2026-10-13
 
 ### 新增功能

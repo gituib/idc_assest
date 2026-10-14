@@ -673,6 +673,52 @@ router.get('/', validateQuery(queryDeviceSchema), requirePermission('device:view
 
 const MAX_EXPORT_SIZE = 50000;
 
+/**
+ * 轻量设备列表（用于 IP 绑定弹窗等场景）
+ * 只返回必要字段，不 include Rack，避免大响应体
+ * GET /api/devices/simple?keyword=xxx
+ */
+router.get('/simple', requirePermission('device:view'), async (req, res) => {
+  try {
+    const { keyword, limit = 500 } = req.query;
+
+    const where = {};
+
+    if (keyword && keyword.trim()) {
+      const kw = keyword.trim().replace(/'/g, "''");
+      where[Op.or] = [
+        { deviceId: { [Op.like]: `%${kw}%` } },
+        { name: { [Op.like]: `%${kw}%` } },
+        { type: { [Op.like]: `%${kw}%` } },
+        { ipAddress: { [Op.like]: `%${kw}%` } },
+        { serialNumber: { [Op.like]: `%${kw}%` } },
+        { model: { [Op.like]: `%${kw}%` } },
+      ];
+    }
+
+    const devices = await Device.findAll({
+      where,
+      attributes: ['deviceId', 'name', 'type', 'status', 'ipAddress', 'model', 'serialNumber'],
+      order: [['createdAt', 'DESC']],
+      limit: Math.min(parseInt(limit, 10) || 500, 5000),
+    });
+
+    // 禁缓存，防止浏览器/Vite proxy 返回 304 导致前端 SWR 拿不到数据
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
+    res.json({
+      success: true,
+      devices,
+      total: devices.length,
+    });
+  } catch (error) {
+    logger.error('获取轻量设备列表失败', { error: error.message });
+    res.status(500).json({ success: false, message: '获取设备列表失败' });
+  }
+});
+
 router.get('/all', requirePermission('device:view'), async (req, res) => {
   try {
     const { keyword, status, type, rackId, roomId } = req.query;
@@ -2871,6 +2917,25 @@ router.delete('/:deviceId', requirePermission('device:delete'), async (req, res)
 
     // 4. 解除工单关联 (Unlink Tickets)
     await Ticket.update({ deviceId: null }, { where: { deviceId: deviceId }, transaction: t });
+
+    // 4.5 级联清理 IP 绑定：清空 deviceId / networkCardId / isPrimaryForDevice
+    // 自动驱动的 used 状态回退 free；用户手动 override 的尊重当前值
+    const IpAddress = require('../models/IpAddress');
+    const boundIps = await IpAddress.findAll({ where: { deviceId }, transaction: t });
+    let cascadedIpCount = 0;
+    for (const ip of boundIps) {
+      const ipUpdates = {
+        deviceId: null,
+        networkCardId: null,
+        isPrimaryForDevice: false,
+      };
+      if (ip.statusAutoDriven === true && ip.status === 'used') {
+        ipUpdates.status = 'free';
+        ipUpdates.statusAutoDriven = false;
+      }
+      await ip.update(ipUpdates, { transaction: t });
+      cascadedIpCount++;
+    }
 
     // 5. 删除盘点记录
     await InventoryRecord.destroy({
