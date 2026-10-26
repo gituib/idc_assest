@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDC 设备资产管理系统 · 安全审计报告</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif; background: #f5f6f8; color: #1f2329; line-height: 1.7; padding: 32px 16px; }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  .card { background: #fff; border-radius: 10px; padding: 28px 32px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  h1 { font-size: 24px; margin-bottom: 6px; }
+  .meta { color: #646a73; font-size: 13px; margin-bottom: 4px; }
+  h2 { font-size: 18px; margin: 26px 0 14px; padding-left: 10px; border-left: 4px solid #3370ff; }
+  h3 { font-size: 15px; margin: 18px 0 8px; }
+  p { margin-bottom: 10px; font-size: 14px; }
+  code { background: #f0f2f5; border-radius: 4px; padding: 1px 6px; font-family: Consolas, monospace; font-size: 12.5px; color: #c0334d; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0; }
+  .stat { border-radius: 8px; padding: 14px 16px; text-align: center; }
+  .stat .num { font-size: 28px; font-weight: 700; }
+  .stat .label { font-size: 12px; color: #646a73; margin-top: 2px; }
+  .s-high { background: #fdeaea; } .s-high .num { color: #cb2634; }
+  .s-mid { background: #fdf3e3; } .s-mid .num { color: #b56a00; }
+  .s-low { background: #eaf3fd; } .s-low .num { color: #3370ff; }
+  .s-ok { background: #e8f6ee; } .s-ok .num { color: #1a7f37; }
+  .vuln { border: 1px solid #e5e6eb; border-radius: 8px; padding: 16px 20px; margin-bottom: 14px; }
+  .vuln.high { border-left: 4px solid #cb2634; }
+  .vuln.mid { border-left: 4px solid #e8960c; }
+  .vuln.low { border-left: 4px solid #3370ff; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; border-radius: 4px; padding: 1px 8px; margin-right: 8px; vertical-align: 2px; }
+  .tag.high { background: #cb2634; color: #fff; }
+  .tag.mid { background: #e8960c; color: #fff; }
+  .tag.low { background: #3370ff; color: #fff; }
+  .loc { font-size: 12px; color: #646a73; font-family: Consolas, monospace; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+  th { background: #f0f2f5; text-align: left; padding: 8px 10px; font-weight: 600; }
+  td { border-bottom: 1px solid #f0f2f5; padding: 8px 10px; vertical-align: top; }
+  .sev { font-weight: 600; white-space: nowrap; }
+  .sev.h { color: #cb2634; } .sev.m { color: #b56a00; } .sev.l { color: #3370ff; }
+  ul { padding-left: 22px; font-size: 14px; }
+  li { margin-bottom: 6px; }
+  .fix { background: #f0f6ff; border-radius: 6px; padding: 10px 14px; font-size: 13px; margin-top: 8px; }
+  .fix b { color: #1a5fd0; }
+  .good li { margin-bottom: 8px; }
+  .note { background: #fff8e6; border: 1px solid #f5d98a; border-radius: 6px; padding: 10px 14px; font-size: 13px; margin-top: 10px; }
+  .footer { text-align: center; color: #8f959e; font-size: 12px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="card">
+  <h1>IDC 设备资产管理系统 · 安全审计报告</h1>
+  <div class="meta">审计时间：2026-10-23 ｜ 审计方式：只读审查（未修改任何代码）｜ 范围：backend/（Express + Sequelize）、frontend/（React + Vite）、依赖供应链、配置与密钥管理</div>
+  <div class="meta">方法：npm audit 依赖扫描（官方 registry）+ 代码人工审计（注入、穿越、认证授权、密钥、日志）+ 配置核查（git 跟踪、.env、CORS）</div>
+
+  <div class="summary-grid">
+    <div class="stat s-high"><div class="num">3</div><div class="label">高危（建议立即修复）</div></div>
+    <div class="stat s-mid"><div class="num">7</div><div class="label">中危（建议尽快处理）</div></div>
+    <div class="stat s-low"><div class="num">10+</div><div class="label">低危 / 观察项</div></div>
+    <div class="stat s-ok"><div class="num">8</div><div class="label">做得好的实践</div></div>
+  </div>
+
+  <div class="note"><b>总体结论：</b>项目整体安全基础不错（认证、加密存储、多防线上传校验都有意识），但存在 <b>3 个高危问题</b>：两处文件上传路径穿越（可写任意文件，结合 nodemon 热重载可转化为远程代码执行）、一个无法自动修复的依赖库原型污染漏洞（xlsx），以及一个"首用户抢占管理员"的部署窗口期风险。中危问题集中在未授权接口、日志泄露 token、错误信息回显等方面。依赖层面 backend 70 个 / frontend 30 个漏洞，其中大部分仅影响开发测试环境，真正需要处理的生产依赖约 8 个。<br><br><b>修复进展（2026-10-26）：3 个高危已全部处置</b>——路径穿越 3 处已修复（basename 校验）；xlsx 已做防护加固（表头危险键拦截 + 规模限制，彻底换 exceljs 排期中）；首用户抢占已通过 BOOTSTRAP_ADMIN_USERNAME 收紧。后端 303 项测试、前端 lint 与构建均通过。详见文末各条目状态标记。</div>
+</div>
+
+<div class="card">
+  <h2>一、高危漏洞（P0，建议立即修复）</h2>
+
+  <div class="vuln high">
+    <h3><span class="tag high">高危 · 已修复</span>1. 导入接口文件名路径穿越 → 任意文件写入（3 处）</h3>
+    <div class="loc">backend/routes/devices.js:187（import-preview）｜backend/routes/racks.js:704（import-preview）｜backend/routes/racks.js:817（import）</div>
+    <p>三处上传接口把客户端提供的<b>原始文件名直接拼进落盘路径</b>：<code>path.join(tempDir, \`preview_${Date.now()}_${csvFile.name}\`)</code>。express-fileupload 不过滤文件名，攻击者可将 filename 设为 <code>../../../../xxx.js</code>，经 path.join 规范化后跳出 temp 目录，实现<b>任意路径、任意内容的文件写入</b>。</p>
+    <p><b>已实测验证：</b>恶意文件名 <code>../../../../Windows/Temp/evil.txt</code> 的落盘结果为 <code>E:\IDC\idc_assest\Windows\Temp\evil.txt</code>，确认跳出目标目录。</p>
+    <p><b>利用条件与危害升级：</b>需要已认证且具备 device:create / rack:create 权限。但写入内容完全可控（CSV/Excel 原文），可覆盖 backend 下任意 .js 文件；若服务以 nodemon 运行（<code>npm start</code> 即 dev 模式，watch 整个目录），写完 routes/*.js 会<b>立即热重载并执行 → 直接 RCE</b>；即使生产用 <code>node server.js</code>，也可在下次重启时生效。同项目 devices.js:1184 的正式导入端点已用 <code>path.basename</code> + 严格相等校验修复，<b>说明团队知道正确写法，只是漏掉了预览端点</b>。</p>
+    <div class="fix"><b>修复建议：</b>统一复用 devices.js:1184 的防护模式——<code>const safe = path.basename(file.name); if (!safe || safe !== file.name) 拒绝</code>；更稳妥的做法是干脆丢弃原始文件名，统一用随机文件名（如 background.js:81 的写法，该项目里已有范本）。建议同时排查全部 <code>file.mv()</code> 调用点。</div>
+  </div>
+
+  <div class="vuln high">
+    <h3><span class="tag high">高危 · 已加固</span>2. xlsx（SheetJS 0.18.5）原型污染 + ReDoS，npm 无安全版本</h3>
+    <div class="loc">backend/package.json:77（xlsx ^0.18.5）｜使用点：backend/routes/racks.js、backend/routes/tickets.js、frontend 6 个页面（PortManagement、CableManagement、ConsumableManagement 等）</div>
+    <p>npm audit 对 xlsx 报出 2 个 high 漏洞（Prototype Pollution、ReDoS），且 <code>fixAvailable: 无</code>——0.18.5 是 npm 上最后一个版本，官方已将新版改为 CDN 分发，<b>npm audit 永远无法自动修复</b>。该库直接解析用户上传的 Excel，恶意构造的工作簿可通过 <code>__proto__</code> 相关键污染 Object.prototype，可能引发权限判断异常、数据篡改等连锁反应；ReDoS 可被超长单元格拖死进程。</p>
+    <div class="fix"><b>修复建议（三选一）：</b>① 后端替换为 <code>exceljs</code>（维护活跃、无同类 CVE）；② 升级 SheetJS 至官方 CDN/最新发行版并锁定来源；③ 短期缓解：限制上传文件大小与单元格数量、解析前做基础结构校验。<b>不建议长期停留在 0.18.5。</b></div>
+  </div>
+
+  <div class="vuln high">
+    <h3><span class="tag high">高危 · 已修复</span>3. 注册接口"首用户抢占管理员"</h3>
+    <div class="loc">backend/routes/auth.js:55-118（register）</div>
+    <p><code>POST /api/auth/register</code> 完全公开，且逻辑为：<code>User.count() === 0</code> 时，首个注册用户直接获得 admin 角色和所有权限。这意味着系统部署后、正式管理员注册前的<b>窗口期内，任何能访问到端口的人都可以抢注成为超级管理员</b>。对于部署在公网或大内网的系统，这是一个现实的账户接管面。</p>
+    <div class="fix"><b>修复建议：</b>① 安装流程（install.js）中强制交互式创建首个管理员，注册接口对"首用户"场景关闭或要求一次性令牌；② 或增加"允许自主注册"的系统开关，默认关闭；③ 已部署的系统如尚未注册管理员，请立即注册并检查现有用户列表。</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>二、中危问题（P1，建议尽快处理）</h2>
+
+  <div class="vuln mid">
+    <h3><span class="tag mid">中危</span>4. <code>POST /api/maintenance/disable</code> 无需认证</h3>
+    <div class="loc">backend/server.js:427-450</div>
+    <p>公开路径白名单 PUBLIC_PATHS 包含 <code>/maintenance</code>，而 isPublicPath 使用 startsWith 前缀匹配，导致 <code>/api/maintenance/status</code> 和 <code>/api/maintenance/disable</code> 双双跳过 authMiddleware——<b>任何未认证用户都可以关闭维护模式</b>。单独看破坏面有限（只是让普通用户恢复登录），但属于明确的未授权操作，且说明前缀匹配的白名单机制容易误伤。</p>
+    <div class="fix"><b>修复建议：</b>将 disable 移出公开前缀匹配（精确匹配 status 一个路径即可），或给 disable 单独加管理员鉴权。</div>
+  </div>
+
+  <div class="vuln mid">
+    <h3><span class="tag mid">中危</span>5. 请求日志记录完整 URL，token 可落盘</h3>
+    <div class="loc">backend/middleware/requestLogger.js:39（url: req.originalUrl）｜backend/middleware/auth.js:109（req.query.token）</div>
+    <p>requestLogger 把 <code>req.originalUrl</code>（含 query string）写入日志；而认证中间件支持从 <code>?token=xxx</code> 取令牌。如果任何客户端/调用方用 URL 传 token，<b>JWT 会明文落盘到 logs/ 目录</b>，日志又常被备份、外发或纳入 ELK，扩大泄露面。</p>
+    <div class="fix"><b>修复建议：</b>① 取消 query.token 传参方式，统一走 Authorization 头（确有下载等场景需要的话，改为一次性签名 URL）；② 日志记录 url 前对 query 中的 token 字段脱敏。</div>
+  </div>
+
+  <div class="vuln mid">
+    <h3><span class="tag mid">中危</span>6. <code>/temp</code> 静态目录公开暴露 + 临时文件可预测</h3>
+    <div class="loc">backend/server.js:28（app.use('/temp', express.static('temp'))）｜backend/routes/racks.js:704/817</div>
+    <p>/temp 未做任何鉴权即静态暴露。racks 导入的临时文件名为 <code>${Date.now()}_${原始文件名}</code>，时间戳可预测、可枚举；且 racks.js:716-722 解析失败的分支直接 return 400 <b>没有清理临时文件</b>（成功分支有 unlink）。未认证用户可枚举下载残留的导入 Excel（含资产明细数据）。若高危漏洞 1 被利用写入的文件落在可经 URL 到达的位置，也会由此读取。</p>
+    <div class="fix"><b>修复建议：</b>临时文件统一放系统临时目录或 uploads 外的不可路由位置；确需 /temp 时加鉴权中间件；文件名改随机不可预测值；解析失败分支也补 unlink。</div>
+  </div>
+
+  <div class="vuln mid">
+    <h3><span class="tag mid">中危</span>7. 登录无 IP 级限速，账户锁定可被武器化</h3>
+    <div class="loc">backend/routes/auth.js:285-321</div>
+    <p>登录有账户锁定（失败 N 次锁 30 分钟，.env 配 3 次/15 分钟），但没有基于 IP 的速率限制：① 攻击者可<b>故意连续输错密码把任意已知用户名锁死</b>，构成账号级 DoS；② loginCount 的"读取-累加-保存"存在并发竞态，瞬时并发请求可能多搏到几次机会；③ 无法缓解对单一密码的分布式慢速尝试。</p>
+    <div class="fix"><b>修复建议：</b>引入 express-rate-limit，按 IP + 用户名双维度限流（如每 IP 每分钟 10 次登录尝试）；账户锁定增加"仅对密码错误计数、不影响账号正常使用"的降级策略或加验证码。</div>
+  </div>
+
+  <div class="vuln mid">
+    <h3><span class="tag mid">中危</span>8. 错误响应直接回显内部 error.message</h3>
+    <div class="loc">backend/routes/backup.js:545、632 等多处（grep 全库约 30+ 处 <code>error: error.message</code>）</div>
+    <p>大量接口在 catch 中把 <code>error.message</code> 原样返回客户端，可能泄露内部路径、SQL 片段、依赖行为等侦察信息，降低攻击成本。</p>
+    <div class="fix"><b>修复建议：</b>生产环境统一返回"服务器内部错误"通用文案，详细错误只进服务端日志（可按 NODE_ENV 区分）。</div>
+  </div>
+
+  <div class="vuln mid">
+    <h3><span class="tag mid">中危</span>9. axios 1.x 存在 SSRF 与认证绕过 CVE（可小版本修复）</h3>
+    <div class="loc">backend/package.json:48（^1.13.6）、frontend 同（直接依赖）</div>
+    <p>audit 报 axios 1.0.0–1.19.0 两个 high：NO_PROXY 主机名规范化绕过导致 SSRF；validateStatus 合并策略的原型污染可导致认证绕过（错误响应被当作成功）。后端 axios 用于 Redfish 采集等外呼场景，SSRF 面真实存在。</p>
+    <div class="fix"><b>修复建议：</b><code>npm update axios</code> 升至 ≥ 1.19.1（minor 升级，无破坏性变更）。</div>
+  </div>
+
+  <div class="vuln mid">
+    <h3><span class="tag mid">中危</span>10. CORS 全开 + 缺少安全响应头</h3>
+    <div class="loc">backend/server.js:25（app.use(cors())）｜全项目无 helmet</div>
+    <p>cors() 默认允许任意源跨域调用。当前令牌走 Authorization 头且存 sessionStorage（非 cookie），浏览器不会自动携带凭据，<b>实际风险被压低</b>；但全开 CORS 意味着任何网页都可以尝试调用 API，为未来的凭据处理变化埋雷。同时项目没有使用 helmet，缺少 X-Content-Type-Options、X-Frame-Options、CSP 等基础响应头。</p>
+    <div class="fix"><b>修复建议：</b>生产环境配置来源白名单（cors({ origin: [...] })）；引入 helmet 并配置 CSP；静态目录加 <code>X-Content-Type-Options: nosniff</code>。</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>三、低危与观察项（P2）</h2>
+  <table>
+    <tr><th style="width:36px">#</th><th>问题</th><th style="width:300px">位置 / 说明</th></tr>
+    <tr><td>11</td><td><span class="sev l">低</span> 备份恢复可写入任意数据：管理员误上传恶意构造的备份 JSON，恢复逻辑会把用户/角色/权限一并写回数据库（改权限、换密码哈希）。属设计使然，但缺二次确认。</td><td>backend/routes/backup.js（restore/upload）；建议恢复前展示数据 diff 并要求二次确认</td></tr>
+    <tr><td>12</td><td><span class="sev l">低</span> express 4.x qs 拒绝服务（moderate），小版本升级可修复。</td><td>backend/package.json:57；npm update express</td></tr>
+    <tr><td>13</td><td><span class="sev l">低</span> multer 为冗余依赖（代码实际用 express-fileupload），但 audit 命中其 DoS 漏洞，建议直接移除。</td><td>backend/package.json:62</td></tr>
+    <tr><td>14</td><td><span class="sev l">低</span> nodemailer IDN/Punycode 域名绕过（high 但利用需特定邮件路由场景），升级可修复。</td><td>backend/package.json:66；npm update nodemailer</td></tr>
+    <tr><td>15</td><td><span class="sev l">低</span> mysql2 认证插件降级（high，内网可信 MySQL 场景风险有限），升级可修复。</td><td>backend/package.json:63；npm update mysql2</td></tr>
+    <tr><td>16</td><td><span class="sev l">低</span> joi 原型污染 / RangeError（high，输入校验库被深度嵌套输入打爆），升级可修复。</td><td>backend/package.json:60；npm update joi</td></tr>
+    <tr><td>17</td><td><span class="sev l">低</span> basic-ftp CRLF/命令注入（high，仅远程 FTP 备份功能触发，且目标是自有 FTP 服务器）。</td><td>backend/package.json:49；npm update basic-ftp</td></tr>
+    <tr><td>18</td><td><span class="sev l">低</span> SVG 上传白名单：background.js 允许 .svg，SVG 可含脚本；当前用作 CSS 背景不执行脚本，但直接访问 URL 时有 XSS 面。建议移除白名单或静态服务强制 nosniff。</td><td>backend/routes/background.js:74</td></tr>
+    <tr><td>19</td><td><span class="sev l">低</span> 图片上传只校验客户端声明的 MIME，不校验文件魔数；因扩展名固定为图片格式且浏览器按图片解析，实际危害很低，可加 magic bytes 校验增强。</td><td>backend/utils/imageAttachment.js:49、backend/routes/users.js:587</td></tr>
+    <tr><td>20</td><td><span class="sev l">低</span> Swagger 文档公开：/api-docs 与 /api-docs.json 无需认证即可获取完整 API 结构，属于信息暴露。生产可加鉴权或关闭。</td><td>backend/server.js:427-436、485-508</td></tr>
+    <tr><td>21</td><td><span class="sev l">低</span> 凭据加密密钥由 JWT_SECRET 派生且 salt 硬编码：SMTP/远程备份密码用 AES-256-GCM 加密（好），但轮换 JWT_SECRET 会导致历史密文全部无法解密；固定 salt 非最佳实践。</td><td>backend/utils/remoteBackupConfig.js:35、backend/utils/crypto.js:17</td></tr>
+    <tr><td>22</td><td><span class="sev l">低</span> bcryptjs 为纯 JS 实现，SALT_ROUNDS=12 下单次哈希数百毫秒，登录并发高时可能拖慢响应（性能问题，非漏洞）。</td><td>backend/routes/auth.js:53</td></tr>
+    <tr><td>23</td><td><span class="sev l">低</span> 调试脚本 probe-redfish.js 禁用 TLS 证书校验（rejectUnauthorized: false），仅限排查使用，勿进生产链路。</td><td>backend/scripts/probe-redfish.js:69</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>四、依赖漏洞全景（npm audit）</h2>
+  <p><b>backend：819 个依赖，70 个漏洞（2 critical / 54 high / 11 moderate / 3 low）｜frontend：743 个依赖，30 个漏洞（1 critical / 20 high / 8 moderate / 1 low）</b></p>
+  <p>需要特别说明：<b>2 个 critical 中，tar 的严重性是真实的，但它经 sqlite3 的构建链进入，而 sqlite3 仅用于 Jest 内存测试（生产库是 MySQL），不进入运行时</b>；frontend 的 1 个 critical 是 vitest（devDep，仅开发环境）。也就是说 critical 全部不影响生产运行时——真正需要优先处理的是下面这些<b>生产依赖</b>：</p>
+  <table>
+    <tr><th>包</th><th style="width:64px">级别</th><th>问题</th><th style="width:150px">处理方式</th></tr>
+    <tr><td>xlsx (SheetJS)</td><td class="sev h">high ×2</td><td>原型污染 + ReDoS，解析用户上传 Excel</td><td><b>无自动修复，需方案决策</b></td></tr>
+    <tr><td>axios</td><td class="sev h">high</td><td>SSRF + 认证绕过</td><td>npm update（minor）</td></tr>
+    <tr><td>nodemailer</td><td class="sev h">high</td><td>IDN/Punycode 域名绕过</td><td>npm update</td></tr>
+    <tr><td>mysql2</td><td class="sev h">high</td><td>认证插件降级泄露明文凭据</td><td>npm update</td></tr>
+    <tr><td>joi</td><td class="sev h">high</td><td>原型污染 / RangeError</td><td>npm update</td></tr>
+    <tr><td>basic-ftp</td><td class="sev h">high</td><td>CRLF 命令注入</td><td>npm update</td></tr>
+    <tr><td>express</td><td class="sev m">moderate</td><td>qs 拒绝服务</td><td>npm update</td></tr>
+    <tr><td>multer</td><td class="sev h">high</td><td>DoS（实际未使用）</td><td>直接移除依赖</td></tr>
+    <tr><td>react-router-dom</td><td class="sev h">high</td><td>开放重定向 → XSS</td><td>npm update</td></tr>
+  </table>
+  <p>其余 high（jest 生态 30+ 个、vite/vitest/rollup/esbuild/postcss、sqlite3→tar/node-gyp 链、nodemon→chokidar、ws、follow-redirects、ip-address 等）<b>均为 devDep 或构建链依赖，不影响生产运行时</b>，建议排入第二梯队随例行维护升级（其中 vitest 的 critical 需注意：仅当启动 vitest UI 服务时才会被利用）。</p>
+  <div class="note"><b>提示：</b>本机 npm 源为 npmmirror 镜像，其 audit 接口未实现（404），本次扫描已临时切换官方 registry 完成。CI 中如配了镜像源，npm audit 可能静默失效，建议在 CI 中显式指定 <code>--registry=https://registry.npmjs.org</code>。</div>
+</div>
+
+<div class="card">
+  <h2>五、做得好的地方（本次审计确认无问题）</h2>
+  <ul class="good">
+    <li><b>密钥管理干净：</b>.env、remote-backup-configs.json 均在 .gitignore 中，git 未跟踪任何敏感文件；根目录残留的 idc_management.db 也未被提交；JWT_SECRET（88 位）、SMTP_SECRET_KEY 强度充足，生产强制 ≥32 位校验。</li>
+    <li><b>敏感凭据加密存储：</b>设备 BMC 密码、SMTP 密码、远程备份密码均 AES-256-GCM 加密落库/落盘，非明文。</li>
+    <li><b>认证体系完整：</b>JWT 过期校验 + 用户存在性校验 + 账户锁定（3 次/15 分钟）+ 维护模式拦截；密码 bcrypt 哈希（SALT_ROUNDS=12），注册密码最小长度 8 位。</li>
+    <li><b>图片上传防护到位：</b>MIME 白名单、大小限制、随机文件名、目录穿越防护（deleteImageFile 的 startsWith 校验）、background.js 的扩展名白名单 + 路径二次校验，都是范本级实现。</li>
+    <li><b>备份链路有校验：</b>上传备份有扩展名白名单 + JSON 结构校验；下载/删除路径经 resolveBackupPath 统一解析（穿越防护），多处调用。</li>
+    <li><b>无注入面：</b>全部数据库访问走 Sequelize 参数化（原始 query 均为常量 SQL 或脚本内使用）；IP 探测的 spawn 为数组传参无 shell，不存在命令注入；前端无 dangerouslySetInnerHTML。</li>
+    <li><b>前端 token 存储：</b>sessionStorage + PBKDF2(10万次)/AES-GCM 加密，且仅在安全上下文启用，降级路径明确。</li>
+    <li><b>git 工作区健康：</b>当前未提交改动为正常的在途开发（DeviceCredential/redfish 采集相关），无异常文件。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>六、修复优先级建议</h2>
+  <table>
+    <tr><th style="width:70px">优先级</th><th>动作</th><th style="width:120px">预期工作量</th></tr>
+    <tr><td><b>P0</b></td><td>✅ 已完成（2026-10-26）：① 3 处上传路径穿越已修复（path.basename + 严格校验）② xlsx 已防护加固（表头危险键拦截 + 行列限制，彻底换 exceljs 排期中）③ 首用户抢占已收紧（BOOTSTRAP_ADMIN_USERNAME，见 .env.example）</td><td>已交付</td></tr>
+    <tr><td><b>P1</b></td><td>④ maintenance/disable 加鉴权 ⑤ 日志 token 脱敏 ⑥ /temp 收敛 + 临时文件随机名 ⑦ 登录加 IP 限流 ⑧ 生产环境统一错误回显 ⑨ npm update 生产依赖（axios/express/mysql2/nodemailer/joi/basic-ftp）并移除 multer</td><td>1-2 天</td></tr>
+    <tr><td><b>P2</b></td><td>⑩ CORS 白名单 + helmet ⑪ 备份恢复二次确认 ⑫ devDeps 例行升级（jest/vite/vitest 等）⑬ 低危表逐项处理</td><td>例行迭代</td></tr>
+  </table>
+  <p style="margin-top:12px; color:#646a73; font-size:13px;">本报告基于 2026-10-23 的代码快照生成，未做动态测试（无渗透/模糊测试）。修复建议均已给出具体文件与行号，可直接派工。<b>更新（2026-10-26）：P0 三项高危已全部完成修复/加固，后端 303 项测试、前端 lint 与构建验证通过。</b></p>
+</div>
+
+<div class="footer">IDC 设备资产管理系统安全审计 · 2026-10-23 · 只读审计，未改动任何代码</div>
+</div>
+</body>
+</html>

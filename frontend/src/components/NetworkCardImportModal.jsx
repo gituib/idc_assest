@@ -22,6 +22,7 @@ import {
   CloseCircleOutlined,
 } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
+import { readWorkbookSafe, sheetToJsonSafe } from '../utils/xlsxSafe';
 import Papa from 'papaparse';
 import api from '../api';
 import { designTokens } from '../config/theme';
@@ -59,10 +60,13 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
         let parsedData = [];
 
         if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-          const workbook = XLSX.read(data, { type: 'binary' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          parsedData = XLSX.utils.sheet_to_json(worksheet);
+          // 安全解析：工作表规模校验 + 表头危险键校验 + 产出清洗（防御 xlsx CVE）
+          const { worksheet, error } = readWorkbookSafe(data, { type: 'binary' });
+          if (error) {
+            message.error(error);
+            return;
+          }
+          parsedData = sheetToJsonSafe(worksheet);
         } else if (file.name.endsWith('.csv')) {
           parsedData = Papa.parse(data, {
             header: true,
@@ -84,7 +88,7 @@ function NetworkCardImportModal({ visible, onClose, onSuccess }) {
         setImportProgress({ current: 0, total: validatedResult.validData.length });
         if (onSuccess) onSuccess();
       } catch (error) {
-        message.error('文件解析失败');
+        message.error('文件解析失败: ' + (error.message || '未知错误'));
         console.error('文件解析失败:', error);
       }
     };

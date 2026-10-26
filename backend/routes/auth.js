@@ -54,6 +54,18 @@ router.post('/register', async (req, res) => {
 
     const userCount = await User.count();
     const isFirstUser = userCount === 0;
+    // 首用户自动分配管理员的安全收紧：
+    // - 配置 BOOTSTRAP_ADMIN_USERNAME 后，仅该用户名的首次注册可获得管理员，
+    //   防止系统部署后、管理员注册前的窗口期内被他人抢注超级管理员
+    // - 未配置时保持旧行为（首用户即管理员），但输出警告日志提示部署风险
+    const bootstrapAdmin = process.env.BOOTSTRAP_ADMIN_USERNAME || null;
+    const grantAdmin = isFirstUser && (!bootstrapAdmin || username === bootstrapAdmin);
+
+    if (isFirstUser && !grantAdmin) {
+      logger.warn(
+        `首用户注册用户名(${username})未匹配 BOOTSTRAP_ADMIN_USERNAME，已按待审核用户处理，未分配管理员权限`
+      );
+    }
 
     const user = await User.create({
       userId: generateId({ prefix: 'USR' }),
@@ -62,10 +74,10 @@ router.post('/register', async (req, res) => {
       email,
       phone,
       realName: realName || username,
-      status: isFirstUser ? 'active' : 'pending',
+      status: grantAdmin ? 'active' : 'pending',
     });
 
-    if (isFirstUser) {
+    if (grantAdmin) {
       let adminRole = await Role.findOne({ where: { roleCode: 'admin' } });
 
       if (!adminRole) {

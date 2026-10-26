@@ -6,6 +6,7 @@ const Device = require('../models/Device');
 const Room = require('../models/Room');
 const { sequelize } = require('../db');
 const XLSX = require('xlsx');
+const { readWorkbookSafe, readHeaderSafe, sheetToJsonSafe } = require('../utils/xlsxSafe');
 const fs = require('fs');
 const path = require('path');
 const { validateBody, validateQuery } = require('../middleware/validation');
@@ -538,22 +539,17 @@ router.delete('/:rackId', requirePermission('rack:delete'), async (req, res) => 
  * @returns {Object} { jsonData, columnIndexMap, error }
  */
 function parseExcelFile(tempFilePath) {
-  let workbook;
-  try {
-    workbook = XLSX.readFile(tempFilePath);
-  } catch (readError) {
-    return { error: `无法解析Excel文件: ${readError.message}` };
+  // 安全读取工作簿（含工作表规模校验，防御 ReDoS 与资源耗尽）
+  const { worksheet, error: readError } = readWorkbookSafe(tempFilePath);
+  if (readError) {
+    return { error: readError };
   }
 
-  if (!workbook.SheetNames.length) {
-    return { error: 'Excel文件中没有找到工作表' };
+  // 读取第一行作为列头（含危险键名校验，防御原型污染）
+  const { headerRow, error: headerError } = readHeaderSafe(worksheet);
+  if (headerError) {
+    return { error: headerError };
   }
-
-  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-  // 读取第一行作为列头
-  const headerRow =
-    XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 0, limit: 1 })[0] || [];
 
   // 定义列名映射（支持导入模板格式和导出文件格式）
   const columnMapping = {
@@ -582,8 +578,8 @@ function parseExcelFile(tempFilePath) {
     return { error: `缺少必需的列: ${missingColumns.join(', ')}，请使用系统导出的文件或下载导入模板` };
   }
 
-  // 转换为JSON格式
-  const rawData = XLSX.utils.sheet_to_json(worksheet, {
+  // 转换为JSON格式（经安全解析：表头危险键校验 + 产出兜底清洗）
+  const rawData = sheetToJsonSafe(worksheet, {
     header: headerRow.map((h, i) => `col_${i}`),
     range: 1,
     blankrows: false,
@@ -700,8 +696,17 @@ router.post('/import-preview', requirePermission('rack:create'), async (req, res
       fs.mkdirSync(tempDir, { recursive: true });
     }
 
+    // 安全校验：仅接受纯文件名，拒绝包含路径分隔符/.. 的文件名，防止路径穿越写出 temp 目录
+    const safeFileName = path.basename(file.name || '');
+    if (!safeFileName || safeFileName.startsWith('.') || safeFileName !== file.name) {
+      return res.status(400).json({
+        success: false,
+        error: '文件名不合法',
+      });
+    }
+
     // 保存临时文件
-    const tempFilePath = path.join(tempDir, `${Date.now()}_${file.name}`);
+    const tempFilePath = path.join(tempDir, `${Date.now()}_${safeFileName}`);
     try {
       await file.mv(tempFilePath);
     } catch (saveError) {
@@ -813,8 +818,19 @@ router.post('/import', requirePermission('rack:create'), async (req, res) => {
       fs.mkdirSync(tempDir, { recursive: true });
     }
 
+    // 安全校验：仅接受纯文件名，拒绝包含路径分隔符/.. 的文件名，防止路径穿越写出 temp 目录
+    const safeFileName = path.basename(file.name || '');
+    if (!safeFileName || safeFileName.startsWith('.') || safeFileName !== file.name) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: '文件名不合法',
+        error: '文件名不合法',
+      });
+    }
+
     // 保存临时文件
-    const tempFilePath = path.join(tempDir, `${Date.now()}_${file.name}`);
+    const tempFilePath = path.join(tempDir, `${Date.now()}_${safeFileName}`);
     try {
       await file.mv(tempFilePath);
     } catch (saveError) {

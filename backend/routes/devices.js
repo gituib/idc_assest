@@ -184,7 +184,13 @@ router.post('/import-preview', requirePermission('device:create'), async (req, r
       fs.mkdirSync(path.join(__dirname, '../temp'), { recursive: true });
     }
 
-    const filePath = path.join(__dirname, '../temp', `preview_${Date.now()}_${csvFile.name}`);
+    // 安全校验：仅接受纯文件名，拒绝包含路径分隔符/.. 的文件名，防止路径穿越写出 temp 目录
+    const safeFileName = path.basename(csvFile.name || '');
+    if (!safeFileName || safeFileName.startsWith('.') || safeFileName !== csvFile.name) {
+      return res.status(400).json({ error: '文件名不合法' });
+    }
+
+    const filePath = path.join(__dirname, '../temp', `preview_${Date.now()}_${safeFileName}`);
     await csvFile.mv(filePath);
 
     const results = [];

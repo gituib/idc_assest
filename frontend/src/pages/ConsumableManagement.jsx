@@ -72,6 +72,7 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import { readWorkbookSafe, sheetToJsonSafe } from '../utils/xlsxSafe';
 import { motion, AnimatePresence } from 'framer-motion';
 import { designTokens } from '../config/theme';
 import CloseButton from '../components/CloseButton';
@@ -549,9 +550,13 @@ function ConsumableManagement() {
       reader.onload = e => {
         try {
           const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+          // 安全解析：工作表规模校验 + 表头危险键校验 + 产出清洗（防御 xlsx CVE）
+          const { worksheet, error } = readWorkbookSafe(data, { type: 'array' });
+          if (error) {
+            reject(new Error(error));
+            return;
+          }
+          const jsonData = sheetToJsonSafe(worksheet, { header: 1 });
 
           if (jsonData.length < 2) {
             resolve({ data: [], headers: [] });
@@ -737,7 +742,7 @@ function ConsumableManagement() {
           message.success(`成功解析 ${parsedData.length} 条数据`);
         }
       } catch (error) {
-        message.error('文件解析失败，请确保文件格式正确');
+        message.error('文件解析失败: ' + (error.message || '未知错误'));
         console.error('文件解析失败:', error);
       } finally {
         setImporting(false);

@@ -42,6 +42,7 @@ import axios from 'axios';
 import CloseButton from '../components/CloseButton';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
+import { readWorkbookSafe, sheetToJsonSafe } from '../utils/xlsxSafe';
 import {
   inputStyles,
   selectStyles,
@@ -489,10 +490,12 @@ function ConsumableLogs() {
           let logItems = [];
 
           if (importType === 'excel') {
-            const workbook = XLSX.read(e.target.result, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            logItems = XLSX.utils.sheet_to_json(worksheet);
+            // 安全解析：工作表规模校验 + 表头危险键校验 + 产出清洗（防御 xlsx CVE）
+            const { worksheet, error } = readWorkbookSafe(e.target.result, { type: 'array' });
+            if (error) {
+              throw new Error(error);
+            }
+            logItems = sheetToJsonSafe(worksheet);
           } else {
             const text = e.target.result;
             const lines = text.split('\n').filter(line => line.trim());

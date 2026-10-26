@@ -144,10 +144,16 @@ api.interceptors.response.use(
     }
 
     if (error.code === 'ECONNABORTED') {
-      return Promise.reject('请求超时，请稍后重试');
+      // 必须 reject Error 对象：reject 字符串会让调用方的 err.message 变成 undefined，
+      // 导致「无错误信息」的空白页（曾导致 Redfish 采集超时后弹窗空白）
+      const timeoutError = new Error(`请求超时（${Math.round((error.config?.timeout || 0) / 1000)}s），请稍后重试`);
+      timeoutError.code = 'ECONNABORTED';
+      return Promise.reject(timeoutError);
     }
 
-    return Promise.reject('网络错误，请检查网络连接');
+    const networkError = new Error('网络错误，请检查网络连接');
+    networkError.code = 'NETWORK_ERROR';
+    return Promise.reject(networkError);
   }
 );
 

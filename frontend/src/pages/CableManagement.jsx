@@ -47,6 +47,7 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import { readWorkbookSafe, sheetToJsonSafe } from '../utils/xlsxSafe';
 import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
 import { designTokens } from '../config/theme';
@@ -490,10 +491,13 @@ function CableManagement() {
         let parsedData = [];
 
         if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-          const workbook = XLSX.read(data, { type: 'binary' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          parsedData = XLSX.utils.sheet_to_json(worksheet);
+          // 安全解析：工作表规模校验 + 表头危险键校验 + 产出清洗（防御 xlsx CVE）
+          const { worksheet, error } = readWorkbookSafe(data, { type: 'binary' });
+          if (error) {
+            message.error(error);
+            return;
+          }
+          parsedData = sheetToJsonSafe(worksheet);
         } else if (file.name.endsWith('.csv')) {
           Papa.parse(data, {
             header: true,
@@ -511,7 +515,7 @@ function CableManagement() {
         setImportPreview(validatedData);
         setImportProgress({ current: 0, total: validatedData.length });
       } catch (error) {
-        message.error('文件解析失败');
+        message.error('文件解析失败: ' + (error.message || '未知错误'));
         console.error('文件解析失败:', error);
       }
     };
@@ -535,44 +539,45 @@ function CableManagement() {
     }
 
     if (errors.length > 0) {
-      message.warning(`发现 ${errors.length} 条数据错误，已跳过`);
+      // 展示具体错误原因（最多 3 条），避免用户只能看到数量无从排查
+      const detail = errors.slice(0, 3).join('；');
+      message.warning({
+        content: `发现 ${errors.length} 条数据错误，已跳过：${detail}`,
+        duration: 6,
+      });
     }
 
     return validatedData;
   };
 
+  // 校验单行接线数据：失败返回错误字符串，成功返回 null
+  // 注意：不能返回 { valid: true } 之类的对象——调用方用 if (error) 判断，truthy 对象会被误判为错误
   const validateCableRow = async (row, index) => {
-    const errors = [];
-
     if (!row['源设备ID'] || !row['源设备端口']) {
-      return { valid: false, error: `第 ${index + 1} 行：缺少必填字段（源设备ID或源设备端口）` };
+      return `第 ${index + 1} 行：缺少必填字段（源设备ID或源设备端口）`;
     }
 
     const sourceDevice = devices.find(d => d.deviceId === row['源设备ID']);
     if (!sourceDevice) {
-      return { valid: false, error: `第 ${index + 1} 行：源设备不存在` };
+      return `第 ${index + 1} 行：源设备不存在`;
     }
 
     const targetDevice = devices.find(d => d.deviceId === row['目标设备ID']);
     if (!targetDevice) {
-      return { valid: false, error: `第 ${index + 1} 行：目标设备不存在` };
+      return `第 ${index + 1} 行：目标设备不存在`;
     }
 
     const validCableTypeLabels = cableTypes.map(o => o.label);
     if (!validCableTypeLabels.includes(row['线缆类型'])) {
-      return { valid: false, error: `第 ${index + 1} 行：无效的线缆类型` };
+      return `第 ${index + 1} 行：无效的线缆类型`;
     }
 
     const validStatuses = ['正常', '故障', '未连接'];
     if (!validStatuses.includes(row['状态'])) {
-      return { valid: false, error: `第 ${index + 1} 行：无效的状态` };
+      return `第 ${index + 1} 行：无效的状态`;
     }
 
-    if (errors.length > 0) {
-      return { valid: false, error: errors.join('; ') };
-    }
-
-    return { valid: true };
+    return null;
   };
 
   const handleBatchImport = async () => {
@@ -1685,9 +1690,10 @@ function CableManagement() {
           <Upload.Dragger
             name="file"
             accept=".xlsx,.xls,.csv"
-            beforeUpload={() => false}
-            customRequest={({ file, onSuccess }) => {
-              handleFileUpload({ file, onSuccess });
+            beforeUpload={file => {
+              // 阻止 antd 自动上传，改为手动解析（beforeUpload 返回 false 时 customRequest 不会被触发）
+              handleFileUpload({ file });
+              return false;
             }}
             style={{
               borderRadius: designTokens.borderRadius.lg,

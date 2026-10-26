@@ -67,6 +67,7 @@ import {
 import api from '../api';
 import { roomAPI, rackAPI } from '../api/cache';
 import * as XLSX from 'xlsx';
+import { readWorkbookSafe, sheetToJsonSafe } from '../utils/xlsxSafe';
 import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
 import NetworkCardPanel from '../components/NetworkCardPanel';
@@ -1048,20 +1049,23 @@ function PortManagement() {
         let networkCardData = [];
 
         if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-          const workbook = XLSX.read(data, { type: 'binary' });
-          
+          // 安全解析：工作表规模校验 + 表头危险键校验 + 产出清洗（防御 xlsx CVE）
+          const { workbook, worksheet, error } = readWorkbookSafe(data, { type: 'binary' });
+          if (error) {
+            message.error(error);
+            return;
+          }
+
           if (importDeviceType === 'server' && workbook.SheetNames.length >= 2) {
             // 服务器设备：解析两张表格
             const networkCardSheet = workbook.Sheets[workbook.SheetNames[0]];
             const portSheet = workbook.Sheets[workbook.SheetNames[1]];
-            
-            networkCardData = XLSX.utils.sheet_to_json(networkCardSheet);
-            parsedData = XLSX.utils.sheet_to_json(portSheet);
+
+            networkCardData = sheetToJsonSafe(networkCardSheet);
+            parsedData = sheetToJsonSafe(portSheet);
           } else {
             // 其他设备：只解析第一张表格
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            parsedData = XLSX.utils.sheet_to_json(worksheet);
+            parsedData = sheetToJsonSafe(worksheet);
           }
         } else if (file.name.endsWith('.csv')) {
           parsedData = Papa.parse(data, {
@@ -1151,7 +1155,7 @@ function PortManagement() {
         setImportProgress({ current: 0, total: validatedResult.validData.length });
         if (onSuccess) onSuccess();
       } catch (error) {
-        message.error('文件解析失败');
+        message.error('文件解析失败: ' + (error.message || '未知错误'));
         console.error('文件解析失败:', error);
       }
     };
@@ -1357,11 +1361,16 @@ function PortManagement() {
             description: card['描述'] || null,
           }));
           
-          const nicResponse = await api.post('/network-cards/batch', {
-            networkCards: networkCardsData,
-            skipExisting: true,
-            updateExisting: false,
-          });
+          const nicResponse = await api.post(
+            '/network-cards/batch',
+            {
+              networkCards: networkCardsData,
+              skipExisting: true,
+              updateExisting: false,
+            },
+            // 批量导入耗时较长（后端事务+日志），延长超时避免误报失败
+            { timeout: 60000 }
+          );
           
           networkCardImportResult = nicResponse;
           
@@ -1400,11 +1409,16 @@ function PortManagement() {
         }));
       }, 200);
 
-      const response = await api.post('/device-ports/batch', {
-        ports: portsData,
-        skipExisting,
-        updateExisting,
-      });
+      const response = await api.post(
+        '/device-ports/batch',
+        {
+          ports: portsData,
+          skipExisting,
+          updateExisting,
+        },
+        // 批量导入耗时较长（后端事务+日志），延长超时避免误报失败
+        { timeout: 60000 }
+      );
       const { total, success, failed, skipped = 0, updated = 0, errors } = response;
 
       clearInterval(importProgressInterval);
@@ -1448,7 +1462,15 @@ function PortManagement() {
       setImportPreview([]);
     } catch (error) {
       console.error('批量导入失败:', error);
-      message.error('批量导入失败，请检查数据格式');
+      // 超时≠失败：后端事务可能在超时后仍成功提交，避免用户重试造成重复导入
+      if (error.message && error.message.includes('超时')) {
+        message.warning({
+          content: '导入请求超时，数据可能已在后台成功导入，请刷新端口列表核实后再操作，勿立即重试以免重复导入',
+          duration: 8,
+        });
+      } else {
+        message.error('批量导入失败，请检查数据格式');
+      }
     } finally {
       setImporting(false);
       // 确保清除保存的网卡数据
@@ -3246,6 +3268,10 @@ function PortManagement() {
               <Table
                 columns={[
                   { title: '设备SN', dataIndex: '设备SN', key: 'deviceSn', width: 120 },
+                  // 服务器双表导入时展示关联网卡名称，便于核对数据
+                  ...(importDeviceType === 'server'
+                    ? [{ title: '网卡名称', dataIndex: '网卡名称', key: 'nicName', width: 120 }]
+                    : []),
                   { title: '端口名称', dataIndex: '端口名称', key: 'portName', width: 120 },
                   {
                     title: '端口类型',
