@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { Button, Result, Space, Collapse, Typography } from 'antd';
 import { WarningOutlined, ReloadOutlined, HomeOutlined, BugOutlined } from '@ant-design/icons';
+import { report } from '../utils/frontendLogger';
 
 const { Text, Paragraph } = Typography;
 const { Panel } = Collapse;
@@ -26,6 +27,13 @@ class ErrorBoundary extends Component {
     });
 
     console.error('错误边界捕获到错误:', error, errorInfo);
+
+    // 上报渲染错误到后端统一日志
+    report('boundary', {
+      message: error?.message,
+      stack: error?.stack,
+      componentStack: errorInfo?.componentStack,
+    });
 
     if (this.props.onError) {
       this.props.onError(error, errorInfo);

@@ -1,6 +1,6 @@
 {
   "name": "idc-device-management",
-  "version": "2.8.3",
+  "version": "2.8.4",
   "description": "IDC设备管理系统",
   "author": "gituib",
   "license": "GPL-3.0-or-later",
@@ -26,7 +26,8 @@
     "test:backend": "cd backend && npm test",
     "deploy": "node install.js",
     "update": "node update.js",
-    "uninstall": "node uninstall.js"
+    "uninstall": "node uninstall.js",
+    "doctor": "node scripts/incident-doctor.js"
   },
   "keywords": [
     "idc",

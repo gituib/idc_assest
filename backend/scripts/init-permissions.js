@@ -11,6 +11,7 @@
  * 父子关系通过 parentId 关联，对应 permissionCode。
  */
 const Permission = require('../models/Permission');
+const logger = require('../utils/logger');
 
 const permissionsData = [
   // ==============================
@@ -195,17 +196,17 @@ const permissionsData = [
  * @returns {Promise<void>}
  */
 async function initPermissions() {
-  console.log('开始初始化权限数据...');
+  logger.info('开始初始化权限数据...');
   let count = 0;
   for (const perm of permissionsData) {
     try {
       await Permission.upsert(perm);
       count++;
     } catch (error) {
-      console.error(`初始化权限 ${perm.permissionCode} 失败:`, error.message);
+      logger.error(`初始化权限 ${perm.permissionCode} 失败: ${error.message}`);
     }
   }
-  console.log(`权限数据初始化完成，共处理 ${count} 条记录`);
+  logger.info(`权限数据初始化完成，共处理 ${count} 条记录`);
   return count;
 }
 

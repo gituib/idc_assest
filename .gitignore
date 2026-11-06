@@ -115,6 +115,8 @@ backend/config/remote-backup-configs.json
 # ==============================================
 # Misc (其他)
 # ==============================================
+# 事故诊断脚本运行输出
+incidents/
 .trae/
 .trae-html-share-packages/
 .vercel/

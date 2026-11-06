@@ -378,4 +378,14 @@ export const portDiscoveryAPI = {
   apply: (data) => api.post('/port-discovery/apply', data),
 };
 
+/**
+ * 前端错误日志上报 API
+ * 用于将 window.onerror / unhandledrejection / ErrorBoundary 捕获的
+ * 前端错误上报到后端，写入统一日志体系。
+ * 注：实际上报在 frontendLogger.js 中使用原生 fetch（避免 axios 拦截器副作用造成循环上报）。
+ */
+export const frontendLogAPI = {
+  report: (payload) => api.post('/frontend-logs', payload),
+};
+
 export default api;

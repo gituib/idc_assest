@@ -311,10 +311,26 @@ async function initAutoBackupScheduler() {
   }
 }
 
+async function initPermissions() {
+  // 权限种子采用 upsert 幂等写入，新部署或空库启动时自动补齐，
+  // 避免角色管理页权限树无数据；失败不阻断服务启动。
+  try {
+    const { initPermissions: seedPermissions } = require('./scripts/init-permissions');
+    const count = await seedPermissions();
+    logger.info(`权限种子数据初始化完成，共处理 ${count} 条记录`);
+  } catch (error) {
+    logger.error('权限种子数据初始化失败（不影响启动）', {
+      error: error.message,
+      stack: error.stack,
+    });
+  }
+}
+
 async function initializeApp() {
   try {
     await syncDatabase();
     await syncBusinessModels();
+    await initPermissions();
     await initDeviceFields();
     await initTicketFields();
     await initTicketModels();
@@ -349,6 +365,7 @@ const { authMiddleware } = require('./middleware/auth');
 const { maintenanceMiddleware } = require('./middleware/maintenance');
 const loadRoutes = require('./utils/routeLoader');
 const { loadPremiumModule } = require('./premium/premiumLoader');
+const { errorHandlerMiddleware } = require('./utils/errorHandler');
 
 initializeApp()
   .then(() => {
@@ -370,6 +387,7 @@ const PUBLIC_PATHS = [
   '/system-settings/system/info',
   '/port-options',
   '/maintenance',
+  '/frontend-logs',
 ];
 
 const isPublicPath = path => {
@@ -482,5 +500,16 @@ app.get('/health', async (req, res) => {
   const statusCode = health.status === 'error' ? 503 : health.status === 'warning' ? 200 : 200;
   res.status(statusCode).json(health);
 });
+
+// 404 兜底：未匹配任何路由时返回统一 JSON，避免 Express 默认 HTML
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: { code: 'NOT_FOUND', message: '请求的资源不存在' },
+  });
+});
+
+// 统一错误中间件：必须在所有路由之后注册，兜住 next(err) 或抛出的异常
+app.use(errorHandlerMiddleware);
 
 // app.listen 已在 initializeApp().then() 中调用

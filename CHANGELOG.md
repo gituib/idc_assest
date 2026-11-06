@@ -4,6 +4,24 @@
 
 ***
 
+## [2.8.4] - 2026-11-06
+
+### 新增功能
+
+- 前端错误日志上报：新增 frontendLogger 全局捕获（window.onerror / unhandledrejection / ErrorBoundary）并上报后端统一日志，新增 POST /api/frontend-logs 接口
+- 事故诊断脚本：新增 scripts/incident-doctor.js（只读诊断工具，产出事故卡），新增 doctor 命令
+
+### 功能改进
+
+- 权限种子初始化：后端启动时幂等 upsert 补齐权限种子，角色管理页新增加载/错误/空态处理
+- 后端错误处理：新增 /api 404 JSON 兜底与统一错误中间件 errorHandlerMiddleware，替代 Express 默认 HTML
+
+### 其他
+
+- 升级版本至 2.8.4
+
+---
+
 ## [2.8.3] - 2026-10-13
 
 ### 新增功能

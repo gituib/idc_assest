@@ -137,6 +137,10 @@ const routesConfig = [
     file: 'public.js',
     path: '/p',
   },
+  {
+    file: 'frontendLogs.js',
+    path: '/api/frontend-logs',
+  },
 ];
 
 module.exports = routesConfig;

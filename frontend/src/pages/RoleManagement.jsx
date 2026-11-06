@@ -16,6 +16,9 @@ import {
   Row,
   Col,
   Divider,
+  Spin,
+  Alert,
+  Empty,
 } from 'antd';
 import {
   PlusOutlined,
@@ -93,6 +96,8 @@ const getAllKeys = (tree) => {
 const RoleManagement = () => {
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
+  const [permissionsLoading, setPermissionsLoading] = useState(false);
+  const [permissionsError, setPermissionsError] = useState('');
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
   const [modalVisible, setModalVisible] = useState(false);
@@ -119,13 +124,23 @@ const RoleManagement = () => {
   }, [pagination.current, pagination.pageSize, searchText]);
 
   const fetchPermissions = useCallback(async () => {
+    setPermissionsLoading(true);
+    setPermissionsError('');
     try {
       const response = await permissionAPI.list();
       if (response.success) {
-        setPermissions(response.data);
+        setPermissions(Array.isArray(response.data) ? response.data : []);
+      } else {
+        setPermissionsError(response.message || '获取权限列表失败');
+        message.error(response.message || '获取权限列表失败');
       }
     } catch (error) {
       console.error('获取权限列表失败:', error);
+      const tip = error.response?.data?.message || '获取权限列表失败，请检查登录状态或后端服务';
+      setPermissionsError(tip);
+      message.error(tip);
+    } finally {
+      setPermissionsLoading(false);
     }
   }, []);
 
@@ -135,7 +150,7 @@ const RoleManagement = () => {
 
   useEffect(() => {
     fetchPermissions();
-  }, []);
+  }, [fetchPermissions]);
 
   const permissionTree = useMemo(() => {
     const tree = buildPermissionTree(permissions);
@@ -497,18 +512,49 @@ const RoleManagement = () => {
                   <span>系统管理员拥有全部权限，不可修改</span>
                 </div>
               )}
-              <Tree
-                checkable
-                checkedKeys={checkedKeys}
-                onCheck={(keys, info) => {
-                  const checked = Array.isArray(keys) ? keys : keys.checked;
-                  setCheckedKeys(checked);
-                  form.setFieldsValue({ permissions: checked });
-                }}
-                treeData={permissionTree}
-                disabled={editingRole?.roleCode === 'admin'}
-                style={{ fontSize: '13px' }}
-              />
+              {permissionsLoading ? (
+                <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                  <Spin size="small" />
+                  <div style={{ marginTop: 8, fontSize: '12px', color: '#8c8c8c' }}>权限加载中...</div>
+                </div>
+              ) : permissionsError ? (
+                <Alert
+                  type="error"
+                  showIcon
+                  message={permissionsError}
+                  action={
+                    <Button size="small" type="link" onClick={fetchPermissions}>
+                      重试
+                    </Button>
+                  }
+                />
+              ) : permissionTree.length === 0 ? (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={
+                    <span style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                      暂无权限数据，请确认后端已初始化权限种子
+                    </span>
+                  }
+                >
+                  <Button size="small" onClick={fetchPermissions}>
+                    重新加载
+                  </Button>
+                </Empty>
+              ) : (
+                <Tree
+                  checkable
+                  checkedKeys={checkedKeys}
+                  onCheck={(keys, info) => {
+                    const checked = Array.isArray(keys) ? keys : keys.checked;
+                    setCheckedKeys(checked);
+                    form.setFieldsValue({ permissions: checked });
+                  }}
+                  treeData={permissionTree}
+                  disabled={editingRole?.roleCode === 'admin'}
+                  style={{ fontSize: '13px' }}
+                />
+              )}
             </div>
           </Form.Item>
 
