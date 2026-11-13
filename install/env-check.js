@@ -358,7 +358,7 @@ async function checkEnvironment() {
   if (checkNodeVersion()) {
     log.success(`Node.js ${version}`);
   } else {
-    log.error(`Node.js 版本过低 (${version})，需要 >= 14.0.0`);
+    log.error(`Node.js 版本过低 (${version})，需要 >= ${MIN_NODE_VERSION}.0.0`);
 
     if (isLinux) {
       console.log(`  ${ICONS.pointer} ${colors.cyan}1.${colors.reset} 自动升级到 Node.js 20.x`);
