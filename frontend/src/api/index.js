@@ -379,6 +379,18 @@ export const portDiscoveryAPI = {
 };
 
 /**
+ * 服务器硬件清单采集 API（Redfish 带外，走 BMC 管理口）
+ * discover: 连接 BMC 采集硬件清单/网卡/端口，返回差异预览（不落库）
+ * apply:    把差异预览的结果落库（幂等）
+ * 慢接口：Redfish 采集需逐项请求 BMC 几十次，单独放宽超时到 3 分钟
+ */
+const SERVER_DISCOVERY_TIMEOUT = 180000; // 3 分钟
+export const serverDiscoveryAPI = {
+  discover: (data) => api.post('/server-discovery/discover', data, { timeout: SERVER_DISCOVERY_TIMEOUT }),
+  apply: (data) => api.post('/server-discovery/apply', data, { timeout: SERVER_DISCOVERY_TIMEOUT }),
+};
+
+/**
  * 前端错误日志上报 API
  * 用于将 window.onerror / unhandledrejection / ErrorBoundary 捕获的
  * 前端错误上报到后端，写入统一日志体系。

@@ -26,10 +26,10 @@ const DeviceCredential = sequelize.define(
       comment: '关联设备',
     },
     protocol: {
-      type: DataTypes.ENUM('ssh', 'snmp', 'telnet', 'api'),
+      type: DataTypes.ENUM('ssh', 'snmp', 'telnet', 'api', 'redfish'),
       allowNull: false,
       defaultValue: 'ssh',
-      comment: '采集协议（api 为历史预留，不再对外提供）',
+      comment: '采集协议（api 为历史预留，不再对外提供；redfish 为服务器 BMC 带外采集）',
     },
     host: {
       type: DataTypes.STRING,

@@ -751,6 +751,7 @@ const DeviceDetailModal = ({
           <DeviceCredentialSection
             deviceId={device.deviceId}
             deviceName={device.name}
+            deviceType={device.type}
           />
         )}
       </div>

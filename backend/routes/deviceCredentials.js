@@ -27,6 +27,10 @@ function validateCredential(protocol, body) {
   } else if (protocol === 'snmp') {
     if (!body.host) errors.push('host 必填');
     if (!body.community) errors.push('community 必填');
+  } else if (protocol === 'redfish') {
+    if (!body.host) errors.push('host 必填（BMC 管理地址）');
+    if (!body.username) errors.push('username 必填');
+    if (!body.password) errors.push('password 必填');
   } else if (protocol === 'api') {
     if (!body.apiBaseUrl) errors.push('apiBaseUrl 必填');
   }
@@ -71,7 +75,7 @@ router.post('/', authMiddleware, requirePermission('port:edit'), async (req, res
       deviceId,
       protocol,
       host: host || null,
-      port: port || ({ ssh: 22, snmp: 161, telnet: 23 }[protocol] || null),
+      port: port || ({ ssh: 22, snmp: 161, telnet: 23, redfish: 443 }[protocol] || null),
       username: username || null,
       password: password ? encrypt(password) : null,
       community: community ? encrypt(community) : null,
@@ -227,6 +231,22 @@ router.post('/:credentialId/test', authMiddleware, requirePermission('port:view'
     // 解密 + 构造驱动测试
     const { decryptCredential, createDriver } = require('../services/portDiscovery');
     const decrypted = decryptCredential(cred);
+
+    // Redfish：协议级驱动（厂商无关），vendor 由采集时从 BMC 的 Manufacturer 自动识别，
+    // 测试连接直接用 RedfishDriver，不走 SSH 厂商探测。
+    // （若误走 detectVendor，redfish 凭据会被当作 SSH 逐个尝试厂商驱动后
+    //   误报「无法自动识别设备厂商」，而指定 vendor 也不起作用）
+    if (decrypted.protocol === 'redfish') {
+      const RedfishDriver = require('../services/serverDiscovery/drivers/redfish');
+      const driver = new RedfishDriver(decrypted);
+      const result = await driver.test();
+      await cred.update({
+        lastTestedAt: new Date(),
+        testStatus: result.ok ? 'success' : 'failed',
+        testMessage: result.message,
+      });
+      return res.json({ success: result.ok, message: result.message });
+    }
 
     // 若 vendor 为空，尝试自动探测
     let vendor = decrypted.vendor;

@@ -1,6 +1,7 @@
 /**
  * 设备凭据管理面板（嵌入设备详情弹窗的「网络凭据」tab）
- * 负责：列出、新增、编辑、删除、测试指定设备的 SSH/SNMP/API 凭据
+ * 负责：列出、新增、编辑、删除、测试指定设备的采集凭据
+ * 协议按设备类型区分：服务器（server）→ Redfish/SSH/SNMP；网络设备 → SSH/SNMP/Telnet
  * UI：卡片流列表 + 分区式弹窗表单（协议卡片选择器）
  */
 import { useState, useEffect } from 'react';
@@ -9,10 +10,11 @@ import {
   PlusOutlined, EditOutlined, DeleteOutlined, ThunderboltOutlined,
   CloudServerOutlined, LinkOutlined, CheckCircleOutlined, CloseCircleOutlined,
   ReloadOutlined, KeyOutlined, QuestionCircleOutlined, UserOutlined, CrownOutlined,
-  DesktopOutlined,
+  DesktopOutlined, HddOutlined,
 } from '@ant-design/icons';
 import { deviceCredentialAPI } from '../../api';
 import { designTokens } from '../../config/theme';
+import ServerDiscoveryModal from '../ServerDiscoveryModal';
 
 const { colors } = designTokens;
 
@@ -20,10 +22,23 @@ const MONO_FONT = "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospa
 
 /** 协议元信息（图标 / 主题色 / 描述） */
 const PROTOCOL_META = {
+  redfish: { label: 'Redfish', icon: <HddOutlined />, color: '#0ea5e9', bg: '#f0f9ff', desc: 'BMC 带外采集硬件清单与网卡，服务器关机可采', supported: true },
   ssh: { label: 'SSH', icon: <CloudServerOutlined />, color: '#3b82f6', bg: '#eff6ff', desc: '命令行采集，仅执行只读命令', supported: true },
   snmp: { label: 'SNMP', icon: <ThunderboltOutlined />, color: '#8b5cf6', bg: '#f5f3ff', desc: '读取 IF-MIB 标准端口表，厂商通用', supported: true },
   telnet: { label: 'Telnet', icon: <DesktopOutlined />, color: '#10b981', bg: '#ecfdf5', desc: '明文终端方式采集设备信息', supported: true },
 };
+
+/** 各设备类型的可用协议与默认协议 */
+const PROTOCOLS_BY_DEVICE_TYPE = {
+  server: ['redfish', 'ssh', 'snmp'],
+  switch: ['ssh', 'snmp', 'telnet'],
+  router: ['ssh', 'snmp', 'telnet'],
+  storage: ['ssh', 'snmp'],
+  other: ['ssh', 'snmp', 'telnet'],
+};
+const DEFAULT_PROTOCOL_BY_TYPE = { server: 'redfish' };
+/** 各协议默认端口 */
+const PROTOCOL_DEFAULT_PORT = { ssh: 22, snmp: 161, telnet: 23, redfish: 443 };
 
 const VENDOR_OPTIONS = [
   { value: 'huawei', label: '华为' },
@@ -48,11 +63,13 @@ function SectionTitle({ icon, title, extra }) {
   );
 }
 
-/** 协议卡片选择器（受 Form.Item 控制的受控组件） */
-function ProtocolSelector({ value, onChange }) {
+/** 协议卡片选择器（受 Form.Item 控制的受控组件；仅展示传入的协议子集） */
+function ProtocolSelector({ value, onChange, allowedProtocols }) {
+  const entries = Object.entries(PROTOCOL_META)
+    .filter(([key]) => allowedProtocols.includes(key));
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-      {Object.entries(PROTOCOL_META).map(([key, meta]) => {
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${entries.length}, 1fr)`, gap: 10 }}>
+      {entries.map(([key, meta]) => {
         const active = value === key;
         return (
           <div
@@ -97,7 +114,7 @@ function ProtocolSelector({ value, onChange }) {
 /** 凭据卡片（列表单条） */
 function CredentialCard({ cred, testing, onTest, onEdit, onDelete }) {
   const meta = PROTOCOL_META[cred.protocol] || PROTOCOL_META.ssh;
-  const target = `${cred.host || '-'}:${cred.port || ({ ssh: 22, snmp: 161, telnet: 23 }[cred.protocol] || 22)}`;
+  const target = `${cred.host || '-'}:${cred.port || PROTOCOL_DEFAULT_PORT[cred.protocol] || 22}`;
   const identity = cred.protocol === 'snmp'
     ? (cred.community ? '••••••••' : '-')
     : (cred.username || '-');
@@ -184,14 +201,21 @@ function CredentialCard({ cred, testing, onTest, onEdit, onDelete }) {
  * 凭据管理面板（卡片列表 + 新增/编辑弹窗）
  * @param {string} deviceId 当前设备 ID
  * @param {string} deviceName 设备名称（用于表单）
+ * @param {string} deviceType 设备类型（server/switch/router/storage/other），决定可用协议
  */
-export default function DeviceCredentialSection({ deviceId, deviceName }) {
+export default function DeviceCredentialSection({ deviceId, deviceName, deviceType }) {
   const [loading, setLoading] = useState(false);
   const [credentials, setCredentials] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null); // 正在编辑的凭据（带明文）
+  const [editing, setEditing] = useState(null); // 正在编辑的凭据（列表返回的掩码/元数据对象，不含明文）
   const [testingId, setTestingId] = useState(null);
+  const [discoveryOpen, setDiscoveryOpen] = useState(false); // 服务器硬件清单采集弹窗
   const [form] = Form.useForm();
+
+  /** 当前设备类型可用的协议列表与默认协议 */
+  const allowedProtocols = PROTOCOLS_BY_DEVICE_TYPE[deviceType] || PROTOCOLS_BY_DEVICE_TYPE.other;
+  const defaultProtocol = DEFAULT_PROTOCOL_BY_TYPE[deviceType] || 'ssh';
+  const isServer = deviceType === 'server';
 
   /** 加载凭据列表 */
   const loadCredentials = async () => {
@@ -209,34 +233,33 @@ export default function DeviceCredentialSection({ deviceId, deviceName }) {
 
   useEffect(() => { loadCredentials(); }, [deviceId]);
 
-  /** 打开新增弹窗 */
+  /** 打开新增弹窗（默认协议按设备类型：服务器 → Redfish，其余 → SSH） */
   const handleCreate = () => {
     setEditing(null);
     form.resetFields();
-    form.setFieldsValue({ protocol: 'ssh', port: 22, isDefault: false, vendor: 'huawei' });
+    form.setFieldsValue({
+      protocol: defaultProtocol,
+      port: PROTOCOL_DEFAULT_PORT[defaultProtocol],
+      isDefault: false,
+      vendor: isServer ? undefined : 'huawei',
+    });
     setModalOpen(true);
   };
 
-  /** 打开编辑弹窗（需先取到明文） */
-  const handleEdit = async (cred) => {
-    try {
-      const res = await deviceCredentialAPI.getRaw(cred.credentialId);
-      const plain = res.data || res;
-      setEditing(plain);
-      form.setFieldsValue({
-        protocol: plain.protocol,
-        host: plain.host,
-        port: plain.port,
-        username: plain.username,
-        password: '', // 保持为空——用户不输入就不改
-        community: '',
-        vendor: plain.vendor || undefined,
-        isDefault: !!plain.isDefault,
-      });
-      setModalOpen(true);
-    } catch (err) {
-      message.error(err?.response?.data?.message || '无法获取凭据明文');
-    }
+  /** 打开编辑弹窗：直接使用列表返回的掩码/元数据对象，不再调用 /raw 把明文口令拉进前端内存 */
+  const handleEdit = (cred) => {
+    setEditing(cred);
+    form.setFieldsValue({
+      protocol: cred.protocol,
+      host: cred.host,
+      port: cred.port,
+      username: cred.username,
+      password: '', // 保持为空——用户不输入就不改
+      community: '',
+      vendor: cred.vendor || undefined,
+      isDefault: !!cred.isDefault,
+    });
+    setModalOpen(true);
   };
 
   /** 删除凭据 */
@@ -308,8 +331,7 @@ export default function DeviceCredentialSection({ deviceId, deviceName }) {
 
   const protocol = Form.useWatch('protocol', form);
 
-  /** 切换协议时，端口自动改为对应协议默认值（避免 SNMP 带着默认打开时的 22 端口提交） */
-  const PROTOCOL_DEFAULT_PORT = { ssh: 22, snmp: 161, telnet: 23 };
+  /** 切换协议时，端口自动改为对应协议默认值（避免带着上一协议的端口提交） */
   const handleProtocolChange = (changed) => {
     if (changed.protocol !== undefined) {
       form.setFieldsValue({ port: PROTOCOL_DEFAULT_PORT[changed.protocol] });
@@ -327,14 +349,25 @@ export default function DeviceCredentialSection({ deviceId, deviceName }) {
             background: colors.primary.bg, color: colors.primary.main,
           }}><KeyOutlined /></span>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: colors.text.primary }}>网络采集凭据</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: colors.text.primary }}>
+              {isServer ? '服务器采集凭据' : '网络采集凭据'}
+            </div>
             <div style={{ color: colors.text.secondary, fontSize: 12 }}>
-              用于从设备自动采集端口列表，仅执行只读命令
+              {isServer
+                ? '通过 BMC 管理口（Redfish）自动采集硬件清单与网卡，关机可采'
+                : '用于从设备自动采集端口列表，仅执行只读命令'}
               {credentials.length > 0 && ` · 共 ${credentials.length} 条`}
             </div>
           </div>
         </div>
         <Space size="small">
+          {isServer && (
+            <Tooltip title="通过 BMC（Redfish）采集硬件清单与网卡端口">
+              <Button icon={<HddOutlined />} onClick={() => setDiscoveryOpen(true)}>
+                采集硬件清单
+              </Button>
+            </Tooltip>
+          )}
           <Tooltip title="刷新">
             <Button icon={<ReloadOutlined />} onClick={loadCredentials} loading={loading} />
           </Tooltip>
@@ -364,7 +397,9 @@ export default function DeviceCredentialSection({ deviceId, deviceName }) {
             还没有采集凭据
           </div>
           <div style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 18 }}>
-            为「{deviceName || '该设备'}」添加 SSH 凭据后，即可自动采集端口列表
+            {isServer
+              ? `为「${deviceName || '该服务器'}」添加 Redfish 凭据（BMC 管理地址 + 账号），即可自动采集硬件清单`
+              : `为「${deviceName || '该设备'}」添加 SSH 凭据后，即可自动采集端口列表`}
           </div>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>新增第一条凭据</Button>
         </div>
@@ -391,9 +426,27 @@ export default function DeviceCredentialSection({ deviceId, deviceName }) {
       }}>
         <QuestionCircleOutlined style={{ fontSize: 13 }} />
         <span>
-          SSH/Telnet 采集仅执行 <code style={{ padding: '1px 5px', background: 'rgba(255,255,255,.7)', borderRadius: 4 }}>display interface brief</code> 等只读命令；SNMP 采集仅读取 IF-MIB 标准端口表。均不会对设备配置产生任何修改。注意：Telnet 为明文协议，建议仅在隔离管理网内使用。
+          {isServer ? (
+            <>
+              Redfish 走 BMC 管理口（HTTPS 443）只读采集，服务器关机也可采；BMC 均为自签证书，系统会自动放行证书校验。建议为采集创建 BMC 只读账号。
+            </>
+          ) : (
+            <>
+              SSH/Telnet 采集仅执行 <code style={{ padding: '1px 5px', background: 'rgba(255,255,255,.7)', borderRadius: 4 }}>display interface brief</code> 等只读命令；SNMP 采集仅读取 IF-MIB 标准端口表。均不会对设备配置产生任何修改。注意：Telnet 为明文协议，建议仅在隔离管理网内使用。
+            </>
+          )}
         </span>
       </div>
+
+      {/* 服务器硬件清单采集弹窗（Redfish，落库后刷新凭据测试状态） */}
+      {isServer && (
+        <ServerDiscoveryModal
+          open={discoveryOpen}
+          onClose={() => setDiscoveryOpen(false)}
+          deviceId={deviceId}
+          deviceName={deviceName}
+        />
+      )}
 
       {/* 新增 / 编辑弹窗 */}
       <Modal
@@ -422,9 +475,9 @@ export default function DeviceCredentialSection({ deviceId, deviceName }) {
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 4 }} onValuesChange={handleProtocolChange}>
-          {/* 协议选择 */}
+          {/* 协议选择（按设备类型过滤） */}
           <Form.Item name="protocol" rules={[{ required: true, message: '请选择协议' }]}>
-            <ProtocolSelector />
+            <ProtocolSelector allowedProtocols={allowedProtocols} />
           </Form.Item>
 
           {/* 连接目标 */}
@@ -432,22 +485,27 @@ export default function DeviceCredentialSection({ deviceId, deviceName }) {
           <div style={{ display: 'flex', gap: 12 }}>
             <Form.Item
               name="host" style={{ flex: 1, marginBottom: 12 }}
-              label="设备 IP / Hostname"
-              rules={[{ required: true, message: '请输入设备 IP' }]}
+              label={protocol === 'redfish' ? 'BMC 管理地址' : '设备 IP / Hostname'}
+              rules={[{ required: true, message: protocol === 'redfish' ? '请输入 BMC 管理地址' : '请输入设备 IP' }]}
             >
-              <Input placeholder="如 10.0.1.1 或 switch01" />
+              <Input placeholder={protocol === 'redfish' ? '如 10.0.100.1（服务器 BMC 管理口）' : '如 10.0.1.1 或 switch01'} />
             </Form.Item>
             <Form.Item name="port" style={{ width: 110, marginBottom: 12 }} label="端口">
-              <Input type="number" placeholder={protocol === 'ssh' ? '22' : protocol === 'telnet' ? '23' : '161'} />
+              <Input type="number" placeholder={String(PROTOCOL_DEFAULT_PORT[protocol] || '')} />
             </Form.Item>
           </div>
 
           {/* 认证信息 */}
           <SectionTitle icon={<KeyOutlined />} title="认证信息" />
-          {(protocol === 'ssh' || protocol === 'telnet') && (
+          {(protocol === 'ssh' || protocol === 'telnet' || protocol === 'redfish') && (
             <>
-              <Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
-                <Input placeholder="如 admin" prefix={<UserOutlined style={{ color: colors.text.tertiary }} />} />
+              {protocol === 'redfish' && (
+                <div style={{ marginBottom: 10, fontSize: 12, color: colors.text.secondary }}>
+                  使用 BMC 管理账号（iDRAC / iLO / iBMC 登录账号），建议创建只读账号专用于采集
+                </div>
+              )}
+              <Form.Item name="username" label={protocol === 'redfish' ? 'BMC 用户名' : '用户名'} rules={[{ required: true, message: '请输入用户名' }]}>
+                <Input placeholder={protocol === 'redfish' ? '如 root / admin' : '如 admin'} prefix={<UserOutlined style={{ color: colors.text.tertiary }} />} />
               </Form.Item>
               <Form.Item
                 name="password"
@@ -472,11 +530,18 @@ export default function DeviceCredentialSection({ deviceId, deviceName }) {
           {/* 采集选项 */}
           <SectionTitle icon={<ThunderboltOutlined />} title="采集选项" />
           <div style={{ display: 'flex', gap: 12 }}>
-            <Form.Item name="vendor" style={{ flex: 1, marginBottom: 12 }} label="设备厂商">
-              <Select placeholder="不指定则自动识别" allowClear>
-                {VENDOR_OPTIONS.map(o => <Select.Option key={o.value} value={o.value}>{o.label}</Select.Option>)}
-              </Select>
-            </Form.Item>
+            {protocol !== 'redfish' && (
+              <Form.Item name="vendor" style={{ flex: 1, marginBottom: 12 }} label="设备厂商">
+                <Select placeholder="不指定则自动识别" allowClear>
+                  {VENDOR_OPTIONS.map(o => <Select.Option key={o.value} value={o.value}>{o.label}</Select.Option>)}
+                </Select>
+              </Form.Item>
+            )}
+            {protocol === 'redfish' && (
+              <div style={{ flex: 1, marginBottom: 12, fontSize: 12, color: colors.text.secondary, alignSelf: 'center' }}>
+                厂商将自动识别（Redfish Manufacturer 字段），无需指定
+              </div>
+            )}
             <Form.Item name="isDefault" style={{ width: 200, marginBottom: 12 }} label="设为默认凭据" valuePropName="checked">
               <Switch checkedChildren="默认" unCheckedChildren="否" />
             </Form.Item>

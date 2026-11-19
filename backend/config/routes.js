@@ -126,6 +126,10 @@ const routesConfig = [
     path: '/api/port-discovery',
   },
   {
+    file: 'serverDiscovery.js',
+    path: '/api/server-discovery',
+  },
+  {
     file: 'deviceCredentials.js',
     path: '/api/device-credentials',
   },
