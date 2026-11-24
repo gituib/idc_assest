@@ -36,6 +36,7 @@ import api from '../api';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { designTokens } from '../config/theme';
+import { normalizeDateFieldValues } from '../utils/deviceUtils.jsx';
 import CloseButton from '../components/CloseButton';
 
 const PendingDeviceManagement = () => {
@@ -353,7 +354,7 @@ const PendingDeviceManagement = () => {
       });
     }
 
-    form.setFieldsValue(formValues);
+    form.setFieldsValue(normalizeDateFieldValues(formValues, fields));
     setEditModalVisible(true);
   };
 

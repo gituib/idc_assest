@@ -4,6 +4,20 @@
 
 ***
 
+## [2.8.5] - 2026-11-24
+
+### 问题修复
+
+- 设备管理：修复点击编辑设备触发 DatePicker 崩溃（e.isValid is not a function），日期字段回显统一转为 dayjs 对象
+- 设备管理：自定义日期字段提交时格式化为 YYYY-MM-DD，避免回填后写成 ISO 字符串造成数据格式不一致
+- 待上架设备：修复编辑回显时日期字段为字符串导致 DatePicker 渲染报错
+
+### 功能改进
+
+- deviceUtils 新增 normalizeDateFieldValues 工具，按字段配置 fieldType=date 统一转换表单日期值
+
+***
+
 ## [2.8.4] - 2026-11-06
 
 ### 新增功能

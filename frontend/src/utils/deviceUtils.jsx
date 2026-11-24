@@ -6,6 +6,7 @@ import {
   AppstoreOutlined,
   SwapOutlined,
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
 
 export const STATUS_MAP = {
   running: { text: '运行中', color: '#52c41a', badgeColor: 'green' },
@@ -105,6 +106,13 @@ export const prepareDeviceFormData = (values, isEditing) => {
     }
   });
 
+  // 自定义日期字段的值是 dayjs 对象，需格式化为 YYYY-MM-DD 后入库，避免与已有数据格式不一致
+  Object.keys(deviceData.customFields).forEach(key => {
+    if (dayjs.isDayjs(deviceData.customFields[key])) {
+      deviceData.customFields[key] = deviceData.customFields[key].format('YYYY-MM-DD');
+    }
+  });
+
   delete deviceData.roomId;
 
   return deviceData;
@@ -148,4 +156,31 @@ export const getFormInitialValues = (device, racks) => {
   }
 
   return cleanDeviceData;
+};
+
+/**
+ * 将表单值中的日期字段统一转换为 dayjs 对象
+ * antd DatePicker 只接受 dayjs 对象；固定日期字段与自定义日期字段
+ * （customFields 中的值）从接口取回时都是字符串，直接回填会导致
+ * DatePicker 渲染时抛出 "date.isValid is not a function"
+ * @param {Object} values - 待回填的表单值（原地修改）
+ * @param {Array} fields - 字段配置列表，按 fieldType === 'date' 识别日期字段
+ * @returns {Object} 转换后的表单值
+ */
+export const normalizeDateFieldValues = (values, fields = []) => {
+  if (!values || typeof values !== 'object') return values;
+
+  const dateFieldNames = new Set(['purchaseDate', 'warrantyExpiry']);
+  (fields || [])
+    .filter(field => field.fieldType === 'date')
+    .forEach(field => dateFieldNames.add(field.fieldName));
+
+  dateFieldNames.forEach(name => {
+    const value = values[name];
+    if (value === undefined || value === null || value === '' || dayjs.isDayjs(value)) return;
+    const parsed = dayjs(value);
+    values[name] = parsed.isValid() ? parsed : undefined;
+  });
+
+  return values;
 };

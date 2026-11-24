@@ -21,9 +21,8 @@ import {
   ExclamationCircleOutlined,
   PictureOutlined,
 } from '@ant-design/icons';
-import dayjs from 'dayjs';
 import { designTokens } from '../../config/theme';
-import { getFormInitialValues, prepareDeviceFormData } from '../../utils/deviceUtils.jsx';
+import { getFormInitialValues, prepareDeviceFormData, normalizeDateFieldValues } from '../../utils/deviceUtils.jsx';
 import { deviceAPI } from '../../api';
 import ImageUploader from '../common/ImageUploader';
 
@@ -90,12 +89,8 @@ const DeviceFormModal = ({
         // antd setFieldsValue 是合并式更新，不会清除未传入的字段
         form.resetFields();
         const initialValues = getFormInitialValues(editingDevice, racks);
-        if (initialValues.purchaseDate) {
-          initialValues.purchaseDate = dayjs(initialValues.purchaseDate);
-        }
-        if (initialValues.warrantyExpiry) {
-          initialValues.warrantyExpiry = dayjs(initialValues.warrantyExpiry);
-        }
+        // 日期字段（含自定义日期字段）需转为 dayjs，否则 DatePicker 渲染报错
+        normalizeDateFieldValues(initialValues, deviceFields);
         form.setFieldsValue(initialValues);
         setImages(Array.isArray(editingDevice.images) ? editingDevice.images : []);
         setPendingImages([]);
