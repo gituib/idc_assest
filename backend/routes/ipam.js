@@ -72,7 +72,10 @@ function buildSubnetTree(allSubnets, parentId = null) {
     // 先按 ipVersion，再按 startInt 排序（字符串比较 DECIMAL 是对的，因为都是等长数字）
     .sort((a, b) => {
       if (a.ipVersion !== b.ipVersion) return a.ipVersion === 'ipv4' ? -1 : 1;
-      return (a.startInt || '0').localeCompare(b.startInt || '0');
+      // startInt 在 SQLite 下可能以 number 返回，统一转成 BigInt 再比较
+      const av = BigInt(String(a.startInt ?? 0));
+      const bv = BigInt(String(b.startInt ?? 0));
+      return av < bv ? -1 : av > bv ? 1 : 0;
     });
 }
 

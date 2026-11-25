@@ -25,6 +25,7 @@ router.get('/', requirePermission('room:view'), async (req, res) => {
 
     const { count, rows } = await Room.findAndCountAll({
       include: [{ model: Rack, attributes: ['rackId', 'name'] }],
+      distinct: true,
       offset: offset,
       limit: pageSize,
     });
