@@ -1,4 +1,5 @@
 require('dotenv').config();
+const fs = require('fs');
 const path = require('path');
 const { ensureJwtSecret } = require('./initConfig');
 ensureJwtSecret();
@@ -500,6 +501,22 @@ app.get('/health', async (req, res) => {
   const statusCode = health.status === 'error' ? 503 : health.status === 'warning' ? 200 : 200;
   res.status(statusCode).json(health);
 });
+
+// 前端静态托管：单服务部署模式下由后端直接提供前端构建产物（public 目录）
+const frontendDir = path.join(__dirname, 'public');
+if (fs.existsSync(frontendDir)) {
+  app.use(express.static(frontendDir));
+  app.get('*', (req, res, next) => {
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/uploads') ||
+      req.path.startsWith('/temp')
+    ) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDir, 'index.html'));
+  });
+}
 
 // 404 兜底：未匹配任何路由时返回统一 JSON，避免 Express 默认 HTML
 app.use('/api', (req, res) => {
